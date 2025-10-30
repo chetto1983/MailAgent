@@ -1,0 +1,56 @@
+import { IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class ConnectGoogleProviderDto {
+  @ApiProperty({
+    description: 'Email address to connect',
+    example: 'user@gmail.com',
+  })
+  @IsEmail()
+  @IsNotEmpty()
+  email!: string;
+
+  @ApiProperty({
+    description: 'OAuth2 authorization code from Google',
+    example: '4/0AX4XfWh...',
+  })
+  @IsString()
+  @IsNotEmpty()
+  authorizationCode!: string;
+
+  @ApiProperty({
+    description: 'Enable calendar sync',
+    example: true,
+    default: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  supportsCalendar?: boolean = true;
+
+  @ApiProperty({
+    description: 'Enable contacts sync',
+    example: false,
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  supportsContacts?: boolean = false;
+
+  @ApiProperty({
+    description: 'Set as default provider',
+    example: false,
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isDefault?: boolean = false;
+}
+
+export class GoogleOAuthUrlDto {
+  @ApiProperty({
+    description: 'Scopes to request from Google',
+    example: ['email', 'calendar'],
+  })
+  @IsOptional()
+  scopes?: string[];
+}

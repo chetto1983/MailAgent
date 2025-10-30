@@ -1,0 +1,295 @@
+// Prisma schema for MailAgent multi-tenant system
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== TENANT MODEL =====
+model Tenant {
+  id                 String   @id @default(cuid())
+  name               String
+  slug               String   @unique
+  description        String?
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  // Relations
+  users              User[]
+  messages           Message[]
+  emailConfigs       EmailConfig[]
+  providerConfigs    ProviderConfig[]
+  embeddings         Embedding[]
+  auditLogs          AuditLog[]
+
+  @@map("tenants")
+}
+
+// ===== USER MODEL =====
+model User {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  email              String
+  passwordHash       String
+  firstName          String?
+  lastName           String?
+  role               String   @default("user") // "admin", "user", "super-admin"
+  isActive           Boolean  @default(true)
+  isMfaEnabled       Boolean  @default(true)
+  lastLogin          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  // Relations
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  mfaCodes           MfaCode[]
+  sessions           Session[]
+  messages           Message[]
+  auditLogs          AuditLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+// ===== MFA CODE MODEL =====
+model MfaCode {
+  id                 String   @id @default(cuid())
+  userId             String
+  code               String   @unique
+  type               String   @default("email") // "email", "sms"
+  isUsed             Boolean  @default(false)
+  expiresAt          DateTime
+  createdAt          DateTime @default(now())
+
+  // Relations
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, code])
+  @@map("mfa_codes")
+}
+
+// ===== SESSION MODEL =====
+model Session {
+  id                 String   @id @default(cuid())
+  userId             String
+  token              String   @unique
+  expiresAt          DateTime
+  ipAddress          String?
+  userAgent          String?
+  createdAt          DateTime @default(now())
+
+  // Relations
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, token])
+  @@map("sessions")
+}
+
+// ===== PASSWORD RESET TOKEN =====
+model PasswordResetToken {
+  id                 String   @id @default(cuid())
+  userEmail          String
+  token              String   @unique
+  tenantId           String
+  isUsed             Boolean  @default(false)
+  expiresAt          DateTime
+  createdAt          DateTime @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+// ===== PROVIDER CONFIG MODEL (Email + Calendar) =====
+model ProviderConfig {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  userId             String?
+  providerType       String   // "google", "microsoft", "generic"
+  email              String
+  displayName        String?
+
+  // Capabilities (what this provider supports)
+  supportsEmail      Boolean  @default(true)
+  supportsCalendar   Boolean  @default(false)
+  supportsContacts   Boolean  @default(false)
+
+  // OAuth2 tokens (for Google/Microsoft) - Encrypted
+  accessToken        String?
+  refreshToken       String?
+  tokenEncryptionIv  String? // IV for token encryption
+  refreshTokenEncryptionIv String? // IV for refresh token encryption
+  tokenExpiresAt     DateTime?
+
+  // IMAP/SMTP configuration (for generic providers)
+  imapHost           String?
+  imapPort           Int?
+  imapUsername       String?
+  imapPassword       String? // Encrypted
+  imapEncryptionIv   String? // IV for IMAP password
+  imapUseTls         Boolean  @default(true)
+
+  smtpHost           String?
+  smtpPort           Int?
+  smtpUsername       String?
+  smtpPassword       String? // Encrypted
+  smtpEncryptionIv   String? // IV for SMTP password
+  smtpUseTls         Boolean  @default(true)
+
+  // CalDAV/CardDAV configuration (for generic providers)
+  caldavUrl          String?
+  caldavUsername     String?
+  caldavPassword     String? // Encrypted
+  caldavEncryptionIv String? // IV for CalDAV password
+
+  carddavUrl         String?
+  carddavUsername    String?
+  carddavPassword    String? // Encrypted
+  carddavEncryptionIv String? // IV for CardDAV password
+
+  // Metadata
+  metadata           Json?    // Additional provider-specific settings
+  isDefault          Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  lastSyncedAt       DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email, providerType])
+  @@index([tenantId, isDefault])
+  @@index([userId])
+  @@map("provider_configs")
+}
+
+// ===== EMAIL CONFIG MODEL (Backwards compatibility - deprecated) =====
+model EmailConfig {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  userId             String?
+  type               String   // "gmail", "outlook", "imap"
+  email              String
+  displayName        String?
+  accessToken        String? // Encrypted
+  refreshToken       String? // Encrypted
+  encryptionIv       String? // IV for encryption
+  imapPassword       String? // Encrypted (for IMAP)
+  isDefault          Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  lastSyncedAt       DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId, isDefault])
+  @@map("email_configs")
+}
+
+// ===== MESSAGE MODEL =====
+model Message {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  userId             String
+  conversationId     String?
+  role               String   // "user", "assistant"
+  content            String
+  embeddingId        String?
+  isDeleted          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  embedding          Embedding? @relation(fields: [embeddingId], references: [id])
+
+  @@index([tenantId, userId, conversationId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// ===== EMBEDDING MODEL (PGVECTOR) =====
+model Embedding {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  messageId          String?
+  documentName       String?
+  content            String
+  vector             Unsupported("vector")? // pgvector type
+  embeddingModel     String   @default("mistral-embed")
+  metadata           Json?
+  createdAt          DateTime @default(now())
+
+  // Relations
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messages           Message[]
+
+  @@index([tenantId])
+  @@map("embeddings")
+}
+
+// ===== AUDIT LOG MODEL =====
+model AuditLog {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  userId             String?
+  action             String   // "CREATE", "UPDATE", "DELETE"
+  entity             String   // "User", "Message", "EmailConfig"
+  entityId           String
+  changes            Json?
+  ipAddress          String?
+  createdAt          DateTime @default(now())
+
+  // Relations
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user               User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+// ===== JOB QUEUE MODEL (for tracking BullMQ jobs) =====
+model JobQueue {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  jobId              String
+  jobType            String   // "email_sync", "ai_processing", "embedding"
+  status             String   @default("pending") // "pending", "running", "completed", "failed"
+  data               Json
+  result             Json?
+  error              String?
+  retries            Int      @default(0)
+  maxRetries         Int      @default(3)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  completedAt        DateTime?
+
+  @@index([tenantId, status])
+  @@index([createdAt])
+  @@map("job_queue")
+}
+
+// ===== HEALTH CHECK =====
+model HealthCheck {
+  id                 String   @id @default(cuid())
+  service            String   // "database", "redis", "mistral", "email"
+  status             String   @default("up") // "up", "down", "degraded"
+  lastCheckedAt      DateTime @default(now())
+  responseTime       Int?     // milliseconds
+  error              String?
+
+  @@unique([service])
+  @@map("health_checks")
+}

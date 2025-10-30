@@ -1,0 +1,27 @@
+FROM node:24-alpine
+
+ARG WORKER_TYPE=email
+
+WORKDIR /app
+
+# Install openssl, libstdc++ and netcat for Prisma and database checks
+RUN apk add --no-cache openssl libstdc++ netcat-openbsd
+
+COPY package*.json ./
+COPY prisma ./prisma/
+
+RUN npm install --legacy-peer-deps
+
+COPY tsconfig.json .
+COPY src ./src
+
+RUN npm run build
+
+# Copy entrypoint script
+COPY entrypoint.worker.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Start appropriate worker based on WORKER_TYPE
+ENV WORKER_TYPE=${WORKER_TYPE}
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

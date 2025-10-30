@@ -1,0 +1,106 @@
+import { apiClient } from '../api-client';
+
+export interface ProviderConfig {
+  id: string;
+  providerType: 'google' | 'microsoft' | 'generic';
+  email: string;
+  displayName?: string;
+  supportsEmail: boolean;
+  supportsCalendar: boolean;
+  supportsContacts: boolean;
+  isDefault: boolean;
+  isActive: boolean;
+  lastSyncedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OAuthUrlResponse {
+  authUrl: string;
+  state: string;
+}
+
+export interface ConnectGoogleDto {
+  email: string;
+  authorizationCode: string;
+  supportsCalendar?: boolean;
+  supportsContacts?: boolean;
+  isDefault?: boolean;
+}
+
+export interface ConnectMicrosoftDto {
+  email: string;
+  authorizationCode: string;
+  supportsCalendar?: boolean;
+  supportsContacts?: boolean;
+  isDefault?: boolean;
+}
+
+export interface ConnectGenericDto {
+  email: string;
+  displayName?: string;
+  imapHost: string;
+  imapPort?: number;
+  imapUsername: string;
+  imapPassword: string;
+  imapUseTls?: boolean;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUsername?: string;
+  smtpPassword?: string;
+  smtpUseTls?: boolean;
+  caldavUrl?: string;
+  caldavUsername?: string;
+  caldavPassword?: string;
+  carddavUrl?: string;
+  carddavUsername?: string;
+  carddavPassword?: string;
+  supportsCalendar?: boolean;
+  supportsContacts?: boolean;
+  isDefault?: boolean;
+}
+
+export const providersApi = {
+  // Google
+  async getGoogleAuthUrl(scopes?: string[]): Promise<OAuthUrlResponse> {
+    const response = await apiClient.post('/providers/google/auth-url', { scopes });
+    return response.data;
+  },
+
+  async connectGoogle(dto: ConnectGoogleDto): Promise<ProviderConfig> {
+    const response = await apiClient.post('/providers/google/connect', dto);
+    return response.data;
+  },
+
+  // Microsoft
+  async getMicrosoftAuthUrl(scopes?: string[]): Promise<OAuthUrlResponse> {
+    const response = await apiClient.post('/providers/microsoft/auth-url', { scopes });
+    return response.data;
+  },
+
+  async connectMicrosoft(dto: ConnectMicrosoftDto): Promise<ProviderConfig> {
+    const response = await apiClient.post('/providers/microsoft/connect', dto);
+    return response.data;
+  },
+
+  // Generic
+  async connectGeneric(dto: ConnectGenericDto): Promise<ProviderConfig> {
+    const response = await apiClient.post('/providers/generic/connect', dto);
+    return response.data;
+  },
+
+  // Common
+  async getProviders(): Promise<ProviderConfig[]> {
+    const response = await apiClient.get('/providers');
+    return response.data;
+  },
+
+  async getProvider(id: string): Promise<ProviderConfig> {
+    const response = await apiClient.get(`/providers/${id}`);
+    return response.data;
+  },
+
+  async deleteProvider(id: string): Promise<void> {
+    await apiClient.delete(`/providers/${id}`);
+  },
+};

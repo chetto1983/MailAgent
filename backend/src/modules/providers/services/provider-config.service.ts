@@ -1,0 +1,387 @@
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { CryptoService } from '../../../common/services/crypto.service';
+import { GoogleOAuthService } from './google-oauth.service';
+import { MicrosoftOAuthService } from './microsoft-oauth.service';
+import { ImapService } from './imap.service';
+import { CalDavService } from './caldav.service';
+import {
+  ConnectGoogleProviderDto,
+  ConnectMicrosoftProviderDto,
+  ConnectGenericProviderDto,
+} from '../dto';
+
+@Injectable()
+export class ProviderConfigService {
+  private readonly logger = new Logger(ProviderConfigService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly crypto: CryptoService,
+    private readonly googleOAuth: GoogleOAuthService,
+    private readonly microsoftOAuth: MicrosoftOAuthService,
+    private readonly imap: ImapService,
+    private readonly caldav: CalDavService,
+  ) {}
+
+  /**
+   * Connect Google provider (Gmail + Calendar)
+   */
+  async connectGoogleProvider(
+    tenantId: string,
+    userId: string,
+    dto: ConnectGoogleProviderDto,
+  ) {
+    try {
+      // Exchange authorization code for tokens
+      const tokenData = await this.googleOAuth.exchangeCodeForTokens(dto.authorizationCode);
+
+      // Verify the email matches
+      if (tokenData.email !== dto.email) {
+        throw new BadRequestException('Email mismatch. Please use the correct Google account.');
+      }
+
+      // Encrypt tokens
+      const encryptedAccessToken = this.crypto.encrypt(tokenData.accessToken);
+      const encryptedRefreshToken = this.crypto.encrypt(tokenData.refreshToken);
+
+      // Save to database
+      const providerConfig = await this.prisma.providerConfig.upsert({
+        where: {
+          tenantId_email_providerType: {
+            tenantId,
+            email: dto.email,
+            providerType: 'google',
+          },
+        },
+        create: {
+          tenantId,
+          userId,
+          providerType: 'google',
+          email: dto.email,
+          supportsEmail: true,
+          supportsCalendar: dto.supportsCalendar ?? true,
+          supportsContacts: dto.supportsContacts ?? false,
+          accessToken: encryptedAccessToken.encrypted,
+          refreshToken: encryptedRefreshToken.encrypted,
+          tokenEncryptionIv: encryptedAccessToken.iv,
+          refreshTokenEncryptionIv: encryptedRefreshToken.iv,
+          tokenExpiresAt: tokenData.expiresAt,
+          isDefault: dto.isDefault ?? false,
+        },
+        update: {
+          accessToken: encryptedAccessToken.encrypted,
+          refreshToken: encryptedRefreshToken.encrypted,
+          tokenEncryptionIv: encryptedAccessToken.iv,
+          refreshTokenEncryptionIv: encryptedRefreshToken.iv,
+          tokenExpiresAt: tokenData.expiresAt,
+          supportsCalendar: dto.supportsCalendar ?? true,
+          supportsContacts: dto.supportsContacts ?? false,
+          isDefault: dto.isDefault ?? false,
+          isActive: true,
+          lastSyncedAt: new Date(),
+        },
+      });
+
+      this.logger.log(`Google provider connected for ${dto.email}`);
+
+      return this.sanitizeProviderConfig(providerConfig);
+    } catch (error) {
+      this.logger.error('Failed to connect Google provider:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Connect Microsoft provider (Outlook + Graph)
+   */
+  async connectMicrosoftProvider(
+    tenantId: string,
+    userId: string,
+    dto: ConnectMicrosoftProviderDto,
+  ) {
+    try {
+      // Exchange authorization code for tokens
+      const tokenData = await this.microsoftOAuth.exchangeCodeForTokens(dto.authorizationCode);
+
+      // Verify the email matches
+      if (tokenData.email.toLowerCase() !== dto.email.toLowerCase()) {
+        throw new BadRequestException('Email mismatch. Please use the correct Microsoft account.');
+      }
+
+      // Encrypt tokens
+      const encryptedAccessToken = this.crypto.encrypt(tokenData.accessToken);
+      const encryptedRefreshToken = this.crypto.encrypt(tokenData.refreshToken);
+
+      // Save to database
+      const providerConfig = await this.prisma.providerConfig.upsert({
+        where: {
+          tenantId_email_providerType: {
+            tenantId,
+            email: dto.email,
+            providerType: 'microsoft',
+          },
+        },
+        create: {
+          tenantId,
+          userId,
+          providerType: 'microsoft',
+          email: dto.email,
+          supportsEmail: true,
+          supportsCalendar: dto.supportsCalendar ?? true,
+          supportsContacts: dto.supportsContacts ?? false,
+          accessToken: encryptedAccessToken.encrypted,
+          refreshToken: encryptedRefreshToken.encrypted,
+          tokenEncryptionIv: encryptedAccessToken.iv,
+          refreshTokenEncryptionIv: encryptedRefreshToken.iv,
+          tokenExpiresAt: tokenData.expiresAt,
+          isDefault: dto.isDefault ?? false,
+        },
+        update: {
+          accessToken: encryptedAccessToken.encrypted,
+          refreshToken: encryptedRefreshToken.encrypted,
+          tokenEncryptionIv: encryptedAccessToken.iv,
+          refreshTokenEncryptionIv: encryptedRefreshToken.iv,
+          tokenExpiresAt: tokenData.expiresAt,
+          supportsCalendar: dto.supportsCalendar ?? true,
+          supportsContacts: dto.supportsContacts ?? false,
+          isDefault: dto.isDefault ?? false,
+          isActive: true,
+          lastSyncedAt: new Date(),
+        },
+      });
+
+      this.logger.log(`Microsoft provider connected for ${dto.email}`);
+
+      return this.sanitizeProviderConfig(providerConfig);
+    } catch (error) {
+      this.logger.error('Failed to connect Microsoft provider:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Connect generic provider (IMAP/SMTP + CalDAV/CardDAV)
+   */
+  async connectGenericProvider(
+    tenantId: string,
+    userId: string,
+    dto: ConnectGenericProviderDto,
+  ) {
+    try {
+      // Test IMAP connection first
+      const imapConnected = await this.imap.testConnection({
+        host: dto.imapHost,
+        port: dto.imapPort ?? 993,
+        username: dto.imapUsername,
+        password: dto.imapPassword,
+        useTls: dto.imapUseTls ?? true,
+      });
+
+      if (!imapConnected) {
+        throw new BadRequestException('IMAP connection test failed. Please check your credentials.');
+      }
+
+      // Test SMTP if provided
+      let smtpConnected = false;
+      if (dto.smtpHost && dto.smtpUsername && dto.smtpPassword) {
+        smtpConnected = await this.imap.testSmtpConnection({
+          host: dto.smtpHost,
+          port: dto.smtpPort ?? 587,
+          username: dto.smtpUsername,
+          password: dto.smtpPassword,
+          useTls: dto.smtpUseTls ?? true,
+        });
+      }
+
+      // Test CalDAV if provided
+      let caldavConnected = false;
+      if (dto.caldavUrl && dto.caldavUsername && dto.caldavPassword) {
+        caldavConnected = await this.caldav.testCalDavConnection({
+          url: dto.caldavUrl,
+          username: dto.caldavUsername,
+          password: dto.caldavPassword,
+        });
+      }
+
+      // Test CardDAV if provided
+      let carddavConnected = false;
+      if (dto.carddavUrl && dto.carddavUsername && dto.carddavPassword) {
+        carddavConnected = await this.caldav.testCardDavConnection({
+          url: dto.carddavUrl,
+          username: dto.carddavUsername,
+          password: dto.carddavPassword,
+        });
+      }
+
+      // Encrypt all passwords
+      const encryptedImapPassword = this.crypto.encrypt(dto.imapPassword);
+      const encryptedSmtpPassword = dto.smtpPassword
+        ? this.crypto.encrypt(dto.smtpPassword)
+        : null;
+      const encryptedCaldavPassword = dto.caldavPassword
+        ? this.crypto.encrypt(dto.caldavPassword)
+        : null;
+      const encryptedCarddavPassword = dto.carddavPassword
+        ? this.crypto.encrypt(dto.carddavPassword)
+        : null;
+
+      // Save to database
+      const providerConfig = await this.prisma.providerConfig.upsert({
+        where: {
+          tenantId_email_providerType: {
+            tenantId,
+            email: dto.email,
+            providerType: 'generic',
+          },
+        },
+        create: {
+          tenantId,
+          userId,
+          providerType: 'generic',
+          email: dto.email,
+          displayName: dto.displayName,
+          supportsEmail: true,
+          supportsCalendar: caldavConnected,
+          supportsContacts: carddavConnected,
+
+          // IMAP config
+          imapHost: dto.imapHost,
+          imapPort: dto.imapPort ?? 993,
+          imapUsername: dto.imapUsername,
+          imapPassword: encryptedImapPassword.encrypted,
+          imapEncryptionIv: encryptedImapPassword.iv,
+          imapUseTls: dto.imapUseTls ?? true,
+
+          // SMTP config
+          smtpHost: dto.smtpHost,
+          smtpPort: dto.smtpPort ?? 587,
+          smtpUsername: dto.smtpUsername,
+          smtpPassword: encryptedSmtpPassword?.encrypted,
+          smtpEncryptionIv: encryptedSmtpPassword?.iv,
+          smtpUseTls: dto.smtpUseTls ?? true,
+
+          // CalDAV config
+          caldavUrl: dto.caldavUrl,
+          caldavUsername: dto.caldavUsername,
+          caldavPassword: encryptedCaldavPassword?.encrypted,
+          caldavEncryptionIv: encryptedCaldavPassword?.iv,
+
+          // CardDAV config
+          carddavUrl: dto.carddavUrl,
+          carddavUsername: dto.carddavUsername,
+          carddavPassword: encryptedCarddavPassword?.encrypted,
+          carddavEncryptionIv: encryptedCarddavPassword?.iv,
+
+          isDefault: dto.isDefault ?? false,
+        },
+        update: {
+          displayName: dto.displayName,
+          supportsEmail: true,
+          supportsCalendar: caldavConnected,
+          supportsContacts: carddavConnected,
+
+          // IMAP config
+          imapHost: dto.imapHost,
+          imapPort: dto.imapPort ?? 993,
+          imapUsername: dto.imapUsername,
+          imapPassword: encryptedImapPassword.encrypted,
+          imapEncryptionIv: encryptedImapPassword.iv,
+          imapUseTls: dto.imapUseTls ?? true,
+
+          // SMTP config
+          smtpHost: dto.smtpHost,
+          smtpPort: dto.smtpPort ?? 587,
+          smtpUsername: dto.smtpUsername,
+          smtpPassword: encryptedSmtpPassword?.encrypted,
+          smtpEncryptionIv: encryptedSmtpPassword?.iv,
+          smtpUseTls: dto.smtpUseTls ?? true,
+
+          // CalDAV config
+          caldavUrl: dto.caldavUrl,
+          caldavUsername: dto.caldavUsername,
+          caldavPassword: encryptedCaldavPassword?.encrypted,
+          caldavEncryptionIv: encryptedCaldavPassword?.iv,
+
+          // CardDAV config
+          carddavUrl: dto.carddavUrl,
+          carddavUsername: dto.carddavUsername,
+          carddavPassword: encryptedCarddavPassword?.encrypted,
+          carddavEncryptionIv: encryptedCarddavPassword?.iv,
+
+          isDefault: dto.isDefault ?? false,
+          isActive: true,
+          lastSyncedAt: new Date(),
+        },
+      });
+
+      this.logger.log(`Generic provider connected for ${dto.email}`);
+
+      return this.sanitizeProviderConfig(providerConfig);
+    } catch (error) {
+      this.logger.error('Failed to connect generic provider:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all provider configs for a tenant
+   */
+  async getProviderConfigs(tenantId: string) {
+    const configs = await this.prisma.providerConfig.findMany({
+      where: { tenantId, isActive: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return configs.map((config) => this.sanitizeProviderConfig(config));
+  }
+
+  /**
+   * Get a specific provider config
+   */
+  async getProviderConfig(tenantId: string, configId: string) {
+    const config = await this.prisma.providerConfig.findFirst({
+      where: { id: configId, tenantId },
+    });
+
+    if (!config) {
+      throw new NotFoundException('Provider config not found');
+    }
+
+    return this.sanitizeProviderConfig(config);
+  }
+
+  /**
+   * Delete a provider config
+   */
+  async deleteProviderConfig(tenantId: string, configId: string) {
+    await this.prisma.providerConfig.delete({
+      where: { id: configId, tenantId },
+    });
+
+    this.logger.log(`Provider config ${configId} deleted`);
+  }
+
+  /**
+   * Remove sensitive data from provider config before returning
+   */
+  private sanitizeProviderConfig(config: any) {
+    const {
+      accessToken,
+      refreshToken,
+      tokenEncryptionIv,
+      refreshTokenEncryptionIv,
+      imapPassword,
+      imapEncryptionIv,
+      smtpPassword,
+      smtpEncryptionIv,
+      caldavPassword,
+      caldavEncryptionIv,
+      carddavPassword,
+      carddavEncryptionIv,
+      ...sanitized
+    } = config;
+
+    return sanitized;
+  }
+}

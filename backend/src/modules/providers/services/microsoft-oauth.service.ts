@@ -1,0 +1,621 @@
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ConfidentialClientApplication, Configuration, AccountInfo } from '@azure/msal-node';
+import { Client } from '@microsoft/microsoft-graph-client';
+import { getConfiguration } from '../../../config/configuration';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { CryptoService } from '../../../common/services/crypto.service';
+
+@Injectable()
+export class MicrosoftOAuthService {
+  private readonly logger = new Logger(MicrosoftOAuthService.name);
+  private msalClient: ConfidentialClientApplication;
+  private config = getConfiguration();
+  private readonly defaultScopes = [
+    'openid',
+    'profile',
+    'email',
+    'offline_access',
+    'https://graph.microsoft.com/Mail.Read',
+    'https://graph.microsoft.com/Mail.Send',
+    'https://graph.microsoft.com/Calendars.ReadWrite',
+    'https://graph.microsoft.com/Contacts.ReadWrite',
+  ];
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cryptoService: CryptoService,
+  ) {
+    const { clientId, clientSecret, redirectUri } = this.config.oauth.microsoft;
+
+    const msalConfig: Configuration = {
+      auth: {
+        clientId,
+        authority: 'https://login.microsoftonline.com/common',
+        clientSecret,
+      },
+    };
+
+    this.msalClient = new ConfidentialClientApplication(msalConfig);
+  }
+
+  /**
+   * Generate Microsoft OAuth2 authorization URL
+   */
+  generateAuthUrl(scopes?: string[]): { authUrl: string; state: string } {
+    const requestedScopes = scopes && scopes.length > 0 ? scopes : this.defaultScopes;
+
+    // Generate random state for CSRF protection
+    const state = this.generateRandomState();
+
+    const { redirectUri } = this.config.oauth.microsoft;
+
+    const authCodeUrlParameters = {
+      scopes: requestedScopes,
+      redirectUri,
+      state,
+      prompt: 'consent', // Force consent screen to get refresh token
+    };
+
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
+      `client_id=${this.config.oauth.microsoft.clientId}&` +
+      `response_type=code&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `response_mode=query&` +
+      `scope=${encodeURIComponent(requestedScopes.join(' '))}&` +
+      `state=${state}&` +
+      `prompt=consent`;
+
+    return { authUrl, state };
+  }
+
+  /**
+   * Exchange authorization code for tokens
+   */
+  async exchangeCodeForTokens(authorizationCode: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: Date;
+    email: string;
+  }> {
+    try {
+      const { redirectUri } = this.config.oauth.microsoft;
+
+      this.logger.log(`Exchanging authorization code for tokens...`);
+      this.logger.debug(`Redirect URI: ${redirectUri}`);
+      this.logger.debug(`Code length: ${authorizationCode.length}`);
+      this.logger.debug(`Code starts with: ${authorizationCode.substring(0, 20)}...`);
+
+      const tokenRequest = {
+        code: authorizationCode,
+        scopes: this.defaultScopes,
+        redirectUri,
+      };
+
+      this.logger.log(`Calling MSAL acquireTokenByCode...`);
+      const response = await this.msalClient.acquireTokenByCode(tokenRequest);
+      this.logger.log(`MSAL response received`);
+
+      if (!response || !response.accessToken) {
+        throw new UnauthorizedException('Failed to obtain access token');
+      }
+
+      // Validate JWT format
+      const isJwtAccessToken = response.accessToken.includes('.');
+
+      if (!this.validateJWT(response.accessToken, 'new access token')) {
+        this.logger.error('Microsoft returned invalid JWT token');
+        throw new UnauthorizedException('Received invalid token from Microsoft');
+      }
+
+      if (isJwtAccessToken) {
+        this.logger.log(`Access token is valid JWT (${response.accessToken.length} chars)`);
+      } else {
+        this.logger.log(`Access token is opaque (${response.accessToken.length} chars)`);
+      }
+
+      // Microsoft MSAL may not return refresh token in the response object, so try cache fallback
+      let refreshToken = (response as any).refreshToken || '';
+
+      if (!refreshToken) {
+        refreshToken = await this.getRefreshTokenFromCache(response.account);
+        if (refreshToken) {
+          this.logger.log(`Refresh token retrieved from MSAL cache (${refreshToken.length} chars)`);
+        }
+      }
+
+      if (!refreshToken) {
+        this.logger.warn(
+          'Refresh token not available after MSAL exchange. Provider will require re-consent before tokens expire.',
+        );
+      } else if (refreshToken.length < 10) {
+        this.logger.error('Refresh token is too short or invalid');
+        throw new UnauthorizedException('Failed to obtain valid refresh token from Microsoft');
+      } else {
+        this.logger.log(`Refresh token obtained successfully (${refreshToken.length} chars)`);
+      }
+
+      // Get user email from the token or make a Graph API call
+      const email = response.account?.username || '';
+
+      if (!email) {
+        // Fallback: get user info from Graph API
+        const graphClient = this.getGraphClient(response.accessToken);
+        const user = await graphClient.api('/me').select('mail,userPrincipalName').get();
+        const userEmail = user.mail || user.userPrincipalName;
+
+        if (!userEmail) {
+          throw new UnauthorizedException('Failed to retrieve user email');
+        }
+
+        this.logger.log(`Successfully exchanged code for tokens for ${userEmail}`);
+
+        return {
+          accessToken: response.accessToken,
+          refreshToken: refreshToken,
+          expiresAt: response.expiresOn || new Date(Date.now() + 3600 * 1000),
+          email: userEmail,
+        };
+      }
+
+      this.logger.log(`Successfully exchanged code for tokens for ${email}`);
+
+      return {
+        accessToken: response.accessToken,
+        refreshToken: refreshToken,
+        expiresAt: response.expiresOn || new Date(Date.now() + 3600 * 1000),
+        email,
+      };
+    } catch (error) {
+      this.logger.error('Failed to exchange authorization code:', error);
+
+      // Log detailed error information
+      if (error && typeof error === 'object') {
+        this.logger.error('Error details:', JSON.stringify(error, null, 2));
+        if ('errorCode' in error) {
+          this.logger.error(`MSAL Error Code: ${(error as any).errorCode}`);
+        }
+        if ('errorMessage' in error) {
+          this.logger.error(`MSAL Error Message: ${(error as any).errorMessage}`);
+        }
+      }
+
+      throw new UnauthorizedException('Invalid authorization code');
+    }
+  }
+
+  /**
+   * Refresh access token using refresh token
+   */
+  async refreshAccessToken(refreshToken: string): Promise<{
+    accessToken: string;
+    expiresAt: Date;
+    refreshToken?: string;
+  }> {
+    try {
+      const refreshTokenRequest = {
+        refreshToken,
+        scopes: this.defaultScopes,
+      };
+
+      const response = await this.msalClient.acquireTokenByRefreshToken(refreshTokenRequest);
+
+      if (!response || !response.accessToken) {
+        throw new UnauthorizedException('Failed to refresh access token');
+      }
+
+      let updatedRefreshToken = (response as any).refreshToken || '';
+
+      if (!updatedRefreshToken) {
+        updatedRefreshToken = (await this.getRefreshTokenFromCache(response.account)) || '';
+      }
+
+      this.logger.log('Successfully refreshed access token');
+
+      return {
+        accessToken: response.accessToken,
+        expiresAt: response.expiresOn || new Date(Date.now() + 3600 * 1000),
+        refreshToken: updatedRefreshToken || undefined,
+      };
+    } catch (error) {
+      this.logger.error('Failed to refresh access token:', error);
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  /**
+   * Test Outlook/Exchange API connection
+   */
+  async testMailConnection(accessToken: string): Promise<boolean> {
+    try {
+      const graphClient = this.getGraphClient(accessToken);
+
+      // Try to get mail folders
+      await graphClient.api('/me/mailFolders').get();
+
+      this.logger.log('Microsoft Mail API connection test successful');
+      return true;
+    } catch (error) {
+      this.logger.error('Microsoft Mail API connection test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Test Microsoft Calendar API connection
+   */
+  async testCalendarConnection(accessToken: string): Promise<boolean> {
+    try {
+      const graphClient = this.getGraphClient(accessToken);
+
+      // Try to list calendars
+      await graphClient.api('/me/calendars').get();
+
+      this.logger.log('Microsoft Calendar API connection test successful');
+      return true;
+    } catch (error) {
+      this.logger.error('Microsoft Calendar API connection test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Create Graph API client with access token
+   */
+  private getGraphClient(accessToken: string): Client {
+    return Client.init({
+      authProvider: (done) => {
+        done(null, accessToken);
+      },
+    });
+  }
+
+  /**
+   * Retrieve refresh token from MSAL cache for given account
+   */
+  private async getRefreshTokenFromCache(account?: AccountInfo | null): Promise<string | null> {
+    try {
+      const tokenCache = this.msalClient.getTokenCache();
+      const serialized = tokenCache.serialize();
+
+      if (!serialized) {
+        this.logger.debug('MSAL cache serialization returned empty string when searching for refresh token.');
+        return null;
+      }
+
+      const cache = JSON.parse(serialized) as {
+        RefreshToken?: Record<
+          string,
+          { secret?: string; client_id?: string; environment?: string; home_account_id?: string }
+        >;
+      };
+
+      const refreshTokens = cache.RefreshToken;
+
+      if (!refreshTokens) {
+        this.logger.debug('No refresh tokens present in MSAL cache.');
+        return null;
+      }
+
+      const accountEnvironment = account?.environment;
+      const accountHomeId = account?.homeAccountId;
+      const clientId = this.config.oauth.microsoft.clientId;
+
+      const matchingEntry = Object.values(refreshTokens).find((entry) => {
+        if (!entry?.secret) {
+          return false;
+        }
+
+        const clientMatches = entry.client_id === clientId;
+        const environmentMatches = accountEnvironment ? entry.environment === accountEnvironment : true;
+        const homeIdMatches = accountHomeId ? entry.home_account_id === accountHomeId : true;
+
+        return clientMatches && environmentMatches && homeIdMatches;
+      });
+
+      if (matchingEntry?.secret) {
+        return matchingEntry.secret;
+      }
+
+      this.logger.debug('No matching refresh token entry found in MSAL cache.');
+      return null;
+    } catch (error) {
+      this.logger.error('Failed to read refresh token from MSAL cache:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate random state for CSRF protection
+   */
+  private generateRandomState(): string {
+    return Math.random().toString(36).substring(2, 15) +
+           Math.random().toString(36).substring(2, 15);
+  }
+
+  /**
+   * Validate JWT token format
+   */
+  private validateJWT(token: string, tokenType: string): boolean {
+    if (!token) {
+      this.logger.error(`Empty token received for ${tokenType}`);
+      return false;
+    }
+
+    if (!token.includes('.')) {
+      this.logger.debug(`Received ${tokenType} in opaque (non-JWT) format; accepting token as-is.`);
+      this.logger.debug(`Token length: ${token.length}, starts with: ${token.substring(0, 50)}...`);
+      return true;
+    }
+
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      this.logger.error(`Invalid JWT format for ${tokenType}: ${parts.length} parts instead of 3`);
+      this.logger.debug(`Token length: ${token.length}, starts with: ${token.substring(0, 50)}...`);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Get provider config and decrypt tokens
+   */
+  private async getProviderWithTokens(tenantId: string, providerId: string) {
+    const provider = await this.prisma.providerConfig.findFirst({
+      where: { id: providerId, tenantId },
+    });
+
+    if (!provider) {
+      throw new UnauthorizedException('Provider not found');
+    }
+
+    this.logger.debug(`Token expires at: ${provider.tokenExpiresAt}`);
+    this.logger.debug(`Current time: ${new Date()}`);
+
+    // Decrypt access token
+    let accessToken = this.cryptoService.decrypt(
+      provider.accessToken!,
+      provider.tokenEncryptionIv!,
+    );
+
+    this.logger.debug(`Decrypted access token length: ${accessToken.length}`);
+
+    // Validate decrypted token
+    if (!this.validateJWT(accessToken, 'access token')) {
+      this.logger.error('Decrypted access token is not a valid JWT. Provider needs re-authentication.');
+      throw new UnauthorizedException('Invalid token format. Please reconnect this provider.');
+    }
+
+    const needsRefresh =
+      !provider.tokenExpiresAt ||
+      provider.tokenExpiresAt.getTime() <= Date.now() + 60 * 1000;
+
+    this.logger.debug(`Needs refresh: ${needsRefresh}`);
+
+    if (needsRefresh && provider.refreshToken && provider.refreshTokenEncryptionIv) {
+      this.logger.log(`Attempting to refresh Microsoft token for provider ${provider.id}...`);
+
+      try {
+        let refreshToken = this.cryptoService.decrypt(
+          provider.refreshToken,
+          provider.refreshTokenEncryptionIv,
+        );
+
+        this.logger.debug(`Decrypted refresh token length: ${refreshToken.length}`);
+
+        const refreshed = await this.refreshAccessToken(refreshToken);
+        accessToken = refreshed.accessToken;
+
+        this.logger.log(`✅ Token refreshed successfully, new expiry: ${refreshed.expiresAt}`);
+
+        // Validate new token before saving
+        if (!this.validateJWT(accessToken, 'refreshed access token')) {
+          throw new Error('Refreshed token is not a valid JWT');
+        }
+
+        const encryptedAccess = this.cryptoService.encrypt(refreshed.accessToken);
+        const updateData: any = {
+          accessToken: encryptedAccess.encrypted,
+          tokenEncryptionIv: encryptedAccess.iv,
+          tokenExpiresAt: refreshed.expiresAt,
+        };
+
+        if (refreshed.refreshToken && refreshed.refreshToken.length >= 10) {
+          this.logger.log('Microsoft issued a new refresh token. Updating stored credentials.');
+          refreshToken = refreshed.refreshToken;
+          const encryptedRefresh = this.cryptoService.encrypt(refreshToken);
+          updateData.refreshToken = encryptedRefresh.encrypted;
+          updateData.refreshTokenEncryptionIv = encryptedRefresh.iv;
+        } else {
+          this.logger.debug('No new refresh token provided during refresh operation.');
+        }
+
+        await this.prisma.providerConfig.update({
+          where: { id: provider.id },
+          data: updateData,
+        });
+
+        this.logger.log(`Token saved to database successfully`);
+      } catch (error) {
+        this.logger.error(
+          `❌ Failed to refresh Microsoft access token for provider ${provider.id}: ${error instanceof Error ? error.message : error}`,
+        );
+        this.logger.error('Stack trace:', error instanceof Error ? error.stack : '');
+
+        // Re-throw to propagate the error up
+        throw new UnauthorizedException(
+          'Failed to refresh access token. Please reconnect this provider.'
+        );
+      }
+    }
+
+    return { provider, accessToken };
+  }
+
+  /**
+   * Test Microsoft Mail API - List mail folders
+   */
+  async testMailFolders(tenantId: string, providerId: string): Promise<any> {
+    try {
+      const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
+      const graphClient = this.getGraphClient(accessToken);
+
+      const response = await graphClient.api('/me/mailFolders').get();
+
+      this.logger.log(`Retrieved ${response.value?.length || 0} mail folders`);
+
+      return {
+        success: true,
+        folders: response.value?.map((folder: any) => ({
+          id: folder.id,
+          displayName: folder.displayName,
+          totalItemCount: folder.totalItemCount,
+          unreadItemCount: folder.unreadItemCount,
+        })),
+      };
+    } catch (error: any) {
+      this.logger.error('Failed to list mail folders:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Test Microsoft Mail API - List recent messages
+   */
+  async testMailMessages(tenantId: string, providerId: string): Promise<any> {
+    try {
+      const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
+      const graphClient = this.getGraphClient(accessToken);
+
+      const response = await graphClient
+        .api('/me/messages')
+        .top(10)
+        .select('subject,from,receivedDateTime,bodyPreview,isRead')
+        .orderby('receivedDateTime DESC')
+        .get();
+
+      this.logger.log(`Retrieved ${response.value?.length || 0} messages`);
+
+      return {
+        success: true,
+        count: response.value?.length || 0,
+        messages: response.value?.map((msg: any) => ({
+          id: msg.id,
+          subject: msg.subject,
+          from: msg.from?.emailAddress?.address,
+          fromName: msg.from?.emailAddress?.name,
+          receivedDateTime: msg.receivedDateTime,
+          bodyPreview: msg.bodyPreview,
+          isRead: msg.isRead,
+        })),
+      };
+    } catch (error: any) {
+      this.logger.error('Failed to list mail messages:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Test Microsoft Calendar API - List calendars
+   */
+  async testCalendars(tenantId: string, providerId: string): Promise<any> {
+    try {
+      const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
+      const graphClient = this.getGraphClient(accessToken);
+
+      const response = await graphClient.api('/me/calendars').get();
+
+      this.logger.log(`Retrieved ${response.value?.length || 0} calendars`);
+
+      return {
+        success: true,
+        calendars: response.value?.map((cal: any) => ({
+          id: cal.id,
+          name: cal.name,
+          color: cal.color,
+          isDefaultCalendar: cal.isDefaultCalendar,
+          canEdit: cal.canEdit,
+        })),
+      };
+    } catch (error: any) {
+      this.logger.error('Failed to list calendars:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Test Microsoft Calendar API - List upcoming events
+   */
+  async testCalendarEvents(tenantId: string, providerId: string): Promise<any> {
+    try {
+      const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
+      const graphClient = this.getGraphClient(accessToken);
+
+      const startDateTime = new Date().toISOString();
+      const endDateTime = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Next 30 days
+
+      const response = await graphClient
+        .api('/me/calendar/calendarView')
+        .query({
+          startDateTime,
+          endDateTime,
+          $top: 10,
+          $orderby: 'start/dateTime',
+        })
+        .get();
+
+      this.logger.log(`Retrieved ${response.value?.length || 0} upcoming events`);
+
+      return {
+        success: true,
+        events: response.value?.map((event: any) => ({
+          id: event.id,
+          subject: event.subject,
+          start: event.start,
+          end: event.end,
+          location: event.location?.displayName,
+          isAllDay: event.isAllDay,
+          attendees: event.attendees?.map((a: any) => ({
+            email: a.emailAddress?.address,
+            name: a.emailAddress?.name,
+            status: a.status?.response,
+          })),
+        })),
+      };
+    } catch (error: any) {
+      this.logger.error('Failed to list calendar events:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Test Microsoft Contacts API - List contacts
+   */
+  async testContacts(tenantId: string, providerId: string): Promise<any> {
+    try {
+      const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
+      const graphClient = this.getGraphClient(accessToken);
+
+      const response = await graphClient
+        .api('/me/contacts')
+        .top(10)
+        .select('displayName,emailAddresses,mobilePhone,businessPhones')
+        .get();
+
+      this.logger.log(`Retrieved ${response.value?.length || 0} contacts`);
+
+      return {
+        success: true,
+        contacts: response.value?.map((contact: any) => ({
+          id: contact.id,
+          name: contact.displayName,
+          emails: contact.emailAddresses?.map((e: any) => e.address),
+          mobilePhone: contact.mobilePhone,
+          businessPhones: contact.businessPhones,
+        })),
+      };
+    } catch (error: any) {
+      this.logger.error('Failed to list contacts:', error);
+      return { success: false, error: error.message };
+    }
+  }
+}

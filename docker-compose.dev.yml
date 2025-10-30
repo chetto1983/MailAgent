@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: mailagent-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mailuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailpass}
+      POSTGRES_DB: ${POSTGRES_DB:-mailagent}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mailuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mailagent-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: mailagent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mailagent-net
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailagent-mailhog
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    networks:
+      - mailagent-net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  mailagent-net:
+    driver: bridge

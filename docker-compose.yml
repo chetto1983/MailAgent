@@ -1,0 +1,219 @@
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: mailagent-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mailuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailpass}
+      POSTGRES_DB: ${POSTGRES_DB:-mailagent}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mailuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mailagent-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: mailagent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mailagent-net
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailagent-mailhog
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    networks:
+      - mailagent-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mailagent-backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Database (base variables - URL built automatically by configuration.ts)
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-mailuser}
+      DB_PASSWORD: ${DB_PASSWORD:-mailpass}
+      DB_NAME: ${DB_NAME:-mailagent}
+      # Redis (base variables - URL built automatically by configuration.ts)
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      # API
+      API_HOST: ${API_HOST:-backend}
+      API_PORT: ${API_PORT:-3000}
+      # Secrets
+      JWT_SECRET: ${JWT_SECRET}
+      AES_SECRET_KEY: ${AES_SECRET_KEY}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-24h}
+      # External Services
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      MISTRAL_MODEL: ${MISTRAL_MODEL:-mistral-large-latest}
+      # OAuth
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
+      # Email - MailHog for development (see http://localhost:8025)
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply}
+      SMTP_FROM_DOMAIN: ${SMTP_FROM_DOMAIN:-mailagent.local}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - mailagent-net
+
+  email-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+      args:
+        WORKER_TYPE: email
+    container_name: mailagent-email-worker
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Database (base variables)
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-mailuser}
+      DB_PASSWORD: ${DB_PASSWORD:-mailpass}
+      DB_NAME: ${DB_NAME:-mailagent}
+      # Redis (base variables)
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      # Secrets
+      AES_SECRET_KEY: ${AES_SECRET_KEY}
+      # OAuth
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET}
+      # Email - MailHog for development (see http://localhost:8025)
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - mailagent-net
+
+  ai-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+      args:
+        WORKER_TYPE: ai
+    container_name: mailagent-ai-worker
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Database (base variables)
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-mailuser}
+      DB_PASSWORD: ${DB_PASSWORD:-mailpass}
+      DB_NAME: ${DB_NAME:-mailagent}
+      # Redis (base variables)
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      # Secrets
+      AES_SECRET_KEY: ${AES_SECRET_KEY}
+      # External Services
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      MISTRAL_MODEL: ${MISTRAL_MODEL:-mistral-large-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - mailagent-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mailagent-frontend
+    environment:
+      # Client-side code must use localhost (not Docker service name)
+      # The browser will reach backend through port forwarding
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - mailagent-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: mailagent-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - mailagent-net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  mailagent-net:
+    driver: bridge
