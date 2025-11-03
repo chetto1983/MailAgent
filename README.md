@@ -184,6 +184,9 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 - `GET /health/ready` - Readiness probe
 - `GET /health/live` - Liveness probe
 
+### Compliance
+- `GET /compliance/gdpr/status` - GDPR compliance snapshot with outstanding actions
+
 ## OAuth Configuration
 
 ### Gmail (Google Cloud)

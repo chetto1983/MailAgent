@@ -10,6 +10,7 @@ import { HealthModule } from './modules/health/health.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { ProvidersModule } from './modules/providers/providers.module';
 import { EmailSyncModule } from './modules/email-sync/email-sync.module';
+import { ComplianceModule } from './modules/compliance/compliance.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { EmailSyncModule } from './modules/email-sync/email-sync.module';
     AuditModule,
     ProvidersModule,
     EmailSyncModule,
+    ComplianceModule,
   ],
 })
 export class AppModule {}
