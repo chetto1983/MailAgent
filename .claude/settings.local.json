@@ -53,7 +53,8 @@
       "Bash(timeout 5 bash:*)",
       "Bash(timeout 15 bash -c \"npm run start:dev > ../backend-startup.log 2>&1 &\")",
       "Bash(timeout 180 bash -c:*)",
-      "Bash(timeout 240 bash:*)"
+      "Bash(timeout 240 bash:*)",
+      "Bash(timeout 60 bash:*)"
     ],
     "deny": [],
     "ask": []

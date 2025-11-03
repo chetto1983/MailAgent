@@ -91,3 +91,4 @@ frontend/.cache/
 *.key
 *.crt
 .vercel
+.claude/
