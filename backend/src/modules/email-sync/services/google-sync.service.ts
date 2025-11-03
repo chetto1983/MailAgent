@@ -314,6 +314,9 @@ export class GoogleSyncService {
     }
   }
 
+
+
+
   /**
    * Refresh Gmail message metadata when labels change.
    */
@@ -464,7 +467,7 @@ export class GoogleSyncService {
       folder: string;
       isDeleted: boolean;
       labels: string[] | null;
-      metadata: Record<string, any> | null;
+      metadata: any;
     },
     tenantId: string,
   ): Promise<void> {
