@@ -174,6 +174,12 @@ export class ImapSyncService {
         maxUid = Math.max(maxUid, message.uid);
       }
 
+      const reconciled = await this.reconcileDeletedMessages(client, providerId, tenantId);
+      if (reconciled > 0) {
+        messagesProcessed += reconciled;
+        this.logger.debug(`Marked ${reconciled} IMAP messages as deleted or moved.`);
+      }
+
       return {
         messagesProcessed,
         newMessages,
@@ -181,6 +187,132 @@ export class ImapSyncService {
       };
     } finally {
       lock.release();
+    }
+  }
+
+  private async reconcileDeletedMessages(
+    client: ImapFlow,
+    providerId: string,
+    tenantId: string,
+  ): Promise<number> {
+    const WINDOW = 500;
+
+    try {
+      const mailboxStatus = await client.status('INBOX', { messages: true });
+      const totalMessages = mailboxStatus.messages || 0;
+
+      if (totalMessages === 0) {
+        const result = await this.prisma.email.updateMany({
+          where: { providerId, isDeleted: false },
+          data: {
+            isDeleted: true,
+            folder: 'TRASH',
+          },
+        });
+        return result.count;
+      }
+
+      const startSeq = Math.max(1, totalMessages - WINDOW + 1);
+      const range = `${startSeq}:*`;
+
+      const remoteState = new Map<number, Set<string>>();
+      for await (const remote of client.fetch(
+        range,
+        { uid: true, flags: true },
+        { uid: true },
+      )) {
+        remoteState.set(remote.uid, remote.flags ?? new Set());
+      }
+
+      const remoteUidSet = new Set(remoteState.keys());
+      const flaggedForDeletion: string[] = [];
+
+      for (const [uid, flags] of remoteState.entries()) {
+        if (flags && flags.has('\\Deleted')) {
+          flaggedForDeletion.push(uid.toString());
+        }
+      }
+
+      let updates = 0;
+
+      if (flaggedForDeletion.length > 0) {
+        const flaggedEmails = await this.prisma.email.findMany({
+          where: {
+            providerId,
+            externalId: { in: flaggedForDeletion },
+          },
+          select: {
+            id: true,
+            metadata: true,
+          },
+        });
+
+        for (const email of flaggedEmails) {
+          try {
+            await this.prisma.email.update({
+              where: { id: email.id },
+              data: {
+                isDeleted: true,
+                folder: 'TRASH',
+                metadata: this.mergeEmailStatusMetadata(
+                  email.metadata as Record<string, any> | null,
+                  'deleted',
+                ),
+              },
+            });
+            updates += 1;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+              `Failed to update flagged IMAP email ${email.id} as deleted: ${message}`,
+            );
+          }
+        }
+      }
+
+      if (remoteUidSet.size === 0) {
+        return updates;
+      }
+
+      const trackedEmails = await this.prisma.email.findMany({
+        where: { providerId, isDeleted: false },
+        select: { id: true, externalId: true, metadata: true },
+        orderBy: { receivedAt: 'desc' },
+        take: WINDOW,
+      });
+
+      for (const email of trackedEmails) {
+        const uid = parseInt(email.externalId, 10);
+        if (!Number.isFinite(uid) || remoteUidSet.has(uid)) {
+          continue;
+        }
+
+        try {
+          await this.prisma.email.update({
+            where: { id: email.id },
+            data: {
+              isDeleted: true,
+              folder: 'TRASH',
+              metadata: this.mergeEmailStatusMetadata(
+                email.metadata as Record<string, any> | null,
+                'deleted',
+              ),
+            },
+          });
+          updates += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Failed to mark IMAP email ${email.id} as deleted: ${message}`);
+        }
+      }
+
+      return updates;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to reconcile IMAP deletions for provider ${providerId} (tenant ${tenantId}): ${message}`,
+      );
+      return 0;
     }
   }
 
@@ -312,6 +444,8 @@ export class ImapSyncService {
       const flags = message.flags || new Set();
       const isRead = flags.has('\\Seen');
       const isStarred = flags.has('\\Flagged');
+      const isDeleted = flags.has('\\Deleted');
+      const folder = isDeleted ? 'TRASH' : 'INBOX';
 
       // Save to database with upsert to prevent duplicates
       const emailRecord = await this.prisma.email.upsert({
@@ -337,10 +471,11 @@ export class ImapSyncService {
           bodyText,
           bodyHtml,
           snippet,
-          folder: 'INBOX',
+          folder,
           labels: [],
           isRead,
           isStarred,
+          isDeleted,
           sentAt,
           receivedAt,
           size: message.size || null,
@@ -348,11 +483,14 @@ export class ImapSyncService {
             uid: message.uid,
             flags: Array.from(flags),
           } as Record<string, any>,
+          metadata: this.mergeEmailStatusMetadata(null, isDeleted ? 'deleted' : 'active'),
         },
         update: {
           // Update flags in case they changed
           isRead,
           isStarred,
+          isDeleted,
+          folder,
           headers: {
             uid: message.uid,
             flags: Array.from(flags),
@@ -425,6 +563,25 @@ export class ImapSyncService {
       this.logger.warn(`Could not download body for UID ${uid}: ${msg}`);
       return null;
     }
+  }
+
+  private mergeEmailStatusMetadata(
+    existing: Record<string, any> | null | undefined,
+    status: 'deleted' | 'active',
+  ): Record<string, any> {
+    const metadata = { ...(existing ?? {}) };
+
+    metadata.status = status;
+
+    if (status === 'deleted') {
+      if (!metadata.deletedAt) {
+        metadata.deletedAt = new Date().toISOString();
+      }
+    } else if (metadata.deletedAt) {
+      delete metadata.deletedAt;
+    }
+
+    return metadata;
   }
 
   private stripHtml(html: string): string {

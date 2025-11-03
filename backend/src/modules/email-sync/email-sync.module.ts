@@ -11,6 +11,7 @@ import { SyncSchedulerService } from './services/sync-scheduler.service';
 import { GoogleSyncService } from './services/google-sync.service';
 import { MicrosoftSyncService } from './services/microsoft-sync.service';
 import { ImapSyncService } from './services/imap-sync.service';
+import { EmailEmbeddingCleanupService } from './services/email-embedding-cleanup.service';
 
 // Workers
 import { SyncWorker } from './workers/sync.worker';
@@ -38,6 +39,7 @@ import { EmailSyncController } from './email-sync.controller';
     GoogleSyncService,
     MicrosoftSyncService,
     ImapSyncService,
+    EmailEmbeddingCleanupService,
 
     // Workers
     SyncWorker,

@@ -6,6 +6,7 @@ import { GoogleOAuthService } from '../../providers/services/google-oauth.servic
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
+import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 
 @Injectable()
 export class GoogleSyncService {
@@ -17,6 +18,7 @@ export class GoogleSyncService {
     private googleOAuth: GoogleOAuthService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
+    private knowledgeBaseService: KnowledgeBaseService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -162,11 +164,10 @@ export class GoogleSyncService {
     this.logger.debug(`Incremental sync from historyId: ${startHistoryId}`);
 
     try {
-      // Get profile to get current historyId
+      // Get profile to obtain the latest historyId
       const profile = await gmail.users.getProfile({ userId: 'me' });
       const currentHistoryId = profile.data.historyId!;
 
-      // If no changes since last sync
       if (currentHistoryId === startHistoryId) {
         return {
           messagesProcessed: 0,
@@ -175,35 +176,80 @@ export class GoogleSyncService {
         };
       }
 
-      // Get history changes
-      const historyResponse = await gmail.users.history.list({
-        userId: 'me',
-        startHistoryId,
-        historyTypes: ['messageAdded', 'messageDeleted'],
-      });
-
-      const history = historyResponse.data.history || [];
-
       let messagesProcessed = 0;
       let newMessages = 0;
+      let pageToken: string | undefined;
+      let pagesFetched = 0;
+      const MAX_PAGES = 25;
 
-      for (const record of history) {
-        // Process new messages
-        if (record.messagesAdded) {
-          for (const added of record.messagesAdded) {
-            await this.processMessage(gmail, added.message!.id!, providerId, tenantId);
-            messagesProcessed++;
-            newMessages++;
+      do {
+        const historyResponse = await gmail.users.history.list({
+          userId: 'me',
+          startHistoryId,
+          pageToken,
+          historyTypes: ['messageAdded', 'messageDeleted', 'labelsAdded', 'labelsRemoved'],
+          maxResults: 500,
+        });
+
+        const history = historyResponse.data.history || [];
+
+        for (const record of history) {
+          if (record.messagesAdded) {
+            for (const added of record.messagesAdded) {
+              const messageId = added.message?.id;
+              if (!messageId) {
+                continue;
+              }
+              const processed = await this.processMessage(gmail, messageId, providerId, tenantId);
+              if (processed) {
+                messagesProcessed++;
+                newMessages++;
+              }
+            }
+          }
+
+          if (record.labelsAdded) {
+            for (const labelChange of record.labelsAdded) {
+              const messageId = labelChange.message?.id;
+              if (!messageId) {
+                continue;
+              }
+              await this.refreshMessageMetadata(gmail, messageId, providerId, tenantId);
+              messagesProcessed++;
+            }
+          }
+
+          if (record.labelsRemoved) {
+            for (const labelChange of record.labelsRemoved) {
+              const messageId = labelChange.message?.id;
+              if (!messageId) {
+                continue;
+              }
+              await this.refreshMessageMetadata(gmail, messageId, providerId, tenantId);
+              messagesProcessed++;
+            }
+          }
+
+          if (record.messagesDeleted) {
+            for (const deleted of record.messagesDeleted) {
+              const messageId = deleted.message?.id;
+              if (!messageId) {
+                continue;
+              }
+              await this.handleMessageDeletion(gmail, messageId, providerId, tenantId);
+              messagesProcessed++;
+            }
           }
         }
 
-        // Handle deleted messages
-        if (record.messagesDeleted) {
-          for (const deleted of record.messagesDeleted) {
-            // TODO: Mark message as deleted in database
-            messagesProcessed++;
-          }
-        }
+        pageToken = historyResponse.data.nextPageToken ?? undefined;
+        pagesFetched += 1;
+      } while (pageToken && pagesFetched < MAX_PAGES);
+
+      if (pageToken) {
+        this.logger.warn(
+          `Gmail history pagination truncated after ${pagesFetched} pages for provider ${providerId}.`,
+        );
       }
 
       return {
@@ -269,7 +315,293 @@ export class GoogleSyncService {
   }
 
   /**
-   * Process a single Gmail message
+   * Refresh Gmail message metadata when labels change.
+   */
+  private async refreshMessageMetadata(
+    gmail: gmail_v1.Gmail,
+    messageId: string,
+    providerId: string,
+    tenantId: string,
+  ): Promise<void> {
+    const existing = await this.prisma.email.findUnique({
+      where: {
+        providerId_externalId: {
+          providerId,
+          externalId: messageId,
+        },
+      },
+      select: {
+        id: true,
+        folder: true,
+        isDeleted: true,
+        labels: true,
+        metadata: true,
+      },
+    });
+
+    if (!existing) {
+      return;
+    }
+
+    try {
+      const response = await gmail.users.messages.get({
+        userId: 'me',
+        id: messageId,
+        format: 'metadata',
+      });
+
+      const labelIds = response.data.labelIds ?? [];
+      const folder = this.determineFolderFromLabels(labelIds, existing.folder);
+      const isDeleted = labelIds.includes('TRASH');
+      const isRead = !labelIds.includes('UNREAD');
+      const isStarred = labelIds.includes('STARRED');
+      const metadata = this.mergeEmailStatusMetadata(
+        existing.metadata as Record<string, any> | null,
+        isDeleted ? 'deleted' : 'active',
+      );
+
+      try {
+        await this.prisma.email.update({
+          where: { id: existing.id },
+          data: {
+            labels: labelIds,
+            folder,
+            isDeleted,
+            isRead,
+            isStarred,
+            metadata,
+          },
+        });
+      } catch (updateError) {
+        const message = updateError instanceof Error ? updateError.message : String(updateError);
+        this.logger.warn(
+          `Failed to update Gmail message ${messageId} after label change: ${message}`,
+        );
+      }
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        await this.enforceTrashState(existing, tenantId);
+      } else {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to refresh Gmail message ${messageId}: ${message}`);
+      }
+    }
+  }
+
+  private async handleMessageDeletion(
+    gmail: gmail_v1.Gmail,
+    messageId: string,
+    providerId: string,
+    tenantId: string,
+  ): Promise<void> {
+    const existing = await this.prisma.email.findUnique({
+      where: {
+        providerId_externalId: {
+          providerId,
+          externalId: messageId,
+        },
+      },
+      select: {
+        id: true,
+        folder: true,
+        isDeleted: true,
+        labels: true,
+        metadata: true,
+      },
+    });
+
+    if (!existing) {
+      return;
+    }
+
+    try {
+      const response = await gmail.users.messages.get({
+        userId: 'me',
+        id: messageId,
+        format: 'metadata',
+      });
+
+      const labelIds = response.data.labelIds ?? [];
+      const labelsWithTrash = Array.from(new Set([...labelIds, 'TRASH']));
+      const isRead = !labelsWithTrash.includes('UNREAD');
+      const isStarred = labelsWithTrash.includes('STARRED');
+      const metadata = this.mergeEmailStatusMetadata(
+        existing.metadata as Record<string, any> | null,
+        'deleted',
+      );
+
+      try {
+        await this.prisma.email.update({
+          where: { id: existing.id },
+          data: {
+            labels: labelsWithTrash,
+            folder: 'TRASH',
+            isDeleted: true,
+            isRead,
+            isStarred,
+            metadata,
+          },
+        });
+      } catch (updateError) {
+        const message = updateError instanceof Error ? updateError.message : String(updateError);
+        this.logger.warn(
+          `Failed to mark Gmail message ${messageId} as deleted: ${message}`,
+        );
+      }
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        await this.enforceTrashState(existing, tenantId);
+      } else {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Error while handling Gmail deletion for ${messageId}: ${message}`);
+      }
+    }
+  }
+
+  private async enforceTrashState(
+    existing: {
+      id: string;
+      folder: string;
+      isDeleted: boolean;
+      labels: string[] | null;
+      metadata: Record<string, any> | null;
+    },
+    tenantId: string,
+  ): Promise<void> {
+    const currentLabels = Array.isArray(existing.labels) ? existing.labels : [];
+
+    if (existing.folder === 'TRASH' || existing.isDeleted) {
+      await this.removeEmailPermanently(existing.id, tenantId);
+      return;
+    }
+
+    const updatedLabels = currentLabels.includes('TRASH')
+      ? currentLabels
+      : [...currentLabels, 'TRASH'];
+    const metadata = this.mergeEmailStatusMetadata(existing.metadata, 'deleted');
+
+    try {
+      await this.prisma.email.update({
+        where: { id: existing.id },
+        data: {
+          isDeleted: true,
+          folder: 'TRASH',
+          labels: updatedLabels,
+          metadata,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to soft-delete Gmail message ${existing.id} locally: ${message}`,
+      );
+    }
+  }
+
+  private async removeEmailPermanently(emailId: string, tenantId: string): Promise<void> {
+    try {
+      await this.knowledgeBaseService.deleteEmbeddingsForEmail(tenantId, emailId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to delete embeddings for email ${emailId} during hard-delete: ${message}`,
+      );
+    }
+
+    try {
+      await this.prisma.email.delete({
+        where: { id: emailId },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to remove email ${emailId} from database: ${message}`);
+    }
+  }
+
+  private determineFolderFromLabels(labelIds?: string[], fallback?: string): string {
+    if (!labelIds || labelIds.length === 0) {
+      return fallback ?? 'INBOX';
+    }
+
+    if (labelIds.includes('TRASH')) {
+      return 'TRASH';
+    }
+
+    if (labelIds.includes('SPAM')) {
+      return 'SPAM';
+    }
+
+    if (labelIds.includes('SENT')) {
+      return 'SENT';
+    }
+
+    if (labelIds.includes('DRAFT') || labelIds.includes('DRAFTS')) {
+      return 'DRAFTS';
+    }
+
+    if (labelIds.includes('INBOX')) {
+      return 'INBOX';
+    }
+
+    const categoryLabel = labelIds.find((label) => label.startsWith('CATEGORY_'));
+    if (categoryLabel) {
+      switch (categoryLabel) {
+        case 'CATEGORY_PERSONAL':
+          return 'INBOX';
+        case 'CATEGORY_SOCIAL':
+          return 'SOCIAL';
+        case 'CATEGORY_PROMOTIONS':
+          return 'PROMOTIONS';
+        case 'CATEGORY_UPDATES':
+          return 'UPDATES';
+        case 'CATEGORY_FORUMS':
+          return 'FORUMS';
+        default:
+          break;
+      }
+    }
+
+    return fallback ?? 'INBOX';
+  }
+
+  private mergeEmailStatusMetadata(
+    existing: Record<string, any> | null | undefined,
+    status: 'deleted' | 'active',
+  ): Record<string, any> {
+    const metadata = { ...(existing ?? {}) };
+
+    metadata.status = status;
+
+    if (status === 'deleted') {
+      if (!metadata.deletedAt) {
+        metadata.deletedAt = new Date().toISOString();
+      }
+    } else if (metadata.deletedAt) {
+      delete metadata.deletedAt;
+    }
+
+    return metadata;
+  }
+
+  private isNotFoundError(error: unknown): boolean {
+    if (!error) {
+      return false;
+    }
+
+    const anyError = error as any;
+
+    const status =
+      anyError?.status ??
+      anyError?.statusCode ??
+      anyError?.code ??
+      anyError?.response?.status ??
+      anyError?.response?.statusCode;
+
+    return status === 404;
+  }
+
+  /**
+   * Process a single Gmail message and persist it locally.
    */
   private async processMessage(
     gmail: gmail_v1.Gmail,
@@ -323,6 +655,12 @@ export class GoogleSyncService {
       // Parse date
       const sentAt = dateStr ? new Date(dateStr) : new Date(message.internalDate ? parseInt(message.internalDate) : Date.now());
 
+      const labelIds = message.labelIds ?? [];
+      const folder = this.determineFolderFromLabels(labelIds);
+      const isRead = !labelIds.includes('UNREAD');
+      const isStarred = labelIds.includes('STARRED');
+      const isDeleted = labelIds.includes('TRASH');
+
       // Check if email already exists (upsert)
       const emailRecord = await this.prisma.email.upsert({
         where: {
@@ -347,20 +685,24 @@ export class GoogleSyncService {
           bodyText,
           bodyHtml,
           snippet,
-          folder: message.labelIds?.includes('SENT') ? 'SENT' : 'INBOX',
-          labels: message.labelIds || [],
-          isRead: !message.labelIds?.includes('UNREAD'),
-          isStarred: message.labelIds?.includes('STARRED'),
+          folder,
+          labels: labelIds,
+          isRead,
+          isStarred,
+          isDeleted,
           sentAt,
           receivedAt: new Date(parseInt(message.internalDate || Date.now().toString())),
           size: message.sizeEstimate,
           headers: headers.reduce((acc, h) => ({ ...acc, [h.name || '']: h.value }), {} as Record<string, any>),
+          metadata: this.mergeEmailStatusMetadata(null, isDeleted ? 'deleted' : 'active'),
         },
         update: {
           // Update flags and labels in case they changed
-          labels: message.labelIds || [],
-          isRead: !message.labelIds?.includes('UNREAD'),
-          isStarred: message.labelIds?.includes('STARRED'),
+          labels: labelIds,
+          folder,
+          isRead,
+          isStarred,
+          isDeleted,
         },
       });
 
