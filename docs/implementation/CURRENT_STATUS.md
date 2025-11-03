@@ -32,6 +32,15 @@
 - **Created:** Startup scripts for Windows (`*.bat`) and Unix (`*.sh`)
 - **Created:** Comprehensive development guide (`LOCAL_DEV_SETUP.md`)
 
+### 6. Email Embedding Pipeline Stabilized
+- **Moved:** All `createEmbeddingForEmail` calls behind `EmailEmbeddingQueueService` so sync jobs only enqueue work
+- **Added:** BullMQ limiter (`max: 6`, `duration: 1000`) with concurrency 1 to respect Mistral’s 6 req/s ceiling
+- **Enhanced:** Automatic exponential backoff for HTTP 429 with capped delay (30s) and status tracking via `job.updateProgress`
+- **Updated:** Backfill process now enqueues batches of 10 emails at a time, pausing 1s between batches to smooth load
+- **Guarded:** Embedding creation skips when an email already has a stored vector (checked via new `EmbeddingsService.hasEmbeddingForEmail`)
+- **De-duplicated:** Queue jobs reuse `emailId` as `jobId`, preventing parallel duplicates while a job is in-flight
+- **Files:** `backend/src/modules/ai/services/{email-embedding.queue.ts,embeddings.service.ts,knowledge-base.service.ts}` and sync services for Google/Microsoft/IMAP
+
 ---
 
 ## 🚀 How to Run Locally (RECOMMENDED)
@@ -187,6 +196,11 @@ Response:
 ### Issue: Docker build caching old code
 **Solution:** Run locally instead of Docker for faster development iteration
 **Status:** ✅ IMPLEMENTED
+
+### Issue: IMAP job keeps logging same message
+**Cause:** Full sync mode reprocesses most recent UID; body download can time out at 10s if message is large
+**Workaround:** Allow incremental sync to kick in (new mail or metadata update) or raise `IMAP_BODY_DOWNLOAD_TIMEOUT_MS` for heavy messages
+**Status:** ⚠️ MONITORING
 
 ---
 
