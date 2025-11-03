@@ -6,6 +6,7 @@ import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
+import { EmbeddingsService } from '../../ai/services/embeddings.service';
 
 interface MicrosoftMessage {
   id: string;
@@ -62,6 +63,7 @@ export class MicrosoftSyncService {
     private crypto: CryptoService,
     private microsoftOAuth: MicrosoftOAuthService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
+    private embeddingsService: EmbeddingsService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -729,23 +731,31 @@ export class MicrosoftSyncService {
 
       this.logger.debug(`Saved email: ${subject} from ${from}`);
 
-      try {
-        await this.emailEmbeddingQueue.enqueue({
-          tenantId,
-          emailId: emailRecord.id,
-          subject,
-          snippet,
-          bodyText,
-          bodyHtml,
-          from,
-          receivedAt: emailRecord.receivedAt,
-        });
-        this.logger.verbose(`Queued embedding job for Microsoft message ${messageId}`);
-      } catch (queueError) {
-        const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
-        this.logger.warn(
-          `Failed to enqueue embedding job for Microsoft message ${messageId}: ${queueMessage}`,
+      const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(tenantId, emailRecord.id);
+
+      if (alreadyEmbedded) {
+        this.logger.verbose(
+          `Skipping embedding enqueue for Microsoft message ${messageId} - embedding already exists.`,
         );
+      } else {
+        try {
+          await this.emailEmbeddingQueue.enqueue({
+            tenantId,
+            emailId: emailRecord.id,
+            subject,
+            snippet,
+            bodyText,
+            bodyHtml,
+            from,
+            receivedAt: emailRecord.receivedAt,
+          });
+          this.logger.verbose(`Queued embedding job for Microsoft message ${messageId}`);
+        } catch (queueError) {
+          const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
+          this.logger.warn(
+            `Failed to enqueue embedding job for Microsoft message ${messageId}: ${queueMessage}`,
+          );
+        }
       }
 
       return true;

@@ -5,6 +5,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
+import { EmbeddingsService } from '../../ai/services/embeddings.service';
 
 const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
 const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -17,6 +18,7 @@ export class ImapSyncService {
     private prisma: PrismaService,
     private crypto: CryptoService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
+    private embeddingsService: EmbeddingsService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -360,23 +362,31 @@ export class ImapSyncService {
 
       this.logger.debug(`Saved email UID ${message.uid}: ${subject} from ${from}`);
 
-      try {
-        await this.emailEmbeddingQueue.enqueue({
-          tenantId,
-          emailId: emailRecord.id,
-          subject,
-          snippet,
-          bodyText,
-          bodyHtml,
-          from,
-          receivedAt,
-        });
-        this.logger.verbose(`Queued embedding job for IMAP message UID ${message.uid}`);
-      } catch (queueError) {
-        const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
-        this.logger.warn(
-          `Failed to enqueue embedding job for IMAP message UID ${message.uid}: ${queueMessage}`,
+      const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(tenantId, emailRecord.id);
+
+      if (alreadyEmbedded) {
+        this.logger.verbose(
+          `Skipping embedding enqueue for IMAP message UID ${message.uid} - embedding already exists.`,
         );
+      } else {
+        try {
+          await this.emailEmbeddingQueue.enqueue({
+            tenantId,
+            emailId: emailRecord.id,
+            subject,
+            snippet,
+            bodyText,
+            bodyHtml,
+            from,
+            receivedAt,
+          });
+          this.logger.verbose(`Queued embedding job for IMAP message UID ${message.uid}`);
+        } catch (queueError) {
+          const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
+          this.logger.warn(
+            `Failed to enqueue embedding job for IMAP message UID ${message.uid}: ${queueMessage}`,
+          );
+        }
       }
 
       return true;

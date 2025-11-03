@@ -93,6 +93,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
 
   async enqueue(job: EmailEmbeddingJob) {
     await this.queue.add('create', job, {
+      jobId: job.emailId,
       attempts: 6,
       backoff: {
         type: 'exponential',

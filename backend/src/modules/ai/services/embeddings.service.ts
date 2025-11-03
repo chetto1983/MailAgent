@@ -96,4 +96,22 @@ export class EmbeddingsService {
       throw error;
     }
   }
+
+  async hasEmbeddingForEmail(tenantId: string, emailId: string): Promise<boolean> {
+    if (!emailId) {
+      return false;
+    }
+
+    const count = await this.prisma.embedding.count({
+      where: {
+        tenantId,
+        metadata: {
+          path: ['emailId'],
+          equals: emailId,
+        },
+      },
+    });
+
+    return count > 0;
+  }
 }

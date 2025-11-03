@@ -127,6 +127,16 @@ export class KnowledgeBaseService {
       return false;
     }
 
+    if (
+      options.emailId &&
+      (await this.embeddingsService.hasEmbeddingForEmail(options.tenantId, options.emailId))
+    ) {
+      this.logger.verbose(
+        `Embedding already exists for email ${options.emailId} (tenant ${options.tenantId}), skipping.`,
+      );
+      return false;
+    }
+
     try {
       const client = await this.mistralService.createMistralClient();
       const embedding = await this.mistralService.generateEmbedding(content, client);

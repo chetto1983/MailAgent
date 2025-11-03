@@ -5,6 +5,7 @@ import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
+import { EmbeddingsService } from '../../ai/services/embeddings.service';
 
 @Injectable()
 export class GoogleSyncService {
@@ -15,6 +16,7 @@ export class GoogleSyncService {
     private crypto: CryptoService,
     private googleOAuth: GoogleOAuthService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
+    private embeddingsService: EmbeddingsService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -364,21 +366,31 @@ export class GoogleSyncService {
 
       this.logger.debug(`Saved email: ${subject} from ${from}`);
 
-      try {
-        await this.emailEmbeddingQueue.enqueue({
-          tenantId,
-          emailId: emailRecord.id,
-          subject,
-          snippet,
-          bodyText,
-          bodyHtml,
-          from,
-          receivedAt: emailRecord.receivedAt,
-        });
-        this.logger.verbose(`Queued embedding job for Gmail message ${messageId}`);
-      } catch (queueError) {
-        const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
-        this.logger.warn(`Failed to enqueue embedding job for Gmail message ${messageId}: ${queueMessage}`);
+      const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(tenantId, emailRecord.id);
+
+      if (alreadyEmbedded) {
+        this.logger.verbose(
+          `Skipping embedding enqueue for Gmail message ${messageId} - embedding already exists.`,
+        );
+      } else {
+        try {
+          await this.emailEmbeddingQueue.enqueue({
+            tenantId,
+            emailId: emailRecord.id,
+            subject,
+            snippet,
+            bodyText,
+            bodyHtml,
+            from,
+            receivedAt: emailRecord.receivedAt,
+          });
+          this.logger.verbose(`Queued embedding job for Gmail message ${messageId}`);
+        } catch (queueError) {
+          const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
+          this.logger.warn(
+            `Failed to enqueue embedding job for Gmail message ${messageId}: ${queueMessage}`,
+          );
+        }
       }
 
       return true;
