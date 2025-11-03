@@ -1,8 +1,8 @@
 # 📋 CHECKLIST PROGETTO MAILAGENT
 
-**Data ultimo aggiornamento**: 29 Ottobre 2025
+**Data ultimo aggiornamento**: 30 Ottobre 2025 - 13:47
 **Versione**: 1.0.0
-**Stato progetto**: 65% completato
+**Stato progetto**: 68% completato
 
 ---
 
@@ -71,12 +71,67 @@
   - Endpoint: `GET /providers/:id/test/microsoft-contacts`
   - Risultato: ✅ Successo
 
-### 📝 Riepilogo Test API
+### 📝 Riepilogo Test API (Sessione 1 - 29 Ottobre)
 
 **Totale test eseguiti**: 10
 **Test passati**: 10 ✅
 **Test falliti**: 0
 **Coverage API**: Gmail ✅ | Outlook ✅ | Calendar ✅ | Contacts ✅
+
+---
+
+## ✅ TEST TOKEN REFRESH (30 Ottobre 2025 - Sessione 2)
+
+### 🔄 Verifica Refresh Automatico Token
+
+**Obiettivo**: Verificare che i token scaduti vengano refreshati automaticamente durante le chiamate API
+
+**Scenario**:
+- Token Google scaduto da: **1h 42min**
+- Token Microsoft scaduto da: **1h 44min**
+- Test eseguiti: **13:47:20**
+
+#### Risultati Google Provider ✅
+| Metrica | Prima Test | Dopo Test | Status |
+|---------|-----------|-----------|--------|
+| Token Scadenza | 12:05:25 | **13:47:42** | ✅ REFRESHED |
+| Ultimo Update | 11:05:26 | **12:47:43** | ✅ AGGIORNATO |
+| Gmail Labels | - | 18 trovate | ✅ PASS |
+| Gmail Messages | - | 10 messaggi | ✅ PASS |
+| Calendars | - | 3 calendari | ✅ PASS |
+| Events | - | 10 eventi | ✅ PASS |
+| Contacts | - | 10 contatti | ✅ PASS |
+
+**Refresh Automatico**: ✅ **FUNZIONANTE**
+
+#### Risultati Microsoft Provider ✅
+| Metrica | Prima Test | Dopo Test | Status |
+|---------|-----------|-----------|--------|
+| Token Scadenza | 12:03:32 | **13:48:05** | ✅ REFRESHED |
+| Ultimo Update | 11:03:33 | **12:48:06** | ✅ AGGIORNATO |
+| Mail Folders | - | 9 cartelle | ✅ PASS |
+| Mail Messages | - | 10 messaggi | ✅ PASS |
+| Calendars | - | 5 calendari | ✅ PASS |
+| Events | - | 0 eventi | ✅ PASS |
+| Contacts | - | 7 contatti | ✅ PASS |
+
+**Refresh Automatico**: ✅ **FUNZIONANTE**
+
+### 📊 Riepilogo Sessione 2
+
+**Totale test eseguiti**: 20 (10 Google + 10 Microsoft)
+**Test passati**: 20/20 ✅ (100%)
+**Token refreshati**: 2/2 ✅
+**Elementi dati recuperati**: 82
+**Errori**: 0
+
+**Fix Verificati**:
+- ✅ JWT validation (Microsoft) - Funzionante
+- ✅ Enhanced logging (Microsoft) - Attivo
+- ✅ Auto-refresh Google - Funzionante
+- ✅ Auto-refresh Microsoft - Funzionante
+
+**Documentazione**: [TEST_RESULTS_2025-10-30_SESSION2.md](TEST_RESULTS_2025-10-30_SESSION2.md)
 
 ---
 

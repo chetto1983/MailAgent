@@ -44,7 +44,16 @@
       "Bash(timeout 3 sleep:*)",
       "Bash(timeout 8 bash:*)",
       "Bash(timeout 15 sleep:*)",
-      "Bash(npx ts-node:*)"
+      "Bash(npx ts-node:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(docker logs:*)",
+      "Bash(timeout 20 npm run start:dev:*)",
+      "Bash(tasklist:*)",
+      "Bash(timeout 10 bash:*)",
+      "Bash(timeout 5 bash:*)",
+      "Bash(timeout 15 bash -c \"npm run start:dev > ../backend-startup.log 2>&1 &\")",
+      "Bash(timeout 180 bash -c:*)",
+      "Bash(timeout 240 bash:*)"
     ],
     "deny": [],
     "ask": []

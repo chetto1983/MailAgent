@@ -19,6 +19,7 @@ set SMTP_PORT=1025
 set SMTP_FROM_EMAIL=noreply
 set SMTP_FROM_DOMAIN=mailagent.local
 set DATABASE_URL=postgresql://mailuser:mailpass@localhost:5432/mailagent
+rem set NODE_EXTRA_CA_CERTS=D:\MailAgent\zscaler-root.pem
 
 echo.
 echo 🚀 Starting MailAgent Backend (Local Development)

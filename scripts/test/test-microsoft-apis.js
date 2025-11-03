@@ -6,7 +6,7 @@
 const https = require('http');
 
 const API_URL = 'http://localhost:3000';
-const PROVIDER_ID = 'cmhdbcm220001ro7n7h2lwxdo'; // The Microsoft provider ID from database
+const PROVIDER_ID = 'cmhdkaefz000tll8tnntr4qq9'; // The Microsoft provider ID from database
 
 // You need to provide your JWT token here
 // To get it:

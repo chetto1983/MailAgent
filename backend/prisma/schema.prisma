@@ -25,6 +25,7 @@ model Tenant {
   messages           Message[]
   emailConfigs       EmailConfig[]
   providerConfigs    ProviderConfig[]
+  emails             Email[]
   embeddings         Embedding[]
   auditLogs          AuditLog[]
 
@@ -163,12 +164,108 @@ model ProviderConfig {
 
   // Relations
   tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  emails             Email[]
 
   @@unique([tenantId, email, providerType])
   @@index([tenantId, isDefault])
   @@index([userId])
   @@map("provider_configs")
 }
+
+// ===== EMAIL MODEL (Synced emails from providers) =====
+model Email {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  providerId         String
+
+  // External IDs for sync tracking
+  externalId         String   // Gmail messageId, Microsoft ID, IMAP UID
+  threadId           String?  // For conversation threading
+
+  // Email metadata
+  messageId          String?  // RFC 2822 Message-ID header
+  inReplyTo          String?  // RFC 2822 In-Reply-To header
+  references         String?  // RFC 2822 References header
+
+  // Sender and recipients
+  from               String   // "Name <email@domain.com>"
+  to                 String[] // Array of recipients
+  cc                 String[] @default([])
+  bcc                String[] @default([])
+  replyTo            String?
+
+  // Content
+  subject            String
+  bodyText           String?  // Plain text version
+  bodyHtml           String?  // HTML version
+  snippet            String?  // Preview/summary (first 200 chars)
+
+  // Classification
+  folder             String   @default("INBOX") // INBOX, SENT, DRAFTS, TRASH, etc.
+  labels             String[] @default([])      // Gmail labels or categories
+
+  // Flags and status
+  isRead             Boolean  @default(false)
+  isStarred          Boolean  @default(false)
+  isFlagged          Boolean  @default(false)
+  isDraft            Boolean  @default(false)
+  isDeleted          Boolean  @default(false)
+
+  // Dates
+  sentAt             DateTime // When email was sent
+  receivedAt         DateTime // When email was received
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Size
+  size               Int?     // Size in bytes
+
+  // Metadata
+  headers            Json?    // Full email headers
+  metadata           Json?    // Provider-specific metadata
+
+  // Relations
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider           ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  attachments        EmailAttachment[]
+
+  @@unique([providerId, externalId]) // Prevent duplicates
+  @@index([tenantId, folder, receivedAt]) // List emails by folder
+  @@index([tenantId, isRead]) // Unread emails
+  @@index([tenantId, threadId]) // Thread grouping
+  @@index([sentAt]) // Sort by date
+  @@map("emails")
+}
+
+// ===== EMAIL ATTACHMENT MODEL =====
+model EmailAttachment {
+  id                 String   @id @default(cuid())
+  emailId            String
+
+  // Attachment metadata
+  filename           String
+  mimeType           String
+  size               Int      // Size in bytes
+  contentId          String?  // For inline images
+
+  // Storage
+  storageType        String   @default("local") // "local", "s3", "azure"
+  storagePath        String?  // Path to file on disk or cloud
+
+  // Inline flag
+  isInline           Boolean  @default(false)
+
+  createdAt          DateTime @default(now())
+
+  // Relations
+  email              Email    @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@index([emailId])
+  @@map("email_attachments")
+}
+
+// Update Tenant model to include emails relation
+// (Already exists, just documenting)
 
 // ===== EMAIL CONFIG MODEL (Backwards compatibility - deprecated) =====
 model EmailConfig {

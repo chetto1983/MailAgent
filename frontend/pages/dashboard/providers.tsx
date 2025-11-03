@@ -41,26 +41,14 @@ export default function ProvidersPage() {
       setLoading(true);
       setError('');
 
-      // Prompt user for email
-      const email = prompt(
-        `Enter the email address for your ${providerType === 'google' ? 'Google' : 'Microsoft'} account:`,
-      );
-
-      if (!email) {
-        setError('Email is required to complete the connection');
-        return;
-      }
-
-      // Connect provider
+      // Connect provider (email will be obtained from OAuth2 automatically)
       if (providerType === 'google') {
         await providersApi.connectGoogle({
-          email,
           authorizationCode,
           supportsCalendar: true,
         });
       } else if (providerType === 'microsoft') {
         await providersApi.connectMicrosoft({
-          email,
           authorizationCode,
           supportsCalendar: true,
         });

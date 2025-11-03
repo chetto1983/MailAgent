@@ -21,7 +21,7 @@ export interface OAuthUrlResponse {
 }
 
 export interface ConnectGoogleDto {
-  email: string;
+  email?: string; // Optional - will be obtained from OAuth2 if not provided
   authorizationCode: string;
   supportsCalendar?: boolean;
   supportsContacts?: boolean;
@@ -29,7 +29,7 @@ export interface ConnectGoogleDto {
 }
 
 export interface ConnectMicrosoftDto {
-  email: string;
+  email?: string; // Optional - will be obtained from OAuth2 if not provided
   authorizationCode: string;
   supportsCalendar?: boolean;
   supportsContacts?: boolean;

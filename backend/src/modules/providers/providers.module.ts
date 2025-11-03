@@ -28,6 +28,7 @@ import { OAuthCallbackController } from './controllers/oauth-callback.controller
   ],
   controllers: [ProvidersController, OAuthCallbackController],
   exports: [
+    CryptoService,
     GoogleOAuthService,
     MicrosoftOAuthService,
     ImapService,

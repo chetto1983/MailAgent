@@ -143,4 +143,96 @@ export class ImapService {
       }
     }
   }
+
+  /**
+   * Fetch recent messages from INBOX
+   */
+  async fetchMessages(
+    config: {
+      host: string;
+      port: number;
+      username: string;
+      password: string;
+      useTls: boolean;
+    },
+    limit: number = 10,
+  ): Promise<any[]> {
+    let client: ImapFlow | null = null;
+
+    try {
+      client = this.createClient(config);
+      await client.connect();
+
+      // Select INBOX
+      const lock = await client.getMailboxLock('INBOX');
+
+      try {
+        // Get total message count
+        const mailboxStatus = await client.status('INBOX', { messages: true });
+        const totalMessages = mailboxStatus.messages || 0;
+
+        if (totalMessages === 0) {
+          this.logger.log('No messages found in INBOX');
+          return [];
+        }
+
+        // Fetch last N messages (newest first)
+        const startSeq = Math.max(1, totalMessages - limit + 1);
+        const endSeq = totalMessages;
+
+        this.logger.log(`Fetching messages ${startSeq}:${endSeq} from INBOX`);
+
+        const messages: any[] = [];
+
+        // Fetch messages
+        for await (const message of client.fetch(`${startSeq}:${endSeq}`, {
+          envelope: true,
+          bodyStructure: true,
+          flags: true,
+          uid: true,
+        })) {
+          const envelope = message.envelope;
+
+          if (!envelope) {
+            continue; // Skip if no envelope
+          }
+
+          messages.push({
+            uid: message.uid,
+            seq: message.seq,
+            flags: message.flags,
+            from: envelope.from?.[0]
+              ? `${envelope.from[0].name || ''} <${envelope.from[0].address}>`.trim()
+              : 'Unknown',
+            to: envelope.to?.[0]
+              ? `${envelope.to[0].name || ''} <${envelope.to[0].address}>`.trim()
+              : 'Unknown',
+            subject: envelope.subject || '(No Subject)',
+            date: envelope.date,
+            messageId: envelope.messageId,
+          });
+        }
+
+        // Reverse to show newest first
+        messages.reverse();
+
+        this.logger.log(`Retrieved ${messages.length} messages from INBOX`);
+
+        return messages;
+      } finally {
+        lock.release();
+      }
+    } catch (error) {
+      this.logger.error('Failed to fetch IMAP messages:', error);
+      throw new UnauthorizedException('Failed to fetch IMAP messages');
+    } finally {
+      if (client) {
+        try {
+          await client.logout();
+        } catch (logoutError) {
+          this.logger.warn('Error during IMAP logout:', logoutError);
+        }
+      }
+    }
+  }
 }

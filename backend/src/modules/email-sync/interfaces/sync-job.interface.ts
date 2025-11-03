@@ -1,0 +1,41 @@
+/**
+ * Email Sync Job Interfaces
+ */
+
+export interface SyncJobData {
+  tenantId: string;
+  providerId: string;
+  providerType: 'google' | 'microsoft' | 'generic';
+  email: string;
+  priority: 'high' | 'normal' | 'low';
+  syncType: 'full' | 'incremental';
+  lastSyncedAt?: Date;
+}
+
+export interface SyncJobResult {
+  success: boolean;
+  providerId: string;
+  email: string;
+  messagesProcessed: number;
+  newMessages: number;
+  errors?: string[];
+  syncDuration: number;
+  lastSyncToken?: string; // For incremental sync (UID, historyId, deltaLink)
+}
+
+export interface SyncStatus {
+  queueName: string;
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+}
+
+export interface CircuitBreakerState {
+  providerId: string;
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  failureCount: number;
+  lastFailureTime?: Date;
+  nextAttemptTime?: Date;
+}

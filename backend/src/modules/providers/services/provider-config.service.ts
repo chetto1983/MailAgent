@@ -36,8 +36,11 @@ export class ProviderConfigService {
       // Exchange authorization code for tokens
       const tokenData = await this.googleOAuth.exchangeCodeForTokens(dto.authorizationCode);
 
-      // Verify the email matches
-      if (tokenData.email !== dto.email) {
+      // Use email from OAuth2 if not provided in DTO
+      const email = dto.email || tokenData.email;
+
+      // If email was provided, verify it matches
+      if (dto.email && tokenData.email !== dto.email) {
         throw new BadRequestException('Email mismatch. Please use the correct Google account.');
       }
 
@@ -50,7 +53,7 @@ export class ProviderConfigService {
         where: {
           tenantId_email_providerType: {
             tenantId,
-            email: dto.email,
+            email,
             providerType: 'google',
           },
         },
@@ -58,7 +61,7 @@ export class ProviderConfigService {
           tenantId,
           userId,
           providerType: 'google',
-          email: dto.email,
+          email,
           supportsEmail: true,
           supportsCalendar: dto.supportsCalendar ?? true,
           supportsContacts: dto.supportsContacts ?? false,
@@ -83,7 +86,7 @@ export class ProviderConfigService {
         },
       });
 
-      this.logger.log(`Google provider connected for ${dto.email}`);
+      this.logger.log(`Google provider connected for ${email}`);
 
       return this.sanitizeProviderConfig(providerConfig);
     } catch (error) {
@@ -104,8 +107,11 @@ export class ProviderConfigService {
       // Exchange authorization code for tokens
       const tokenData = await this.microsoftOAuth.exchangeCodeForTokens(dto.authorizationCode);
 
-      // Verify the email matches
-      if (tokenData.email.toLowerCase() !== dto.email.toLowerCase()) {
+      // Use email from OAuth2 if not provided in DTO
+      const email = dto.email || tokenData.email;
+
+      // If email was provided, verify it matches
+      if (dto.email && tokenData.email.toLowerCase() !== dto.email.toLowerCase()) {
         throw new BadRequestException('Email mismatch. Please use the correct Microsoft account.');
       }
 
@@ -118,7 +124,7 @@ export class ProviderConfigService {
         where: {
           tenantId_email_providerType: {
             tenantId,
-            email: dto.email,
+            email,
             providerType: 'microsoft',
           },
         },
@@ -126,7 +132,7 @@ export class ProviderConfigService {
           tenantId,
           userId,
           providerType: 'microsoft',
-          email: dto.email,
+          email,
           supportsEmail: true,
           supportsCalendar: dto.supportsCalendar ?? true,
           supportsContacts: dto.supportsContacts ?? false,
@@ -151,7 +157,7 @@ export class ProviderConfigService {
         },
       });
 
-      this.logger.log(`Microsoft provider connected for ${dto.email}`);
+      this.logger.log(`Microsoft provider connected for ${email}`);
 
       return this.sanitizeProviderConfig(providerConfig);
     } catch (error) {
@@ -360,6 +366,148 @@ export class ProviderConfigService {
     });
 
     this.logger.log(`Provider config ${configId} deleted`);
+  }
+
+  /**
+   * Test IMAP connection for generic provider
+   */
+  async testImapConnection(tenantId: string, providerId: string): Promise<any> {
+    const provider = await this.prisma.providerConfig.findFirst({
+      where: { id: providerId, tenantId, providerType: 'generic' },
+    });
+
+    if (!provider) {
+      throw new NotFoundException('Provider not found');
+    }
+
+    if (!provider.imapHost || !provider.imapUsername || !provider.imapPassword) {
+      throw new BadRequestException('IMAP configuration is incomplete');
+    }
+
+    // Decrypt password
+    const imapPassword = this.crypto.decrypt(provider.imapPassword, provider.imapEncryptionIv!);
+
+    // Test connection
+    const success = await this.imap.testConnection({
+      host: provider.imapHost,
+      port: provider.imapPort || 993,
+      username: provider.imapUsername,
+      password: imapPassword,
+      useTls: provider.imapUseTls ?? true,
+    });
+
+    return {
+      success,
+      message: success ? 'IMAP connection successful' : 'IMAP connection failed',
+      host: provider.imapHost,
+      port: provider.imapPort,
+    };
+  }
+
+  /**
+   * Test IMAP folders listing for generic provider
+   */
+  async testImapFolders(tenantId: string, providerId: string): Promise<any> {
+    const provider = await this.prisma.providerConfig.findFirst({
+      where: { id: providerId, tenantId, providerType: 'generic' },
+    });
+
+    if (!provider) {
+      throw new NotFoundException('Provider not found');
+    }
+
+    if (!provider.imapHost || !provider.imapUsername || !provider.imapPassword) {
+      throw new BadRequestException('IMAP configuration is incomplete');
+    }
+
+    // Decrypt password
+    const imapPassword = this.crypto.decrypt(provider.imapPassword, provider.imapEncryptionIv!);
+
+    // List folders
+    const folders = await this.imap.listFolders({
+      host: provider.imapHost,
+      port: provider.imapPort || 993,
+      username: provider.imapUsername,
+      password: imapPassword,
+      useTls: provider.imapUseTls ?? true,
+    });
+
+    return {
+      success: true,
+      folders,
+      count: folders.length,
+    };
+  }
+
+  /**
+   * Test SMTP connection for generic provider
+   */
+  async testSmtpConnection(tenantId: string, providerId: string): Promise<any> {
+    const provider = await this.prisma.providerConfig.findFirst({
+      where: { id: providerId, tenantId, providerType: 'generic' },
+    });
+
+    if (!provider) {
+      throw new NotFoundException('Provider not found');
+    }
+
+    if (!provider.smtpHost || !provider.smtpUsername || !provider.smtpPassword) {
+      throw new BadRequestException('SMTP configuration is incomplete');
+    }
+
+    // Decrypt password
+    const smtpPassword = this.crypto.decrypt(provider.smtpPassword, provider.smtpEncryptionIv!);
+
+    // Test connection
+    const success = await this.imap.testSmtpConnection({
+      host: provider.smtpHost,
+      port: provider.smtpPort || 587,
+      username: provider.smtpUsername,
+      password: smtpPassword,
+      useTls: provider.smtpUseTls ?? true,
+    });
+
+    return {
+      success,
+      message: success ? 'SMTP connection successful' : 'SMTP connection failed',
+      host: provider.smtpHost,
+      port: provider.smtpPort,
+    };
+  }
+
+  /**
+   * Fetch recent messages via IMAP for generic provider
+   */
+  async testImapMessages(tenantId: string, providerId: string): Promise<any> {
+    const provider = await this.prisma.providerConfig.findFirst({
+      where: { id: providerId, tenantId, providerType: 'generic' },
+    });
+
+    if (!provider) {
+      throw new NotFoundException('Provider not found');
+    }
+
+    if (!provider.imapHost || !provider.imapUsername || !provider.imapPassword) {
+      throw new BadRequestException('IMAP configuration is incomplete');
+    }
+
+    // Decrypt password
+    const imapPassword = this.crypto.decrypt(provider.imapPassword, provider.imapEncryptionIv!);
+
+    // Fetch messages
+    const messages = await this.imap.fetchMessages({
+      host: provider.imapHost,
+      port: provider.imapPort || 993,
+      username: provider.imapUsername,
+      password: imapPassword,
+      useTls: provider.imapUseTls ?? true,
+    }, 10); // Fetch last 10 messages
+
+    return {
+      success: true,
+      messages,
+      count: messages.length,
+    };
   }
 
   /**

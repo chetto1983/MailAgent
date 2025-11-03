@@ -47,7 +47,15 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
     setLoading(true);
 
     try {
-      await providersApi.connectGeneric(formData);
+      // Use IMAP credentials for SMTP if SMTP username is not provided
+      const submitData = {
+        ...formData,
+        smtpUsername: formData.smtpUsername || formData.imapUsername,
+        smtpPassword: formData.smtpPassword || formData.imapPassword,
+        supportsCalendar: showAdvanced && !!formData.caldavUrl,
+      };
+
+      await providersApi.connectGeneric(submitData);
       setOpen(false);
       onSuccess();
       // Reset form
@@ -173,6 +181,7 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
           {/* SMTP Settings */}
           <div className="space-y-4 border-t pt-4">
             <h3 className="font-medium">SMTP Settings (Outgoing Mail)</h3>
+            <p className="text-sm text-gray-600">SMTP will use the same credentials as IMAP</p>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">SMTP Host</label>
@@ -189,22 +198,6 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
                   type="number"
                   value={formData.smtpPort}
                   onChange={(e) => updateField('smtpPort', parseInt(e.target.value))}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Username</label>
-                <Input
-                  type="text"
-                  value={formData.smtpUsername}
-                  onChange={(e) => updateField('smtpUsername', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Password</label>
-                <Input
-                  type="password"
-                  value={formData.smtpPassword}
-                  onChange={(e) => updateField('smtpPassword', e.target.value)}
                 />
               </div>
             </div>

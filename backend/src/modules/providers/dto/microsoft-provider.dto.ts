@@ -3,12 +3,13 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class ConnectMicrosoftProviderDto {
   @ApiProperty({
-    description: 'Email address to connect',
+    description: 'Email address to connect (optional, will be obtained from OAuth2 if not provided)',
     example: 'user@outlook.com',
+    required: false,
   })
   @IsEmail()
-  @IsNotEmpty()
-  email!: string;
+  @IsOptional()
+  email?: string;
 
   @ApiProperty({
     description: 'OAuth2 authorization code from Microsoft',

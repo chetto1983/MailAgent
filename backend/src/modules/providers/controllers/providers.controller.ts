@@ -206,4 +206,38 @@ export class ProvidersController {
     const { tenantId } = req.user;
     return this.microsoftOAuth.testContacts(tenantId, id);
   }
+
+  // ========== GENERIC IMAP TEST ENDPOINTS ==========
+
+  @Get(':id/test/imap-connection')
+  @ApiOperation({ summary: 'Test IMAP connection' })
+  @ApiResponse({ status: 200, description: 'Test IMAP connection' })
+  async testImapConnection(@Request() req: any, @Param('id') id: string): Promise<any> {
+    const { tenantId } = req.user;
+    return this.providerConfigService.testImapConnection(tenantId, id);
+  }
+
+  @Get(':id/test/imap-folders')
+  @ApiOperation({ summary: 'Test IMAP - List folders' })
+  @ApiResponse({ status: 200, description: 'Returns IMAP folders' })
+  async testImapFolders(@Request() req: any, @Param('id') id: string): Promise<any> {
+    const { tenantId } = req.user;
+    return this.providerConfigService.testImapFolders(tenantId, id);
+  }
+
+  @Get(':id/test/imap-messages')
+  @ApiOperation({ summary: 'Test IMAP - Fetch recent messages' })
+  @ApiResponse({ status: 200, description: 'Returns recent IMAP messages' })
+  async testImapMessages(@Request() req: any, @Param('id') id: string): Promise<any> {
+    const { tenantId } = req.user;
+    return this.providerConfigService.testImapMessages(tenantId, id);
+  }
+
+  @Get(':id/test/smtp-connection')
+  @ApiOperation({ summary: 'Test SMTP connection' })
+  @ApiResponse({ status: 200, description: 'Test SMTP connection' })
+  async testSmtpConnection(@Request() req: any, @Param('id') id: string): Promise<any> {
+    const { tenantId } = req.user;
+    return this.providerConfigService.testSmtpConnection(tenantId, id);
+  }
 }

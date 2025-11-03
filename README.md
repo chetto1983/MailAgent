@@ -407,22 +407,53 @@ docker-compose exec backend npx prisma db seed
 
 ## 📚 Documentation
 
-Documentazione completa disponibile:
+### 📖 Documentazione Principale
 
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Guida risoluzione problemi comuni
 - **[PROJECT_CHECKLIST.md](PROJECT_CHECKLIST.md)** - Stato progetto, test effettuati, roadmap
-- **[LOCAL_DEV_SETUP.md](LOCAL_DEV_SETUP.md)** - Setup ambiente sviluppo
-- **[OAUTH_GMAIL_SETUP.md](OAUTH_GMAIL_SETUP.md)** - Setup OAuth2 Google (step-by-step)
-- **[OAUTH_MICROSOFT_SETUP.md](OAUTH_MICROSOFT_SETUP.md)** - Setup OAuth2 Microsoft (step-by-step)
-- **[PROVIDER_INTEGRATION_GUIDE.md](PROVIDER_INTEGRATION_GUIDE.md)** - Guida completa provider
-- **[CONFIGURATION.md](CONFIGURATION.md)** - Sistema configurazione centralizzato
-- **[CURRENT_STATUS.md](CURRENT_STATUS.md)** - Status corrente del progetto
+- **[PRIVACY.md](PRIVACY.md)** - Informativa privacy e GDPR compliance
 
-### Test Scripts
+### 📁 Documentazione Organizzata
 
-- `test-google-apis.js` - Test completo Google Provider (Gmail, Calendar, Contacts)
-- `test-microsoft-apis.js` - Test completo Microsoft Provider (Outlook, Calendar, Contacts)
-- `test-mistral-api.js` - Test diagnostico Mistral AI
+Tutta la documentazione è ora organizzata nella cartella **[`docs/`](docs/)**:
+
+#### 🚀 [Setup](docs/setup/)
+- Guide configurazione e quick start
+- Setup ambiente locale e produzione
+- Checklist iniziali
+
+#### 🔐 [OAuth](docs/oauth/)
+- Setup OAuth2 Gmail (step-by-step)
+- Setup OAuth2 Microsoft (step-by-step)
+- Fix e troubleshooting token
+
+#### 💻 [Implementation](docs/implementation/)
+- Strategia sincronizzazione email
+- Guida integrazione provider
+- Auto-refresh token (Google + Microsoft)
+- Architettura sistema
+
+#### 🧪 [Testing](docs/testing/)
+- Risultati test sessioni
+- Test token refresh
+- Test email sync success
+
+#### 📈 [Scalability](docs/scalability/)
+- Analisi capacità sistema
+- Piano B: Ottimizzazioni per 1000+ tenant
+- Test risultati performance
+
+**📚 [Indice Completo Documentazione →](docs/README.md)**
+
+### 🔧 Script di Test
+
+Gli script sono organizzati in **[`scripts/`](scripts/)**:
+
+- **[`scripts/test/`](scripts/test/)** - Test API (Google, Microsoft, IMAP)
+- **[`scripts/diagnostics/`](scripts/diagnostics/)** - Script diagnostici (database, provider, sync)
+- **[`scripts/scalability/`](scripts/scalability/)** - Test scalabilità e performance
+
+**🔧 [Guida Script →](scripts/README.md)**
 
 ### Problemi Comuni
 

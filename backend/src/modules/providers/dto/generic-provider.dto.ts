@@ -1,11 +1,13 @@
-import { IsBoolean, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Min, Max } from 'class-validator';
+import { IsBoolean, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Min, Max, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class ConnectGenericProviderDto {
   @ApiProperty({
     description: 'Email address',
     example: 'user@example.com',
   })
+  @Transform(({ value }) => value?.trim())
   @IsEmail()
   @IsNotEmpty()
   email!: string;
@@ -14,6 +16,7 @@ export class ConnectGenericProviderDto {
     description: 'Display name',
     example: 'John Doe',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsOptional()
   displayName?: string;
@@ -23,6 +26,7 @@ export class ConnectGenericProviderDto {
     description: 'IMAP server host',
     example: 'imap.example.com',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsNotEmpty()
   imapHost!: string;
@@ -42,6 +46,7 @@ export class ConnectGenericProviderDto {
     description: 'IMAP username',
     example: 'user@example.com',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsNotEmpty()
   imapUsername!: string;
@@ -50,6 +55,7 @@ export class ConnectGenericProviderDto {
     description: 'IMAP password',
     example: 'password123',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsNotEmpty()
   imapPassword!: string;
@@ -68,6 +74,7 @@ export class ConnectGenericProviderDto {
     description: 'SMTP server host',
     example: 'smtp.example.com',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsOptional()
   smtpHost?: string;
@@ -87,6 +94,7 @@ export class ConnectGenericProviderDto {
     description: 'SMTP username',
     example: 'user@example.com',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsOptional()
   smtpUsername?: string;
@@ -95,6 +103,7 @@ export class ConnectGenericProviderDto {
     description: 'SMTP password',
     example: 'password123',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsOptional()
   smtpPassword?: string;
@@ -114,6 +123,8 @@ export class ConnectGenericProviderDto {
     example: 'https://caldav.example.com/calendars/user',
     required: false,
   })
+  @Transform(({ value }) => value?.trim())
+  @ValidateIf((o) => o.caldavUrl && o.caldavUrl.length > 0)
   @IsUrl()
   @IsOptional()
   caldavUrl?: string;
@@ -122,6 +133,7 @@ export class ConnectGenericProviderDto {
     description: 'CalDAV username',
     example: 'user@example.com',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsOptional()
   caldavUsername?: string;
@@ -130,6 +142,7 @@ export class ConnectGenericProviderDto {
     description: 'CalDAV password',
     example: 'password123',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsOptional()
   caldavPassword?: string;
@@ -140,6 +153,8 @@ export class ConnectGenericProviderDto {
     example: 'https://carddav.example.com/contacts/user',
     required: false,
   })
+  @Transform(({ value }) => value?.trim())
+  @ValidateIf((o) => o.carddavUrl && o.carddavUrl.length > 0)
   @IsUrl()
   @IsOptional()
   carddavUrl?: string;
@@ -148,6 +163,7 @@ export class ConnectGenericProviderDto {
     description: 'CardDAV username',
     example: 'user@example.com',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsOptional()
   carddavUsername?: string;
@@ -156,6 +172,7 @@ export class ConnectGenericProviderDto {
     description: 'CardDAV password',
     example: 'password123',
   })
+  @Transform(({ value }) => value?.trim())
   @IsString()
   @IsOptional()
   carddavPassword?: string;
