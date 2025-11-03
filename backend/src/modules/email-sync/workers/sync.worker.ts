@@ -125,16 +125,30 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
       }
 
       // Update last synced timestamp in database
+      const metadataUpdates: Record<string, any> = {
+        ...(result.metadata || {}),
+      };
+
+      if (result.lastSyncToken && metadataUpdates.lastSyncToken === undefined) {
+        metadataUpdates.lastSyncToken = result.lastSyncToken;
+      }
+
+      const shouldUpdateMetadata = Object.keys(metadataUpdates).length > 0;
+      let mergedMetadata: Record<string, any> | undefined;
+
+      if (shouldUpdateMetadata) {
+        const existingMetadata = await this.getProviderMetadata(providerId);
+        mergedMetadata = {
+          ...existingMetadata,
+          ...metadataUpdates,
+        };
+      }
+
       await this.prisma.providerConfig.update({
         where: { id: providerId },
         data: {
           lastSyncedAt: new Date(),
-          metadata: result.lastSyncToken
-            ? {
-                ...(await this.getProviderMetadata(providerId)),
-                lastSyncToken: result.lastSyncToken,
-              }
-            : undefined,
+          ...(shouldUpdateMetadata ? { metadata: mergedMetadata } : {}),
         },
       });
 

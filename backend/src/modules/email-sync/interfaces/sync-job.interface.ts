@@ -21,6 +21,7 @@ export interface SyncJobResult {
   errors?: string[];
   syncDuration: number;
   lastSyncToken?: string; // For incremental sync (UID, historyId, deltaLink)
+  metadata?: Record<string, any>;
 }
 
 export interface SyncStatus {

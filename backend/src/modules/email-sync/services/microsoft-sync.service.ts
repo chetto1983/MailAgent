@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
+import { URLSearchParams } from 'url';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
@@ -12,6 +13,42 @@ interface MicrosoftMessage {
   toRecipients: { emailAddress: { address: string; name: string } }[];
   receivedDateTime: string;
   isRead: boolean;
+}
+
+interface MicrosoftDeltaResponse<T = Partial<MicrosoftMessage>> {
+  value?: T[];
+  '@odata.deltaLink'?: string;
+  '@odata.nextLink'?: string;
+}
+
+type MicrosoftDeltaItem = Partial<MicrosoftMessage> & {
+  id?: string;
+  '@removed'?: {
+    reason?: string;
+  };
+};
+
+type MicrosoftSyncMode = 'delta' | 'timestamp';
+
+interface MicrosoftIncrementalDeltaResult {
+  messagesProcessed: number;
+  newMessages: number;
+  newDeltaLink: string;
+  latestReceivedDate?: string;
+}
+
+interface MicrosoftIncrementalTimestampResult {
+  messagesProcessed: number;
+  newMessages: number;
+  newTimestamp: string;
+}
+
+interface MicrosoftFullSyncInitResult {
+  messagesProcessed: number;
+  newMessages: number;
+  syncToken: string;
+  mode: MicrosoftSyncMode;
+  latestTimestamp?: string;
 }
 
 @Injectable()
@@ -105,48 +142,118 @@ export class MicrosoftSyncService {
         }
       }
 
-      // Get last delta link from metadata (for incremental sync)
+      // Get tracking metadata
       const metadata = (provider.metadata as any) || {};
-      const lastDeltaLink = metadata.lastSyncToken;
+      const lastDeltaLink =
+        typeof metadata.lastSyncToken === 'string' ? (metadata.lastSyncToken as string) : undefined;
+      const deltaMode: MicrosoftSyncMode | undefined = metadata.microsoftDeltaMode;
+      const lastTimestamp =
+        typeof metadata.microsoftLastSyncTimestamp === 'string'
+          ? (metadata.microsoftLastSyncTimestamp as string)
+          : undefined;
+      const lastSyncedIso = this.normalizeTimestamp(lastSyncedAt);
 
       let messagesProcessed = 0;
       let newMessages = 0;
-      let newDeltaLink: string | undefined;
+      let metadataUpdates: Record<string, any> = {};
+      let incrementalHandled = false;
+      let shouldRunFull = syncType === 'full';
 
-      // Validate deltaLink is a proper URL (not corrupted data like date strings)
-      let isValidDeltaLink = false;
-      if (lastDeltaLink) {
-        try {
-          new URL(lastDeltaLink);
-          isValidDeltaLink = true;
-        } catch (error) {
-          this.logger.warn(`⚠️ Invalid deltaLink detected for ${email}: "${lastDeltaLink}". Forcing full sync.`);
-          isValidDeltaLink = false;
+      if (!shouldRunFull && syncType === 'incremental') {
+        const canUseDelta =
+          deltaMode !== 'timestamp' &&
+          !!lastDeltaLink &&
+          lastDeltaLink.includes('graph.microsoft.com');
+
+        if (canUseDelta) {
+          this.logger.log(`Using incremental delta sync for ${email}`);
+
+          try {
+            const deltaResult = await this.syncIncremental(
+              accessToken,
+              lastDeltaLink,
+              providerId,
+              provider.tenantId,
+            );
+
+            messagesProcessed = deltaResult.messagesProcessed;
+            newMessages = deltaResult.newMessages;
+            metadataUpdates = {
+              lastSyncToken: deltaResult.newDeltaLink,
+              microsoftDeltaMode: 'delta' as MicrosoftSyncMode,
+            };
+
+            if (deltaResult.latestReceivedDate) {
+              metadataUpdates.microsoftLastSyncTimestamp = deltaResult.latestReceivedDate;
+            }
+
+            incrementalHandled = true;
+          } catch (deltaError) {
+            if (this.isDeltaUnsupportedError(deltaError)) {
+              this.logger.warn(
+                `Microsoft delta sync is not supported for ${email}; switching to timestamp-based incremental sync.`,
+              );
+              shouldRunFull = true; // Will fall back to timestamp strategy during full sync
+            } else {
+              throw deltaError;
+            }
+          }
+        }
+
+        if (!shouldRunFull && !incrementalHandled) {
+          const sinceTimestamp =
+            lastTimestamp ||
+            (lastDeltaLink && !lastDeltaLink.includes('graph.microsoft.com')
+              ? lastDeltaLink
+              : lastSyncedIso);
+
+          if (sinceTimestamp) {
+            this.logger.log(`Using incremental timestamp sync for ${email} since ${sinceTimestamp}`);
+
+            const timestampResult = await this.syncIncrementalByTimestamp(
+              accessToken,
+              sinceTimestamp,
+              providerId,
+              provider.tenantId,
+            );
+
+            messagesProcessed = timestampResult.messagesProcessed;
+            newMessages = timestampResult.newMessages;
+            metadataUpdates = {
+              lastSyncToken: timestampResult.newTimestamp,
+              microsoftDeltaMode: 'timestamp' as MicrosoftSyncMode,
+              microsoftLastSyncTimestamp: timestampResult.newTimestamp,
+            };
+
+            incrementalHandled = true;
+          } else {
+            shouldRunFull = true;
+          }
         }
       }
 
-      if (syncType === 'incremental' && lastDeltaLink && isValidDeltaLink) {
-        // Incremental sync using deltaLink
-        const deltaResult = await this.syncIncremental(
-          accessToken,
-          lastDeltaLink,
-          providerId,
-          provider.tenantId,
+      if (!incrementalHandled) {
+        this.logger.log(
+          `Running full Microsoft sync for ${email} (this may take a while for large mailboxes)`,
         );
-        messagesProcessed = deltaResult.messagesProcessed;
-        newMessages = deltaResult.newMessages;
-        newDeltaLink = deltaResult.newDeltaLink;
-      } else {
-        // Full sync - fetch recent messages
-        const fullResult = await this.syncFull(
+
+        const fullResult = await this.syncFullAndInitializeDelta(
           accessToken,
           email,
           providerId,
           provider.tenantId,
         );
+
         messagesProcessed = fullResult.messagesProcessed;
         newMessages = fullResult.newMessages;
-        newDeltaLink = fullResult.deltaLink;
+        metadataUpdates = {
+          lastSyncToken: fullResult.syncToken,
+          microsoftDeltaMode: fullResult.mode,
+        };
+
+        if (fullResult.latestTimestamp) {
+          metadataUpdates.microsoftLastSyncTimestamp = fullResult.latestTimestamp;
+        }
       }
 
       return {
@@ -156,7 +263,8 @@ export class MicrosoftSyncService {
         messagesProcessed,
         newMessages,
         syncDuration: 0, // Will be set by worker
-        lastSyncToken: newDeltaLink,
+        lastSyncToken: metadataUpdates.lastSyncToken,
+        metadata: metadataUpdates,
       };
     } catch (error) {
       this.logger.error(`Microsoft sync failed for ${email}:`, error);
@@ -172,37 +280,91 @@ export class MicrosoftSyncService {
     deltaLink: string,
     providerId: string,
     tenantId: string,
-  ): Promise<{
-    messagesProcessed: number;
-    newMessages: number;
-    newDeltaLink: string;
-  }> {
+  ): Promise<MicrosoftIncrementalDeltaResult> {
     this.logger.debug(`Incremental sync using deltaLink`);
 
     try {
-      // Call delta link to get changes
-      const response = await axios.get(deltaLink, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      const messages: MicrosoftMessage[] = response.data.value || [];
-      const newDeltaLink = response.data['@odata.deltaLink'];
-
+      let nextLink: string | undefined = deltaLink;
+      let newDeltaLink: string | undefined;
       let messagesProcessed = 0;
       let newMessages = 0;
+      let latestReceivedDate: string | undefined;
+      let page = 0;
+      const maxPages = 25;
 
-      for (const message of messages) {
-        const processed = await this.processMessage(
-          message.id,
-          accessToken,
-          providerId,
-          tenantId,
-        );
-        if (processed) {
-          messagesProcessed++;
-          newMessages++;
+      while (nextLink) {
+        if (page++ >= maxPages) {
+          this.logger.warn(
+            `Delta pagination exceeded ${maxPages} pages for provider ${providerId}; stop processing early.`,
+          );
+          break;
+        }
+
+        const response: AxiosResponse<MicrosoftDeltaResponse<MicrosoftDeltaItem>> =
+          await axios.get<MicrosoftDeltaResponse<MicrosoftDeltaItem>>(nextLink, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+
+        const items = response.data.value ?? [];
+
+        for (const item of items) {
+          const messageId = item?.id;
+          const itemReceived = item?.receivedDateTime;
+
+          if (item && item['@removed']) {
+            if (messageId) {
+              await this.prisma.email.updateMany({
+                where: {
+                  providerId,
+                  externalId: messageId,
+                },
+                data: {
+                  isDeleted: true,
+                },
+              });
+              messagesProcessed++;
+            }
+            continue;
+          }
+
+          if (!messageId) {
+            continue;
+          }
+
+          const processed = await this.processMessage(
+            messageId,
+            accessToken,
+            providerId,
+            tenantId,
+          );
+
+          if (processed) {
+            messagesProcessed++;
+            newMessages++;
+
+            if (itemReceived) {
+              if (!latestReceivedDate) {
+                latestReceivedDate = itemReceived;
+              } else if (new Date(itemReceived).getTime() > new Date(latestReceivedDate).getTime()) {
+                latestReceivedDate = itemReceived;
+              }
+            }
+          }
+        }
+
+        const delta = response.data['@odata.deltaLink'];
+        const next = response.data['@odata.nextLink'];
+
+        if (delta) {
+          newDeltaLink = delta;
+        }
+
+        nextLink = next || undefined;
+
+        if (!nextLink) {
+          break;
         }
       }
 
@@ -210,11 +372,101 @@ export class MicrosoftSyncService {
         messagesProcessed,
         newMessages,
         newDeltaLink: newDeltaLink || deltaLink,
+        latestReceivedDate,
       };
     } catch (error) {
       this.logger.error('Incremental sync error:', error);
       throw error;
     }
+  }
+
+  private async syncIncrementalByTimestamp(
+    accessToken: string,
+    sinceTimestamp: string,
+    providerId: string,
+    tenantId: string,
+  ): Promise<MicrosoftIncrementalTimestampResult> {
+    this.logger.debug(`Incremental sync using timestamp since ${sinceTimestamp}`);
+
+    let sinceDate = new Date(sinceTimestamp);
+    if (Number.isNaN(sinceDate.getTime())) {
+      this.logger.warn(
+        `Invalid timestamp "${sinceTimestamp}" provided for incremental sync; defaulting to epoch.`,
+      );
+      sinceDate = new Date(0);
+    }
+    const sinceIso = sinceDate.toISOString();
+
+    const params = new URLSearchParams({
+      $filter: `receivedDateTime ge ${sinceIso}`,
+      $orderby: 'receivedDateTime asc',
+      $top: '50',
+    });
+
+    let nextLink: string | undefined = `${this.GRAPH_API_BASE}/me/messages?${params.toString()}`;
+    let page = 0;
+    const maxPages = 25;
+
+    let messagesProcessed = 0;
+    let newMessages = 0;
+    let latestTimestamp = sinceIso;
+
+    while (nextLink) {
+      if (page++ >= maxPages) {
+        this.logger.warn(
+          `Timestamp pagination exceeded ${maxPages} pages for provider ${providerId}; stopping early.`,
+        );
+        break;
+      }
+
+      const response: AxiosResponse<MicrosoftDeltaResponse<MicrosoftMessage>> =
+        await axios.get<MicrosoftDeltaResponse<MicrosoftMessage>>(nextLink, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+      const messages = response.data.value ?? [];
+
+      for (const message of messages) {
+        if (!message?.id) {
+          continue;
+        }
+
+        const processed = await this.processMessage(
+          message.id,
+          accessToken,
+          providerId,
+          tenantId,
+        );
+
+        if (processed) {
+          messagesProcessed++;
+          newMessages++;
+
+          if (message.receivedDateTime) {
+            latestTimestamp = message.receivedDateTime;
+          }
+        }
+      }
+
+      const next = response.data['@odata.nextLink'];
+      nextLink = next || undefined;
+
+      if (!nextLink) {
+        break;
+      }
+    }
+
+    if (messagesProcessed === 0 && newMessages === 0) {
+      latestTimestamp = new Date().toISOString();
+    }
+
+    return {
+      messagesProcessed,
+      newMessages,
+      newTimestamp: latestTimestamp,
+    };
   }
 
   /**
@@ -228,7 +480,7 @@ export class MicrosoftSyncService {
   ): Promise<{
     messagesProcessed: number;
     newMessages: number;
-    deltaLink: string;
+    latestReceivedDate?: string;
   }> {
     this.logger.debug('Full sync - fetching recent messages and initializing delta');
 
@@ -260,61 +512,130 @@ export class MicrosoftSyncService {
         }
       }
 
-      // Step 2: Initialize delta sync for Inbox folder
-      // Microsoft requires delta tracking per folder (not global /me/messages)
-      this.logger.debug('Initializing delta sync for Inbox folder...');
+      const latestReceivedDate = messages.length > 0 ? messages[0].receivedDateTime : undefined;
 
-      let deltaLink: string | undefined;
-
-      try {
-        let deltaUrl = `${this.GRAPH_API_BASE}/me/mailFolders/inbox/messages/delta`;
-        let pageCount = 0;
-        const MAX_PAGES = 50; // Safety limit to prevent infinite loops
-
-        while (deltaUrl && !deltaLink && pageCount < MAX_PAGES) {
-          const deltaResponse = await axios.get(deltaUrl, {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          });
-
-          // Check if we have the deltaLink
-          deltaLink = deltaResponse.data['@odata.deltaLink'];
-
-          if (!deltaLink) {
-            // Get next page URL
-            deltaUrl = deltaResponse.data['@odata.nextLink'];
-            pageCount++;
-          }
-        }
-
-        if (deltaLink) {
-          this.logger.debug(`✅ Successfully obtained deltaLink for Inbox after ${pageCount + 1} pages`);
-        } else {
-          this.logger.warn(`Could not obtain deltaLink after ${pageCount} pages`);
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.logger.warn(`Failed to initialize delta sync: ${errorMessage}`);
-      }
-
-      // Fallback: use timestamp if deltaLink not obtained
-      if (!deltaLink) {
-        const lastMessageDate = messages.length > 0
-          ? messages[messages.length - 1].receivedDateTime
-          : new Date().toISOString();
-        deltaLink = lastMessageDate;
-        this.logger.debug(`Using timestamp fallback: ${deltaLink}`);
+      if (latestReceivedDate) {
+        this.logger.debug(`Most recent message timestamp: ${latestReceivedDate}`);
       }
 
       return {
         messagesProcessed,
         newMessages,
-        deltaLink,
+        latestReceivedDate,
       };
     } catch (error) {
       this.logger.error('Full sync error:', error);
       throw error;
+    }
+  }
+
+  private async syncFullAndInitializeDelta(
+    accessToken: string,
+    email: string,
+    providerId: string,
+    tenantId: string,
+  ): Promise<MicrosoftFullSyncInitResult> {
+    const fullResult = await this.syncFull(accessToken, email, providerId, tenantId);
+
+    let syncToken: string;
+    let mode: MicrosoftSyncMode = 'delta';
+    let latestTimestamp = fullResult.latestReceivedDate;
+
+    try {
+      syncToken = await this.initializeDeltaLink(accessToken);
+      this.logger.debug('Initialized Microsoft delta link after full sync');
+    } catch (error) {
+      mode = 'timestamp';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (this.isDeltaUnsupportedError(error)) {
+        this.logger.warn(
+          'Microsoft account does not support change tracking; using timestamp fallback for incremental sync.',
+        );
+      } else {
+        this.logger.warn(
+          `Failed to initialize delta link via Microsoft Graph (reason: ${errorMessage}); falling back to timestamp tracking.`,
+        );
+      }
+
+      if (!latestTimestamp) {
+        latestTimestamp = new Date().toISOString();
+      }
+      syncToken = latestTimestamp;
+    }
+
+    return {
+      messagesProcessed: fullResult.messagesProcessed,
+      newMessages: fullResult.newMessages,
+      syncToken,
+      mode,
+      latestTimestamp,
+    };
+  }
+
+  private isDeltaUnsupportedError(error: any): boolean {
+    const message: string | undefined =
+      error?.response?.data?.error?.message || error?.message || error?.toString?.();
+    const code: string | undefined = error?.response?.data?.error?.code;
+
+    if (typeof message === 'string' && message.toLowerCase().includes('change tracking is not supported')) {
+      return true;
+    }
+
+    if (typeof code === 'string' && code.toLowerCase().includes('changetracking')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private normalizeTimestamp(timestamp?: Date | string): string | undefined {
+    if (!timestamp) {
+      return undefined;
+    }
+
+    if (timestamp instanceof Date) {
+      return timestamp.toISOString();
+    }
+
+    const parsed = new Date(timestamp);
+    if (Number.isNaN(parsed.getTime())) {
+      return undefined;
+    }
+
+    return parsed.toISOString();
+  }
+
+  private async initializeDeltaLink(accessToken: string): Promise<string> {
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+    };
+
+    let requestUrl = `${this.GRAPH_API_BASE}/me/messages/delta?$select=id&$top=50`;
+    let page = 0;
+    const maxPages = 50;
+
+    while (true) {
+      if (page++ >= maxPages) {
+        throw new Error(
+          `Delta initialization exceeded ${maxPages} pages without receiving a delta link`,
+        );
+      }
+
+      const response: AxiosResponse<MicrosoftDeltaResponse> =
+        await axios.get<MicrosoftDeltaResponse>(requestUrl, { headers });
+      const deltaLink = response.data['@odata.deltaLink'];
+      const nextLink = response.data['@odata.nextLink'];
+
+      if (deltaLink) {
+        return deltaLink;
+      }
+
+      if (!nextLink) {
+        throw new Error('Delta initialization ended without delta or next links from Microsoft Graph');
+      }
+
+      requestUrl = nextLink;
     }
   }
 
