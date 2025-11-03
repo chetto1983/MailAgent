@@ -4,7 +4,7 @@ import { simpleParser } from 'mailparser';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
+import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 
 const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
 const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -16,7 +16,7 @@ export class ImapSyncService {
   constructor(
     private prisma: PrismaService,
     private crypto: CryptoService,
-    private knowledgeBase: KnowledgeBaseService,
+    private emailEmbeddingQueue: EmailEmbeddingQueueService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -361,7 +361,7 @@ export class ImapSyncService {
       this.logger.debug(`Saved email UID ${message.uid}: ${subject} from ${from}`);
 
       try {
-        await this.knowledgeBase.createEmbeddingForEmail({
+        await this.emailEmbeddingQueue.enqueue({
           tenantId,
           emailId: emailRecord.id,
           subject,
@@ -371,11 +371,11 @@ export class ImapSyncService {
           from,
           receivedAt,
         });
-      } catch (embeddingError) {
-        const messageText =
-          embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
+        this.logger.verbose(`Queued embedding job for IMAP message UID ${message.uid}`);
+      } catch (queueError) {
+        const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
         this.logger.warn(
-          `Failed to generate embedding for IMAP message UID ${message.uid}: ${messageText}`,
+          `Failed to enqueue embedding job for IMAP message UID ${message.uid}: ${queueMessage}`,
         );
       }
 

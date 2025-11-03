@@ -1,12 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { MistralService } from './mistral.service';
 import { EmbeddingsService } from './embeddings.service';
-import { Prisma } from '@prisma/client';
+import { EmailEmbeddingQueueService } from './email-embedding.queue';
 
 interface BackfillResult {
   processed: number;
-  embedded: number;
+  embedded: number; // Number of emails queued for embedding
   skipped: number;
   remaining: number;
 }
@@ -43,6 +44,8 @@ export class KnowledgeBaseService {
     private readonly prisma: PrismaService,
     private readonly mistralService: MistralService,
     private readonly embeddingsService: EmbeddingsService,
+    @Inject(forwardRef(() => EmailEmbeddingQueueService))
+    private readonly emailEmbeddingQueue: EmailEmbeddingQueueService,
   ) {}
 
   async backfillEmailEmbeddingsForTenant(
@@ -50,14 +53,12 @@ export class KnowledgeBaseService {
     options: BackfillOptions = {},
   ): Promise<BackfillResult> {
     const limit = options.limit && options.limit > 0 ? options.limit : 100;
-    const batchSize = options.batchSize && options.batchSize > 0 ? options.batchSize : 20;
+    const requestedBatchSize = options.batchSize && options.batchSize > 0 ? options.batchSize : 10;
+    const batchSize = Math.min(requestedBatchSize, 10);
     const includeDeleted = options.includeDeleted ?? false;
 
-    const mistralClient = await this.mistralService.createMistralClient();
-    const embeddingModel = this.mistralService.getEmbeddingModel();
-
     let processed = 0;
-    let embedded = 0;
+    let enqueued = 0;
     let skipped = 0;
 
     while (processed < limit) {
@@ -70,35 +71,34 @@ export class KnowledgeBaseService {
 
       for (const email of emails) {
         processed += 1;
-        const content = this.composeEmailEmbeddingContent(email);
+        const contentPreview = this.composeEmailEmbeddingContent(email);
 
-        if (!content) {
+        if (!contentPreview) {
           skipped += 1;
           continue;
         }
 
         try {
-          const embedding = await this.mistralService.generateEmbedding(content, mistralClient);
-          await this.embeddingsService.saveEmbedding({
+          await this.emailEmbeddingQueue.enqueue({
             tenantId,
-            content,
-            embedding,
-            model: embeddingModel,
-            documentName: email.subject,
-            metadata: {
-              source: 'email',
-              emailId: email.id,
-              subject: email.subject,
-              from: email.from,
-              receivedAt: email.receivedAt?.toISOString?.() ?? email.receivedAt,
-            },
+            emailId: email.id,
+            subject: email.subject,
+            snippet: email.snippet,
+            bodyText: email.bodyText,
+            bodyHtml: email.bodyHtml,
+            from: email.from,
+            receivedAt: email.receivedAt,
           });
-          embedded += 1;
+          enqueued += 1;
         } catch (error) {
           skipped += 1;
           const message = error instanceof Error ? error.message : String(error);
-          this.logger.error(`Failed to create embedding for email ${email.id}: ${message}`);
+          this.logger.error(`Failed to enqueue embedding job for email ${email.id}: ${message}`);
         }
+      }
+
+      if (processed < limit && emails.length === batchCount) {
+        await this.pauseBetweenBackfillBatches();
       }
     }
 
@@ -106,7 +106,7 @@ export class KnowledgeBaseService {
 
     return {
       processed,
-      embedded,
+      embedded: enqueued,
       skipped,
       remaining,
     };
@@ -289,6 +289,11 @@ export class KnowledgeBaseService {
 
     const remaining = result?.[0]?.remaining ?? BigInt(0);
     return Number(remaining);
+  }
+
+  private async pauseBetweenBackfillBatches(): Promise<void> {
+    const pauseMs = 1000;
+    await new Promise((resolve) => setTimeout(resolve, pauseMs));
   }
 
   private composeEmailEmbeddingContent(email: {

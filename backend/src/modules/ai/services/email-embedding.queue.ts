@@ -1,5 +1,5 @@
 import { Job, Queue, Worker } from 'bullmq';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { KnowledgeBaseService } from './knowledge-base.service';
 
@@ -22,6 +22,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
 
   constructor(
     private readonly config: ConfigService,
+    @Inject(forwardRef(() => KnowledgeBaseService))
     private readonly knowledgeBaseService: KnowledgeBaseService,
   ) {}
 
@@ -32,16 +33,46 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
       password: this.config.get<string>('REDIS_PASSWORD'),
     };
 
-    this.queue = new Queue<EmailEmbeddingJob>('email-embedding', { connection });
+    this.queue = new Queue<EmailEmbeddingJob>('email-embedding', {
+      connection,
+      defaultJobOptions: {
+        attempts: 6,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+        removeOnComplete: true,
+        removeOnFail: 1000,
+      },
+    });
+
     this.worker = new Worker<EmailEmbeddingJob, boolean>(
       'email-embedding',
       async (job: Job<EmailEmbeddingJob>) => {
         this.logger.debug(`Processing email embedding job ${job.id}`);
-        return this.knowledgeBaseService.createEmbeddingForEmail(job.data);
+        try {
+          return await this.knowledgeBaseService.createEmbeddingForEmail(job.data);
+        } catch (error) {
+          if (this.isRateLimitError(error)) {
+            const delayMs = this.computeBackoffDelay(job.attemptsMade);
+            this.logger.warn(
+              `Rate limit hit for email embedding job ${job.id}. Retry ${job.attemptsMade + 1} in ${delayMs}ms`,
+            );
+            await job.updateProgress({
+              status: 'rate_limited',
+              retryInMs: delayMs,
+            });
+          }
+          throw error;
+        }
       },
       {
         connection,
-        concurrency: 2,
+        concurrency: 1,
+        limiter: {
+          max: 6,
+          duration: 1000,
+        },
       },
     );
 
@@ -62,11 +93,41 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
 
   async enqueue(job: EmailEmbeddingJob) {
     await this.queue.add('create', job, {
-      attempts: 3,
+      attempts: 6,
       backoff: {
         type: 'exponential',
         delay: 1000,
       },
     });
+  }
+
+  private isRateLimitError(error: unknown): boolean {
+    if (!error) {
+      return false;
+    }
+
+    const possibleStatus =
+      (error as any)?.status ??
+      (error as any)?.statusCode ??
+      (error as any)?.response?.status ??
+      (error as any)?.response?.statusCode;
+
+    if (typeof possibleStatus === 'number') {
+      return possibleStatus === 429;
+    }
+
+    if (error instanceof Error && typeof error.message === 'string') {
+      return error.message.includes('429');
+    }
+
+    return false;
+  }
+
+  private computeBackoffDelay(attemptsMade: number): number {
+    const baseDelay = 1000;
+    const exponent = Math.max(0, attemptsMade);
+    const delay = baseDelay * Math.pow(2, exponent);
+    // Cap delay at 30 seconds to avoid runaway waits
+    return Math.min(delay, 30000);
   }
 }

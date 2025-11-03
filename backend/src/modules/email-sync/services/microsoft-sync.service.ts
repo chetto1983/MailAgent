@@ -5,7 +5,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
+import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 
 interface MicrosoftMessage {
   id: string;
@@ -61,7 +61,7 @@ export class MicrosoftSyncService {
     private prisma: PrismaService,
     private crypto: CryptoService,
     private microsoftOAuth: MicrosoftOAuthService,
-    private knowledgeBase: KnowledgeBaseService,
+    private emailEmbeddingQueue: EmailEmbeddingQueueService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -730,7 +730,7 @@ export class MicrosoftSyncService {
       this.logger.debug(`Saved email: ${subject} from ${from}`);
 
       try {
-        await this.knowledgeBase.createEmbeddingForEmail({
+        await this.emailEmbeddingQueue.enqueue({
           tenantId,
           emailId: emailRecord.id,
           subject,
@@ -740,11 +740,11 @@ export class MicrosoftSyncService {
           from,
           receivedAt: emailRecord.receivedAt,
         });
-      } catch (embeddingError) {
-        const messageText =
-          embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
+        this.logger.verbose(`Queued embedding job for Microsoft message ${messageId}`);
+      } catch (queueError) {
+        const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
         this.logger.warn(
-          `Failed to generate embedding for Microsoft message ${messageId}: ${messageText}`,
+          `Failed to enqueue embedding job for Microsoft message ${messageId}: ${queueMessage}`,
         );
       }
 
