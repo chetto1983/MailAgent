@@ -20,6 +20,8 @@ export function MicrosoftProviderCard({ onSuccess }: MicrosoftProviderCardProps)
       // Get OAuth URL
       const { authUrl } = await providersApi.getMicrosoftAuthUrl();
 
+      onSuccess();
+
       // Redirect to Microsoft OAuth
       window.location.href = authUrl;
     } catch (err: any) {

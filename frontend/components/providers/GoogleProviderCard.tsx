@@ -20,6 +20,8 @@ export function GoogleProviderCard({ onSuccess }: GoogleProviderCardProps) {
       // Get OAuth URL
       const { authUrl } = await providersApi.getGoogleAuthUrl();
 
+      onSuccess();
+
       // Redirect to Google OAuth
       window.location.href = authUrl;
     } catch (err: any) {

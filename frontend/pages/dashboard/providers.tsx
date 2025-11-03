@@ -102,6 +102,7 @@ export default function ProvidersPage() {
             <h1 className="text-2xl font-bold">Email & Calendar Providers</h1>
             <p className="text-sm text-muted-foreground">
               Connect your email and calendar accounts
+              {user ? ` for ${user.email}` : ''}
             </p>
           </div>
           <Link href="/dashboard">
