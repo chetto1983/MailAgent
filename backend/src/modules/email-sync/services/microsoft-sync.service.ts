@@ -5,6 +5,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
+import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 
 interface MicrosoftMessage {
   id: string;
@@ -60,6 +61,7 @@ export class MicrosoftSyncService {
     private prisma: PrismaService,
     private crypto: CryptoService,
     private microsoftOAuth: MicrosoftOAuthService,
+    private knowledgeBase: KnowledgeBaseService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -682,7 +684,7 @@ export class MicrosoftSyncService {
       const labels = message.categories || [];
 
       // Save to database with upsert to prevent duplicates
-      await this.prisma.email.upsert({
+      const emailRecord = await this.prisma.email.upsert({
         where: {
           providerId_externalId: {
             providerId,
@@ -726,6 +728,25 @@ export class MicrosoftSyncService {
       });
 
       this.logger.debug(`Saved email: ${subject} from ${from}`);
+
+      try {
+        await this.knowledgeBase.createEmbeddingForEmail({
+          tenantId,
+          emailId: emailRecord.id,
+          subject,
+          snippet,
+          bodyText,
+          bodyHtml,
+          from,
+          receivedAt: emailRecord.receivedAt,
+        });
+      } catch (embeddingError) {
+        const messageText =
+          embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
+        this.logger.warn(
+          `Failed to generate embedding for Microsoft message ${messageId}: ${messageText}`,
+        );
+      }
 
       return true;
     } catch (error) {

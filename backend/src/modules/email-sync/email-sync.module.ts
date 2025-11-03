@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
+import { AiModule } from '../ai/ai.module';
 
 // Services
 import { QueueService } from './services/queue.service';
@@ -23,6 +24,7 @@ import { EmailSyncController } from './email-sync.controller';
     ScheduleModule.forRoot(),
     PrismaModule,
     ProvidersModule, // For OAuth services and crypto
+    AiModule,
   ],
   controllers: [EmailSyncController],
   providers: [

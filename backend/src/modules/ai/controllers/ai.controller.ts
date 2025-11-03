@@ -16,13 +16,16 @@ export class AiController {
   @Post('chat')
   async chat(
     @Request() req: AuthenticatedRequest,
-    @Body() body: { message: string; conversationHistory?: any[] },
+    @Body() body: { message: string; conversationHistory?: any[]; conversationId?: string },
   ) {
     const response = await this.mistralService.generateResponse(
       req.user.tenantId,
       req.user.userId,
       body.message,
       body.conversationHistory || [],
+      {
+        conversationId: body.conversationId,
+      },
     );
 
     return {

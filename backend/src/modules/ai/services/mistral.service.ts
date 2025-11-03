@@ -4,6 +4,7 @@ import { Mistral } from '@mistralai/mistralai';
 import type { Messages as MistralChatMessage } from '@mistralai/mistralai/models/components/chatcompletionrequest.js';
 import type { AssistantMessage } from '@mistralai/mistralai/models/components/assistantmessage.js';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EmbeddingsService } from './embeddings.service';
 
 type ConversationMessage = {
   role: 'assistant' | 'user';
@@ -19,14 +20,32 @@ export class MistralService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private embeddingsService: EmbeddingsService,
   ) {}
 
   private getApiKey(): string | undefined {
     return this.configService.get<string>('MISTRAL_API_KEY') || process.env.MISTRAL_API_KEY;
   }
 
+  private getRequiredApiKey(): string {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      throw new Error('Mistral API key is not configured');
+    }
+    return apiKey;
+  }
+
   private getModel(): string {
     return this.configService.get<string>('MISTRAL_MODEL') || process.env.MISTRAL_MODEL || this.defaultModel;
+  }
+
+  getEmbeddingModel(): string {
+    return this.embeddingModel;
+  }
+
+  async createMistralClient(): Promise<Mistral> {
+    const apiKey = this.getRequiredApiKey();
+    return this.createClient(apiKey);
   }
 
   private createClient(apiKey: string): Mistral {
@@ -86,9 +105,10 @@ export class MistralService {
   /**
    * Generate embeddings for RAG
    */
-  async generateEmbedding(text: string, client: Mistral): Promise<number[]> {
+  async generateEmbedding(text: string, client?: Mistral): Promise<number[]> {
     try {
-      const response = await client.embeddings.create({
+      const mistralClient = client ?? (await this.createMistralClient());
+      const response = await mistralClient.embeddings.create({
         model: this.embeddingModel,
         inputs: text,
       });
@@ -109,13 +129,13 @@ export class MistralService {
    * Get similar embeddings from database for RAG context
    */
   async searchSimilarContent(tenantId: string, embedding: number[], limit: number = 5) {
-    // This would use pgvector similarity search
-    // Example: SELECT * FROM embeddings WHERE tenant_id = $1 ORDER BY vector <-> $2 LIMIT $3
-    // For now, returning mock implementation
-    this.logger.log(`Searching for similar content for tenant: ${tenantId}`);
-
-    // TODO: Implement pgvector similarity search using Prisma or raw SQL
-    return [];
+    try {
+      return await this.embeddingsService.findSimilarContent(tenantId, embedding, limit);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Similarity search failed: ${errorMessage}`);
+      return [];
+    }
   }
 
   /**
@@ -126,14 +146,17 @@ export class MistralService {
     userId: string,
     userPrompt: string,
     conversationHistory: any[] = [],
+    options?: { conversationId?: string },
   ): Promise<string> {
     const apiKey = this.getApiKey();
     const model = this.getModel();
+    const conversationId = options?.conversationId ?? null;
 
-    await this.prisma.message.create({
+    const userMessage = await this.prisma.message.create({
       data: {
         tenantId,
         userId,
+        conversationId,
         role: 'user',
         content: userPrompt,
       },
@@ -147,6 +170,7 @@ export class MistralService {
         data: {
           tenantId,
           userId,
+          conversationId,
           role: 'assistant',
           content: fallbackResponse,
         },
@@ -160,15 +184,34 @@ export class MistralService {
       const mistralClient = this.createClient(apiKey);
 
       let ragContext = '';
+      let userEmbedding: number[] | undefined;
       try {
         // Generate embedding for user prompt
-        const userEmbedding = await this.generateEmbedding(userPrompt, mistralClient);
+        userEmbedding = await this.generateEmbedding(userPrompt, mistralClient);
+
+        await this.embeddingsService.saveEmbedding({
+          tenantId,
+          messageId: userMessage.id,
+          content: userPrompt,
+          embedding: userEmbedding,
+          model: this.embeddingModel,
+          metadata: {
+            source: 'user_prompt',
+            createdBy: userId,
+          },
+        });
 
         // Search for similar content in knowledge base
         const similarContent = await this.searchSimilarContent(tenantId, userEmbedding);
 
         if (similarContent.length > 0) {
-          ragContext = '\n\nContext:\n' + similarContent.map((c: any) => c.content).join('\n\n');
+          const contextBlocks = similarContent
+            .map((contentItem: any, index: number) => {
+              const title = contentItem.documentName || `Fonte ${index + 1}`;
+              return `### ${title}\n${contentItem.content}`;
+            })
+            .join('\n\n');
+          ragContext = `\n\n---\nUtilizza le seguenti informazioni se rilevanti:\n\n${contextBlocks}\n\n---\n`;
         }
       } catch (ragError) {
         const ragMessage = ragError instanceof Error ? ragError.message : String(ragError);
@@ -203,6 +246,7 @@ export class MistralService {
         data: {
           tenantId,
           userId,
+          conversationId,
           role: 'assistant',
           content: assistantResponse,
         },
@@ -236,6 +280,7 @@ export class MistralService {
         data: {
           tenantId,
           userId,
+          conversationId,
           role: 'assistant',
           content: fallbackResponse,
         },

@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
+import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 
 @Injectable()
 export class GoogleSyncService {
@@ -13,6 +14,7 @@ export class GoogleSyncService {
     private prisma: PrismaService,
     private crypto: CryptoService,
     private googleOAuth: GoogleOAuthService,
+    private knowledgeBase: KnowledgeBaseService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -320,7 +322,7 @@ export class GoogleSyncService {
       const sentAt = dateStr ? new Date(dateStr) : new Date(message.internalDate ? parseInt(message.internalDate) : Date.now());
 
       // Check if email already exists (upsert)
-      await this.prisma.email.upsert({
+      const emailRecord = await this.prisma.email.upsert({
         where: {
           providerId_externalId: {
             providerId,
@@ -361,6 +363,25 @@ export class GoogleSyncService {
       });
 
       this.logger.debug(`Saved email: ${subject} from ${from}`);
+
+      try {
+        await this.knowledgeBase.createEmbeddingForEmail({
+          tenantId,
+          emailId: emailRecord.id,
+          subject,
+          snippet,
+          bodyText,
+          bodyHtml,
+          from,
+          receivedAt: emailRecord.receivedAt,
+        });
+      } catch (embeddingError) {
+        const embeddingMessage =
+          embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
+        this.logger.warn(
+          `Failed to generate embedding for Gmail message ${messageId}: ${embeddingMessage}`,
+        );
+      }
 
       return true;
     } catch (error) {

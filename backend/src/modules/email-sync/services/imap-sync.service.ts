@@ -1,8 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ImapFlow } from 'imapflow';
+import { simpleParser } from 'mailparser';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
+import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
+
+const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
+const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 
 @Injectable()
 export class ImapSyncService {
@@ -11,6 +16,7 @@ export class ImapSyncService {
   constructor(
     private prisma: PrismaService,
     private crypto: CryptoService,
+    private knowledgeBase: KnowledgeBaseService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -274,40 +280,31 @@ export class ImapSyncService {
       const sentAt = envelope.date ? new Date(envelope.date) : new Date();
       const receivedAt = new Date();
 
-      // Fetch body content (text and html)
-      // TEMPORARY FIX: Skip body download to prevent timeout
-      // TODO: Implement proper timeout or background body download
       let bodyText = '';
       let bodyHtml = '';
 
-      this.logger.debug(`Processing message UID ${message.uid} without body (temporary fix)`);
-
-      // Original body download code (DISABLED due to timeout issues)
-      /*
-      try {
-        // Download the full message to get body content
-        const download = await client.download(message.uid.toString(), '1', { uid: true });
-        const chunks: Buffer[] = [];
-
-        for await (const chunk of download.content) {
-          chunks.push(chunk);
+      const bodyBuffer = await this.downloadMessageBody(client, message.uid);
+      if (bodyBuffer) {
+        try {
+          const parsed = await simpleParser(bodyBuffer);
+          bodyText = parsed.text ?? '';
+          bodyHtml = typeof parsed.html === 'string' ? parsed.html : '';
+        } catch (parseError) {
+          const parseMessage = parseError instanceof Error ? parseError.message : String(parseError);
+          this.logger.warn(`Failed to parse IMAP message UID ${message.uid}: ${parseMessage}`);
         }
-
-        const fullMessage = Buffer.concat(chunks).toString('utf-8');
-
-        // Simple extraction of text from message body
-        // In production, you'd use a proper email parser like mailparser
-        const bodyMatch = fullMessage.match(/\r?\n\r?\n([\s\S]*)/);
-        if (bodyMatch) {
-          bodyText = bodyMatch[1].substring(0, 5000); // Limit to 5000 chars
-        }
-      } catch (downloadError) {
-        this.logger.warn(`Could not download body for UID ${message.uid}:`, downloadError);
       }
-      */
+
+      if (bodyText.length > 10000) {
+        bodyText = bodyText.slice(0, 10000);
+      }
+      if (bodyHtml.length > 20000) {
+        bodyHtml = bodyHtml.slice(0, 20000);
+      }
 
       // Create snippet from body or subject
-      const snippet = bodyText.substring(0, 200) || subject;
+      const snippetSource = bodyText || this.stripHtml(bodyHtml) || subject;
+      const snippet = snippetSource.substring(0, 200);
 
       // Extract flags
       const flags = message.flags || new Set();
@@ -315,7 +312,7 @@ export class ImapSyncService {
       const isStarred = flags.has('\\Flagged');
 
       // Save to database with upsert to prevent duplicates
-      await this.prisma.email.upsert({
+      const emailRecord = await this.prisma.email.upsert({
         where: {
           providerId_externalId: {
             providerId,
@@ -363,10 +360,64 @@ export class ImapSyncService {
 
       this.logger.debug(`Saved email UID ${message.uid}: ${subject} from ${from}`);
 
+      try {
+        await this.knowledgeBase.createEmbeddingForEmail({
+          tenantId,
+          emailId: emailRecord.id,
+          subject,
+          snippet,
+          bodyText,
+          bodyHtml,
+          from,
+          receivedAt,
+        });
+      } catch (embeddingError) {
+        const messageText =
+          embeddingError instanceof Error ? embeddingError.message : String(embeddingError);
+        this.logger.warn(
+          `Failed to generate embedding for IMAP message UID ${message.uid}: ${messageText}`,
+        );
+      }
+
       return true;
     } catch (error) {
       this.logger.error(`Failed to process message UID ${message.uid}:`, error);
       return false;
     }
+  }
+
+  private async downloadMessageBody(client: ImapFlow, uid: number): Promise<Buffer | null> {
+    const downloadTask = (async () => {
+      const source = await client.download(`${uid}`, undefined, { uid: true });
+      const chunks: Buffer[] = [];
+      let totalBytes = 0;
+
+      for await (const chunk of source.content) {
+        totalBytes += chunk.length;
+        if (totalBytes > IMAP_BODY_MAX_BYTES) {
+          throw new Error(`Message body exceeds ${IMAP_BODY_MAX_BYTES} bytes limit`);
+        }
+        chunks.push(chunk);
+      }
+
+      return Buffer.concat(chunks);
+    })();
+
+    try {
+      return await Promise.race([
+        downloadTask,
+        new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error('IMAP body download timed out')), IMAP_BODY_DOWNLOAD_TIMEOUT_MS),
+        ),
+      ]);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Could not download body for UID ${uid}: ${msg}`);
+      return null;
+    }
+  }
+
+  private stripHtml(html: string): string {
+    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   }
 }

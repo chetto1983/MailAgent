@@ -166,6 +166,12 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 ### AI Chat
 - `POST /ai/chat` - Send message to AI
 
+### AI Knowledge Base
+- `POST /ai/knowledge-base/emails/backfill` - Admin: generate embeddings for existing emails
+- `GET /ai/knowledge-base/embeddings` - Admin: inspect stored embeddings
+- `DELETE /ai/knowledge-base/embeddings/:id` - Admin: remove a specific embedding
+- `DELETE /ai/knowledge-base/embeddings/email/:emailId` - Admin: purge embeddings linked to an email
+
 ### Email Configuration
 - `GET /email-configs` - List email accounts
 - `POST /email-configs` - Add email account
