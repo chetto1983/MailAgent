@@ -14,6 +14,114 @@ interface RunAgentOptions {
   history?: Array<{ role: string; content: string }>;
 }
 
+const isAssistantMessage = (message: any): boolean => {
+  if (!message) {
+    return false;
+  }
+
+  const role = message.role ?? message.type ?? message._type;
+  if (typeof role === 'string') {
+    const normalized = role.toLowerCase();
+    if (normalized === 'assistant' || normalized === 'ai') {
+      return true;
+    }
+  }
+
+  if (typeof message._getType === 'function') {
+    try {
+      const derived = message._getType();
+      return typeof derived === 'string' && derived.toLowerCase() === 'ai';
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+};
+
+const extractMessageText = (message: any): string => {
+  if (!message) {
+    return '';
+  }
+
+  const content = message.content;
+  if (!content) {
+    return '';
+  }
+
+  if (typeof content === 'string') {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (!part) {
+          return '';
+        }
+        if (typeof part === 'string') {
+          return part;
+        }
+        if (typeof part === 'object') {
+          if (typeof part.text === 'string') {
+            return part.text;
+          }
+          if (typeof part.content === 'string') {
+            return part.content;
+          }
+          if (typeof part.message === 'string') {
+            return part.message;
+          }
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+
+  return '';
+};
+
+const extractToolSteps = (result: any) => {
+  const executed =
+    (Array.isArray(result?.executedTools) && result.executedTools) ||
+    (Array.isArray(result?.steps) && result.steps) ||
+    (Array.isArray(result?.toolInvocations) && result.toolInvocations);
+
+  if (!executed) {
+    return undefined;
+  }
+
+  const mapped = executed
+    .map((entry: any) => {
+      const toolName = entry?.name ?? entry?.tool ?? 'tool';
+      const rawOutput =
+        entry?.result ??
+        entry?.output ??
+        entry?.response ??
+        (Array.isArray(entry?.results) ? entry.results.join('\n') : undefined);
+
+      if (rawOutput === undefined || rawOutput === null) {
+        return {
+          tool: toolName,
+          output: '',
+        };
+      }
+
+      const output =
+        typeof rawOutput === 'string' ? rawOutput : JSON.stringify(rawOutput);
+
+      return {
+        tool: toolName,
+        output,
+      };
+    })
+    .filter((item: { tool: string; output: string }) => item.output.length > 0);
+
+  return mapped.length ? mapped : undefined;
+};
+
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name);
@@ -192,12 +300,29 @@ export class AgentService {
         `type=${typeof result} keys=${resultKeys} outputType=${outputType}`,
     );
 
-    const output =
-      typeof result?.output === 'string'
-        ? result.output.trim()
-        : typeof result === 'string'
-          ? result
-          : 'I could not produce a response for this request.';
+    let output = '';
+    if (typeof result?.output === 'string') {
+      output = result.output.trim();
+    } else if (typeof result === 'string') {
+      output = result.trim();
+    } else if (typeof result?.structuredResponse === 'string') {
+      output = result.structuredResponse.trim();
+    }
+
+    if (!output && Array.isArray(result?.messages)) {
+      const lastAiMessage = [...result.messages]
+        .reverse()
+        .find((message) => isAssistantMessage(message));
+      output = extractMessageText(lastAiMessage);
+    }
+
+    if (!output && typeof result?.final_output === 'string') {
+      output = result.final_output.trim();
+    }
+
+    if (!output) {
+      output = 'I could not produce a response for this request.';
+    }
 
     await this.prisma.message.create({
       data: {
@@ -209,15 +334,7 @@ export class AgentService {
       },
     });
 
-    const intermediateSteps = Array.isArray((result as any)?.steps)
-      ? (result as any).steps.map((step: any) => ({
-          tool: step?.tool ?? 'unknown',
-          output:
-            typeof step?.output === 'string'
-              ? step.output
-              : JSON.stringify(step?.output ?? ''),
-        }))
-      : undefined;
+    const intermediateSteps = extractToolSteps(result);
 
     const response = {
       output,
