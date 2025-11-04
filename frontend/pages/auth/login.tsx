@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth-store';
 export default function LoginPage() {
   const router = useRouter();
   const { setToken, setUser } = useAuthStore();
+
   const [step, setStep] = useState<'login' | 'otp'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,15 +19,14 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Read email from query parameter on mount
   useEffect(() => {
     if (router.query.email) {
       setEmail(router.query.email as string);
     }
   }, [router.query.email]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setError('');
 
@@ -38,9 +38,8 @@ export default function LoginPage() {
 
       if (response.data.mfaRequired) {
         setStep('otp');
-        setPassword(''); // Clear password for security
+        setPassword('');
       } else {
-        // Login successful
         setToken(response.data.accessToken);
         setUser(response.data.user);
         router.push('/dashboard');
@@ -52,8 +51,8 @@ export default function LoginPage() {
     }
   };
 
-  const handleOtpVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleOtpVerify = async (event: React.FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setError('');
 
@@ -64,7 +63,6 @@ export default function LoginPage() {
       });
 
       if (response.data.success) {
-        // OTP verified, token returned directly from verify-otp endpoint
         setToken(response.data.accessToken);
         setUser(response.data.user);
         router.push('/dashboard');
@@ -100,7 +98,7 @@ export default function LoginPage() {
                   type="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   required
                 />
               </div>
@@ -110,7 +108,7 @@ export default function LoginPage() {
                   type="password"
                   placeholder="Enter your password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   required
                 />
               </div>
@@ -126,7 +124,7 @@ export default function LoginPage() {
                   type="email"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   required
                 />
               </div>
@@ -136,7 +134,7 @@ export default function LoginPage() {
                   type="text"
                   placeholder="000000"
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
+                  onChange={(event) => setOtp(event.target.value)}
                   maxLength={6}
                   required
                 />
@@ -148,7 +146,10 @@ export default function LoginPage() {
                 type="button"
                 variant="outline"
                 className="w-full"
-                onClick={() => setStep('login')}
+                onClick={() => {
+                  setStep('login');
+                  setOtp('');
+                }}
               >
                 Back to Login
               </Button>
@@ -156,7 +157,7 @@ export default function LoginPage() {
           )}
 
           <p className="text-sm text-center mt-4">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/auth/register" className="text-blue-600 hover:underline">
               Sign up
             </Link>

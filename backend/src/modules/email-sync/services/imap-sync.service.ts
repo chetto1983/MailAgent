@@ -527,6 +527,12 @@ export class ImapSyncService {
         }
       }
 
+      await this.applyStatusMetadata(
+        emailRecord.id,
+        emailRecord.metadata as Record<string, any> | null,
+        isDeleted ? 'deleted' : 'active',
+      );
+
       return true;
     } catch (error) {
       this.logger.error(`Failed to process message UID ${message.uid}:`, error);
@@ -562,6 +568,34 @@ export class ImapSyncService {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Could not download body for UID ${uid}: ${msg}`);
       return null;
+    }
+  }
+
+  private async applyStatusMetadata(
+    emailId: string,
+    existing: Record<string, any> | null | undefined,
+    status: 'deleted' | 'active',
+  ): Promise<void> {
+    const next = this.mergeEmailStatusMetadata(existing, status);
+    const shouldUpdate =
+      !existing ||
+      existing.status !== next.status ||
+      existing.deletedAt !== next.deletedAt;
+
+    if (!shouldUpdate) {
+      return;
+    }
+
+    try {
+      await this.prisma.email.update({
+        where: { id: emailId },
+        data: {
+          metadata: next,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to update metadata for IMAP email ${emailId}: ${message}`);
     }
   }
 

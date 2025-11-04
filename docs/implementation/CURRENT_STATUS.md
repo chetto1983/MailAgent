@@ -34,12 +34,27 @@
 
 ### 6. Email Embedding Pipeline Stabilized
 - **Moved:** All `createEmbeddingForEmail` calls behind `EmailEmbeddingQueueService` so sync jobs only enqueue work
-- **Added:** BullMQ limiter (`max: 6`, `duration: 1000`) with concurrency 1 to respect Mistral’s 6 req/s ceiling
+- **Added:** BullMQ limiter (`max: 6`, `duration: 1000`) with concurrency 1 to respect Mistral's 6 req/s ceiling
 - **Enhanced:** Automatic exponential backoff for HTTP 429 with capped delay (30s) and status tracking via `job.updateProgress`
 - **Updated:** Backfill process now enqueues batches of 10 emails at a time, pausing 1s between batches to smooth load
 - **Guarded:** Embedding creation skips when an email already has a stored vector (checked via new `EmbeddingsService.hasEmbeddingForEmail`)
 - **De-duplicated:** Queue jobs reuse `emailId` as `jobId`, preventing parallel duplicates while a job is in-flight
 - **Files:** `backend/src/modules/ai/services/{email-embedding.queue.ts,embeddings.service.ts,knowledge-base.service.ts}` and sync services for Google/Microsoft/IMAP
+
+### 7. Email Sync Deletion & Cleanup
+- **Gmail:** Incremental history processing now handles `messagesDeleted`, `labelsAdded`, and `labelsRemoved`, ensuring folders/labels stay aligned and soft-deleted emails land in `TRASH` with metadata (`backend/src/modules/email-sync/services/google-sync.service.ts`).
+- **IMAP:** Incremental sync reconciles missing UIDs and `\Deleted` flags, marking local rows as deleted and preserving audit metadata (`backend/src/modules/email-sync/services/imap-sync.service.ts`).
+- **Embeddings:** Scheduled cleanup (`backend/src/modules/email-sync/services/email-embedding-cleanup.service.ts`) strips vectors for emails flagged `isDeleted = true`, avoiding stale knowledge base entries.
+- **Metadata:** Email records now track `metadata.status`/`metadata.deletedAt` to support downstream auditing and eventual recovery flows.
+
+### 8. Account Deletion Lifecycle
+- **Full removal:** Deleting an account now hard-deletes the user and, when they are the last member, cascades deletion of the entire tenant, including providers, emails, and embeddings (`backend/src/modules/users/services/users.service.ts`).
+- **Queue cleanup:** Pending sync jobs and embedding jobs for the removed tenant are purged (`backend/src/modules/email-sync/services/queue.service.ts`, `backend/src/modules/ai/services/email-embedding.queue.ts`).
+- **Per-user workspace:** Each email address owns its own tenant automatically; registration/login flows derive the workspace slug from the email so no manual slug management is required (`frontend/pages/auth/{register,login}.tsx`, `backend/src/modules/auth/services/auth.service.ts`).
+
+### 9. Embedding Chunking
+- **Large emails:** Email bodies are automatically split into 12k-character chunks before embedding so Mistral never exceeds its 8k-token limit. Each chunk becomes a separate embedding with metadata indicating `chunkIndex`/`chunkCount` (`backend/src/modules/ai/services/knowledge-base.service.ts`).
+- **Partial failures:** Existing embeddings for the email are cleared first; chunk failures are logged individually without blocking the remaining chunks.
 
 ---
 

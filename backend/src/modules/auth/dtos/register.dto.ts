@@ -15,8 +15,4 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   lastName?: string;
-
-  @IsOptional()
-  @IsString()
-  tenantSlug?: string;
 }

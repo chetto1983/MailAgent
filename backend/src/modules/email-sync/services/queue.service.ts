@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { Queue, QueueEvents } from 'bullmq';
+import { Queue, QueueEvents, JobType } from 'bullmq';
 import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 import { SyncJobData, SyncStatus } from '../interfaces/sync-job.interface';
@@ -193,6 +193,36 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     const queue = this.getQueueByPriority(priority);
     await queue.obliterate({ force: true });
     this.logger.warn(`Obliterated ${priority} priority queue - all jobs deleted`);
+  }
+
+  async removeJobsForTenant(tenantId: string): Promise<number> {
+    const queues = [
+      { name: 'high', queue: this.highQueue },
+      { name: 'normal', queue: this.normalQueue },
+      { name: 'low', queue: this.lowQueue },
+    ];
+
+    const removableStates: JobType[] = ['waiting', 'delayed', 'paused', 'waiting-children'];
+    let removed = 0;
+
+    for (const { name, queue } of queues) {
+      const jobs = await queue.getJobs(removableStates, 0, -1);
+
+      for (const job of jobs) {
+        if (job?.data?.tenantId === tenantId) {
+          await job.remove();
+          removed += 1;
+        }
+      }
+
+      if (removed > 0) {
+        this.logger.verbose(
+          `Removed pending ${name} priority sync jobs for tenant ${tenantId}.`,
+        );
+      }
+    }
+
+    return removed;
   }
 
   private getQueueByPriority(priority: 'high' | 'normal' | 'low'): Queue<SyncJobData> {

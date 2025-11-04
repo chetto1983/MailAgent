@@ -54,7 +54,7 @@ export class EmailEmbeddingCleanupService {
 
   private async cleanupForEmail(email: DeletedEmailRecord): Promise<void> {
     const nowIso = new Date().toISOString();
-    const existingMetadata = (email.metadata ?? {}) as Record<string, any>;
+    const existingMetadata = (email.metadata ?? {});
 
     try {
       const removed = await this.knowledgeBaseService.deleteEmbeddingsForEmail(

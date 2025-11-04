@@ -102,6 +102,35 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
     });
   }
 
+  async removeJobsForTenant(tenantId: string): Promise<number> {
+    if (!this.queue) {
+      return 0;
+    }
+
+    const removableStates: Array<'waiting' | 'delayed' | 'paused' | 'waiting-children'> = [
+      'waiting',
+      'delayed',
+      'paused',
+      'waiting-children',
+    ];
+
+    const jobs = await this.queue.getJobs(removableStates, 0, -1);
+    let removed = 0;
+
+    for (const job of jobs) {
+      if (job?.data?.tenantId === tenantId) {
+        await job.remove();
+        removed += 1;
+      }
+    }
+
+    this.logger.verbose(
+      `Removed ${removed} pending email embedding job(s) for tenant ${tenantId}.`,
+    );
+
+    return removed;
+  }
+
   private isRateLimitError(error: unknown): boolean {
     if (!error) {
       return false;

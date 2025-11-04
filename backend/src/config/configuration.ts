@@ -115,7 +115,7 @@ export function loadConfiguration(): Configuration {
     process.env.FRONTEND_URL || 'http://localhost:3001',
     'https://localhost',
     'https://localhost:443',
-  ].filter(Boolean) as string[];
+  ].filter(Boolean);
 
   // OAuth redirect URIs - built from API_URL
   const gmailRedirectUri = `${apiUrl}/auth/gmail/callback`;

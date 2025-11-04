@@ -153,11 +153,26 @@ Ogni worker:
 1. Riceve un job dalla coda
 2. Decripta i token/credenziali del provider
 3. Chiama il servizio appropriato (Gmail, Microsoft, IMAP)
-4. Salva nuove email (TODO: implementare storage)
+4. Salva/aggiorna le email nel database (corpo, metadata, flag, etichette)
 5. Aggiorna `lastSyncedAt` e `lastSyncToken` nel database
 6. Ritorna statistiche (messaggi processati, nuovi messaggi, durata)
 
 ### Sincronizzazione Incrementale
+
+### Gestione Cancellazioni & Spostamenti
+
+- **Gmail**
+  - La History API processa ora `messagesDeleted`, `labelsAdded`, `labelsRemoved`.
+  - Gli aggiornamenti aggiornano `folder`, `labels`, `isDeleted` e metadati; le email eliminate finiscono in `TRASH`.
+  - Quando Gmail restituisce `404`, l'email viene rimossa dal database insieme agli embedding associati.
+
+- **IMAP**
+  - Ogni ciclo incrementale confronta gli ultimi ~500 UID per individuare elementi mancanti o con flag `\Deleted`.
+  - Gli UID assenti vengono marcati `isDeleted = true`, `folder = 'TRASH'` mantenendo audit (`metadata.status`, `metadata.deletedAt`).
+
+- **Embeddings**
+  - Job pianificato (`EmailEmbeddingCleanupService`) ogni 30 minuti elimina gli embedding collegati alle email soft-deleted.
+  - L'attributo `metadata.embeddingCleanup` traccia esiti ed eventuali errori di pulizia.
 
 #### Gmail (Google API)
 - Usa `historyId` per tracking
@@ -323,12 +338,9 @@ Sync failed for user@example.com: IMAP connection timeout
 
 Funzionalità non ancora implementate:
 
-### 1. Storage Email in Database
-Attualmente i messaggi vengono recuperati ma non salvati. Serve:
-- Schema database per email
-- Inserimento bulk messages
-- Gestione allegati
-- Full-text search
+### 1. Folder avanzati per IMAP
+- Mappare mailbox diverse da INBOX (`client.list()`) e registrare `folder` corrispondente
+- Gestire copie/spostamenti multipli (UIDPLUS / MOVE)
 
 ### 2. Circuit Breaker
 Pattern per gestire provider temporaneamente non disponibili:
@@ -348,6 +360,10 @@ Export metriche per monitoring:
 - Latenza media sincronizzazione
 - Rate di errori per provider type
 - Queue depth over time
+
+### 5. Restore email eliminate
+- Endpoint/API per ripristinare email soft-deleted (`isDeleted = true`)
+- Re-enqueue embedding se l'email torna `active`
 
 ---
 

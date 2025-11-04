@@ -1,11 +1,17 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
+import { QueueService } from '../../email-sync/services/queue.service';
 
 @Injectable()
 export class UsersService {
   private logger = new Logger(UsersService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailEmbeddingQueue: EmailEmbeddingQueueService,
+    private queueService: QueueService,
+  ) {}
 
   /**
    * Get user profile
@@ -40,21 +46,61 @@ export class UsersService {
    * Delete user account (GDPR - right to be forgotten)
    */
   async deleteUserAccount(userId: string) {
-    // Soft delete user
-    const user = await this.prisma.user.update({
-      where: { id: userId },
-      data: { deletedAt: new Date() },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          tenantId: true,
+          email: true,
+        },
+      });
+
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
+      const otherUsers = await tx.user.count({
+        where: {
+          tenantId: user.tenantId,
+          id: { not: userId },
+        },
+      });
+
+      await tx.session.deleteMany({ where: { userId } });
+      await tx.mfaCode.deleteMany({ where: { userId } });
+      await tx.passwordResetToken.deleteMany({ where: { userEmail: user.email } });
+
+      await tx.user.delete({ where: { id: userId } });
+
+      let tenantDeleted = false;
+
+      if (otherUsers === 0) {
+        await tx.tenant.delete({ where: { id: user.tenantId } });
+        tenantDeleted = true;
+      }
+
+      return {
+        tenantId: user.tenantId,
+        tenantDeleted,
+      };
     });
 
-    this.logger.log(`User deleted (soft): ${userId}`);
+    if (result.tenantDeleted) {
+      await this.emailEmbeddingQueue.removeJobsForTenant(result.tenantId);
+      await this.queueService.removeJobsForTenant(result.tenantId);
+      this.logger.log(`Tenant ${result.tenantId} deleted due to final user removal.`);
+    } else {
+      this.logger.log(`User ${userId} deleted; tenant ${result.tenantId} remains active.`);
+    }
 
-    // TODO: Schedule background job to permanently delete:
-    // - User data (anonymize sensitive info)
-    // - Messages and embeddings
-    // - Email configurations
-    // - Sessions and tokens
-
-    return { success: true, message: 'Account deletion initiated' };
+    return {
+      success: true,
+      tenantDeleted: result.tenantDeleted,
+      message: result.tenantDeleted
+        ? 'Account and workspace deleted successfully.'
+        : 'Account deleted successfully.',
+    };
   }
 
   /**

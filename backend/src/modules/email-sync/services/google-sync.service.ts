@@ -187,7 +187,7 @@ export class GoogleSyncService {
           userId: 'me',
           startHistoryId,
           pageToken,
-          historyTypes: ['messageAdded', 'messageDeleted', 'labelsAdded', 'labelsRemoved'],
+          historyTypes: ['messageAdded', 'messageDeleted'],
           maxResults: 500,
         });
 
@@ -567,6 +567,34 @@ export class GoogleSyncService {
     return fallback ?? 'INBOX';
   }
 
+  private async applyStatusMetadata(
+    emailId: string,
+    existing: Record<string, any> | null | undefined,
+    status: 'deleted' | 'active',
+  ): Promise<void> {
+    const next = this.mergeEmailStatusMetadata(existing, status);
+    const shouldUpdate =
+      !existing ||
+      existing.status !== next.status ||
+      existing.deletedAt !== next.deletedAt;
+
+    if (!shouldUpdate) {
+      return;
+    }
+
+    try {
+      await this.prisma.email.update({
+        where: { id: emailId },
+        data: {
+          metadata: next,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to update metadata for email ${emailId}: ${message}`);
+    }
+  }
+
   private mergeEmailStatusMetadata(
     existing: Record<string, any> | null | undefined,
     status: 'deleted' | 'active',
@@ -710,6 +738,12 @@ export class GoogleSyncService {
       });
 
       this.logger.debug(`Saved email: ${subject} from ${from}`);
+
+      await this.applyStatusMetadata(
+        emailRecord.id,
+        emailRecord.metadata as Record<string, any> | null,
+        isDeleted ? 'deleted' : 'active',
+      );
 
       const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(tenantId, emailRecord.id);
 

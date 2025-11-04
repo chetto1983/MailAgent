@@ -10,7 +10,7 @@ export class AllExceptionsFilter extends BaseExceptionFilter {
     const response = ctx.getResponse();
     const request = ctx.getRequest();
 
-    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    const status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal Server Error';
 
     if (exception instanceof Error) {

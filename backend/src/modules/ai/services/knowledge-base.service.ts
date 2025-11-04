@@ -39,6 +39,7 @@ interface CreateEmailEmbeddingOptions {
 @Injectable()
 export class KnowledgeBaseService {
   private readonly logger = new Logger(KnowledgeBaseService.name);
+  private static readonly MAX_CHARS_PER_CHUNK = 12000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -138,31 +139,56 @@ export class KnowledgeBaseService {
     }
 
     try {
+      const chunks = KnowledgeBaseService.chunkContentForEmbedding(content);
+
+      if (chunks.length > 1) {
+        this.logger.debug(
+          `Email ${options.emailId} (tenant ${options.tenantId}) split into ${chunks.length} chunks for embedding.`,
+        );
+      }
+
       const client = await this.mistralService.createMistralClient();
-      const embedding = await this.mistralService.generateEmbedding(content, client);
+      await this.deleteEmbeddingsForEmail(options.tenantId, options.emailId);
 
       const receivedAtIso =
         options.receivedAt instanceof Date
           ? options.receivedAt.toISOString()
           : options.receivedAt || undefined;
 
-      await this.embeddingsService.saveEmbedding({
-        tenantId: options.tenantId,
-        messageId: options.emailId,
-        content,
-        embedding,
-        model: this.mistralService.getEmbeddingModel(),
-        documentName: options.subject,
-        metadata: {
-          source: 'email',
-          emailId: options.emailId,
-          subject: options.subject,
-          from: options.from ?? null,
-          receivedAt: receivedAtIso ?? null,
-        },
-      });
+      let successfulChunks = 0;
 
-      return true;
+      for (const chunk of chunks) {
+        try {
+          const embedding = await this.mistralService.generateEmbedding(chunk.content, client);
+
+          await this.embeddingsService.saveEmbedding({
+            tenantId: options.tenantId,
+            messageId: `${options.emailId}::chunk-${chunk.index + 1}`,
+            content: chunk.content,
+            embedding,
+            model: this.mistralService.getEmbeddingModel(),
+            documentName: options.subject,
+            metadata: {
+              source: 'email',
+              emailId: options.emailId,
+              subject: options.subject,
+              from: options.from ?? null,
+              receivedAt: receivedAtIso ?? null,
+              chunkIndex: chunk.index,
+              chunkCount: chunks.length,
+            },
+          });
+
+          successfulChunks += 1;
+        } catch (chunkError) {
+          const message = chunkError instanceof Error ? chunkError.message : String(chunkError);
+          this.logger.warn(
+            `Failed embedding chunk ${chunk.index + 1}/${chunks.length} for email ${options.emailId} (tenant ${options.tenantId}): ${message}`,
+          );
+        }
+      }
+
+      return successfulChunks > 0;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
@@ -332,6 +358,39 @@ export class KnowledgeBaseService {
 
     const combined = pieces.join('\n\n').trim();
     return combined.length > 0 ? combined : null;
+  }
+
+  private static chunkContentForEmbedding(content: string): Array<{ content: string; index: number }> {
+    const maxChars = KnowledgeBaseService.MAX_CHARS_PER_CHUNK;
+
+    if (content.length <= maxChars) {
+      return [{ content, index: 0 }];
+    }
+
+    const chunks: Array<{ content: string; index: number }> = [];
+    let start = 0;
+    let index = 0;
+
+    while (start < content.length) {
+      let end = Math.min(start + maxChars, content.length);
+
+      if (end < content.length) {
+        const lastBreak = content.lastIndexOf('\n', end);
+        if (lastBreak > start + maxChars * 0.5) {
+          end = lastBreak;
+        }
+      }
+
+      const chunkContent = content.slice(start, end).trim();
+      if (chunkContent.length > 0) {
+        chunks.push({ content: chunkContent, index });
+        index += 1;
+      }
+
+      start = end;
+    }
+
+    return chunks;
   }
 
   private stripHtml(html: string): string {

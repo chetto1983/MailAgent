@@ -1,4 +1,11 @@
-import { Injectable, CanActivate, ExecutionContext, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  BadRequestException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 /**
@@ -11,29 +18,51 @@ export class TenantGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
-    // Extract tenant from JWT or header or subdomain
-    let tenantId = request.user?.tenantId;
-
-    if (!tenantId) {
-      // Try to get from header
-      tenantId = request.headers['x-tenant-id'];
+    const user = request.user;
+    if (!user) {
+      throw new UnauthorizedException('User context missing from request.');
     }
 
-    if (!tenantId) {
+    const headerTenantRaw = request.headers['x-tenant-id'];
+    const headerTenantId = Array.isArray(headerTenantRaw)
+      ? headerTenantRaw[0]
+      : headerTenantRaw;
+
+    const providedTenantIdentifier = headerTenantId || user.tenantId;
+
+    if (!providedTenantIdentifier) {
       throw new BadRequestException('Tenant ID not found in request');
     }
 
-    // Verify tenant exists
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+    // Look up tenant by id or slug
+    const tenant = await this.prisma.tenant.findFirst({
+      where: {
+        OR: [
+          { id: providedTenantIdentifier },
+          { slug: providedTenantIdentifier },
+        ],
+      },
     });
 
     if (!tenant || !tenant.isActive) {
-      throw new BadRequestException('Invalid or inactive tenant');
+      throw new ForbiddenException('Invalid or inactive tenant');
+    }
+
+    const resolvedTenantId = tenant.id;
+    const isCrossTenant = user.tenantId && user.tenantId !== resolvedTenantId;
+
+    if (isCrossTenant && user.role !== 'super-admin') {
+      throw new ForbiddenException('Cross-tenant access requires super-admin privileges.');
     }
 
     // Attach tenant to request
     request.tenant = tenant;
+    request.activeTenantId = resolvedTenantId;
+    request.user = {
+      ...user,
+      originalTenantId: user.originalTenantId ?? user.tenantId,
+      tenantId: resolvedTenantId,
+    };
 
     return true;
   }

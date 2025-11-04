@@ -25,20 +25,29 @@ export class AuthService {
     password: string;
     firstName?: string;
     lastName?: string;
-    tenantSlug?: string;
   }) {
-    // Get tenant
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { slug: data.tenantSlug || 'default' },
+    const normalizedEmail = data.email.trim();
+    const tenantSlug = normalizedEmail.toLowerCase();
+
+    let tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
     });
+    const tenantExisted = Boolean(tenant);
 
     if (!tenant) {
-      throw new BadRequestException('Tenant not found');
+      tenant = await this.prisma.tenant.create({
+        data: {
+          name: normalizedEmail,
+          slug: tenantSlug,
+          description: `Workspace for ${normalizedEmail}`,
+          isActive: true,
+        },
+      });
     }
 
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId: tenant.id, email: data.email } },
+      where: { tenantId_email: { tenantId: tenant.id, email: normalizedEmail } },
     });
 
     if (existingUser) {
@@ -52,19 +61,20 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         tenantId: tenant.id,
-        email: data.email,
+        email: normalizedEmail,
         passwordHash,
         firstName: data.firstName,
         lastName: data.lastName,
         isMfaEnabled: true,
+        role: tenantExisted ? undefined : 'admin',
       },
     });
 
     // Send OTP for email verification (non-blocking - continue even if email fails)
     try {
-      await this.sendOtpCode(data.email, data.tenantSlug);
+      await this.sendOtpCode(normalizedEmail, tenant.slug);
     } catch (error) {
-      this.logger.warn(`Failed to send OTP email to ${data.email}: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(`Failed to send OTP email to ${normalizedEmail}: ${error instanceof Error ? error.message : String(error)}`);
       // Continue anyway - in development, email might not be configured
     }
 
@@ -74,6 +84,8 @@ export class AuthService {
       success: true,
       message: 'User registered successfully. Check your email for OTP code to verify your account.',
       userId: user.id,
+      tenantId: tenant.id,
+      tenantSlug: tenant.slug,
     };
   }
 
@@ -81,8 +93,11 @@ export class AuthService {
    * Generate and send OTP code
    */
   async sendOtpCode(email: string, tenantSlug?: string) {
+    const normalizedEmail = email.trim();
+    const slug = (tenantSlug || normalizedEmail).toLowerCase();
+
     const tenant = await this.prisma.tenant.findUnique({
-      where: { slug: tenantSlug || 'default' },
+      where: { slug },
     });
 
     if (!tenant) {
@@ -90,12 +105,12 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId: tenant.id, email } },
+      where: { tenantId_email: { tenantId: tenant.id, email: normalizedEmail } },
     });
 
     if (!user) {
       // For security, don't reveal if user exists - just return success
-      this.logger.warn(`OTP requested for non-existent user: ${email}`);
+      this.logger.warn(`OTP requested for non-existent user: ${normalizedEmail}`);
       return { success: true, message: 'If the email exists, an OTP has been sent' };
     }
 
@@ -133,13 +148,17 @@ export class AuthService {
     };
   }
 
+
   /**
    * Verify OTP code
    * Verifies the OTP and returns an access token on success
    */
   async verifyOtpCode(email: string, code: string, tenantSlug?: string) {
+    const normalizedEmail = email.trim();
+    const slug = (tenantSlug || normalizedEmail).toLowerCase();
+
     const tenant = await this.prisma.tenant.findUnique({
-      where: { slug: tenantSlug || 'default' },
+      where: { slug },
     });
 
     if (!tenant) {
@@ -147,7 +166,7 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId: tenant.id, email } },
+      where: { tenantId_email: { tenantId: tenant.id, email: normalizedEmail } },
     });
 
     if (!user) {
@@ -166,6 +185,7 @@ export class AuthService {
     });
 
     if (!otpRecord) {
+      this.logger.warn(`OTP verification failed for user: ${normalizedEmail}`);
       throw new UnauthorizedException('Invalid or expired OTP code');
     }
 
@@ -226,8 +246,11 @@ export class AuthService {
    * Login user
    */
   async login(email: string, password: string, tenantSlug?: string) {
+    const normalizedEmail = email.trim();
+    const slug = (tenantSlug || normalizedEmail).toLowerCase();
+
     const tenant = await this.prisma.tenant.findUnique({
-      where: { slug: tenantSlug || 'default' },
+      where: { slug },
     });
 
     if (!tenant) {
@@ -235,7 +258,7 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId: tenant.id, email } },
+      where: { tenantId_email: { tenantId: tenant.id, email: normalizedEmail } },
     });
 
     if (!user) {
@@ -250,7 +273,7 @@ export class AuthService {
 
     // If MFA is enabled, request OTP
     if (user.isMfaEnabled) {
-      await this.sendOtpCode(email, tenantSlug);
+      await this.sendOtpCode(normalizedEmail, slug);
       return {
         mfaRequired: true,
         message: 'OTP code has been sent to your email',
@@ -307,8 +330,11 @@ export class AuthService {
    * Request password reset
    */
   async requestPasswordReset(email: string, tenantSlug?: string) {
+    const normalizedEmail = email.trim();
+    const slug = (tenantSlug || normalizedEmail).toLowerCase();
+
     const tenant = await this.prisma.tenant.findUnique({
-      where: { slug: tenantSlug || 'default' },
+      where: { slug },
     });
 
     if (!tenant) {
@@ -316,7 +342,7 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findUnique({
-      where: { tenantId_email: { tenantId: tenant.id, email } },
+      where: { tenantId_email: { tenantId: tenant.id, email: normalizedEmail } },
     });
 
     if (!user) {
@@ -337,7 +363,7 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + parseInt(process.env.PASSWORD_RESET_EXPIRATION || '900000'));
     await this.prisma.passwordResetToken.create({
       data: {
-        userEmail: email,
+        userEmail: normalizedEmail,
         token,
         tenantId: tenant.id,
         expiresAt,
@@ -345,7 +371,7 @@ export class AuthService {
     });
 
     // Send reset email
-    await this.emailService.sendPasswordReset(email, token);
+    await this.emailService.sendPasswordReset(normalizedEmail, token);
 
     this.logger.log(`Password reset requested for: ${email}`);
 

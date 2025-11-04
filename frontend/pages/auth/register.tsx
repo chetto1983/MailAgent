@@ -19,24 +19,24 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError('');
-    setLoading(true);
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
-      setLoading(false);
       return;
     }
+
+    setLoading(true);
 
     try {
       const response = await apiClient.post('/auth/register', {
@@ -64,7 +64,7 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Create Account</CardTitle>
-          <CardDescription>Sign up for MailAgent</CardDescription>
+          <CardDescription>Sign up with your email to get started.</CardDescription>
         </CardHeader>
         <CardContent>
           {error && (
