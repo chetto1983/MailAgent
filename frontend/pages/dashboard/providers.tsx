@@ -95,23 +95,28 @@ export default function ProvidersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+      <header className="sticky top-0 z-20 border-b border-white/5 bg-slate-950/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Email & Calendar Providers</h1>
-            <p className="text-sm text-muted-foreground">
-              Connect your email and calendar accounts
-              {user ? ` for ${user.email}` : ''}
+            <p className="text-xs uppercase tracking-[0.3em] text-sky-300/80">
+              Providers Control Center
+            </p>
+            <h1 className="mt-1 text-3xl font-semibold">Email & Calendar Providers</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-400">
+              Connect and manage secure access to your workspace mailboxes, calendars, and synced
+              sources{user ? ` for ${user.email}` : ''}.
             </p>
           </div>
-          <Link href="/dashboard">
-            <Button variant="outline">Back to Dashboard</Button>
+          <Link href="/dashboard" className="w-full md:w-auto">
+            <Button variant="outline" className="w-full md:w-auto">
+              Back to Dashboard
+            </Button>
           </Link>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto p-4 space-y-6">
+      <main className="mx-auto max-w-6xl px-4 py-8 space-y-6">
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -124,24 +129,28 @@ export default function ProvidersPage() {
           </Alert>
         )}
 
-        <Tabs defaultValue="connected" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="connected">Connected Providers</TabsTrigger>
-            <TabsTrigger value="add">Add Provider</TabsTrigger>
+        <Tabs defaultValue="connected" className="w-full space-y-6">
+          <TabsList className="grid w-full grid-cols-1 gap-2 md:grid-cols-2">
+            <TabsTrigger value="connected" className="w-full">
+              Connected Providers
+            </TabsTrigger>
+            <TabsTrigger value="add" className="w-full">
+              Add Provider
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="connected" className="space-y-4">
-            <Card>
+            <Card className="border-white/10 bg-white/5">
               <CardHeader>
                 <CardTitle>Your Connected Providers</CardTitle>
                 <CardDescription>
-                  Manage your connected email and calendar accounts
+                  Manage linked inboxes, calendars, and automation sources for your tenant.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">Loading providers...</p>
+                  <div className="py-10 text-center text-slate-400">
+                    Loading providers...
                   </div>
                 ) : (
                   <ProvidersList providers={providers} onDelete={handleProviderDelete} />
@@ -151,7 +160,7 @@ export default function ProvidersPage() {
           </TabsContent>
 
           <TabsContent value="add" className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
               {/* Google Provider */}
               <GoogleProviderCard onSuccess={handleProviderSuccess} />
 
@@ -164,7 +173,7 @@ export default function ProvidersPage() {
               <CardHeader>
                 <CardTitle>Generic Email/Calendar Provider</CardTitle>
                 <CardDescription>
-                  Connect any email account using IMAP/SMTP and CalDAV for calendar sync
+                  Connect any IMAP/SMTP or CalDAV provider to unify email and calendar data.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -178,22 +187,21 @@ export default function ProvidersPage() {
                 <CardTitle>Need Help?</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-slate-300">
                   <strong>Google:</strong> Click "Connect Google Account" and sign in with your
-                  Google credentials. Make sure to grant access to Gmail and Calendar.
+                  Google credentials. Grant access to Gmail, Calendar, and Contacts when prompted.
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Microsoft:</strong> Click "Connect Microsoft Account" and sign in with
-                  your Microsoft/Outlook credentials.
+                <p className="text-sm text-slate-300">
+                  <strong>Microsoft:</strong> Use "Connect Microsoft Account" and sign in with your
+                  Outlook/Microsoft 365 credentials.
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Generic IMAP:</strong> Enter your email server details (IMAP for
-                  incoming, SMTP for outgoing). You can find these settings from your email
-                  provider's documentation.
+                <p className="text-sm text-slate-300">
+                  <strong>Generic IMAP:</strong> Provide IMAP (incoming) and SMTP (outgoing) server
+                  details from your provider&rsquo;s documentation. CalDAV enables calendar sync.
                 </p>
-                <div className="mt-4 p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium mb-2">Common IMAP/SMTP Settings:</p>
-                  <ul className="text-sm text-muted-foreground space-y-1">
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+                  <p className="mb-2 font-semibold text-slate-100">Common IMAP/SMTP Settings:</p>
+                  <ul className="space-y-1 text-slate-300">
                     <li>
                       <strong>Gmail:</strong> imap.gmail.com:993, smtp.gmail.com:587 (requires app
                       password)
@@ -211,7 +219,7 @@ export default function ProvidersPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+      </main>
     </div>
   );
 }

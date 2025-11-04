@@ -112,7 +112,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">
+          <p className="text-center text-slate-300">
             No providers connected yet. Connect a provider to get started.
           </p>
         </CardContent>
@@ -213,7 +213,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
               </div>
 
               {/* Last Synced */}
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-slate-300">
                 Last synced: {formatDate(provider.lastSyncedAt)}
               </div>
 
@@ -235,3 +235,6 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
     </div>
   );
 }
+
+
+

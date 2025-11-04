@@ -2,8 +2,9 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const alertVariants = {
-  default: 'bg-background text-foreground',
-  destructive: 'border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive',
+  default: 'border-white/10 bg-white/5 text-slate-100 shadow-lg shadow-slate-950/30',
+  destructive:
+    'border-rose-500/60 bg-rose-500/10 text-rose-200 [&>svg]:text-rose-300 shadow-lg shadow-rose-900/30',
 };
 
 interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -16,7 +17,7 @@ const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
       ref={ref}
       role="alert"
       className={cn(
-        'relative w-full rounded-lg border p-4',
+        'relative w-full rounded-2xl border p-4 backdrop-blur',
         alertVariants[variant],
         className,
       )}
@@ -37,7 +38,7 @@ AlertTitle.displayName = 'AlertTitle';
 
 const AlertDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('text-sm [&_p]:leading-relaxed', className)} {...props} />
+    <div ref={ref} className={cn('text-sm text-slate-200 [&_p]:leading-relaxed', className)} {...props} />
   ),
 );
 

@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { MessageCircle, Send, Mic, Volume2, Sparkles, User, Bot } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
@@ -73,6 +76,78 @@ const translations = {
 type LocaleKey = keyof typeof translations;
 
 const resolveLocale = (value: string): LocaleKey => (value === 'it' ? 'it' : 'en');
+
+const markdownComponents: Components = {
+  p: ({ children, ...props }) => (
+    <p className="leading-relaxed text-slate-100" {...props}>
+      {children}
+    </p>
+  ),
+  ol: ({ children, ...props }) => (
+    <ol className="space-y-2 text-slate-100 list-decimal list-inside" {...props}>
+      {children}
+    </ol>
+  ),
+  ul: ({ children, ...props }) => (
+    <ul className="space-y-2 text-slate-100 list-disc list-inside" {...props}>
+      {children}
+    </ul>
+  ),
+  li: ({ children, ...props }) => (
+    <li className="leading-relaxed marker:text-sky-300 text-slate-100" {...props}>
+      {children}
+    </li>
+  ),
+  strong: ({ children, ...props }) => (
+    <strong className="font-semibold text-sky-200" {...props}>
+      {children}
+    </strong>
+  ),
+  em: ({ children, ...props }) => (
+    <em className="text-slate-200 not-italic" {...props}>
+      {children}
+    </em>
+  ),
+  blockquote: ({ children, ...props }) => (
+    <blockquote
+      className="border-l-2 border-sky-400/50 pl-4 text-slate-200 italic"
+      {...props}
+    >
+      {children}
+    </blockquote>
+  ),
+  pre: ({ children, ...props }) => (
+    <pre
+      className="overflow-auto rounded-xl bg-slate-900/80 p-4 text-sm text-slate-100 shadow-inner shadow-slate-950/50"
+      {...props}
+    >
+      {children}
+    </pre>
+  ),
+  code: ({ inline, children, ...props }) =>
+    inline ? (
+      <code
+        className="rounded bg-slate-800/70 px-1.5 py-0.5 text-xs font-mono text-sky-200"
+        {...props}
+      >
+        {children}
+      </code>
+    ) : (
+      <code className="font-mono text-sm text-sky-200" {...props}>
+        {children}
+      </code>
+    ),
+  a: ({ children, ...props }) => (
+    <a
+      className="text-sky-300 underline underline-offset-4 transition hover:text-sky-200"
+      target="_blank"
+      rel="noreferrer"
+      {...props}
+    >
+      {children}
+    </a>
+  ),
+};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -181,16 +256,11 @@ export default function DashboardPage() {
             <p className="text-slate-400 mt-1">{t.heroSubtitle}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              className="border-white/10 hover:bg-white/10"
-              onClick={() => router.push('/dashboard/providers')}
-            >
+            <Button variant="outline" onClick={() => router.push('/dashboard/providers')}>
               {t.navProviders}
             </Button>
             <Button
               variant="outline"
-              className="border-white/10 hover:bg-white/10"
               onClick={() => router.push('/dashboard/settings')}
             >
               {t.navSettings}
@@ -250,7 +320,18 @@ export default function DashboardPage() {
                           : 'bg-white/5 text-slate-200'
                       }`}
                     >
-                      <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      {isUser ? (
+                        <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      ) : (
+                        <div className="space-y-4 text-sm leading-relaxed">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={markdownComponents}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      )}
 
                       {message.steps && message.steps.length > 0 && (
                         <details className="mt-4 text-xs text-slate-300/90">
@@ -310,7 +391,7 @@ export default function DashboardPage() {
                 variant="outline"
                 size="icon"
                 onClick={() => setIsRecording((prev) => !prev)}
-                className={`border-white/10 ${isRecording ? 'bg-red-500/20 text-red-200' : 'hover:bg-white/10'}`}
+                className={isRecording ? 'bg-red-500/20 text-red-200' : undefined}
                 aria-label={t.micAria}
               >
                 <Mic className="w-4 h-4" />
@@ -336,7 +417,6 @@ export default function DashboardPage() {
                 type="button"
                 variant="outline"
                 size="icon"
-                className="border-white/10 hover:bg-white/10"
                 aria-label={t.volumeAria}
               >
                 <Volume2 className="w-4 h-4" />

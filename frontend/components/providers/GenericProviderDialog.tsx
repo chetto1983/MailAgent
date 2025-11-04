@@ -95,10 +95,12 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
           Connect Generic Provider (IMAP/CalDAV)
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-3xl border border-white/10 bg-slate-950/90 text-slate-100 shadow-2xl shadow-slate-950/60">
         <DialogHeader>
-          <DialogTitle>Connect Generic Email/Calendar Provider</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl font-semibold text-slate-100">
+            Connect Generic Email/Calendar Provider
+          </DialogTitle>
+          <DialogDescription className="text-sm text-slate-400">
             Configure IMAP/SMTP for email and CalDAV for calendar sync
           </DialogDescription>
         </DialogHeader>
@@ -112,10 +114,10 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
 
           {/* Basic Info */}
           <div className="space-y-4">
-            <h3 className="font-medium">Basic Information</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-200">Basic Information</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium mb-1">Email *</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Email *</label>
                 <Input
                   type="email"
                   value={formData.email}
@@ -124,7 +126,7 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Display Name</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Display Name</label>
                 <Input
                   type="text"
                   value={formData.displayName}
@@ -135,11 +137,11 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
           </div>
 
           {/* IMAP Settings */}
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="font-medium">IMAP Settings (Incoming Mail)</h3>
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4 border-t border-white/10 pt-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-200">IMAP Settings (Incoming Mail)</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium mb-1">IMAP Host *</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">IMAP Host *</label>
                 <Input
                   type="text"
                   placeholder="imap.example.com"
@@ -149,7 +151,7 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">IMAP Port *</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">IMAP Port *</label>
                 <Input
                   type="number"
                   value={formData.imapPort}
@@ -158,7 +160,7 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Username *</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Username *</label>
                 <Input
                   type="text"
                   value={formData.imapUsername}
@@ -167,7 +169,7 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Password *</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Password *</label>
                 <Input
                   type="password"
                   value={formData.imapPassword}
@@ -179,12 +181,12 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
           </div>
 
           {/* SMTP Settings */}
-          <div className="space-y-4 border-t pt-4">
-            <h3 className="font-medium">SMTP Settings (Outgoing Mail)</h3>
-            <p className="text-sm text-gray-600">SMTP will use the same credentials as IMAP</p>
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4 border-t border-white/10 pt-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-200">SMTP Settings (Outgoing Mail)</h3>
+            <p className="text-sm text-slate-400">SMTP will use the same credentials as IMAP</p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium mb-1">SMTP Host</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">SMTP Host</label>
                 <Input
                   type="text"
                   placeholder="smtp.example.com"
@@ -193,7 +195,7 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">SMTP Port</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">SMTP Port</label>
                 <Input
                   type="number"
                   value={formData.smtpPort}
@@ -204,10 +206,10 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
           </div>
 
           {/* CalDAV Settings */}
-          <div className="space-y-4 border-t pt-4">
+          <div className="space-y-4 border-t border-white/10 pt-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-medium">CalDAV Settings (Calendar Sync)</h3>
-              <label className="flex items-center gap-2 text-sm">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-200">CalDAV Settings (Calendar Sync)</h3>
+              <label className="flex items-center gap-2 text-sm text-slate-300">
                 <input
                   type="checkbox"
                   checked={showAdvanced}
@@ -220,7 +222,7 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
             {showAdvanced && (
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">CalDAV URL</label>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">CalDAV URL</label>
                   <Input
                     type="url"
                     placeholder="https://caldav.example.com/calendars/user"
@@ -231,9 +233,9 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
                     }}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Username</label>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Username</label>
                     <Input
                       type="text"
                       value={formData.caldavUsername}
@@ -241,7 +243,7 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Password</label>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">Password</label>
                     <Input
                       type="password"
                       value={formData.caldavPassword}
@@ -253,7 +255,7 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
             )}
           </div>
 
-          <div className="flex justify-end gap-2 border-t pt-4">
+          <div className="flex justify-end gap-2 border-t border-white/10 pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
@@ -266,3 +268,5 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
     </Dialog>
   );
 }
+
+
