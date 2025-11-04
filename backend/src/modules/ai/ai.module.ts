@@ -6,11 +6,24 @@ import { EmbeddingsService } from './services/embeddings.service';
 import { KnowledgeBaseService } from './services/knowledge-base.service';
 import { KnowledgeBaseController } from './controllers/knowledge-base.controller';
 import { EmailEmbeddingQueueService } from './services/email-embedding.queue';
+import { AgentService } from './services/agent.service';
 
 @Module({
   imports: [PrismaModule],
-  providers: [MistralService, EmbeddingsService, KnowledgeBaseService, EmailEmbeddingQueueService],
+  providers: [
+    MistralService,
+    EmbeddingsService,
+    KnowledgeBaseService,
+    EmailEmbeddingQueueService,
+    AgentService,
+  ],
   controllers: [AiController, KnowledgeBaseController],
-  exports: [MistralService, EmbeddingsService, KnowledgeBaseService, EmailEmbeddingQueueService],
+  exports: [
+    MistralService,
+    EmbeddingsService,
+    KnowledgeBaseService,
+    EmailEmbeddingQueueService,
+    AgentService,
+  ],
 })
 export class AiModule {}
