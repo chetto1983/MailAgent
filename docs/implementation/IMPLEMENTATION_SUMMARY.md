@@ -5,6 +5,7 @@
 - Tutti i nuovi sviluppi devono operare sul modello `ProviderConfig`; la tabella legacy `EmailConfig` è stata migrata e rimossa dal database.
 - Gli accessi residui a `/email-configs` vengono intercettati e loggati (`LegacyRoutes` logger) per facilitare la bonifica dei client.
 - `/health/metrics` è ora disponibile per Prometheus/Grafana e include contatori/durate delle code BullMQ.
+- Le conversazioni AI vengono salvate in `chat_sessions` (FIFO per tenant/utente) e ricevono un titolo contestuale generato da Mistral.
 
 ## Cosa è stato implementato
 

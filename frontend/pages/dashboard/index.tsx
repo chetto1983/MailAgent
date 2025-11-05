@@ -9,38 +9,17 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { apiClient } from '@/lib/api-client';
 import { useLocale } from '@/lib/hooks/use-locale';
+import {
+  aiApi,
+  type ChatSession as ApiChatSession,
+  type ChatMessage as ApiChatMessage,
+} from '@/lib/api/ai';
 
-type ChatMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-  steps?: Array<{ tool: string; output: string }>;
-};
+type ChatMessage = ApiChatMessage;
+type ChatSession = ApiChatSession;
 
-type ChatSession = {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  updatedAt: string;
-};
-
-const CHAT_HISTORY_STORAGE_KEY = 'mailagent.chatHistory';
 const MAX_CHAT_HISTORY = 5;
-
-const generateSessionId = () =>
-  `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-const getSessionTitle = (messages: ChatMessage[]): string => {
-  const firstUserMessage = messages.find((message) => message.role === 'user');
-  if (firstUserMessage?.content) {
-    const trimmed = firstUserMessage.content.trim();
-    if (trimmed.length > 0) {
-      return trimmed.length > 60 ? `${trimmed.slice(0, 57)}…` : trimmed;
-    }
-  }
-  return 'New chat';
-};
 
 const translations = {
   en: {
@@ -52,6 +31,7 @@ const translations = {
     navLogout: 'Logout',
     historyHeading: 'Recent chats',
     historyEmpty: 'No previous conversations yet.',
+    historyLoading: 'Loading conversations…',
     historyActiveTag: 'Current',
     newChatLabel: 'New chat',
     quickPrompts: [
@@ -82,6 +62,7 @@ const translations = {
     navLogout: 'Esci',
     historyHeading: 'Chat recenti',
     historyEmpty: 'Nessuna conversazione precedente.',
+    historyLoading: 'Caricamento conversazioni…',
     historyActiveTag: 'Attiva',
     newChatLabel: 'Nuova chat',
     quickPrompts: [
@@ -195,11 +176,11 @@ export default function DashboardPage() {
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
-  const historyHydratedRef = useRef(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dateFormatter = useMemo(
     () =>
@@ -212,117 +193,102 @@ export default function DashboardPage() {
     [localeKey],
   );
 
-  const persistSessions = useCallback((nextSessions: ChatSession[]) => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    window.localStorage.setItem(
-      CHAT_HISTORY_STORAGE_KEY,
-      JSON.stringify(nextSessions),
-    );
-  }, []);
+  const normaliseSession = useCallback(
+    (session: ApiChatSession): ChatSession => ({
+      ...session,
+      messages: Array.isArray(session.messages)
+        ? (session.messages as ChatMessage[])
+        : [],
+    }),
+    [],
+  );
 
-  const startNewSession = useCallback(() => {
-    const newSession: ChatSession = {
-      id: generateSessionId(),
-      title: 'New chat',
-      messages: [],
-      updatedAt: new Date().toISOString(),
-    };
-
-    historyHydratedRef.current = true;
-    setCurrentSessionId(newSession.id);
-    setMessages([]);
-    setInput('');
-    setLoading(false);
-
-    setSessions((prev) => {
-      const filtered = prev.filter((session) => session.id !== newSession.id);
-      const nextSessions = [newSession, ...filtered].slice(0, MAX_CHAT_HISTORY);
-      persistSessions(nextSessions);
-      return nextSessions;
-    });
-  }, [persistSessions]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const raw = window.localStorage.getItem(CHAT_HISTORY_STORAGE_KEY);
-
-    if (!raw) {
-      startNewSession();
-      return;
-    }
-
+  const hydrateSessions = useCallback(async () => {
+    setSessionsLoading(true);
     try {
-      const parsed = JSON.parse(raw) as ChatSession[];
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const limited = parsed.slice(0, MAX_CHAT_HISTORY);
-        historyHydratedRef.current = true;
-        setSessions(limited);
-        setCurrentSessionId(limited[0].id);
-        setMessages(limited[0].messages ?? []);
-      } else {
-        startNewSession();
+      const { data } = await aiApi.listSessions();
+      let fetched: ChatSession[] = (data.sessions ?? []).map(normaliseSession);
+
+      if (fetched.length === 0) {
+        const { data: created } = await aiApi.createSession();
+        const session = normaliseSession(created.session);
+        fetched = [session];
       }
+
+      const limited = fetched.slice(0, MAX_CHAT_HISTORY);
+      setSessions(limited);
+      setCurrentSessionId(limited[0]?.id ?? '');
+      setMessages(limited[0]?.messages ?? []);
     } catch (error) {
-      console.warn('Failed to parse chat history from storage', error);
-      startNewSession();
+      console.error('Failed to fetch chat sessions', error);
+      setSessions([]);
+      setCurrentSessionId('');
+      setMessages([]);
+    } finally {
+      setSessionsLoading(false);
     }
-  }, [startNewSession]);
+  }, [normaliseSession]);
 
   useEffect(() => {
-    if (!historyHydratedRef.current || !currentSessionId) {
+    if (isLoading || !user) {
       return;
     }
+    hydrateSessions();
+  }, [isLoading, user, hydrateSessions]);
 
-    setSessions((prev) => {
-      const existing = prev.find((session) => session.id === currentSessionId);
-      const updatedSession: ChatSession = {
-        id: currentSessionId,
-        title: getSessionTitle(messages),
-        messages,
-        updatedAt: new Date().toISOString(),
-      };
-
-      const others = existing
-        ? prev.filter((session) => session.id !== currentSessionId)
-        : prev;
-      const nextSessions = [updatedSession, ...others].slice(
-        0,
-        MAX_CHAT_HISTORY,
-      );
-      persistSessions(nextSessions);
-      return nextSessions;
-    });
-  }, [messages, currentSessionId, persistSessions]);
-
-  const handleSelectSession = useCallback(
-    (sessionId: string) => {
-      if (sessionId === currentSessionId) {
-        return;
-      }
-
-      const session = sessions.find((item) => item.id === sessionId);
-      if (!session) {
-        return;
-      }
-
-      setCurrentSessionId(session.id);
-      setMessages(session.messages ?? []);
-      setInput('');
-      setLoading(false);
+  const startNewSession = useCallback(async () => {
+    try {
+      const { data } = await aiApi.createSession();
+      const newSession = normaliseSession(data.session);
 
       setSessions((prev) => {
-        const others = prev.filter((item) => item.id !== sessionId);
-        const nextSessions = [session, ...others].slice(0, MAX_CHAT_HISTORY);
-        persistSessions(nextSessions);
-        return nextSessions;
+        const others = prev.filter((session) => session.id !== newSession.id);
+        return [newSession, ...others].slice(0, MAX_CHAT_HISTORY);
       });
+
+      setCurrentSessionId(newSession.id);
+      setMessages(newSession.messages ?? []);
+      setInput('');
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to create chat session', error);
+    }
+  }, [normaliseSession]);
+
+  const handleSelectSession = useCallback(
+    async (sessionId: string) => {
+      if (!sessionId || sessionId === currentSessionId) {
+        return;
+      }
+
+      try {
+        let session = sessions.find((item) => item.id === sessionId);
+
+        if (!session || !session.messages || session.messages.length === 0) {
+          const { data } = await aiApi.getSession(sessionId);
+          if (data.session) {
+            session = normaliseSession(data.session);
+          }
+        }
+
+        if (!session) {
+          return;
+        }
+
+        setCurrentSessionId(session.id);
+        setMessages(session.messages ?? []);
+        setInput('');
+        setLoading(false);
+
+        setSessions((prev) => {
+          const others = prev.filter((item) => item.id !== session!.id);
+          return [session!, ...others].slice(0, MAX_CHAT_HISTORY);
+        });
+      } catch (error) {
+        console.error('Failed to load chat session', error);
+      }
     },
-    [currentSessionId, sessions, persistSessions],
+    [currentSessionId, sessions, normaliseSession],
   );
 
   useEffect(() => {
@@ -342,33 +308,47 @@ export default function DashboardPage() {
     }
 
     const userMessage = input.trim();
-    const nextMessages: ChatMessage[] = [
+    const pendingMessages: ChatMessage[] = [
       ...messages,
       { role: 'user', content: userMessage },
     ];
 
     setInput('');
-    setMessages(nextMessages);
+    setMessages(pendingMessages);
     setLoading(true);
 
     try {
-      const response = await apiClient.post('/ai/agent', {
+      let sessionId = currentSessionId;
+
+      if (!sessionId) {
+        const { data } = await aiApi.createSession();
+        const newSession = normaliseSession(data.session);
+        sessionId = newSession.id;
+        setSessions((prev) => [newSession, ...prev].slice(0, MAX_CHAT_HISTORY));
+        setCurrentSessionId(newSession.id);
+      }
+
+      const response = await aiApi.sendAgentMessage({
+        sessionId,
         message: userMessage,
-        history: nextMessages.map(({ role, content }) => ({ role, content })),
+        history: pendingMessages,
       });
 
       if (response.data.success) {
-        setMessages([
-          ...nextMessages,
-          {
-            role: 'assistant',
-            content: response.data.response,
-            steps: response.data.steps ?? [],
-          },
-        ]);
+        const updatedSession = normaliseSession(response.data.session);
+        const serverMessages = Array.isArray(response.data.messages)
+          ? (response.data.messages as ChatMessage[])
+          : updatedSession.messages ?? [];
+
+        setMessages(serverMessages);
+        setSessions((prev) => {
+          const others = prev.filter((session) => session.id !== updatedSession.id);
+          return [updatedSession, ...others].slice(0, MAX_CHAT_HISTORY);
+        });
+        setCurrentSessionId(updatedSession.id);
       } else {
-        setMessages([
-          ...nextMessages,
+        setMessages((prev) => [
+          ...prev,
           {
             role: 'assistant',
             content: t.fallbackMessage,
@@ -442,11 +422,18 @@ export default function DashboardPage() {
               <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
                 {t.historyHeading}
               </h2>
-              <Button variant="outline" size="sm" onClick={startNewSession}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startNewSession}
+                disabled={loading}
+              >
                 {t.newChatLabel}
               </Button>
             </div>
-            {sessions.length === 0 ? (
+            {sessionsLoading ? (
+              <p className="text-xs text-slate-500">{t.historyLoading}</p>
+            ) : sessions.length === 0 ? (
               <p className="text-xs text-slate-500">{t.historyEmpty}</p>
             ) : (
               <div className="flex flex-wrap gap-2">

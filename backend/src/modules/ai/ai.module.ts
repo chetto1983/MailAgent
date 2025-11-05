@@ -7,6 +7,7 @@ import { KnowledgeBaseService } from './services/knowledge-base.service';
 import { KnowledgeBaseController } from './controllers/knowledge-base.controller';
 import { EmailEmbeddingQueueService } from './services/email-embedding.queue';
 import { AgentService } from './services/agent.service';
+import { ChatSessionService } from './services/chat-session.service';
 
 @Module({
   imports: [PrismaModule],
@@ -16,6 +17,7 @@ import { AgentService } from './services/agent.service';
     KnowledgeBaseService,
     EmailEmbeddingQueueService,
     AgentService,
+    ChatSessionService,
   ],
   controllers: [AiController, KnowledgeBaseController],
   exports: [
@@ -24,6 +26,7 @@ import { AgentService } from './services/agent.service';
     KnowledgeBaseService,
     EmailEmbeddingQueueService,
     AgentService,
+    ChatSessionService,
   ],
 })
 export class AiModule {}

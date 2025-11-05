@@ -165,6 +165,10 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 
 ### AI Chat
 - `POST /ai/chat` - Send message to AI
+- `GET /ai/chat/sessions` - List the latest chat sessions (FIFO per user/tenant)
+- `POST /ai/chat/sessions` - Create a new chat session
+- `GET /ai/chat/sessions/:id` - Retrieve a specific session with history
+- `POST /ai/agent` - Agentic workflow (LangChain) with automatic session persistence and titles
 
 ### AI Knowledge Base
 - `POST /ai/knowledge-base/emails/backfill` - Admin: generate embeddings for existing emails

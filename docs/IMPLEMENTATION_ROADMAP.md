@@ -6,6 +6,7 @@
 - I metodi `handleGoogleOAuth`/`handleMicrosoftOAuth` in `AuthService` restano stub ma non sono più usati: le route reali passano da `/providers/...`; servono decisioni su rimozione o reindirizzamento.
 - Il health check Mistral (`backend/src/modules/health/services/health.service.ts:45`) simula l’esito senza effettuare richieste reali; manca visibilità sull’API AI.
 - La documentazione deve descrivere chiaramente la migrazione verso il nuovo modulo provider e segnalare i componenti deprecati.
+- Le chat AI vengono ora salvate in `chat_sessions` (FIFO per tenant/utente) con titoli generati da Mistral; monitorare eventuali estensioni (es. soft delete, ricerca full-text).
 
 ## 2. Workstream Prioritari
 

@@ -102,6 +102,81 @@ export class MistralService {
     return '';
   }
 
+  async generateChatTitle(messages: Array<{ role: string; content: string }> = []): Promise<string> {
+    if (!messages || messages.length === 0) {
+      return 'New chat';
+    }
+
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      return this.buildFallbackTitle(messages);
+    }
+
+    try {
+      const client = this.createClient(apiKey);
+      const recentMessages = messages.slice(-6);
+      const transcript = recentMessages
+        .map((message) => `${message.role === 'assistant' ? 'Assistant' : 'User'}: ${message.content}`)
+        .join('\n');
+
+      const completion = await client.chat.complete({
+        model: this.getModel(),
+        temperature: 0.2,
+        maxTokens: 32,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You summarise conversations. Craft a short, descriptive title (max 8 words) for the conversation provided. Reply with the title only, no quotes.',
+          },
+          {
+            role: 'user',
+            content: `Conversation:\n${transcript}\n\nTitle:`,
+          },
+        ],
+      });
+
+      const rawTitle =
+        this.extractAssistantContent(completion.choices?.[0]?.message) || this.buildFallbackTitle(messages);
+      return this.sanitiseTitle(rawTitle);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to generate chat title: ${errorMessage}`);
+      return this.buildFallbackTitle(messages);
+    }
+  }
+
+  private buildFallbackTitle(messages: Array<{ role: string; content: string }>): string {
+    const firstUserMessage = messages.find(
+      (message) => message.role === 'user' && typeof message.content === 'string' && message.content.trim().length > 0,
+    );
+
+    if (!firstUserMessage) {
+      return 'New chat';
+    }
+
+    const trimmed = firstUserMessage.content.trim();
+    if (trimmed.length <= 60) {
+      return trimmed;
+    }
+
+    return `${trimmed.slice(0, 57)}…`;
+  }
+
+  private sanitiseTitle(title: string): string {
+    const cleaned = title.replace(/^"+|"+$/g, '').replace(/[\r\n]+/g, ' ').trim();
+
+    if (!cleaned) {
+      return 'New chat';
+    }
+
+    if (cleaned.length <= 60) {
+      return cleaned;
+    }
+
+    return `${cleaned.slice(0, 57)}…`;
+  }
+
   /**
    * Generate embeddings for RAG
    */
