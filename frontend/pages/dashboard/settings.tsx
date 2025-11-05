@@ -30,8 +30,9 @@ export default function SettingsPage() {
       await apiClient.put('/users/me', profile);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Update failed');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Update failed');
     } finally {
       setLoading(false);
     }
@@ -46,8 +47,9 @@ export default function SettingsPage() {
     try {
       await apiClient.delete('/users/me');
       router.push('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Deletion failed');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Deletion failed');
     } finally {
       setDeleteLoading(false);
     }

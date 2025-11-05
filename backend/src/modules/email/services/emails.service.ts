@@ -45,6 +45,8 @@ export class EmailsService {
       tenantId,
       ...(providerId && { providerId }),
       ...(filters.folder && { folder: filters.folder }),
+      // Only show deleted emails if we're viewing the TRASH folder
+      ...(!filters.folder || filters.folder !== 'TRASH' ? { isDeleted: false } : {}),
       ...(filters.isRead !== undefined && { isRead: filters.isRead }),
       ...(filters.isStarred !== undefined && { isStarred: filters.isStarred }),
       ...(filters.from && { from: { contains: filters.from, mode: 'insensitive' } }),
@@ -152,7 +154,8 @@ export class EmailsService {
   }
 
   /**
-   * Delete email
+   * Delete email - Mark as deleted and move to TRASH
+   * This will be synced to the server on next sync
    */
   async deleteEmail(id: string, tenantId: string) {
     const email = await this.prisma.email.findFirst({
@@ -163,10 +166,16 @@ export class EmailsService {
       throw new NotFoundException('Email not found');
     }
 
-    await this.prisma.email.delete({
+    // Mark as deleted and move to TRASH folder
+    await this.prisma.email.update({
       where: { id },
+      data: {
+        isDeleted: true,
+        folder: 'TRASH',
+      },
     });
 
+    this.logger.log(`Email ${id} marked as deleted and moved to TRASH`);
     return { success: true };
   }
 
@@ -252,6 +261,127 @@ export class EmailsService {
         isRead: true,
       },
     });
+
+    return emails;
+  }
+
+  /**
+   * Get conversations - emails grouped by threadId from all folders
+   */
+  async getConversations(params: {
+    tenantId: string;
+    providerId?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { tenantId, providerId, page = 1, limit = 50 } = params;
+    const skip = (page - 1) * limit;
+
+    // Get all non-deleted emails, excluding TRASH and SPAM
+    const where: Prisma.EmailWhereInput = {
+      tenantId,
+      ...(providerId && { providerId }),
+      isDeleted: false,
+      folder: { notIn: ['TRASH', 'SPAM'] },
+    };
+
+    // Get emails grouped by thread - find the latest email in each thread
+    const emails = await this.prisma.email.findMany({
+      where,
+      orderBy: { receivedAt: 'desc' },
+      select: {
+        id: true,
+        externalId: true,
+        threadId: true,
+        from: true,
+        to: true,
+        subject: true,
+        snippet: true,
+        folder: true,
+        labels: true,
+        isRead: true,
+        isStarred: true,
+        isFlagged: true,
+        receivedAt: true,
+        sentAt: true,
+      },
+    });
+
+    // Group by threadId or messageId (for emails without threadId)
+    const threadsMap = new Map<string, any[]>();
+    for (const email of emails) {
+      const key = email.threadId || email.id;
+      if (!threadsMap.has(key)) {
+        threadsMap.set(key, []);
+      }
+      threadsMap.get(key)!.push(email);
+    }
+
+    // Convert to array of conversations, sorted by most recent email
+    const conversations = Array.from(threadsMap.values())
+      .map((thread) => {
+        // Sort emails in thread by date
+        thread.sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime());
+
+        const latestEmail = thread[0];
+        const hasUnread = thread.some((e) => !e.isRead);
+
+        return {
+          threadId: latestEmail.threadId || latestEmail.id,
+          subject: latestEmail.subject,
+          from: latestEmail.from,
+          to: latestEmail.to,
+          snippet: latestEmail.snippet,
+          folder: latestEmail.folder,
+          labels: latestEmail.labels,
+          isRead: !hasUnread,
+          isStarred: thread.some((e) => e.isStarred),
+          isFlagged: thread.some((e) => e.isFlagged),
+          receivedAt: latestEmail.receivedAt,
+          sentAt: latestEmail.sentAt,
+          emailCount: thread.length,
+          latestEmailId: latestEmail.id,
+        };
+      })
+      .sort((a, b) => b.receivedAt.getTime() - a.receivedAt.getTime());
+
+    // Paginate
+    const total = conversations.length;
+    const paginatedConversations = conversations.slice(skip, skip + limit);
+
+    return {
+      conversations: paginatedConversations,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Get all emails in a thread/conversation
+   */
+  async getThread(threadId: string, tenantId: string) {
+    const emails = await this.prisma.email.findMany({
+      where: {
+        tenantId,
+        OR: [
+          { threadId },
+          { id: threadId }, // In case threadId is actually an email ID
+        ],
+        isDeleted: false,
+      },
+      orderBy: { receivedAt: 'asc' },
+      include: {
+        attachments: true,
+      },
+    });
+
+    if (emails.length === 0) {
+      throw new NotFoundException('Thread not found');
+    }
 
     return emails;
   }

@@ -22,7 +22,7 @@ export class GoogleSyncService {
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
-    const { providerId, email, syncType, lastSyncedAt } = jobData;
+    const { providerId, email, syncType } = jobData;
 
     this.logger.log(`Starting ${syncType} Gmail sync for ${email}`);
 

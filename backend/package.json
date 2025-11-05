@@ -22,7 +22,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
-    "worker:email": "node dist/workers/email.worker.js",
+
     "worker:ai": "node dist/workers/ai.worker.js"
   },
   "dependencies": {

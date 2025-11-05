@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import { getConfiguration } from '../../../config/configuration';

@@ -124,7 +124,6 @@ export function loadConfiguration(): Configuration {
   // SMTP config
   const smtpFromEmail = process.env.SMTP_FROM_EMAIL || 'noreply';
   const smtpFromDomain = process.env.SMTP_FROM_DOMAIN || 'mailagent.local';
-  const smtpFrom = `${smtpFromEmail}@${smtpFromDomain}`;
 
   return {
     nodeEnv: (process.env.NODE_ENV as any) || 'development',

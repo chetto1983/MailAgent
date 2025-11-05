@@ -11,50 +11,50 @@ datasource db {
 
 // ===== TENANT MODEL =====
 model Tenant {
-  id                 String   @id @default(cuid())
-  name               String
-  slug               String   @unique
-  description        String?
-  isActive           Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  deletedAt          DateTime?
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
   // Relations
-  users              User[]
-  messages           Message[]
-  providerConfigs    ProviderConfig[]
-  emails             Email[]
-  embeddings         Embedding[]
-  auditLogs          AuditLog[]
-  chatSessions       ChatSession[]
+  users           User[]
+  messages        Message[]
+  providerConfigs ProviderConfig[]
+  emails          Email[]
+  embeddings      Embedding[]
+  auditLogs       AuditLog[]
+  chatSessions    ChatSession[]
 
   @@map("tenants")
 }
 
 // ===== USER MODEL =====
 model User {
-  id                 String   @id @default(cuid())
-  tenantId           String
-  email              String
-  passwordHash       String
-  firstName          String?
-  lastName           String?
-  role               String   @default("user") // "admin", "user", "super-admin"
-  isActive           Boolean  @default(true)
-  isMfaEnabled       Boolean  @default(true)
-  lastLogin          DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  deletedAt          DateTime?
+  id           String    @id @default(cuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  firstName    String?
+  lastName     String?
+  role         String    @default("user") // "admin", "user", "super-admin"
+  isActive     Boolean   @default(true)
+  isMfaEnabled Boolean   @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   // Relations
-  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  mfaCodes           MfaCode[]
-  sessions           Session[]
-  messages           Message[]
-  auditLogs          AuditLog[]
-  chatSessions       ChatSession[]
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  mfaCodes     MfaCode[]
+  sessions     Session[]
+  messages     Message[]
+  auditLogs    AuditLog[]
+  chatSessions ChatSession[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -63,16 +63,16 @@ model User {
 
 // ===== MFA CODE MODEL =====
 model MfaCode {
-  id                 String   @id @default(cuid())
-  userId             String
-  code               String   @unique
-  type               String   @default("email") // "email", "sms"
-  isUsed             Boolean  @default(false)
-  expiresAt          DateTime
-  createdAt          DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  code      String   @unique
+  type      String   @default("email") // "email", "sms"
+  isUsed    Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   // Relations
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, code])
   @@map("mfa_codes")
@@ -80,16 +80,16 @@ model MfaCode {
 
 // ===== SESSION MODEL =====
 model Session {
-  id                 String   @id @default(cuid())
-  userId             String
-  token              String   @unique
-  expiresAt          DateTime
-  ipAddress          String?
-  userAgent          String?
-  createdAt          DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
 
   // Relations
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, token])
   @@map("sessions")
@@ -97,52 +97,52 @@ model Session {
 
 // ===== PASSWORD RESET TOKEN =====
 model PasswordResetToken {
-  id                 String   @id @default(cuid())
-  userEmail          String
-  token              String   @unique
-  tenantId           String
-  isUsed             Boolean  @default(false)
-  expiresAt          DateTime
-  createdAt          DateTime @default(now())
+  id        String   @id @default(cuid())
+  userEmail String
+  token     String   @unique
+  tenantId  String
+  isUsed    Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   @@map("password_reset_tokens")
 }
 
 // ===== PROVIDER CONFIG MODEL (Email + Calendar) =====
 model ProviderConfig {
-  id                 String   @id @default(cuid())
-  tenantId           String
-  userId             String?
-  providerType       String   // "google", "microsoft", "generic"
-  email              String
-  displayName        String?
+  id           String  @id @default(cuid())
+  tenantId     String
+  userId       String?
+  providerType String // "google", "microsoft", "generic"
+  email        String
+  displayName  String?
 
   // Capabilities (what this provider supports)
-  supportsEmail      Boolean  @default(true)
-  supportsCalendar   Boolean  @default(false)
-  supportsContacts   Boolean  @default(false)
+  supportsEmail    Boolean @default(true)
+  supportsCalendar Boolean @default(false)
+  supportsContacts Boolean @default(false)
 
   // OAuth2 tokens (for Google/Microsoft) - Encrypted
-  accessToken        String?
-  refreshToken       String?
-  tokenEncryptionIv  String? // IV for token encryption
+  accessToken              String?
+  refreshToken             String?
+  tokenEncryptionIv        String? // IV for token encryption
   refreshTokenEncryptionIv String? // IV for refresh token encryption
-  tokenExpiresAt     DateTime?
+  tokenExpiresAt           DateTime?
 
   // IMAP/SMTP configuration (for generic providers)
-  imapHost           String?
-  imapPort           Int?
-  imapUsername       String?
-  imapPassword       String? // Encrypted
-  imapEncryptionIv   String? // IV for IMAP password
-  imapUseTls         Boolean  @default(true)
+  imapHost         String?
+  imapPort         Int?
+  imapUsername     String?
+  imapPassword     String? // Encrypted
+  imapEncryptionIv String? // IV for IMAP password
+  imapUseTls       Boolean @default(true)
 
-  smtpHost           String?
-  smtpPort           Int?
-  smtpUsername       String?
-  smtpPassword       String? // Encrypted
-  smtpEncryptionIv   String? // IV for SMTP password
-  smtpUseTls         Boolean  @default(true)
+  smtpHost         String?
+  smtpPort         Int?
+  smtpUsername     String?
+  smtpPassword     String? // Encrypted
+  smtpEncryptionIv String? // IV for SMTP password
+  smtpUseTls       Boolean @default(true)
 
   // CalDAV/CardDAV configuration (for generic providers)
   caldavUrl          String?
@@ -150,22 +150,22 @@ model ProviderConfig {
   caldavPassword     String? // Encrypted
   caldavEncryptionIv String? // IV for CalDAV password
 
-  carddavUrl         String?
-  carddavUsername    String?
-  carddavPassword    String? // Encrypted
+  carddavUrl          String?
+  carddavUsername     String?
+  carddavPassword     String? // Encrypted
   carddavEncryptionIv String? // IV for CardDAV password
 
   // Metadata
-  metadata           Json?    // Additional provider-specific settings
-  isDefault          Boolean  @default(false)
-  isActive           Boolean  @default(true)
-  lastSyncedAt       DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  metadata     Json? // Additional provider-specific settings
+  isDefault    Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  lastSyncedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // Relations
-  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  emails             Email[]
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  emails Email[]
 
   @@unique([tenantId, email, providerType])
   @@index([tenantId, isDefault])
@@ -175,60 +175,61 @@ model ProviderConfig {
 
 // ===== EMAIL MODEL (Synced emails from providers) =====
 model Email {
-  id                 String   @id @default(cuid())
-  tenantId           String
-  providerId         String
+  id         String @id @default(cuid())
+  tenantId   String
+  providerId String
 
   // External IDs for sync tracking
-  externalId         String   // Gmail messageId, Microsoft ID, IMAP UID
-  threadId           String?  // For conversation threading
+  externalId String // Gmail messageId, Microsoft ID, IMAP UID
+  threadId   String? // For conversation threading
 
   // Email metadata
-  messageId          String?  // RFC 2822 Message-ID header
-  inReplyTo          String?  // RFC 2822 In-Reply-To header
-  references         String?  // RFC 2822 References header
+  messageId  String? // RFC 2822 Message-ID header
+  inReplyTo  String? // RFC 2822 In-Reply-To header
+  references String? // RFC 2822 References header
 
   // Sender and recipients
-  from               String   // "Name <email@domain.com>"
-  to                 String[] // Array of recipients
-  cc                 String[] @default([])
-  bcc                String[] @default([])
-  replyTo            String?
+  from    String // "Name <email@domain.com>"
+  to      String[] // Array of recipients
+  cc      String[] @default([])
+  bcc     String[] @default([])
+  replyTo String?
 
   // Content
-  subject            String
-  bodyText           String?  // Plain text version
-  bodyHtml           String?  // HTML version
-  snippet            String?  // Preview/summary (first 200 chars)
+  subject  String
+  bodyText String? // Plain text version
+  bodyHtml String? // HTML version
+  snippet  String? // Preview/summary (first 200 chars)
 
   // Classification
-  folder             String   @default("INBOX") // INBOX, SENT, DRAFTS, TRASH, etc.
-  labels             String[] @default([])      // Gmail labels or categories
+  folder String   @default("INBOX") // INBOX, SENT, DRAFTS, TRASH, etc.
+  labels String[] @default([]) // Gmail labels or categories
 
   // Flags and status
-  isRead             Boolean  @default(false)
-  isStarred          Boolean  @default(false)
-  isFlagged          Boolean  @default(false)
-  isDraft            Boolean  @default(false)
-  isDeleted          Boolean  @default(false)
+  isRead     Boolean @default(false)
+  isStarred  Boolean @default(false)
+  isFlagged  Boolean @default(false)
+  isDraft    Boolean @default(false)
+  isDeleted  Boolean @default(false)
+  isArchived Boolean @default(false) // Archived emails have body removed but keep ID + embeddings
 
   // Dates
-  sentAt             DateTime // When email was sent
-  receivedAt         DateTime // When email was received
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  sentAt     DateTime // When email was sent
+  receivedAt DateTime // When email was received
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // Size
-  size               Int?     // Size in bytes
+  size Int? // Size in bytes
 
   // Metadata
-  headers            Json?    // Full email headers
-  metadata           Json?    // Provider-specific metadata
+  headers  Json? // Full email headers
+  metadata Json? // Provider-specific metadata
 
   // Relations
-  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  provider           ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  attachments        EmailAttachment[]
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider    ProviderConfig    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  attachments EmailAttachment[]
 
   @@unique([providerId, externalId]) // Prevent duplicates
   @@index([tenantId, folder, receivedAt]) // List emails by folder
@@ -240,26 +241,26 @@ model Email {
 
 // ===== EMAIL ATTACHMENT MODEL =====
 model EmailAttachment {
-  id                 String   @id @default(cuid())
-  emailId            String
+  id      String @id @default(cuid())
+  emailId String
 
   // Attachment metadata
-  filename           String
-  mimeType           String
-  size               Int      // Size in bytes
-  contentId          String?  // For inline images
+  filename  String
+  mimeType  String
+  size      Int // Size in bytes
+  contentId String? // For inline images
 
   // Storage
-  storageType        String   @default("local") // "local", "s3", "azure"
-  storagePath        String?  // Path to file on disk or cloud
+  storageType String  @default("local") // "local", "s3", "azure"
+  storagePath String? // Path to file on disk or cloud
 
   // Inline flag
-  isInline           Boolean  @default(false)
+  isInline Boolean @default(false)
 
-  createdAt          DateTime @default(now())
+  createdAt DateTime @default(now())
 
   // Relations
-  email              Email    @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
 
   @@index([emailId])
   @@map("email_attachments")
@@ -270,21 +271,21 @@ model EmailAttachment {
 
 // ===== MESSAGE MODEL =====
 model Message {
-  id                 String   @id @default(cuid())
-  tenantId           String
-  userId             String
-  conversationId     String?
-  role               String   // "user", "assistant"
-  content            String
-  embeddingId        String?
-  isDeleted          Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id             String   @id @default(cuid())
+  tenantId       String
+  userId         String
+  conversationId String?
+  role           String // "user", "assistant"
+  content        String
+  embeddingId    String?
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
-  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  embedding          Embedding? @relation(fields: [embeddingId], references: [id])
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  embedding Embedding? @relation(fields: [embeddingId], references: [id])
 
   @@index([tenantId, userId, conversationId])
   @@index([createdAt])
@@ -292,16 +293,16 @@ model Message {
 }
 
 model ChatSession {
-  id         String   @id @default(cuid())
-  tenantId   String
-  userId     String
-  title      String
-  messages   Json
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  title     String
+  messages  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, userId, updatedAt])
   @@map("chat_sessions")
@@ -309,19 +310,19 @@ model ChatSession {
 
 // ===== EMBEDDING MODEL (PGVECTOR) =====
 model Embedding {
-  id                 String   @id @default(cuid())
-  tenantId           String
-  messageId          String?
-  documentName       String?
-  content            String
-  vector             Unsupported("vector")? // pgvector type
-  embeddingModel     String   @default("mistral-embed")
-  metadata           Json?
-  createdAt          DateTime @default(now())
+  id             String                 @id @default(cuid())
+  tenantId       String
+  messageId      String?
+  documentName   String?
+  content        String
+  vector         Unsupported("vector")? // pgvector type
+  embeddingModel String                 @default("mistral-embed")
+  metadata       Json?
+  createdAt      DateTime               @default(now())
 
   // Relations
-  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  messages           Message[]
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messages Message[]
 
   @@index([tenantId])
   @@map("embeddings")
@@ -329,19 +330,19 @@ model Embedding {
 
 // ===== AUDIT LOG MODEL =====
 model AuditLog {
-  id                 String   @id @default(cuid())
-  tenantId           String
-  userId             String?
-  action             String   // "CREATE", "UPDATE", "DELETE"
-  entity             String   // "User", "Message", "ProviderConfig"
-  entityId           String
-  changes            Json?
-  ipAddress          String?
-  createdAt          DateTime @default(now())
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String?
+  action    String // "CREATE", "UPDATE", "DELETE"
+  entity    String // "User", "Message", "ProviderConfig"
+  entityId  String
+  changes   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
 
   // Relations
-  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user               User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([userId, createdAt])
@@ -350,19 +351,19 @@ model AuditLog {
 
 // ===== JOB QUEUE MODEL (for tracking BullMQ jobs) =====
 model JobQueue {
-  id                 String   @id @default(cuid())
-  tenantId           String
-  jobId              String
-  jobType            String   // "email_sync", "ai_processing", "embedding"
-  status             String   @default("pending") // "pending", "running", "completed", "failed"
-  data               Json
-  result             Json?
-  error              String?
-  retries            Int      @default(0)
-  maxRetries         Int      @default(3)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  completedAt        DateTime?
+  id          String    @id @default(cuid())
+  tenantId    String
+  jobId       String
+  jobType     String // "email_sync", "ai_processing", "embedding"
+  status      String    @default("pending") // "pending", "running", "completed", "failed"
+  data        Json
+  result      Json?
+  error       String?
+  retries     Int       @default(0)
+  maxRetries  Int       @default(3)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
 
   @@index([tenantId, status])
   @@index([createdAt])
@@ -371,12 +372,12 @@ model JobQueue {
 
 // ===== HEALTH CHECK =====
 model HealthCheck {
-  id                 String   @id @default(cuid())
-  service            String   // "database", "redis", "mistral", "email"
-  status             String   @default("up") // "up", "down", "degraded"
-  lastCheckedAt      DateTime @default(now())
-  responseTime       Int?     // milliseconds
-  error              String?
+  id            String   @id @default(cuid())
+  service       String // "database", "redis", "mistral", "email"
+  status        String   @default("up") // "up", "down", "degraded"
+  lastCheckedAt DateTime @default(now())
+  responseTime  Int? // milliseconds
+  error         String?
 
   @@unique([service])
   @@map("health_checks")

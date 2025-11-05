@@ -100,7 +100,7 @@ export class ChatSessionService {
           })),
           params.locale,
         );
-      } catch (error) {
+      } catch {
         title = this.deriveFallbackTitle(sanitisedMessages, params.locale);
       }
     }

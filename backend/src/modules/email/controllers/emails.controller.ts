@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Delete,
+  Post,
   Param,
   Query,
   Body,
@@ -13,11 +14,17 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { EmailsService, EmailListFilters } from '../services/emails.service';
+import { EmailRetentionService } from '../services/email-retention.service';
+import { EmailFetchService } from '../services/email-fetch.service';
 
 @Controller('emails')
 @UseGuards(JwtAuthGuard)
 export class EmailsController {
-  constructor(private emailsService: EmailsService) {}
+  constructor(
+    private emailsService: EmailsService,
+    private retentionService: EmailRetentionService,
+    private fetchService: EmailFetchService,
+  ) {}
 
   /**
    * GET /emails - List emails with pagination and filters
@@ -85,6 +92,34 @@ export class EmailsController {
   }
 
   /**
+   * GET /emails/conversations - Get conversation view (threaded emails)
+   */
+  @Get('conversations')
+  async getConversations(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('providerId') providerId?: string,
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.getConversations({
+      tenantId,
+      providerId,
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 50,
+    });
+  }
+
+  /**
+   * GET /emails/thread/:threadId - Get all emails in a thread
+   */
+  @Get('thread/:threadId')
+  async getThread(@Req() req: any, @Param('threadId') threadId: string) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.getThread(threadId, tenantId);
+  }
+
+  /**
    * GET /emails/:id - Get email by ID
    */
   @Get(':id')
@@ -130,5 +165,30 @@ export class EmailsController {
       tenantId,
       data.isRead,
     );
+  }
+
+  /**
+   * POST /emails/:id/fetch-archived - Fetch archived email from server
+   */
+  @Post(':id/fetch-archived')
+  async fetchArchivedEmail(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.user.tenantId;
+    return this.fetchService.fetchArchivedEmail(id, tenantId);
+  }
+
+  /**
+   * GET /emails/retention/stats - Get retention statistics
+   */
+  @Get('retention/stats')
+  async getRetentionStats() {
+    return this.retentionService.getRetentionStats();
+  }
+
+  /**
+   * POST /emails/retention/run - Manually run retention policy
+   */
+  @Post('retention/run')
+  async runRetentionPolicy(@Body() data?: { retentionDays?: number }) {
+    return this.retentionService.runManualRetention(data?.retentionDays);
   }
 }

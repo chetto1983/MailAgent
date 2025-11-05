@@ -390,12 +390,11 @@ export class AuthService {
   /**
    * Reset password with token
    */
-  async resetPassword(token: string, newPassword: string, tenantSlug?: string) {
+  async resetPassword(token: string, newPassword: string, _tenantSlug?: string) {
     // Verify token
-    let decoded;
     try {
-      decoded = this.jwtService.verify(token);
-    } catch (error) {
+      this.jwtService.verify(token);
+    } catch {
       throw new UnauthorizedException('Invalid or expired reset token');
     }
 
@@ -470,10 +469,10 @@ export class AuthService {
   /**
    * Handle Google OAuth
    */
-  async handleGoogleOAuth(code: string, tenantSlug?: string) {
+  async handleGoogleOAuth(_code: string, _tenantSlug?: string) {
     throw new GoneException({
       message:
-        'Questo metodo è stato deprecato. Richiedi l’URL OAuth tramite /providers/google/auth-url e completa la procedura con /providers/google/connect.',
+        "Questo metodo è stato deprecato. Richiedi l'URL OAuth tramite /providers/google/auth-url e completa la procedura con /providers/google/connect.",
       documentation: 'docs/implementation/PROVIDER_INTEGRATION_GUIDE.md',
     });
   }
@@ -481,10 +480,10 @@ export class AuthService {
   /**
    * Handle Microsoft OAuth
    */
-  async handleMicrosoftOAuth(code: string, tenantSlug?: string) {
+  async handleMicrosoftOAuth(_code: string, _tenantSlug?: string) {
     throw new GoneException({
       message:
-        'Questo metodo è stato deprecato. Usa /providers/microsoft/auth-url e /providers/microsoft/connect per completare l’OAuth.',
+        "Questo metodo è stato deprecato. Usa /providers/microsoft/auth-url e /providers/microsoft/connect per completare l'OAuth.",
       documentation: 'docs/implementation/PROVIDER_INTEGRATION_GUIDE.md',
     });
   }

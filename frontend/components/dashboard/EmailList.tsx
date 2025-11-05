@@ -9,6 +9,7 @@ interface EmailListProps {
   selectedEmail: Email | null;
   onEmailClick: (email: Email) => void;
   loading: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
   formatDate: (dateString: string) => string;
   extractDisplayName: (from: string) => string;

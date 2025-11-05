@@ -189,9 +189,8 @@ export class ProviderConfigService {
       }
 
       // Test SMTP if provided
-      let smtpConnected = false;
       if (dto.smtpHost && dto.smtpUsername && dto.smtpPassword) {
-        smtpConnected = await this.imap.testSmtpConnection({
+        await this.imap.testSmtpConnection({
           host: dto.smtpHost,
           port: dto.smtpPort ?? 587,
           username: dto.smtpUsername,
@@ -515,18 +514,18 @@ export class ProviderConfigService {
    */
   private sanitizeProviderConfig(config: any) {
     const {
-      accessToken,
-      refreshToken,
-      tokenEncryptionIv,
-      refreshTokenEncryptionIv,
-      imapPassword,
-      imapEncryptionIv,
-      smtpPassword,
-      smtpEncryptionIv,
-      caldavPassword,
-      caldavEncryptionIv,
-      carddavPassword,
-      carddavEncryptionIv,
+      accessToken: _accessToken,
+      refreshToken: _refreshToken,
+      tokenEncryptionIv: _tokenEncryptionIv,
+      refreshTokenEncryptionIv: _refreshTokenEncryptionIv,
+      imapPassword: _imapPassword,
+      imapEncryptionIv: _imapEncryptionIv,
+      smtpPassword: _smtpPassword,
+      smtpEncryptionIv: _smtpEncryptionIv,
+      caldavPassword: _caldavPassword,
+      caldavEncryptionIv: _caldavEncryptionIv,
+      carddavPassword: _carddavPassword,
+      carddavEncryptionIv: _carddavEncryptionIv,
       ...sanitized
     } = config;
 

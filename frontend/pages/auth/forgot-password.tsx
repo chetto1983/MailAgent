@@ -23,8 +23,9 @@ export default function ForgotPasswordPage() {
       if (response.data.success) {
         setSuccess(true);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Request failed');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Request failed');
     } finally {
       setLoading(false);
     }
@@ -40,7 +41,7 @@ export default function ForgotPasswordPage() {
           <CardContent>
             <Alert className="mb-4">
               <AlertDescription>
-                If an account exists with this email, you'll receive a password reset link in a few minutes.
+                If an account exists with this email, you&apos;ll receive a password reset link in a few minutes.
               </AlertDescription>
             </Alert>
 

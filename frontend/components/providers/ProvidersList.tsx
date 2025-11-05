@@ -25,8 +25,9 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
     try {
       await providersApi.deleteProvider(id);
       onDelete();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete provider');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to delete provider');
     } finally {
       setDeletingId(null);
     }

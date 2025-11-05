@@ -24,8 +24,9 @@ export function MicrosoftProviderCard({ onSuccess }: MicrosoftProviderCardProps)
 
       // Redirect to Microsoft OAuth
       window.location.href = authUrl;
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to connect Microsoft account');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to connect Microsoft account');
       setLoading(false);
     }
   };

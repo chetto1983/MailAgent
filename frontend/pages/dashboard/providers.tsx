@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/use-auth';
@@ -20,23 +20,20 @@ export default function ProvidersPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Handle OAuth callback
-  useEffect(() => {
-    const { code, provider: providerType, error: oauthError } = router.query;
-
-    if (oauthError) {
-      setError(`OAuth error: ${oauthError}`);
-      // Remove error from URL
-      router.replace('/dashboard/providers', undefined, { shallow: true });
-      return;
+  const loadProviders = async () => {
+    try {
+      setLoading(true);
+      const data = await providersApi.getProviders();
+      setProviders(data);
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to load providers');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (code && providerType) {
-      handleOAuthCallback(code as string, providerType as string);
-    }
-  }, [router.query]);
-
-  const handleOAuthCallback = async (authorizationCode: string, providerType: string) => {
+  const handleOAuthCallback = useCallback(async (authorizationCode: string, providerType: string) => {
     try {
       setLoading(true);
       setError('');
@@ -59,24 +56,29 @@ export default function ProvidersPage() {
 
       // Remove code from URL
       router.replace('/dashboard/providers', undefined, { shallow: true });
-    } catch (err: any) {
-      setError(err.response?.data?.message || `Failed to connect ${providerType} account`);
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || `Failed to connect ${providerType} account`);
     } finally {
       setLoading(false);
     }
-  };
+  }, [router, setLoading, setError, setSuccess]);
 
-  const loadProviders = async () => {
-    try {
-      setLoading(true);
-      const data = await providersApi.getProviders();
-      setProviders(data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load providers');
-    } finally {
-      setLoading(false);
+  // Handle OAuth callback
+  useEffect(() => {
+    const { code, provider: providerType, error: oauthError } = router.query;
+
+    if (oauthError) {
+      setError(`OAuth error: ${oauthError}`);
+      // Remove error from URL
+      router.replace('/dashboard/providers', undefined, { shallow: true });
+      return;
     }
-  };
+
+    if (code && providerType) {
+      handleOAuthCallback(code as string, providerType as string);
+    }
+  }, [router.query, router, handleOAuthCallback]);
 
   useEffect(() => {
     loadProviders();
@@ -188,11 +190,11 @@ export default function ProvidersPage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <p className="text-sm text-slate-300">
-                  <strong>Google:</strong> Click "Connect Google Account" and sign in with your
+                  <strong>Google:</strong> Click &quot;Connect Google Account&quot; and sign in with your
                   Google credentials. Grant access to Gmail, Calendar, and Contacts when prompted.
                 </p>
                 <p className="text-sm text-slate-300">
-                  <strong>Microsoft:</strong> Use "Connect Microsoft Account" and sign in with your
+                  <strong>Microsoft:</strong> Use &quot;Connect Microsoft Account&quot; and sign in with your
                   Outlook/Microsoft 365 credentials.
                 </p>
                 <p className="text-sm text-slate-300">

@@ -25,7 +25,7 @@ export class MicrosoftOAuthService {
     private readonly prisma: PrismaService,
     private readonly cryptoService: CryptoService,
   ) {
-    const { clientId, clientSecret, redirectUri } = this.config.oauth.microsoft;
+    const { clientId, clientSecret } = this.config.oauth.microsoft;
 
     const msalConfig: Configuration = {
       auth: {
@@ -48,13 +48,6 @@ export class MicrosoftOAuthService {
     const state = this.generateRandomState();
 
     const { redirectUri } = this.config.oauth.microsoft;
-
-    const authCodeUrlParameters = {
-      scopes: requestedScopes,
-      redirectUri,
-      state,
-      prompt: 'consent', // Force consent screen to get refresh token
-    };
 
     const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
       `client_id=${this.config.oauth.microsoft.clientId}&` +

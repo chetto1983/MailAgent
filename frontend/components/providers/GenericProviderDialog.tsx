@@ -77,14 +77,15 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
         caldavPassword: '',
         supportsCalendar: false,
       });
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to connect provider');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to connect provider');
     } finally {
       setLoading(false);
     }
   };
 
-  const updateField = (field: keyof ConnectGenericDto, value: any) => {
+  const updateField = (field: keyof ConnectGenericDto, value: string | number | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 

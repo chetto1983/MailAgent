@@ -12,7 +12,7 @@ export default function Home() {
     if (!isLoading && user) {
       router.push('/dashboard');
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, router]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;

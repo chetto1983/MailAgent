@@ -227,8 +227,8 @@ JWT_SECRET=<generated-automatically>
 AES_SECRET_KEY=<generated-automatically>
 
 # External Services (optional for testing)
-GMAIL_CLIENT_ID=placeholder
-MISTRAL_API_KEY=placeholder
+GMAIL_CLIENT_ID=your_google_client_id # Obtain from Google Cloud Console
+MISTRAL_API_KEY=your_mistral_api_key # Obtain from Mistral AI platform
 SMTP_HOST=mail-server
 ```
 

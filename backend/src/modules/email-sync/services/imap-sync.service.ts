@@ -22,7 +22,7 @@ export class ImapSyncService {
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
-    const { providerId, email, syncType, lastSyncedAt } = jobData;
+    const { providerId, email, syncType } = jobData;
 
     this.logger.log(`Starting ${syncType} IMAP sync for ${email}`);
 
@@ -108,7 +108,7 @@ export class ImapSyncService {
       if (client) {
         try {
           await client.logout();
-        } catch (logoutError) {
+        } catch {
           // Ignore logout errors
         }
       }

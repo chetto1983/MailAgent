@@ -24,8 +24,9 @@ export function GoogleProviderCard({ onSuccess }: GoogleProviderCardProps) {
 
       // Redirect to Google OAuth
       window.location.href = authUrl;
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to connect Google account');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to connect Google account');
       setLoading(false);
     }
   };

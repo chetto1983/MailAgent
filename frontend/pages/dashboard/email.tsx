@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { emailApi, type Email, type EmailStats } from '@/lib/api/email';
+import { aiApi, type ChatMessage } from '@/lib/api/ai';
 import { useLocale } from '@/lib/hooks/use-locale';
 import { EmailList } from '@/components/dashboard/EmailList';
 import { EmailView } from '@/components/dashboard/EmailView';
@@ -74,6 +75,8 @@ const translations = {
     aiSend: 'Send',
     hideAi: 'Hide AI panel',
     showAi: 'Show AI panel',
+    thinking: 'Thinking',
+    toolStepsLabel: (count: number) => `Agent steps (${count})`,
   },
   it: {
     title: 'Email',
@@ -125,6 +128,8 @@ const translations = {
     aiSend: 'Invia',
     hideAi: 'Nascondi pannello AI',
     showAi: 'Mostra pannello AI',
+    thinking: 'Sto pensando',
+    toolStepsLabel: (count: number) => `Passaggi dell'agente (${count})`,
   },
 } as const;
 
@@ -140,7 +145,7 @@ export default function EmailPage() {
   const localeKey = resolveLocale(locale);
   const t = translations[localeKey];
 
-  const [currentFolder, setCurrentFolder] = useState<string>('INBOX');
+  const [currentFolder, setCurrentFolder] = useState<string>('ALL');
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [stats, setStats] = useState<EmailStats | null>(null);
@@ -148,26 +153,63 @@ export default function EmailPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [showAiChat, setShowAiChat] = useState(true);
+  const [aiSessionId, setAiSessionId] = useState<string | null>(null);
+  const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   const statsByFolder = useMemo(() => stats?.byFolder ?? {}, [stats]);
 
   const loadEmails = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await emailApi.listEmails({
-        folder: currentFolder,
+
+      // Load conversations (all emails from all folders grouped by thread)
+      const response = await emailApi.getConversations({
         page: 1,
         limit: 50,
       });
 
-      setEmails(response.data.emails);
+      // Convert conversations to email format for display
+      const conversationEmails: Email[] = response.data.conversations.map((conv) => ({
+        id: conv.latestEmailId,
+        threadId: conv.threadId,
+        from: conv.from,
+        to: conv.to,
+        subject: conv.subject + (conv.emailCount > 1 ? ` (${conv.emailCount})` : ''),
+        snippet: conv.snippet,
+        folder: conv.folder,
+        labels: conv.labels,
+        isRead: conv.isRead,
+        isStarred: conv.isStarred,
+        isFlagged: conv.isFlagged,
+        receivedAt: conv.receivedAt,
+        sentAt: conv.sentAt,
+        // Default values for fields not in conversation
+        tenantId: '',
+        providerId: '',
+        externalId: '',
+        cc: [],
+        bcc: [],
+        isDraft: false,
+        isDeleted: false,
+        createdAt: conv.receivedAt,
+        updatedAt: conv.receivedAt,
+      }));
+
+      // Filter by current folder if not viewing all
+      const filteredEmails = currentFolder === 'ALL'
+        ? conversationEmails
+        : conversationEmails.filter(email => email.folder === currentFolder);
+
+      setEmails(filteredEmails);
     } catch (error) {
       console.error('Failed to load emails:', error);
       setEmails([]);
     } finally {
       setLoading(false);
     }
-  }, [currentFolder, user]);
+  }, [currentFolder]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -176,7 +218,7 @@ export default function EmailPage() {
     } catch (error) {
       console.error('Failed to load stats:', error);
     }
-  }, [user]);
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -222,19 +264,50 @@ export default function EmailPage() {
 
   const handleEmailClick = useCallback(async (email: Email) => {
     try {
-      // Load full email details
-      const response = await emailApi.getEmail(email.id);
-      setSelectedEmail(response.data);
+      // If this is a conversation (has threadId), load the full thread
+      if (email.threadId) {
+        const threadResponse = await emailApi.getThread(email.threadId);
+        const threadEmails = threadResponse.data;
 
-      // Mark as read if unread
-      if (!email.isRead) {
-        emailApi.updateEmail(email.id, { isRead: true }).then(() => {
-          setEmails((prev) =>
-            prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e))
-          );
-          loadStats();
-        });
+        // Set the latest email as selected (or the one clicked)
+        const fullEmail = threadEmails.find(e => e.id === email.id) || threadEmails[threadEmails.length - 1];
+        setSelectedEmail(fullEmail);
+
+        // Mark all unread emails in thread as read
+        const unreadIds = threadEmails.filter(e => !e.isRead).map(e => e.id);
+        if (unreadIds.length > 0) {
+          emailApi.bulkMarkRead(unreadIds, true).then(() => {
+            setEmails((prev) =>
+              prev.map((e) => {
+                if (e.threadId === email.threadId || e.id === email.id) {
+                  return { ...e, isRead: true };
+                }
+                return e;
+              })
+            );
+            loadStats();
+          });
+        }
+      } else {
+        // Single email without thread
+        const response = await emailApi.getEmail(email.id);
+        setSelectedEmail(response.data);
+
+        // Mark as read if unread
+        if (!email.isRead) {
+          emailApi.updateEmail(email.id, { isRead: true }).then(() => {
+            setEmails((prev) =>
+              prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e))
+            );
+            loadStats();
+          });
+        }
       }
+
+      // Clear AI session when switching emails
+      setAiSessionId(null);
+      setAiMessages([]);
+      setAiInput('');
     } catch (error) {
       console.error('Failed to load email details:', error);
       // Fallback to list email (may have missing fields)
@@ -312,6 +385,70 @@ export default function EmailPage() {
     return match ? match[1].trim() : from.split('@')[0];
   }, []);
 
+  const handleAiQuickAction = useCallback(async (action: string) => {
+    if (!selectedEmail) return;
+
+    setAiLoading(true);
+    try {
+      let prompt = '';
+      switch (action) {
+        case 'summarize':
+          prompt = `Please summarize this email:\n\nFrom: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\n\n${selectedEmail.bodyText || selectedEmail.bodyHtml}`;
+          break;
+        case 'reply':
+          prompt = `Generate a professional reply to this email:\n\nFrom: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\n\n${selectedEmail.bodyText || selectedEmail.bodyHtml}`;
+          break;
+        case 'labels':
+          prompt = `Suggest appropriate labels/tags for this email:\n\nFrom: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\n\n${selectedEmail.bodyText || selectedEmail.bodyHtml}`;
+          break;
+        case 'followup':
+          prompt = `Draft a follow-up email for:\n\nFrom: ${selectedEmail.from}\nSubject: ${selectedEmail.subject}\n\n${selectedEmail.bodyText || selectedEmail.bodyHtml}`;
+          break;
+        default:
+          return;
+      }
+
+      const response = await aiApi.sendAgentMessage({
+        sessionId: aiSessionId || undefined,
+        message: prompt,
+        history: aiMessages,
+        locale,
+      });
+
+      setAiSessionId(response.data.sessionId);
+      setAiMessages(response.data.messages);
+    } catch (error) {
+      console.error('Failed to process AI request:', error);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [selectedEmail, aiSessionId, aiMessages, locale]);
+
+  const handleAiSend = useCallback(async () => {
+    if (!aiInput.trim() || !selectedEmail) return;
+
+    setAiLoading(true);
+    try {
+      const emailContext = `Context: You are helping with an email from ${selectedEmail.from} with subject "${selectedEmail.subject}".`;
+      const fullPrompt = `${emailContext}\n\n${aiInput}`;
+
+      const response = await aiApi.sendAgentMessage({
+        sessionId: aiSessionId || undefined,
+        message: fullPrompt,
+        history: aiMessages,
+        locale,
+      });
+
+      setAiSessionId(response.data.sessionId);
+      setAiMessages(response.data.messages);
+      setAiInput('');
+    } catch (error) {
+      console.error('Failed to send AI message:', error);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiInput, selectedEmail, aiSessionId, aiMessages, locale]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen text-slate-200 bg-slate-950">
@@ -386,6 +523,10 @@ export default function EmailPage() {
             {/* Folder Tabs */}
             <Tabs value={currentFolder} onValueChange={setCurrentFolder} className="flex-1 flex flex-col overflow-hidden">
               <TabsList className="flex-shrink-0 bg-white/5">
+                <TabsTrigger value="ALL" className="gap-2">
+                  <Mail className="w-4 h-4" />
+                  All Conversations
+                </TabsTrigger>
                 <TabsTrigger value="INBOX" className="gap-2">
                   <Inbox className="w-4 h-4" />
                   {t.folders.inbox}
@@ -439,6 +580,12 @@ export default function EmailPage() {
                       t={t}
                       locale={locale}
                       extractDisplayName={extractDisplayName}
+                      aiMessages={aiMessages}
+                      aiInput={aiInput}
+                      aiLoading={aiLoading}
+                      onAiInputChange={setAiInput}
+                      onAiSend={handleAiSend}
+                      onQuickAction={handleAiQuickAction}
                     />
                   )}
                 </div>

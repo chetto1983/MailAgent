@@ -346,7 +346,7 @@
 - [x] MailHog (test email)
 - [x] Backend container
 - [x] Frontend container
-- [x] Email Worker
+
 - [x] AI Worker
 - [x] Nginx reverse proxy
 

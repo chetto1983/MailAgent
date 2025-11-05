@@ -27,13 +27,14 @@ export type Email = {
   isFlagged: boolean;
   isDraft: boolean;
   isDeleted: boolean;
+  isArchived: boolean;
   sentAt: string;
   receivedAt: string;
   createdAt: string;
   updatedAt: string;
   size?: number;
-  headers?: Record<string, any>;
-  metadata?: Record<string, any>;
+  headers?: Record<string, string>;
+  metadata?: Record<string, unknown>;
   attachments?: EmailAttachment[];
 };
 
@@ -95,6 +96,33 @@ export type EmailUpdateData = {
   isRead?: boolean;
   isStarred?: boolean;
   folder?: string;
+};
+
+export type Conversation = {
+  threadId: string;
+  subject: string;
+  from: string;
+  to: string[];
+  snippet?: string;
+  folder: string;
+  labels: string[];
+  isRead: boolean;
+  isStarred: boolean;
+  isFlagged: boolean;
+  receivedAt: string;
+  sentAt: string;
+  emailCount: number;
+  latestEmailId: string;
+};
+
+export type ConversationsResponse = {
+  conversations: Conversation[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 };
 
 // ===== API CLIENT =====
@@ -195,6 +223,64 @@ export const emailApi = {
    * GET /email-sync/status
    */
   getSyncStatus() {
-    return apiClient.get<any>('/email-sync/status');
+    return apiClient.get<Record<string, unknown>>('/email-sync/status');
+  },
+
+  /**
+   * Get conversations (threaded view of all emails)
+   * GET /emails/conversations
+   */
+  getConversations(params?: { page?: number; limit?: number; providerId?: string }) {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.providerId) queryParams.append('providerId', params.providerId);
+
+    const query = queryParams.toString();
+    return apiClient.get<ConversationsResponse>(
+      `/emails/conversations${query ? `?${query}` : ''}`
+    );
+  },
+
+  /**
+   * Get all emails in a thread/conversation
+   * GET /emails/thread/:threadId
+   */
+  getThread(threadId: string) {
+    return apiClient.get<Email[]>(`/emails/thread/${threadId}`);
+  },
+
+  /**
+   * Fetch archived email from server
+   * POST /emails/:id/fetch-archived
+   */
+  fetchArchivedEmail(id: string) {
+    return apiClient.post<Email>(`/emails/${id}/fetch-archived`);
+  },
+
+  /**
+   * Get retention statistics
+   * GET /emails/retention/stats
+   */
+  getRetentionStats() {
+    return apiClient.get<{
+      totalEmails: number;
+      archivedEmails: number;
+      recentEmails: number;
+      oldUnarchived: number;
+      retentionDays: number;
+      estimatedSpaceSavedMB: number;
+    }>('/emails/retention/stats');
+  },
+
+  /**
+   * Manually run retention policy
+   * POST /emails/retention/run
+   */
+  runRetention(retentionDays?: number) {
+    return apiClient.post<{ count: number; emailIds: string[] }>(
+      '/emails/retention/run',
+      { retentionDays }
+    );
   },
 };

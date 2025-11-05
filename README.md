@@ -30,10 +30,10 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
                            │
     ┌──────────────────────┼──────────────────────┐
     │                      │                      │
-┌───▼────────┐  ┌──────────▼────────┐  ┌────────▼──────────┐
-│   Backend   │  │   Email Worker   │  │   AI Worker      │
-│  (NestJS)   │  │  (Email Sync)    │  │  (Mistral API)   │
-└───┬────────┘  └──────────┬────────┘  └────────┬──────────┘
+┌───▼────────┐  ┌────────▼──────────┐
+│   Backend   │  │   AI Worker      │
+│  (NestJS)   │  │  (Mistral API)   │
+└───┬────────┘  └────────┬──────────┘
     │                      │                    │
     └──────────────────────┼────────────────────┘
                            │
@@ -307,7 +307,7 @@ mailagent/
 │   │   │   ├── health/          # Health checks
 │   │   │   └── audit/           # Audit logging
 │   │   ├── workers/
-│   │   │   ├── email.worker.ts  # Email sync worker
+
 │   │   │   └── ai.worker.ts     # AI processing worker
 │   │   ├── common/
 │   │   │   ├── services/

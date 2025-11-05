@@ -275,7 +275,7 @@ Lasciati scadere i token (40 minuti oltre scadenza) e ri-testato.
 ### Priorità ALTA 🔥 (Prossima settimana)
 
 #### 1. Email Sync Worker (3-5 giorni)
-**File**: `backend/src/workers/email.worker.ts`
+**File**: `backend/src/modules/email-sync/workers/sync.worker.ts` (formerly `backend/src/workers/email.worker.ts`)
 
 **TODO**:
 - [ ] Completare sync IMAP

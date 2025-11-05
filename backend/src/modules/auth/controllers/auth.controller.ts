@@ -116,7 +116,7 @@ export class AuthController {
    * POST /auth/google/callback
    */
   @Post('google/callback')
-  async googleCallback(@Body() body: { code: string; tenantSlug?: string }) {
+  async googleCallback(@Body() _body: { code: string; tenantSlug?: string }) {
     throw new GoneException({
       message: 'Questo endpoint è stato deprecato. Utilizza /providers/google/{auth-url,connect}.',
       documentation: 'docs/implementation/PROVIDER_INTEGRATION_GUIDE.md',
@@ -128,7 +128,7 @@ export class AuthController {
    * POST /auth/microsoft/callback
    */
   @Post('microsoft/callback')
-  async microsoftCallback(@Body() body: { code: string; tenantSlug?: string }) {
+  async microsoftCallback(@Body() _body: { code: string; tenantSlug?: string }) {
     throw new GoneException({
       message: 'Questo endpoint è stato deprecato. Utilizza /providers/microsoft/{auth-url,connect}.',
       documentation: 'docs/implementation/PROVIDER_INTEGRATION_GUIDE.md',

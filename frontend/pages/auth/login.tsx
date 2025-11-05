@@ -44,8 +44,9 @@ export default function LoginPage() {
         setUser(response.data.user);
         router.push('/dashboard');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -67,8 +68,9 @@ export default function LoginPage() {
         setUser(response.data.user);
         router.push('/dashboard');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'OTP verification failed');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'OTP verification failed');
     } finally {
       setLoading(false);
     }

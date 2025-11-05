@@ -11,6 +11,7 @@ interface EmailViewProps {
   onToggleStar: (email: Email) => void;
   onToggleRead: (email: Email) => void;
   onDelete: (email: Email) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
   locale: string;
 }

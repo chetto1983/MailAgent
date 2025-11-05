@@ -56,7 +56,10 @@
       "Bash(timeout 240 bash:*)",
       "Bash(timeout 60 bash:*)",
       "Bash(timeout 10 sleep:*)",
-      "Bash(npx prisma studio:*)"
+      "Bash(npx prisma studio:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run:*)",
+      "Bash(npx prisma:*)"
     ],
     "deny": [],
     "ask": []

@@ -42,8 +42,9 @@ export default function ResetPasswordPage() {
       if (response.data.success) {
         setSuccess(true);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Reset failed');
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Reset failed');
     } finally {
       setLoading(false);
     }
