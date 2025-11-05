@@ -135,7 +135,7 @@ export class ChatSessionService {
     });
   }
 
-  private deriveFallbackTitle(messages: StoredChatMessage[]): string {
+  private deriveFallbackTitle(messages: StoredChatMessage[], locale?: string): string {
     const firstUserMessage = messages.find((msg) => msg.role === 'user');
     if (firstUserMessage?.content) {
       const trimmed = firstUserMessage.content.trim();
@@ -143,7 +143,7 @@ export class ChatSessionService {
         return trimmed.length > 60 ? `${trimmed.slice(0, 57)}…` : trimmed;
       }
     }
-    return this.getDefaultTitle();
+    return this.getDefaultTitle(locale);
   }
 
   private getDefaultTitle(locale?: string): string {
@@ -163,5 +163,23 @@ export class ChatSessionService {
       normalised === DEFAULT_TITLES.en.toLowerCase() ||
       normalised === DEFAULT_TITLES.it.toLowerCase()
     );
+  }
+
+  async deleteSession(params: {
+    tenantId: string;
+    userId: string;
+    sessionId: string;
+  }): Promise<boolean> {
+    const session = await this.getSession(params.tenantId, params.userId, params.sessionId);
+
+    if (!session) {
+      return false;
+    }
+
+    await this.prisma.chatSession.delete({
+      where: { id: session.id },
+    });
+
+    return true;
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, Param, Delete } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../modules/auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../modules/auth/guards/tenant.guard';
 import { MistralService } from '../services/mistral.service';
@@ -86,15 +86,39 @@ export class AiController {
    * POST /ai/chat/sessions
    */
   @Post('chat/sessions')
-  async createSession(@Request() req: AuthenticatedRequest) {
+  async createSession(
+    @Request() req: AuthenticatedRequest,
+    @Body() body: { locale?: string },
+  ) {
     const session = await this.chatSessionService.createSession({
       tenantId: req.user.tenantId,
       userId: req.user.userId,
+      locale: body?.locale,
     });
 
     return {
       success: true,
       session,
+    };
+  }
+
+  /**
+   * Delete a chat session
+   * DELETE /ai/chat/sessions/:id
+   */
+  @Delete('chat/sessions/:id')
+  async deleteSession(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') sessionId: string,
+  ) {
+    const deleted = await this.chatSessionService.deleteSession({
+      tenantId: req.user.tenantId,
+      userId: req.user.userId,
+      sessionId,
+    });
+
+    return {
+      success: deleted,
     };
   }
 
@@ -123,6 +147,7 @@ export class AiController {
       session = await this.chatSessionService.createSession({
         tenantId,
         userId,
+        locale: body.locale,
       });
     }
 

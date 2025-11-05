@@ -31,9 +31,10 @@ const translations = {
     navLogout: 'Logout',
     historyHeading: 'Recent chats',
     historyEmpty: 'No previous conversations yet.',
-    historyLoading: 'Loading conversations…',
+    historyLoading: 'Loading conversations...',
     historyActiveTag: 'Current',
     newChatLabel: 'New chat',
+    deleteLabel: 'Delete',
     quickPrompts: [
       'Summarise the latest unread emails',
       'What should I reply to the most recent message?',
@@ -62,9 +63,10 @@ const translations = {
     navLogout: 'Esci',
     historyHeading: 'Chat recenti',
     historyEmpty: 'Nessuna conversazione precedente.',
-    historyLoading: 'Caricamento conversazioni…',
+    historyLoading: 'Caricamento conversazioni...',
     historyActiveTag: 'Attiva',
     newChatLabel: 'Nuova chat',
+    deleteLabel: 'Elimina',
     quickPrompts: [
       'Riassumi le ultime email non lette',
       'Cosa dovrei rispondere all\'ultimo messaggio?',
@@ -210,7 +212,7 @@ export default function DashboardPage() {
       let fetched: ChatSession[] = (data.sessions ?? []).map(normaliseSession);
 
       if (fetched.length === 0) {
-        const { data: created } = await aiApi.createSession();
+        const { data: created } = await aiApi.createSession(localeKey);
         const session = normaliseSession(created.session);
         fetched = [session];
       }
@@ -227,7 +229,7 @@ export default function DashboardPage() {
     } finally {
       setSessionsLoading(false);
     }
-  }, [normaliseSession]);
+  }, [normaliseSession, localeKey]);
 
   useEffect(() => {
     if (isLoading || !user) {
@@ -238,7 +240,7 @@ export default function DashboardPage() {
 
   const startNewSession = useCallback(async () => {
     try {
-      const { data } = await aiApi.createSession();
+      const { data } = await aiApi.createSession(localeKey);
       const newSession = normaliseSession(data.session);
 
       setSessions((prev) => {
@@ -253,7 +255,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Failed to create chat session', error);
     }
-  }, [normaliseSession]);
+  }, [normaliseSession, localeKey]);
 
   const handleSelectSession = useCallback(
     async (sessionId: string) => {
@@ -291,6 +293,40 @@ export default function DashboardPage() {
     [currentSessionId, sessions, normaliseSession],
   );
 
+  const handleDeleteSession = useCallback(
+    async (sessionId: string) => {
+      if (!sessionId || loading) {
+        return;
+      }
+
+      try {
+        const remaining = sessions.filter((session) => session.id !== sessionId);
+        await aiApi.deleteSession(sessionId);
+
+        if (sessionId === currentSessionId) {
+          const fallback = remaining[0];
+
+          if (fallback) {
+            setSessions(remaining);
+            setCurrentSessionId(fallback.id);
+            setMessages(fallback.messages ?? []);
+          } else {
+            const { data } = await aiApi.createSession(localeKey);
+            const newSession = normaliseSession(data.session);
+            setSessions([newSession]);
+            setCurrentSessionId(newSession.id);
+            setMessages(newSession.messages ?? []);
+          }
+        } else {
+          setSessions(remaining);
+        }
+      } catch (error) {
+        console.error('Failed to delete chat session', error);
+      }
+    },
+    [loading, currentSessionId, sessions, localeKey, normaliseSession],
+  );
+
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/auth/login');
@@ -321,7 +357,7 @@ export default function DashboardPage() {
       let sessionId = currentSessionId;
 
       if (!sessionId) {
-        const { data } = await aiApi.createSession();
+        const { data } = await aiApi.createSession(localeKey);
         const newSession = normaliseSession(data.session);
         sessionId = newSession.id;
         setSessions((prev) => [newSession, ...prev].slice(0, MAX_CHAT_HISTORY));
@@ -332,6 +368,7 @@ export default function DashboardPage() {
         sessionId,
         message: userMessage,
         history: pendingMessages,
+        locale: localeKey,
       });
 
       if (response.data.success) {
@@ -440,24 +477,40 @@ export default function DashboardPage() {
                 {sessions.map((session) => {
                   const isActive = session.id === currentSessionId;
                   return (
-                    <button
+                    <div
                       key={session.id}
-                      type="button"
-                      onClick={() => handleSelectSession(session.id)}
-                      className={`flex min-w-[160px] flex-col rounded-xl border px-3 py-2 text-left transition ${
+                      className={`flex min-w-[200px] items-center justify-between gap-2 rounded-xl border px-3 py-2 transition ${
                         isActive
                           ? 'border-sky-400/80 bg-sky-500/20 text-sky-100 shadow-md shadow-sky-900/40'
                           : 'border-white/10 bg-white/5 text-slate-200 hover:border-sky-400/60 hover:bg-sky-500/10'
                       }`}
                     >
-                      <span className="truncate text-sm font-medium">
-                        {session.title}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        {dateFormatter.format(new Date(session.updatedAt))}
-                        {isActive ? ` · ${t.historyActiveTag}` : ''}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSession(session.id)}
+                        className="flex-1 text-left"
+                      >
+                        <span className="block truncate text-sm font-medium">
+                          {session.title}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {dateFormatter.format(new Date(session.updatedAt))}
+                          {isActive ? ` · ${t.historyActiveTag}` : ''}
+                        </span>
+                      </button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-slate-400 hover:text-red-300"
+                        onClick={() => handleDeleteSession(session.id)}
+                        disabled={loading || isActive}
+                        aria-label={t.deleteLabel}
+                        title={t.deleteLabel}
+                      >
+                        ×
+                      </Button>
+                    </div>
                   );
                 })}
               </div>

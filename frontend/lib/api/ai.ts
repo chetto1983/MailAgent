@@ -23,13 +23,21 @@ export const aiApi = {
       `/ai/chat/sessions/${sessionId}`,
     );
   },
-  createSession() {
-    return apiClient.post<{ success: boolean; session: ChatSession }>('/ai/chat/sessions');
+  createSession(locale?: string) {
+    return apiClient.post<{ success: boolean; session: ChatSession }>(
+      '/ai/chat/sessions',
+      { locale },
+    );
+  },
+
+  deleteSession(sessionId: string) {
+    return apiClient.delete<{ success: boolean }>(`/ai/chat/sessions/${sessionId}`);
   },
   sendAgentMessage(payload: {
     sessionId?: string;
     message: string;
     history: ChatMessage[];
+    locale?: string;
   }) {
     return apiClient.post<{
       success: boolean;

@@ -11,6 +11,28 @@ type ConversationMessage = {
   content: string;
 };
 
+type LocaleKey = 'en' | 'it';
+
+const TITLE_PROMPTS: Record<
+  LocaleKey,
+  { system: string; conversationLabel: string; titleLabel: string; defaultTitle: string }
+> = {
+  en: {
+    system:
+      'You summarise conversations. Craft a short, descriptive title (max 8 words) for the conversation provided. Reply with the title only, no quotes.',
+    conversationLabel: 'Conversation',
+    titleLabel: 'Title',
+    defaultTitle: 'New chat',
+  },
+  it: {
+    system:
+      'Sei un assistente che riassume le conversazioni. Crea un titolo breve e descrittivo (massimo 8 parole) per la conversazione indicata. Rispondi solo con il titolo, senza virgolette.',
+    conversationLabel: 'Conversazione',
+    titleLabel: 'Titolo',
+    defaultTitle: 'Nuova chat',
+  },
+};
+
 @Injectable()
 export class MistralService {
   private logger = new Logger(MistralService.name);
@@ -102,14 +124,19 @@ export class MistralService {
     return '';
   }
 
-  async generateChatTitle(messages: Array<{ role: string; content: string }> = []): Promise<string> {
+  async generateChatTitle(
+    messages: Array<{ role: string; content: string }> = [],
+    locale?: string,
+  ): Promise<string> {
+    const localeKey = this.resolveLocale(locale);
+
     if (!messages || messages.length === 0) {
-      return 'New chat';
+      return TITLE_PROMPTS[localeKey].defaultTitle;
     }
 
     const apiKey = this.getApiKey();
     if (!apiKey) {
-      return this.buildFallbackTitle(messages);
+      return this.buildFallbackTitle(messages, localeKey);
     }
 
     try {
@@ -126,33 +153,36 @@ export class MistralService {
         messages: [
           {
             role: 'system',
-            content:
-              'You summarise conversations. Craft a short, descriptive title (max 8 words) for the conversation provided. Reply with the title only, no quotes.',
+            content: TITLE_PROMPTS[localeKey].system,
           },
           {
             role: 'user',
-            content: `Conversation:\n${transcript}\n\nTitle:`,
+            content: `${TITLE_PROMPTS[localeKey].conversationLabel}:\n${transcript}\n\n${TITLE_PROMPTS[localeKey].titleLabel}:`,
           },
         ],
       });
 
       const rawTitle =
-        this.extractAssistantContent(completion.choices?.[0]?.message) || this.buildFallbackTitle(messages);
-      return this.sanitiseTitle(rawTitle);
+        this.extractAssistantContent(completion.choices?.[0]?.message) ||
+        this.buildFallbackTitle(messages, localeKey);
+      return this.sanitiseTitle(rawTitle, localeKey);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Failed to generate chat title: ${errorMessage}`);
-      return this.buildFallbackTitle(messages);
+      return this.buildFallbackTitle(messages, localeKey);
     }
   }
 
-  private buildFallbackTitle(messages: Array<{ role: string; content: string }>): string {
+  private buildFallbackTitle(
+    messages: Array<{ role: string; content: string }>,
+    localeKey: LocaleKey,
+  ): string {
     const firstUserMessage = messages.find(
       (message) => message.role === 'user' && typeof message.content === 'string' && message.content.trim().length > 0,
     );
 
     if (!firstUserMessage) {
-      return 'New chat';
+      return TITLE_PROMPTS[localeKey].defaultTitle;
     }
 
     const trimmed = firstUserMessage.content.trim();
@@ -160,21 +190,25 @@ export class MistralService {
       return trimmed;
     }
 
-    return `${trimmed.slice(0, 57)}…`;
+    return `${trimmed.slice(0, 57)}...`;
   }
 
-  private sanitiseTitle(title: string): string {
+  private resolveLocale(locale?: string): LocaleKey {
+    return locale && locale.toLowerCase().startsWith('it') ? 'it' : 'en';
+  }
+
+  private sanitiseTitle(title: string, localeKey: LocaleKey): string {
     const cleaned = title.replace(/^"+|"+$/g, '').replace(/[\r\n]+/g, ' ').trim();
 
     if (!cleaned) {
-      return 'New chat';
+      return TITLE_PROMPTS[localeKey].defaultTitle;
     }
 
     if (cleaned.length <= 60) {
       return cleaned;
     }
 
-    return `${cleaned.slice(0, 57)}…`;
+    return `${cleaned.slice(0, 57)}...`;
   }
 
   /**

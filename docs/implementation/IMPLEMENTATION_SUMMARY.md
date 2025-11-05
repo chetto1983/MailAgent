@@ -6,6 +6,7 @@
 - Gli accessi residui a `/email-configs` vengono intercettati e loggati (`LegacyRoutes` logger) per facilitare la bonifica dei client.
 - `/health/metrics` è ora disponibile per Prometheus/Grafana e include contatori/durate delle code BullMQ.
 - Le conversazioni AI vengono salvate in `chat_sessions` (FIFO per tenant/utente) e ricevono un titolo contestuale generato da Mistral.
+- Le sessioni più vecchie possono essere eliminate tramite `DELETE /ai/chat/sessions/:id` (isolamento per tenant/utente).
 
 ## Cosa è stato implementato
 
@@ -39,8 +40,10 @@
 - ✅ `GET /providers` - Lista tutti i provider
 - ✅ `GET /providers/:id` - Dettagli provider
 - ✅ `DELETE /providers/:id` - Elimina provider
-- ✅ `GET /auth/gmail/callback` - OAuth callback Google
-- ✅ `GET /auth/microsoft/callback` - OAuth callback Microsoft
+- ✅ `GET /auth/gmail/callback` - OAuth callback Google (attivo)
+- ✅ `GET /auth/microsoft/callback` - OAuth callback Microsoft (attivo)
+- ⚠️ `POST /auth/google/callback` - DEPRECATO (restituisce 410 Gone)
+- ⚠️ `POST /auth/microsoft/callback` - DEPRECATO (restituisce 410 Gone)
 
 **File**: `backend/src/modules/providers/controllers/`
 
@@ -189,6 +192,12 @@ npx prisma generate
 2. Crea progetto e abilita Gmail API + Calendar API
 3. Crea credenziali OAuth2 (Web application)
 4. Redirect URI: `http://localhost:3000/auth/gmail/callback`
+
+   ⚠️ **Nota sul flusso OAuth**:
+   - Il backend (porta 3000) riceve il callback dall'OAuth provider
+   - Il backend poi redirige automaticamente al frontend (porta 3001)
+   - Il frontend gestisce il code e chiama `/providers/google/connect`
+
 5. Copia Client ID e Client Secret nel `.env`:
    ```env
    GMAIL_CLIENT_ID=...
@@ -199,6 +208,12 @@ npx prisma generate
 1. Vai a https://portal.azure.com/
 2. Registra app in Azure AD
 3. Redirect URI: `http://localhost:3000/auth/microsoft/callback`
+
+   ⚠️ **Nota sul flusso OAuth**:
+   - Il backend (porta 3000) riceve il callback dall'OAuth provider
+   - Il backend poi redirige automaticamente al frontend (porta 3001)
+   - Il frontend gestisce il code e chiama `/providers/microsoft/connect`
+
 4. Aggiungi permessi: Mail.Read, Mail.Send, Calendars.ReadWrite, offline_access
 5. Crea Client Secret
 6. Copia Application ID e Client Secret nel `.env`:

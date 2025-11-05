@@ -119,7 +119,9 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
    - Frontend: https://localhost
    - API: https://localhost/api
    - API Docs: https://localhost/api/docs
-   - Demo Credentials: email: `demo@mailagent.local` | password: `demo@password123`
+   - Demo Credentials:
+     - Admin: `admin@mailagent.local` | password: `TestPassword123!`
+     - User: `test@mailagent.local` | password: `UserPassword123!`
 
 ### Local Development (without Docker)
 
@@ -168,6 +170,7 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 - `GET /ai/chat/sessions` - List the latest chat sessions (FIFO per user/tenant)
 - `POST /ai/chat/sessions` - Create a new chat session
 - `GET /ai/chat/sessions/:id` - Retrieve a specific session with history
+- `DELETE /ai/chat/sessions/:id` - Delete a stored chat session
 - `POST /ai/agent` - Agentic workflow (LangChain) with automatic session persistence and titles
 
 ### AI Knowledge Base
@@ -238,6 +241,8 @@ Grafana utilizza una datasource preconfigurata che punta al servizio Prometheus 
 5. Add redirect URIs:
    - `http://localhost:3000/auth/gmail/callback` (development)
    - `https://yourdomain.com/auth/gmail/callback` (production)
+
+   **Note**: Backend receives OAuth callback, then redirects to frontend with auth code
 6. Copy Client ID and Secret to `.env`
 
 ### Microsoft Graph (Azure)
@@ -248,6 +253,8 @@ Grafana utilizza una datasource preconfigurata che punta al servizio Prometheus 
 4. Configure redirect URIs:
    - `http://localhost:3000/auth/microsoft/callback` (development)
    - `https://yourdomain.com/auth/microsoft/callback` (production)
+
+   **Note**: Backend receives OAuth callback, then redirects to frontend with auth code
 5. Enable API permissions:
    - Mail.Read
    - Mail.Send
@@ -324,6 +331,7 @@ mailagent/
 │   │   │   └── reset-password.tsx
 │   │   └── dashboard/
 │   │       ├── index.tsx        # Main dashboard
+│   │       ├── providers.tsx    # Provider management
 │   │       └── settings.tsx     # Settings
 │   ├── components/
 │   │   └── ui/                  # ShadCN UI

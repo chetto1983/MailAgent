@@ -5,6 +5,7 @@
 - Il worker legacy `backend/src/workers/email.worker.ts` ora termina immediatamente; utilizzare il modulo `email-sync` (QueueService + SyncWorker).
 - Lo `ImapSyncService` nel modulo `email` è mantenuto solo per compatibilità ma non esegue più sincronizzazioni: tutte le integrazioni devono basarsi su `ProviderConfig` e sui servizi in `backend/src/modules/email-sync/`.
 - Le conversazioni AI vengono salvate in `chat_sessions` (Prisma) con FIFO per tenant/utente; il titolo viene generato automaticamente da Mistral.
+- La cronologia può essere eliminata via `DELETE /ai/chat/sessions/:id`, rispettando l’isolamento per tenant/utente.
 
 ## ✅ Completed in This Session
 
