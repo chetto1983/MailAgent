@@ -26,6 +26,7 @@ const translations = {
     heroKicker: 'Smart workspace copilot',
     heroTitle: (name?: string | null) => 'MailAgent' + (name ? ' for ' + name : ''),
     heroSubtitle: 'Ask anything about your inbox, contacts, or ongoing conversations.',
+    navEmail: 'Email',
     navProviders: 'Providers',
     navSettings: 'Settings',
     navLogout: 'Logout',
@@ -58,6 +59,7 @@ const translations = {
     heroKicker: 'Copilota intelligente per il workspace',
     heroTitle: (name?: string | null) => 'MailAgent' + (name ? ' per ' + name : ''),
     heroSubtitle: 'Chiedimi qualsiasi cosa sulla tua posta, i contatti o le conversazioni in corso.',
+    navEmail: 'Email',
     navProviders: 'Provider',
     navSettings: 'Impostazioni',
     navLogout: 'Esci',
@@ -436,6 +438,9 @@ export default function DashboardPage() {
             <p className="text-slate-400 mt-1">{t.heroSubtitle}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => router.push('/dashboard/email')}>
+              {t.navEmail}
+            </Button>
             <Button variant="outline" onClick={() => router.push('/dashboard/providers')}>
               {t.navProviders}
             </Button>
