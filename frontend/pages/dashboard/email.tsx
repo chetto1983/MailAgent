@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
   Mail,
@@ -10,7 +10,9 @@ import {
   Search,
   RefreshCw,
   ChevronLeft,
+  ChevronRight,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useAuthStore } from '@/stores/auth-store';
@@ -20,6 +22,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { emailApi, type Email, type EmailStats } from '@/lib/api/email';
+import { useLocale } from '@/lib/hooks/use-locale';
 
 const translations = {
   en: {
@@ -51,6 +54,27 @@ const translations = {
     archive: 'Archive',
     reply: 'Reply',
     forward: 'Forward',
+    deleteLabel: 'Delete chat',
+    deleteConfirm: 'Are you sure you want to delete this email?',
+    attachments: 'Attachments',
+    from: 'From',
+    to: 'To',
+    cc: 'Cc',
+    date: 'Date',
+    labels: 'Labels',
+    folderLabel: 'Folder',
+    aiAssistant: 'AI Assistant',
+    aiPlaceholder: 'Select an email to get AI-powered suggestions',
+    aiQuickActions: 'Quick actions',
+    aiSummarize: 'Summarise this email',
+    aiReply: 'Generate smart reply',
+    aiFollowUp: 'Draft follow-up email',
+    aiSuggestLabels: 'Suggest labels',
+    aiEmailContext: 'Email context',
+    aiInputPlaceholder: 'Ask AI about this email...',
+    aiSend: 'Send',
+    hideAi: 'Hide AI panel',
+    showAi: 'Show AI panel',
   },
   it: {
     title: 'Email',
@@ -81,6 +105,27 @@ const translations = {
     archive: 'Archivia',
     reply: 'Rispondi',
     forward: 'Inoltra',
+    deleteLabel: 'Elimina chat',
+    deleteConfirm: 'Sei sicuro di voler eliminare questa email?',
+    attachments: 'Allegati',
+    from: 'Da',
+    to: 'A',
+    cc: 'Cc',
+    date: 'Data',
+    labels: 'Etichette',
+    folderLabel: 'Cartella',
+    aiAssistant: 'Assistente AI',
+    aiPlaceholder: 'Seleziona un\'email per ricevere suggerimenti AI',
+    aiQuickActions: 'Azioni rapide',
+    aiSummarize: 'Riassumi questa email',
+    aiReply: 'Genera una risposta intelligente',
+    aiFollowUp: 'Prepara un follow-up',
+    aiSuggestLabels: 'Suggerisci etichette',
+    aiEmailContext: 'Contesto email',
+    aiInputPlaceholder: 'Chiedi qualcosa all\'assistente su questa email...',
+    aiSend: 'Invia',
+    hideAi: 'Nascondi pannello AI',
+    showAi: 'Mostra pannello AI',
   },
 } as const;
 
@@ -92,18 +137,20 @@ export default function EmailPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { logout } = useAuthStore();
-  const locale = 'en'; // TODO: use useLocale hook
+  const locale = useLocale();
   const localeKey = resolveLocale(locale);
   const t = translations[localeKey];
 
   const [currentFolder, setCurrentFolder] = useState<string>('INBOX');
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-  const [stats, setStats] = useState<EmailStats['stats'] | null>(null);
+  const [stats, setStats] = useState<EmailStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [showAiChat, setShowAiChat] = useState(true);
+
+  const statsByFolder = useMemo(() => stats?.byFolder ?? {}, [stats]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -226,7 +273,7 @@ export default function EmailPage() {
   };
 
   const handleDelete = async (email: Email) => {
-    if (!confirm('Are you sure you want to delete this email?')) return;
+    if (!window.confirm(t.deleteConfirm)) return;
 
     try {
       await emailApi.deleteEmail(email.id);
@@ -342,9 +389,9 @@ export default function EmailPage() {
                 <TabsTrigger value="INBOX" className="gap-2">
                   <Inbox className="w-4 h-4" />
                   {t.folders.inbox}
-                  {stats && stats.byFolder?.INBOX > 0 && (
+                  {(statsByFolder.INBOX ?? 0) > 0 && (
                     <Badge variant="secondary" className="ml-1">
-                      {stats.byFolder.INBOX}
+                      {statsByFolder.INBOX ?? 0}
                     </Badge>
                   )}
                 </TabsTrigger>
@@ -459,23 +506,23 @@ export default function EmailPage() {
                           </div>
                           <div className="space-y-2 text-sm">
                             <div className="flex items-center gap-2">
-                              <span className="text-slate-400">From:</span>
+                              <span className="text-slate-400">{t.from}:</span>
                               <span className="text-slate-200">{selectedEmail.from}</span>
                             </div>
                             {selectedEmail.to && selectedEmail.to.length > 0 && (
                               <div className="flex items-center gap-2">
-                                <span className="text-slate-400">To:</span>
+                                <span className="text-slate-400">{t.to}:</span>
                                 <span className="text-slate-200">{selectedEmail.to.join(', ')}</span>
                               </div>
                             )}
                             {selectedEmail.cc && selectedEmail.cc.length > 0 && (
                               <div className="flex items-center gap-2">
-                                <span className="text-slate-400">Cc:</span>
+                                <span className="text-slate-400">{t.cc}:</span>
                                 <span className="text-slate-200">{selectedEmail.cc.join(', ')}</span>
                               </div>
                             )}
                             <div className="flex items-center gap-2">
-                              <span className="text-slate-400">Date:</span>
+                              <span className="text-slate-400">{t.date}:</span>
                               <span className="text-slate-200">
                                 {new Date(selectedEmail.receivedAt).toLocaleString(locale)}
                               </span>
@@ -483,30 +530,27 @@ export default function EmailPage() {
                           </div>
                         </div>
 
-                        </div>
-
                         {/* Email Body - Scrollable */}
                         <div className="flex-1 overflow-y-auto pr-2">
-                        <div className="prose prose-invert max-w-none">
-                          {selectedEmail.bodyHtml ? (
-                            <div
-                              dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
-                              className="text-slate-200"
-                            />
-                          ) : (
-                            <pre className="whitespace-pre-wrap text-slate-200 font-sans">
-                              {selectedEmail.bodyText}
-                            </pre>
-                          )}
-                        </div>
-
+                          <div className="prose prose-invert max-w-none">
+                            {selectedEmail.bodyHtml ? (
+                              <div
+                                dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
+                                className="text-slate-200"
+                              />
+                            ) : (
+                              <pre className="whitespace-pre-wrap text-slate-200 font-sans">
+                                {selectedEmail.bodyText}
+                              </pre>
+                            )}
+                          </div>
                         </div>
 
                         {/* Attachments - At bottom */}
                         {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
                           <div className="flex-shrink-0 border-t border-white/10 pt-4 mt-4">
                             <h3 className="text-sm font-semibold text-slate-300 mb-2">
-                              Attachments ({selectedEmail.attachments.length})
+                              {t.attachments} ({selectedEmail.attachments.length})
                             </h3>
                             <div className="space-y-2">
                               {selectedEmail.attachments.map((attachment) => (
@@ -523,7 +567,7 @@ export default function EmailPage() {
                             </div>
                           </div>
                         )}
-                        </div>
+                      </div>
                       </div>
                     )}
                   </Card>
@@ -534,88 +578,86 @@ export default function EmailPage() {
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                           <Sparkles className="w-5 h-5 text-sky-400" />
-                          <h3 className="text-sm font-semibold">AI Assistant</h3>
+                          <h3 className="text-sm font-semibold">{t.aiAssistant}</h3>
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => setShowAiChat(false)}
                           className="h-6 w-6"
+                          aria-label={t.hideAi}
+                          title={t.hideAi}
                         >
-                          ×
+                          <span aria-hidden>×</span>
                         </Button>
                       </div>
 
                       {!selectedEmail ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 text-sm">
                           <Sparkles className="w-12 h-12 mb-3 opacity-50" />
-                          <p>Select an email to get AI-powered suggestions</p>
+                          <p>{t.aiPlaceholder}</p>
                         </div>
                       ) : (
                         <div className="flex-1 flex flex-col overflow-hidden">
-                          {/* AI Suggestions */}
                           <div className="flex-1 overflow-y-auto space-y-3 mb-4">
                             <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20">
                               <h4 className="text-xs font-semibold text-sky-300 mb-2 flex items-center gap-1">
                                 <Sparkles className="w-3 h-3" />
-                                Quick Actions
+                                {t.aiQuickActions}
                               </h4>
                               <div className="space-y-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="w-full justify-start text-xs"
-                                >
-                                  ✨ Summarize this email
+                                <Button variant="ghost" size="sm" className="w-full justify-start text-xs">
+                                  • {t.aiSummarize}
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="w-full justify-start text-xs"
-                                >
-                                  💬 Generate smart reply
+                                <Button variant="ghost" size="sm" className="w-full justify-start text-xs">
+                                  • {t.aiReply}
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="w-full justify-start text-xs"
-                                >
-                                  🏷️ Suggest labels
+                                <Button variant="ghost" size="sm" className="w-full justify-start text-xs">
+                                  • {t.aiSuggestLabels}
+                                </Button>
+                                <Button variant="ghost" size="sm" className="w-full justify-start text-xs">
+                                  • {t.aiFollowUp}
                                 </Button>
                               </div>
                             </div>
 
                             <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                               <h4 className="text-xs font-semibold text-slate-300 mb-2">
-                                Email Context
+                                {t.aiEmailContext}
                               </h4>
                               <div className="space-y-1 text-xs text-slate-400">
-                                <p>• From: {extractDisplayName(selectedEmail.from)}</p>
-                                <p>• Received: {new Date(selectedEmail.receivedAt).toLocaleDateString()}</p>
-                                <p>• Folder: {selectedEmail.folder}</p>
+                                <p>• {t.from}: {extractDisplayName(selectedEmail.from)}</p>
+                                {selectedEmail.to && selectedEmail.to.length > 0 && (
+                                  <p>• {t.to}: {selectedEmail.to.slice(0, 3).join(', ')}</p>
+                                )}
+                                {selectedEmail.cc && selectedEmail.cc.length > 0 && (
+                                  <p>• {t.cc}: {selectedEmail.cc.slice(0, 3).join(', ')}</p>
+                                )}
+                                <p>• {t.date}: {new Date(selectedEmail.receivedAt).toLocaleDateString(locale)}</p>
+                                <p>• {t.folderLabel}: {selectedEmail.folder}</p>
                                 {selectedEmail.labels.length > 0 && (
-                                  <p>• Labels: {selectedEmail.labels.slice(0, 2).join(', ')}</p>
+                                  <p>• {t.labels}: {selectedEmail.labels.slice(0, 3).join(', ')}</p>
                                 )}
                               </div>
                             </div>
                           </div>
 
-                          {/* AI Chat Input */}
                           <div className="flex-shrink-0">
                             <Input
                               type="text"
-                              placeholder="Ask AI about this email..."
+                              placeholder={t.aiInputPlaceholder}
                               className="text-sm bg-white/5 border-white/10"
                             />
+                            <div className="mt-2 flex justify-end">
+                              <Button size="sm" variant="outline">
+                                {t.aiSend}
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       )}
                     </Card>
                   )}
-                </div>
-              </TabsContent>
-            </Tabs>
-
             {/* Toggle AI Chat Button (when hidden) */}
             {!showAiChat && (
               <Button
@@ -634,3 +676,5 @@ export default function EmailPage() {
     </div>
   );
 }
+
+
