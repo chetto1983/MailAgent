@@ -1,5 +1,7 @@
 # Email & Calendar Provider Integration Guide
 
+> **Nota (2025-11-04):** le rotte legacy `/email-configs` e i callback OAuth in `/auth/*` sono deprecati. Tutte le integrazioni devono usare gli endpoint descritti in questo documento (`/providers/...`).
+
 Guida completa per l'integrazione dei provider email/calendario in MailAgent.
 
 ## Indice

@@ -4,6 +4,30 @@ import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 import { SyncJobData, SyncStatus } from '../interfaces/sync-job.interface';
 
+type QueuePriority = 'high' | 'normal' | 'low';
+
+export interface QueueMetricsSummary {
+  queue: QueuePriority;
+  completed: number;
+  failed: number;
+  lastError?: string;
+  lastCompletedAt?: string;
+  lastFailedAt?: string;
+  averageDurationMs: number;
+  lastDurationMs?: number;
+}
+
+interface InternalQueueMetrics {
+  completed: number;
+  failed: number;
+  processed: number;
+  totalDurationMs: number;
+  lastDurationMs?: number;
+  lastCompletedAt?: string;
+  lastFailedAt?: string;
+  lastError?: string;
+}
+
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(QueueService.name);
@@ -14,6 +38,26 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   public lowQueue: Queue<SyncJobData>;
 
   private queueEvents: QueueEvents[] = [];
+  private readonly metrics: Record<QueuePriority, InternalQueueMetrics> = {
+    high: {
+      completed: 0,
+      failed: 0,
+      processed: 0,
+      totalDurationMs: 0,
+    },
+    normal: {
+      completed: 0,
+      failed: 0,
+      processed: 0,
+      totalDurationMs: 0,
+    },
+    low: {
+      completed: 0,
+      failed: 0,
+      processed: 0,
+      totalDurationMs: 0,
+    },
+  };
 
   constructor(private configService: ConfigService) {}
 
@@ -94,10 +138,16 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
       queueEvents.on('completed', ({ jobId }) => {
         this.logger.debug(`[${name}] Job ${jobId} completed`);
+        this.recordCompletion(name as QueuePriority, queue, jobId).catch((error) => {
+          this.logger.debug(
+            `[${name}] Failed to record metrics for job ${jobId}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
       });
 
       queueEvents.on('failed', ({ jobId, failedReason }) => {
         this.logger.error(`[${name}] Job ${jobId} failed: ${failedReason}`);
+        this.recordFailure(name as QueuePriority, failedReason);
       });
 
       this.queueEvents.push(queueEvents);
@@ -255,5 +305,59 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     await this.redisConnection.quit();
 
     this.logger.log('All queue connections closed');
+  }
+
+  getQueueMetricsSummary(): QueueMetricsSummary[] {
+    return (['high', 'normal', 'low'] as QueuePriority[]).map((priority) => {
+      const metric = this.metrics[priority];
+      const averageDuration =
+        metric.processed > 0 ? Math.round(metric.totalDurationMs / metric.processed) : 0;
+
+      return {
+        queue: priority,
+        completed: metric.completed,
+        failed: metric.failed,
+        lastError: metric.lastError,
+        lastCompletedAt: metric.lastCompletedAt,
+        lastFailedAt: metric.lastFailedAt,
+        averageDurationMs: averageDuration,
+        lastDurationMs: metric.lastDurationMs,
+      };
+    });
+  }
+
+  private async recordCompletion(priority: QueuePriority, queue: Queue<SyncJobData>, jobId?: string) {
+    const metric = this.metrics[priority];
+    metric.completed += 1;
+    metric.lastCompletedAt = new Date().toISOString();
+
+    if (!jobId) {
+      return;
+    }
+
+    try {
+      const job = await queue.getJob(jobId);
+      if (!job || job.processedOn == null || job.finishedOn == null) {
+        return;
+      }
+
+      const duration = job.finishedOn - job.processedOn;
+      if (Number.isFinite(duration) && duration >= 0) {
+        metric.processed += 1;
+        metric.totalDurationMs += duration;
+        metric.lastDurationMs = duration;
+      }
+    } catch (error) {
+      this.logger.debug(
+        `[${priority}] Unable to fetch job ${jobId} for duration metrics: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private recordFailure(priority: QueuePriority, failedReason?: string) {
+    const metric = this.metrics[priority];
+    metric.failed += 1;
+    metric.lastFailedAt = new Date().toISOString();
+    metric.lastError = failedReason;
   }
 }

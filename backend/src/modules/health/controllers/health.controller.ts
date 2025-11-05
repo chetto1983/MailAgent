@@ -1,9 +1,9 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Header } from '@nestjs/common';
 import { HealthService } from '../services/health.service';
 
 @Controller('health')
 export class HealthController {
-  constructor(private healthService: HealthService) {}
+  constructor(private readonly healthService: HealthService) {}
 
   /**
    * Get system health status
@@ -28,5 +28,22 @@ export class HealthController {
   @Get('live')
   async getLiveness() {
     return { status: 'alive' };
+  }
+
+  /**
+   * Queue metrics summary (JSON)
+   */
+  @Get('queues')
+  async getQueueMetrics() {
+    return this.healthService.getQueueMetrics();
+  }
+
+  /**
+   * Prometheus-compatible metrics
+   */
+  @Get('metrics')
+  @Header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
+  async getPrometheusMetrics() {
+    return this.healthService.getQueueMetricsPrometheus();
   }
 }

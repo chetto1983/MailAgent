@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { MessageCircle, Send, Mic, Volume2, Sparkles, User, Bot } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -18,6 +18,30 @@ type ChatMessage = {
   steps?: Array<{ tool: string; output: string }>;
 };
 
+type ChatSession = {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  updatedAt: string;
+};
+
+const CHAT_HISTORY_STORAGE_KEY = 'mailagent.chatHistory';
+const MAX_CHAT_HISTORY = 5;
+
+const generateSessionId = () =>
+  `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const getSessionTitle = (messages: ChatMessage[]): string => {
+  const firstUserMessage = messages.find((message) => message.role === 'user');
+  if (firstUserMessage?.content) {
+    const trimmed = firstUserMessage.content.trim();
+    if (trimmed.length > 0) {
+      return trimmed.length > 60 ? `${trimmed.slice(0, 57)}…` : trimmed;
+    }
+  }
+  return 'New chat';
+};
+
 const translations = {
   en: {
     heroKicker: 'Smart workspace copilot',
@@ -26,6 +50,10 @@ const translations = {
     navProviders: 'Providers',
     navSettings: 'Settings',
     navLogout: 'Logout',
+    historyHeading: 'Recent chats',
+    historyEmpty: 'No previous conversations yet.',
+    historyActiveTag: 'Current',
+    newChatLabel: 'New chat',
     quickPrompts: [
       'Summarise the latest unread emails',
       'What should I reply to the most recent message?',
@@ -52,6 +80,10 @@ const translations = {
     navProviders: 'Provider',
     navSettings: 'Impostazioni',
     navLogout: 'Esci',
+    historyHeading: 'Chat recenti',
+    historyEmpty: 'Nessuna conversazione precedente.',
+    historyActiveTag: 'Attiva',
+    newChatLabel: 'Nuova chat',
     quickPrompts: [
       'Riassumi le ultime email non lette',
       'Cosa dovrei rispondere all\'ultimo messaggio?',
@@ -124,7 +156,11 @@ const markdownComponents: Components = {
       {children}
     </pre>
   ),
-  code: ({ inline, children, ...props }) =>
+  code: ({
+    inline,
+    children,
+    ...props
+  }: { inline?: boolean; children?: React.ReactNode } & React.HTMLAttributes<HTMLElement>) =>
     inline ? (
       <code
         className="rounded bg-slate-800/70 px-1.5 py-0.5 text-xs font-mono text-sky-200"
@@ -154,13 +190,140 @@ export default function DashboardPage() {
   const { user, isLoading } = useAuth();
   const { logout } = useAuthStore();
   const locale = useLocale();
-  const t = translations[resolveLocale(locale)];
+  const localeKey = resolveLocale(locale);
+  const t = translations[localeKey];
 
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string>('');
+  const historyHydratedRef = useRef(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeKey === 'it' ? 'it-IT' : 'en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: 'short',
+      }),
+    [localeKey],
+  );
+
+  const persistSessions = useCallback((nextSessions: ChatSession[]) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(
+      CHAT_HISTORY_STORAGE_KEY,
+      JSON.stringify(nextSessions),
+    );
+  }, []);
+
+  const startNewSession = useCallback(() => {
+    const newSession: ChatSession = {
+      id: generateSessionId(),
+      title: 'New chat',
+      messages: [],
+      updatedAt: new Date().toISOString(),
+    };
+
+    historyHydratedRef.current = true;
+    setCurrentSessionId(newSession.id);
+    setMessages([]);
+    setInput('');
+    setLoading(false);
+
+    setSessions((prev) => {
+      const filtered = prev.filter((session) => session.id !== newSession.id);
+      const nextSessions = [newSession, ...filtered].slice(0, MAX_CHAT_HISTORY);
+      persistSessions(nextSessions);
+      return nextSessions;
+    });
+  }, [persistSessions]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const raw = window.localStorage.getItem(CHAT_HISTORY_STORAGE_KEY);
+
+    if (!raw) {
+      startNewSession();
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as ChatSession[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const limited = parsed.slice(0, MAX_CHAT_HISTORY);
+        historyHydratedRef.current = true;
+        setSessions(limited);
+        setCurrentSessionId(limited[0].id);
+        setMessages(limited[0].messages ?? []);
+      } else {
+        startNewSession();
+      }
+    } catch (error) {
+      console.warn('Failed to parse chat history from storage', error);
+      startNewSession();
+    }
+  }, [startNewSession]);
+
+  useEffect(() => {
+    if (!historyHydratedRef.current || !currentSessionId) {
+      return;
+    }
+
+    setSessions((prev) => {
+      const existing = prev.find((session) => session.id === currentSessionId);
+      const updatedSession: ChatSession = {
+        id: currentSessionId,
+        title: getSessionTitle(messages),
+        messages,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const others = existing
+        ? prev.filter((session) => session.id !== currentSessionId)
+        : prev;
+      const nextSessions = [updatedSession, ...others].slice(
+        0,
+        MAX_CHAT_HISTORY,
+      );
+      persistSessions(nextSessions);
+      return nextSessions;
+    });
+  }, [messages, currentSessionId, persistSessions]);
+
+  const handleSelectSession = useCallback(
+    (sessionId: string) => {
+      if (sessionId === currentSessionId) {
+        return;
+      }
+
+      const session = sessions.find((item) => item.id === sessionId);
+      if (!session) {
+        return;
+      }
+
+      setCurrentSessionId(session.id);
+      setMessages(session.messages ?? []);
+      setInput('');
+      setLoading(false);
+
+      setSessions((prev) => {
+        const others = prev.filter((item) => item.id !== sessionId);
+        const nextSessions = [session, ...others].slice(0, MAX_CHAT_HISTORY);
+        persistSessions(nextSessions);
+        return nextSessions;
+      });
+    },
+    [currentSessionId, sessions, persistSessions],
+  );
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -274,6 +437,46 @@ export default function DashboardPage() {
 
       <main className="flex-1 w-full">
         <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+          <section className="rounded-3xl border border-white/5 bg-black/20 backdrop-blur p-4 md:p-5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                {t.historyHeading}
+              </h2>
+              <Button variant="outline" size="sm" onClick={startNewSession}>
+                {t.newChatLabel}
+              </Button>
+            </div>
+            {sessions.length === 0 ? (
+              <p className="text-xs text-slate-500">{t.historyEmpty}</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {sessions.map((session) => {
+                  const isActive = session.id === currentSessionId;
+                  return (
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => handleSelectSession(session.id)}
+                      className={`flex min-w-[160px] flex-col rounded-xl border px-3 py-2 text-left transition ${
+                        isActive
+                          ? 'border-sky-400/80 bg-sky-500/20 text-sky-100 shadow-md shadow-sky-900/40'
+                          : 'border-white/10 bg-white/5 text-slate-200 hover:border-sky-400/60 hover:bg-sky-500/10'
+                      }`}
+                    >
+                      <span className="truncate text-sm font-medium">
+                        {session.title}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {dateFormatter.format(new Date(session.updatedAt))}
+                        {isActive ? ` · ${t.historyActiveTag}` : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
           <section className="grid gap-3 md:grid-cols-2">
             {t.quickPrompts.map((prompt) => (
               <button

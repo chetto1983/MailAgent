@@ -1,5 +1,7 @@
 # MailAgent - Gmail OAuth2 Setup Guide
 
+> **Aggiornamento 2025-11-04:** la procedura OAuth si completa tramite le rotte `/providers/google/auth-url` e `/providers/google/connect`. Gli endpoint `email-configs` e `/auth/google/callback` sono deprecati.
+
 Guida completa per configurare l'autenticazione Gmail (Google) su MailAgent.
 
 ## 📋 Indice

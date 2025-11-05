@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'mailagent-backend'
+    metrics_path: /health/metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - backend:3000
+        labels:
+          service: backend
+
+  - job_name: 'mailagent-email-sync-queues'
+    metrics_path: /health/metrics
+    static_configs:
+      - targets:
+          - backend:3000
+        labels:
+          component: email-sync

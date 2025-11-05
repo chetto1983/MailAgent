@@ -1,5 +1,10 @@
 # MailAgent - Current Status & Next Steps
 
+## Legacy Components (Aggiornamento 2025-11-04)
+- Le API `email-configs` e i servizi associati sono stati deprecati: restituiscono HTTP 410 e rimandano ai nuovi endpoint `/providers/*`. Ogni accesso viene registrato dal logger `LegacyRoutes` per identificare client da aggiornare.
+- Il worker legacy `backend/src/workers/email.worker.ts` ora termina immediatamente; utilizzare il modulo `email-sync` (QueueService + SyncWorker).
+- Lo `ImapSyncService` nel modulo `email` è mantenuto solo per compatibilità ma non esegue più sincronizzazioni: tutte le integrazioni devono basarsi su `ProviderConfig` e sui servizi in `backend/src/modules/email-sync/`.
+
 ## ✅ Completed in This Session
 
 ### 1. Email Configuration Fixed

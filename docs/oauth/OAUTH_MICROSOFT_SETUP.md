@@ -1,5 +1,7 @@
 # MailAgent - Microsoft OAuth2 Setup Guide
 
+> **Aggiornamento 2025-11-04:** utilizzare gli endpoint `/providers/microsoft/auth-url` e `/providers/microsoft/connect` per completare il flusso. Gli endpoint legacy `email-configs` e `/auth/microsoft/callback` sono dismessi.
+
 Guida completa per configurare l'autenticazione Microsoft (Outlook, Exchange) su MailAgent.
 
 ## 📋 Indice

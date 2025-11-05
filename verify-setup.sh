@@ -139,8 +139,8 @@ echo "5️⃣  Checking Service Connectivity"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 if docker-compose ps backend | grep -q 'Up'; then
-  test_item "Backend API responding" "curl -s http://localhost:3000/api/health | grep -q 'status'"
-  test_item "Backend health check passes" "curl -s http://localhost:3000/api/health | grep -q 'database.*connected'"
+  test_item "Backend API responding" "curl -s http://localhost:3000/api/health | grep -q '\"status\":\"healthy\"'"
+  test_item "Backend health check passes" "curl -s http://localhost:3000/api/health | grep -q '\"services\":{\"database\":{\"status\":\"up\"'"
 fi
 
 if docker-compose ps frontend | grep -q 'Up'; then

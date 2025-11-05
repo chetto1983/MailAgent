@@ -1,6 +1,10 @@
 # 📧 Email Sync Worker - Multi-Tenant Strategy
 
 **Data**: 30 Ottobre 2025
+
+## Stato Aggiornato (2025-11-04)
+- Il pipeline attivo utilizza `QueueService`, `SyncSchedulerService` e `SyncWorker` nel modulo `email-sync`; il worker legacy singolo è stato dismesso.
+- Le API basate su `EmailConfig` restituiscono 410 Gone: configurare gli account esclusivamente tramite `/providers/*` e `ProviderConfig`.
 **Obiettivo**: Implementare sincronizzazione email scalabile per ambiente multi-tenant
 
 ---
@@ -414,26 +418,40 @@ Metrics:
 
 ### Health Checks
 
-```typescript
-GET /health/sync-worker
-Response:
-{
-  status: 'healthy',
-  queues: {
-    high: { waiting: 5, active: 3, completed: 1234 },
-    normal: { waiting: 12, active: 2, completed: 5678 },
-    low: { waiting: 45, active: 1, completed: 9012 },
+```http
+GET /health/queues
+[
+  {
+    "queue": "high",
+    "completed": 1234,
+    "failed": 12,
+    "averageDurationMs": 420,
+    "lastDurationMs": 390,
+    "lastCompletedAt": "2025-11-04T17:20:11.000Z"
   },
-  workers: {
-    high: { active: 3, concurrency: 5 },
-    normal: { active: 2, concurrency: 3 },
-    low: { active: 1, concurrency: 2 },
+  {
+    "queue": "normal",
+    "completed": 567,
+    "failed": 3,
+    "averageDurationMs": 610,
+    "lastDurationMs": 580
   },
-  circuitBreakers: {
-    open: 2,    // 2 providers in OPEN state
-    closed: 48, // 48 providers healthy
+  {
+    "queue": "low",
+    "completed": 90,
+    "failed": 0,
+    "averageDurationMs": 1200,
+    "lastDurationMs": 1180
   }
-}
+]
+
+GET /health/metrics
+# HELP email_sync_queue_completed Total completed sync jobs per queue
+email_sync_queue_completed{queue="high"} 1234
+email_sync_queue_completed{queue="normal"} 567
+email_sync_queue_completed{queue="low"} 90
+# HELP email_sync_queue_failed Total failed sync jobs per queue
+email_sync_queue_failed{queue="high"} 12
 ```
 
 ---

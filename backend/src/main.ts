@@ -47,6 +47,26 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document);
   }
 
+  // Legacy route watchdog (email-configs)
+  const legacyLogger = new Logger('LegacyRoutes');
+  const httpAdapter = app.getHttpAdapter();
+  const server: any = typeof httpAdapter.getInstance === 'function' ? httpAdapter.getInstance() : null;
+  if (server?.use) {
+    server.use('/email-configs', (req: any, res: any) => {
+      const requestInfo = {
+        method: req.method,
+        url: req.originalUrl ?? req.url,
+        ip: req.ip,
+        userAgent: req.headers?.['user-agent'],
+      };
+      legacyLogger.warn('Legacy /email-configs endpoint accessed', requestInfo);
+      res.status(410).json({
+        message: 'This endpoint has been removed. Please migrate to /providers/*.',
+        documentation: 'docs/implementation/PROVIDER_INTEGRATION_GUIDE.md',
+      });
+    });
+  }
+
   await app.listen(config.api.port);
   logger.log(`🚀 Application is running on ${config.api.url}`);
   logger.log(`📊 Swagger docs available at ${config.api.url}/api/docs`);

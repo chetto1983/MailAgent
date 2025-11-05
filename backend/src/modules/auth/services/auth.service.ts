@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  Logger,
+  GoneException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -465,15 +471,21 @@ export class AuthService {
    * Handle Google OAuth
    */
   async handleGoogleOAuth(code: string, tenantSlug?: string) {
-    // TODO: Implement Google OAuth flow
-    throw new Error('Google OAuth not yet implemented');
+    throw new GoneException({
+      message:
+        'Questo metodo è stato deprecato. Richiedi l’URL OAuth tramite /providers/google/auth-url e completa la procedura con /providers/google/connect.',
+      documentation: 'docs/implementation/PROVIDER_INTEGRATION_GUIDE.md',
+    });
   }
 
   /**
    * Handle Microsoft OAuth
    */
   async handleMicrosoftOAuth(code: string, tenantSlug?: string) {
-    // TODO: Implement Microsoft OAuth flow
-    throw new Error('Microsoft OAuth not yet implemented');
+    throw new GoneException({
+      message:
+        'Questo metodo è stato deprecato. Usa /providers/microsoft/auth-url e /providers/microsoft/connect per completare l’OAuth.',
+      documentation: 'docs/implementation/PROVIDER_INTEGRATION_GUIDE.md',
+    });
   }
 }

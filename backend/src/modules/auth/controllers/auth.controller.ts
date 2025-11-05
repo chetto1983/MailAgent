@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  UseGuards,
+  Request,
+  BadRequestException,
+  GoneException,
+} from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
@@ -108,7 +117,10 @@ export class AuthController {
    */
   @Post('google/callback')
   async googleCallback(@Body() body: { code: string; tenantSlug?: string }) {
-    return this.authService.handleGoogleOAuth(body.code, body.tenantSlug);
+    throw new GoneException({
+      message: 'Questo endpoint è stato deprecato. Utilizza /providers/google/{auth-url,connect}.',
+      documentation: 'docs/implementation/PROVIDER_INTEGRATION_GUIDE.md',
+    });
   }
 
   /**
@@ -117,6 +129,9 @@ export class AuthController {
    */
   @Post('microsoft/callback')
   async microsoftCallback(@Body() body: { code: string; tenantSlug?: string }) {
-    return this.authService.handleMicrosoftOAuth(body.code, body.tenantSlug);
+    throw new GoneException({
+      message: 'Questo endpoint è stato deprecato. Utilizza /providers/microsoft/{auth-url,connect}.',
+      documentation: 'docs/implementation/PROVIDER_INTEGRATION_GUIDE.md',
+    });
   }
 }

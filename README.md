@@ -172,11 +172,14 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 - `DELETE /ai/knowledge-base/embeddings/:id` - Admin: remove a specific embedding
 - `DELETE /ai/knowledge-base/embeddings/email/:emailId` - Admin: purge embeddings linked to an email
 
-### Email Configuration
-- `GET /email-configs` - List email accounts
-- `POST /email-configs` - Add email account
-- `POST /email-configs/:id/sync` - Sync emails
-- `DELETE /email-configs/:id` - Remove email account
+### Providers & Email Sync
+- `POST /providers/google/auth-url` - Ottieni URL OAuth Google
+- `POST /providers/google/connect` - Collega account Google
+- `POST /providers/microsoft/auth-url` - Ottieni URL OAuth Microsoft
+- `POST /providers/microsoft/connect` - Collega account Microsoft
+- `POST /providers/generic/connect` - Collega provider IMAP/SMTP
+- `GET /providers` - Elenco provider collegati
+- `GET /providers/:id/test/*` - Diagnostic API per Gmail/Microsoft
 
 ### Tenants (Admin)
 - `GET /tenants` - List tenants
@@ -189,6 +192,33 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 - `GET /health` - System health status
 - `GET /health/ready` - Readiness probe
 - `GET /health/live` - Liveness probe
+- `GET /health/queues` - Email sync queue metrics (JSON)
+- `GET /health/metrics` - Prometheus metrics (text/plain)
+
+## Observability Stack
+
+### Avvio Prometheus e Grafana
+
+Il `docker-compose.yml` include Prometheus (porta `9090`) e Grafana (porta `3002`). Per avviarli:
+
+```bash
+docker-compose up -d prometheus grafana
+```
+
+Prometheus carica automaticamente `monitoring/prometheus.yml`, che esegue lo scrape di `backend:3000/health/metrics`.
+Grafana utilizza una datasource preconfigurata che punta al servizio Prometheus interno.
+
+- Dashboard Prometheus: http://localhost:9090
+- Dashboard Grafana: http://localhost:3002 (credenziali di default `admin` / `admin`; personalizzabili via `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`)
+
+### Metriche disponibili
+
+- `email_sync_queue_completed{queue="high"}` – contatore job completati per coda
+- `email_sync_queue_failed{queue="normal"}` – contatore job falliti per coda
+- `email_sync_queue_last_duration_ms{queue="low"}` – durata dell’ultimo job
+- `email_sync_queue_avg_duration_ms{queue="high"}` – media mobile delle durate
+
+È possibile estendere `QueueService` per esporre metriche aggiuntive (lag, rate limit, circuit breaker) se necessario.
 
 ### Compliance
 - `GET /compliance/gdpr/status` - GDPR compliance snapshot with outstanding actions
@@ -371,15 +401,39 @@ Logs available via:
 
 ### Health Checks
 ```bash
-GET /health
+$ curl http://localhost:3000/health
 {
   "status": "healthy",
+  "timestamp": "2025-11-04T17:20:11.000Z",
   "services": {
     "database": { "status": "up", "responseTime": 5 },
     "redis": { "status": "up", "responseTime": 2 },
-    "mistral": { "status": "up", "responseTime": 100 }
+    "mistral": { "status": "up", "responseTime": 110 },
+    "emailSyncQueue": {
+      "status": "up",
+      "queues": [
+        { "queue": "high", "completed": 1234, "failed": 12, "averageDurationMs": 420 },
+        { "queue": "normal", "completed": 567, "failed": 3, "averageDurationMs": 610 },
+        { "queue": "low", "completed": 90, "failed": 0, "averageDurationMs": 1200 }
+      ],
+      "totals": { "completed": 1891, "failed": 15 }
+    }
   }
 }
+```
+
+Queue-only metrics:
+
+```bash
+$ curl http://localhost:3000/health/queues
+```
+
+Prometheus metrics:
+
+```bash
+$ curl http://localhost:3000/health/metrics
+# HELP email_sync_queue_completed Total completed sync jobs per queue
+email_sync_queue_completed{queue="high"} 1234
 ```
 
 ### Dashboard Metrics
