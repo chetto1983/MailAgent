@@ -51,6 +51,34 @@ export type EmailAttachment = {
   createdAt: string;
 };
 
+export type EmailAttachmentUpload = {
+  filename: string;
+  contentType: string;
+  contentBase64: string;
+};
+
+export type SendEmailPayload = {
+  providerId: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  bodyHtml: string;
+  bodyText: string;
+  inReplyTo?: string;
+  references?: string;
+  attachments?: EmailAttachmentUpload[];
+};
+
+export type ReplyForwardEmailPayload = Omit<SendEmailPayload, 'providerId'> & {
+  providerId?: string;
+};
+
+export type SendEmailResponse = {
+  success: boolean;
+  messageId: string;
+};
+
 export type EmailListFilters = {
   folder?: string;
   isRead?: boolean;
@@ -281,6 +309,36 @@ export const emailApi = {
     return apiClient.post<{ count: number; emailIds: string[] }>(
       '/emails/retention/run',
       { retentionDays }
+    );
+  },
+
+  /**
+   * Send a new email
+   * POST /emails/send
+   */
+  sendEmail(payload: SendEmailPayload) {
+    return apiClient.post<SendEmailResponse>('/emails/send', payload);
+  },
+
+  /**
+   * Reply to an email
+   * POST /emails/:id/reply
+   */
+  replyToEmail(emailId: string, payload: ReplyForwardEmailPayload) {
+    return apiClient.post<SendEmailResponse>(
+      `/emails/${emailId}/reply`,
+      payload
+    );
+  },
+
+  /**
+   * Forward an email
+   * POST /emails/:id/forward
+   */
+  forwardEmail(emailId: string, payload: ReplyForwardEmailPayload) {
+    return apiClient.post<SendEmailResponse>(
+      `/emails/${emailId}/forward`,
+      payload
     );
   },
 };

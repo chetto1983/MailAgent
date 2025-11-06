@@ -8,14 +8,32 @@ import {
   Query,
   Body,
   UseGuards,
-  Req,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { EmailsService, EmailListFilters } from '../services/emails.service';
 import { EmailRetentionService } from '../services/email-retention.service';
 import { EmailFetchService } from '../services/email-fetch.service';
+import { EmailSendService } from '../services/email-send.service';
+import {
+  ReplyForwardEmailRequestDto,
+  SendEmailRequestDto,
+  type EmailAttachmentDto,
+} from '../dto/send-email.dto';
+
+const decodeAttachments = (attachments?: EmailAttachmentDto[]) =>
+  attachments?.map((attachment) => {
+    const [, base64 = attachment.contentBase64] =
+      attachment.contentBase64.split(',');
+
+    return {
+      filename: attachment.filename,
+      contentType: attachment.contentType,
+      content: Buffer.from(base64, 'base64'),
+    };
+  });
 
 @Controller('emails')
 @UseGuards(JwtAuthGuard)
@@ -24,6 +42,7 @@ export class EmailsController {
     private emailsService: EmailsService,
     private retentionService: EmailRetentionService,
     private fetchService: EmailFetchService,
+    private emailSendService: EmailSendService,
   ) {}
 
   /**
@@ -126,6 +145,56 @@ export class EmailsController {
   async getEmail(@Req() req: any, @Param('id') id: string) {
     const tenantId = req.user.tenantId;
     return this.emailsService.getEmailById(id, tenantId);
+  }
+
+  /**
+   * POST /emails/send - Send a new email
+   */
+  @Post('send')
+  async sendEmail(@Req() req: any, @Body() body: SendEmailRequestDto) {
+    const tenantId = req.user.tenantId;
+    const { providerId, attachments, ...rest } = body;
+
+    return this.emailSendService.sendEmail({
+      tenantId,
+      providerId,
+      ...rest,
+      attachments: decodeAttachments(attachments),
+    });
+  }
+
+  /**
+   * POST /emails/:id/reply - Reply to an email
+   */
+  @Post(':id/reply')
+  async replyToEmail(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: ReplyForwardEmailRequestDto,
+  ) {
+    const tenantId = req.user.tenantId;
+
+    return this.emailSendService.replyToEmail(id, tenantId, {
+      ...body,
+      attachments: decodeAttachments(body.attachments),
+    });
+  }
+
+  /**
+   * POST /emails/:id/forward - Forward an email
+   */
+  @Post(':id/forward')
+  async forwardEmail(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: ReplyForwardEmailRequestDto,
+  ) {
+    const tenantId = req.user.tenantId;
+
+    return this.emailSendService.forwardEmail(id, tenantId, {
+      ...body,
+      attachments: decodeAttachments(body.attachments),
+    });
   }
 
   /**
