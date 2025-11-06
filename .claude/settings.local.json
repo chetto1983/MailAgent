@@ -59,7 +59,8 @@
       "Bash(npx prisma studio:*)",
       "Bash(npm run lint)",
       "Bash(npm run:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

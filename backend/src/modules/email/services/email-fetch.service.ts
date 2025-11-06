@@ -125,7 +125,12 @@ export class EmailFetchService {
       extractBody(message.payload);
     }
 
-    const headers = (message.payload?.headers || []).reduce((acc, h) => ({ ...acc, [h.name || '']: h.value }), {});
+    const headers: Record<string, string> = (message.payload?.headers || []).reduce((acc, h) => {
+      if (h.name && h.value) {
+        acc[h.name] = h.value;
+      }
+      return acc;
+    }, {} as Record<string, string>);
 
     return {
       bodyText,
@@ -144,8 +149,8 @@ export class EmailFetchService {
       provider.tokenEncryptionIv,
     );
 
-    const graphClient = GraphClient.Client.init({
-      authProvider: (done) => {
+    const graphClient = GraphClient.init({
+      authProvider: (done: (error: any, token: string) => void) => {
         done(null, accessToken);
       },
     });
@@ -157,7 +162,7 @@ export class EmailFetchService {
 
     const headers = {
       'From': message.from?.emailAddress?.address,
-      'To': message.toRecipients?.map(r => r.emailAddress?.address).join(', '),
+      'To': message.toRecipients?.map((r: any) => r.emailAddress?.address).join(', '),
       'Subject': message.subject,
       'Date': message.receivedDateTime,
       'Message-ID': message.internetMessageId,
@@ -198,9 +203,9 @@ export class EmailFetchService {
       const messageStream = await client.download(email.externalId, undefined, { uid: true });
       const parsed = await simpleParser(messageStream.content);
 
-      const headers = {};
-      parsed.headers.forEach((value, key) => {
-        headers[key] = value;
+      const headers: Record<string, string> = {};
+      parsed.headers.forEach((value: any, key: string) => {
+        headers[key] = Array.isArray(value) ? value.join(', ') : String(value);
       });
 
       return {

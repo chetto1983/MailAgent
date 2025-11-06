@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class EmailRetentionService {
@@ -76,7 +77,7 @@ export class EmailRetentionService {
         isArchived: true,
         bodyText: null,
         bodyHtml: null,
-        headers: null, // Clear headers to save even more space
+        headers: Prisma.JsonNull, // Clear headers to save even more space
       },
     });
 

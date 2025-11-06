@@ -92,3 +92,4 @@ frontend/.cache/
 *.crt
 .vercel
 .claude/
+.claude/settings.local.json

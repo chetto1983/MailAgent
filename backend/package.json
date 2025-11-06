@@ -22,7 +22,6 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
-
     "worker:ai": "node dist/workers/ai.worker.js"
   },
   "dependencies": {
@@ -55,8 +54,8 @@
     "jsonwebtoken": "^9.0.0",
     "langchain": "^1.0.2",
     "mailparser": "^3.6.5",
-    "nanoid": "^4.0.2",
-    "nodemailer": "^6.10.0",
+    "nanoid": "^5.1.6",
+    "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pino": "^9.6.0",
