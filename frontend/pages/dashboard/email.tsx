@@ -62,7 +62,6 @@ export default function EmailPage() {
   const localeKey = resolveLocale(locale);
   const t = translations[localeKey];
 
-  const [currentFolder, setCurrentFolder] = useState<string>('ALL');
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [stats, setStats] = useState<EmailStats | null>(null);
@@ -80,7 +79,6 @@ export default function EmailPage() {
   const [composeOriginalEmail, setComposeOriginalEmail] = useState<Email | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
-  const statsByFolder = useMemo(() => stats?.byFolder ?? {}, [stats]);
   const hasEmailProviders = emailProviders.length > 0;
   const defaultProviderId = useMemo(
     () => emailProviders.find((provider) => provider.isDefault)?.id ?? emailProviders[0]?.id ?? null,
@@ -122,19 +120,14 @@ export default function EmailPage() {
         updatedAt: conv.receivedAt,
       }));
 
-      const filteredEmails =
-        currentFolder === 'ALL'
-          ? conversationEmails
-          : conversationEmails.filter((email) => email.folder === currentFolder);
-
-      setEmails(filteredEmails);
+      setEmails(conversationEmails);
     } catch (error) {
       console.error('Failed to load emails:', error);
       setEmails([]);
     } finally {
       setLoading(false);
     }
-  }, [currentFolder, user]);
+  }, [user]);
 
   const loadStats = useCallback(async () => {
     if (!user) return;
@@ -163,7 +156,7 @@ export default function EmailPage() {
   useEffect(() => {
     if (!user) return;
     loadEmails();
-  }, [loadEmails, user, currentFolder]);
+  }, [loadEmails, user]);
 
   useEffect(() => {
     if (!user) return;

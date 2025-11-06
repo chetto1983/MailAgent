@@ -78,10 +78,10 @@ export function EmailComposer({
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const canSaveDraft = Boolean(onSaveDraft);
   const hasProviders = providers.length > 0;
-  const buildProviderLabel = (provider: ProviderConfig) =>
-    `${provider.displayName ?? provider.email} • ${provider.providerType}`;
 
-  // Initialize TipTap editor
+  const buildProviderLabel = (provider: ProviderConfig) =>
+    `${provider.displayName ?? provider.email} (${provider.providerType})`;
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -98,75 +98,47 @@ export function EmailComposer({
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none focus:outline-none min-h-[300px] px-4 py-3',
+        class:
+          'prose prose-invert mx-auto max-w-2xl focus:outline-none min-h-[260px] px-4 py-3 text-[15px] leading-relaxed',
       },
     },
     immediatelyRender: false,
   });
 
   useEffect(() => {
-    if (!providers || providers.length === 0) {
-      setProviderId('');
-      return;
-    }
-
-    setProviderId((current) => {
-      if (current) {
-        return current;
-      }
-
-      if (defaultProviderId && providers.some((p) => p.id === defaultProviderId)) {
-        return defaultProviderId;
-      }
-
-      return providers[0].id;
-    });
-  }, [providers, defaultProviderId]);
-
-  // Initialize editor content based on mode
-  useEffect(() => {
     if (!editor || !originalEmail) return;
 
     if (mode === 'reply') {
-      // Set recipient to original sender
       setTo(originalEmail.from);
-
-      // Set subject with Re: prefix
       const reSubject = originalEmail.subject.startsWith('Re:')
         ? originalEmail.subject
         : `Re: ${originalEmail.subject}`;
       setSubject(reSubject);
-
-      // Add quoted original message
       const quotedText = originalEmail.bodyHtml || originalEmail.bodyText || '';
       const quotedHtml = `<p><br></p><p>On ${new Date().toLocaleDateString()}, ${originalEmail.from} wrote:</p><blockquote>${quotedText}</blockquote>`;
       editor.commands.setContent(quotedHtml);
     } else if (mode === 'forward') {
-      // Set subject with Fwd: prefix
       const fwdSubject = originalEmail.subject.startsWith('Fwd:')
         ? originalEmail.subject
         : `Fwd: ${originalEmail.subject}`;
       setSubject(fwdSubject);
-
-      // Add forwarded message
       const forwardedText = originalEmail.bodyHtml || originalEmail.bodyText || '';
       const forwardedHtml = `<p><br></p><p>---------- Forwarded message ---------</p><p>From: ${originalEmail.from}</p><p>Subject: ${originalEmail.subject}</p><p><br></p>${forwardedText}`;
       editor.commands.setContent(forwardedHtml);
     }
   }, [editor, mode, originalEmail]);
 
-  // Auto-save draft every 30 seconds
   const handleSaveDraft = useCallback(async () => {
     if (!editor || !onSaveDraft || !providerId) return;
-    if (!to.trim() && !subject.trim() && editor.isEmpty) return; // Don't save empty draft
+    if (!to.trim() && !subject.trim() && editor.isEmpty) return;
 
     setSaving(true);
     try {
       const draft: EmailDraft = {
-        providerId: providerId || '',
-        to: to.split(',').map(e => e.trim()).filter(Boolean),
-        cc: cc.split(',').map(e => e.trim()).filter(Boolean),
-        bcc: bcc.split(',').map(e => e.trim()).filter(Boolean),
+        providerId,
+        to: to.split(',').map((e) => e.trim()).filter(Boolean),
+        cc: cc.split(',').map((e) => e.trim()).filter(Boolean),
+        bcc: bcc.split(',').map((e) => e.trim()).filter(Boolean),
         subject,
         bodyHtml: editor.getHTML(),
         bodyText: editor.getText(),
@@ -179,23 +151,44 @@ export function EmailComposer({
       setLastSaved(new Date());
     } catch (error) {
       console.error('Failed to save draft:', error);
-      // Show user-friendly error message
       alert('Failed to save draft. Please try again.');
     } finally {
       setSaving(false);
     }
-  }, [editor, providerId, to, cc, bcc, subject, attachments, originalEmail, onSaveDraft]);
+  }, [attachments, bcc, cc, editor, onSaveDraft, originalEmail, providerId, subject, to]);
 
-  // Auto-save draft every 30 seconds
   useEffect(() => {
     if (!editor || !onSaveDraft) return;
 
     const interval = setInterval(() => {
       handleSaveDraft();
-    }, 30000); // 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [editor, onSaveDraft, handleSaveDraft]);
+
+  useEffect(() => {
+    if (!providers || providers.length === 0) {
+      setProviderId('');
+      return;
+    }
+    setProviderId((current) => {
+      if (current) return current;
+      if (defaultProviderId && providers.some((p) => p.id === defaultProviderId)) {
+        return defaultProviderId;
+      }
+      return providers[0].id;
+    });
+  }, [providers, defaultProviderId]);
+
+  const handleAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files) return;
+    setAttachments(Array.from(event.target.files));
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleSend = async () => {
     if (!editor || !onSend) return;
@@ -216,9 +209,9 @@ export function EmailComposer({
     try {
       const draft: EmailDraft = {
         providerId,
-        to: to.split(',').map(e => e.trim()).filter(Boolean),
-        cc: cc.split(',').map(e => e.trim()).filter(Boolean),
-        bcc: bcc.split(',').map(e => e.trim()).filter(Boolean),
+        to: to.split(',').map((e) => e.trim()).filter(Boolean),
+        cc: cc.split(',').map((e) => e.trim()).filter(Boolean),
+        bcc: bcc.split(',').map((e) => e.trim()).filter(Boolean),
         subject,
         bodyHtml: editor.getHTML(),
         bodyText: editor.getText(),
@@ -229,7 +222,6 @@ export function EmailComposer({
 
       await onSend(draft);
 
-      // Clear form after successful send
       setTo('');
       setCc('');
       setBcc('');
@@ -246,127 +238,119 @@ export function EmailComposer({
     }
   };
 
-  const handleAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setAttachments(prev => [...prev, ...files]);
-  };
-
-  const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const toggleBold = () => editor?.chain().focus().toggleBold().run();
-  const toggleItalic = () => editor?.chain().focus().toggleItalic().run();
-  const toggleBulletList = () => editor?.chain().focus().toggleBulletList().run();
-  const toggleOrderedList = () => editor?.chain().focus().toggleOrderedList().run();
-  const setLink = () => {
-    const url = window.prompt('Enter URL');
-    if (url) {
-      editor?.chain().focus().setLink({ href: url }).run();
-    }
-  };
-
   if (!editor) return null;
 
   return (
-    <Card className="bg-slate-900/50 border-white/10">
-      <div className="p-4 space-y-3">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">
-            {mode === 'reply' ? 'Reply' : mode === 'forward' ? 'Forward' : 'New Message'}
-          </h3>
+    <Card className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-gradient-to-b from-slate-950/85 via-slate-950/70 to-slate-950/80 shadow-2xl shadow-slate-950/50 backdrop-blur">
+      <div className="space-y-4 p-5 md:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.32em] text-slate-400">
+              {mode === 'reply' ? 'Reply' : mode === 'forward' ? 'Forward' : 'Compose'}
+            </p>
+            <h3 className="text-xl font-semibold text-slate-100">
+              {mode === 'reply'
+                ? 'Reply to message'
+                : mode === 'forward'
+                ? 'Forward message'
+                : 'New message'}
+            </h3>
+          </div>
           <div className="flex items-center gap-2">
             {lastSaved && (
-              <span className="text-xs text-slate-400">
-                Saved {lastSaved.toLocaleTimeString()}
-              </span>
+              <span className="text-xs text-slate-400">Saved {lastSaved.toLocaleTimeString()}</span>
             )}
             {onClose && (
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="w-4 h-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="rounded-full border border-white/10"
+              >
+                <X className="h-4 w-4" />
               </Button>
             )}
           </div>
         </div>
 
-        {/* From */}
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-            From
-          </label>
-          <select
-            className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none disabled:opacity-60"
-            value={providerId}
-            onChange={(event) => setProviderId(event.target.value)}
-            disabled={!hasProviders}
-          >
-            {providers.map((provider) => (
-              <option key={provider.id} value={provider.id} className="bg-slate-900 text-slate-100">
-                {buildProviderLabel(provider)}
-              </option>
-            ))}
-          </select>
-          {!hasProviders && (
-            <p className="text-xs text-red-400">Connect an email provider before sending messages.</p>
-          )}
-        </div>
+        <div className="space-y-3">
+          <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              From
+            </label>
+            <select
+              className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none disabled:opacity-60"
+              value={providerId}
+              onChange={(event) => setProviderId(event.target.value)}
+              disabled={!hasProviders}
+            >
+              {providers.map((provider) => (
+                <option key={provider.id} value={provider.id} className="bg-slate-900 text-slate-100">
+                  {buildProviderLabel(provider)}
+                </option>
+              ))}
+            </select>
+            {!hasProviders && (
+              <p className="text-xs text-red-400">
+                Connect an email provider before sending messages.
+              </p>
+            )}
+          </div>
 
-        {/* Recipients */}
-        <div className="space-y-2">
-          <div className="flex gap-2">
+          <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
             <Input
               placeholder="To"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="bg-white/5 border-white/10"
+              className="bg-transparent text-sm text-slate-100"
             />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowCc(!showCc)}
-              className="text-xs"
-            >
-              Cc
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowBcc(!showBcc)}
-              className="text-xs"
-            >
-              Bcc
-            </Button>
+            <div className="flex gap-2 text-xs text-slate-400">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCc(!showCc)}
+                className="rounded-full border border-white/10 px-3 text-xs"
+              >
+                Cc
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowBcc(!showBcc)}
+                className="rounded-full border border-white/10 px-3 text-xs"
+              >
+                Bcc
+              </Button>
+            </div>
+
+            {showCc && (
+              <Input
+                placeholder="Cc"
+                value={cc}
+                onChange={(e) => setCc(e.target.value)}
+                className="bg-transparent text-sm text-slate-100"
+              />
+            )}
+
+            {showBcc && (
+              <Input
+                placeholder="Bcc"
+                value={bcc}
+                onChange={(e) => setBcc(e.target.value)}
+                className="bg-transparent text-sm text-slate-100"
+              />
+            )}
+
+            <Input
+              placeholder="Subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="bg-transparent text-sm text-slate-100"
+            />
           </div>
-
-          {showCc && (
-            <Input
-              placeholder="Cc"
-              value={cc}
-              onChange={(e) => setCc(e.target.value)}
-              className="bg-white/5 border-white/10"
-            />
-          )}
-
-          {showBcc && (
-            <Input
-              placeholder="Bcc"
-              value={bcc}
-              onChange={(e) => setBcc(e.target.value)}
-              className="bg-white/5 border-white/10"
-            />
-          )}
-
-          <Input
-            placeholder="Subject"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            className="bg-white/5 border-white/10"
-          />
         </div>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-1 border-y border-white/10 py-2">
+        <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/5 px-2 py-2">
           <Button
             variant="ghost"
             size="sm"
@@ -407,30 +391,21 @@ export function EmailComposer({
           >
             <LinkIcon className="w-4 h-4" />
           </Button>
-
           <div className="flex-1" />
-
           <label>
             <Button variant="ghost" size="sm" asChild>
               <span>
                 <Paperclip className="w-4 h-4" />
               </span>
             </Button>
-            <input
-              type="file"
-              multiple
-              onChange={handleAttachment}
-              className="hidden"
-            />
+            <input type="file" multiple onChange={handleAttachment} className="hidden" />
           </label>
         </div>
 
-        {/* Editor */}
-        <div className="border border-white/10 rounded-md bg-white/5 min-h-[300px]">
-          <EditorContent editor={editor} />
+        <div className="custom-scroll rounded-2xl border border-white/10 bg-slate-950/60">
+          <EditorContent editor={editor} className="max-h-[50vh] overflow-y-auto" />
         </div>
 
-        {/* Attachments */}
         {attachments.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm text-slate-400">Attachments ({attachments.length})</p>
@@ -438,15 +413,16 @@ export function EmailComposer({
               {attachments.map((file, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-md text-sm"
+                  className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm text-slate-100"
                 >
-                  <Paperclip className="w-3 h-3" />
-                  <span>{file.name}</span>
+                  <Paperclip className="h-3 w-3" />
+                  <span className="truncate">{file.name}</span>
                   <button
+                    type="button"
                     onClick={() => removeAttachment(index)}
-                    className="text-red-400 hover:text-red-300"
+                    className="text-red-400 transition hover:text-red-300"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
               ))}
@@ -454,11 +430,8 @@ export function EmailComposer({
           </div>
         )}
 
-        {/* Actions */}
         <div
-          className={`flex items-center pt-2 ${
-            canSaveDraft ? 'justify-between' : 'justify-end'
-          }`}
+          className={`flex items-center pt-2 ${canSaveDraft ? 'justify-between' : 'justify-end'}`}
         >
           {canSaveDraft && (
             <Button
@@ -466,16 +439,17 @@ export function EmailComposer({
               size="sm"
               onClick={handleSaveDraft}
               disabled={saving || sending || !providerId}
+              className="rounded-full px-4"
             >
               {saving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
                 </>
               ) : (
                 <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Draft
+                  <Save className="mr-2 h-4 w-4" />
+                  Save draft
                 </>
               )}
             </Button>
@@ -486,15 +460,16 @@ export function EmailComposer({
             size="sm"
             onClick={handleSend}
             disabled={sending || saving || !providerId || !hasProviders}
+            className="rounded-full px-5"
           >
             {sending ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Sending...
               </>
             ) : (
               <>
-                <Send className="w-4 h-4 mr-2" />
+                <Send className="mr-2 h-4 w-4" />
                 Send
               </>
             )}
