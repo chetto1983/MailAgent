@@ -8,6 +8,10 @@ const nextConfig = {
   images: {
     remotePatterns: [],
   },
+  // Skip static optimization for error pages to avoid SSR issues with MUI
+  experimental: {
+    optimizePackageImports: ['@mui/material', '@mui/icons-material'],
+  },
 };
 
 module.exports = nextConfig;

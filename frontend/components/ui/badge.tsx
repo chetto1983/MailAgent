@@ -1,24 +1,44 @@
-import * as React from 'react';
+import { forwardRef } from 'react';
+import Chip, { ChipProps } from '@mui/material/Chip';
+import type { SxProps, Theme } from '@mui/material/styles';
 
-export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'success';
-}
+type Variant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success';
 
-function Badge({ className, variant = 'default', ...props }: BadgeProps) {
-  const variants = {
-    default: 'border border-white/10 bg-white/10 text-slate-100',
-    secondary: 'border border-sky-400/40 bg-sky-500/15 text-sky-100',
-    destructive: 'border border-rose-500/40 bg-rose-500/15 text-rose-100',
-    outline: 'border border-white/20 text-slate-200',
-    success: 'border border-emerald-400/40 bg-emerald-500/15 text-emerald-100',
+const variantMap: Record<Variant, { color: ChipProps['color']; variant: ChipProps['variant']; sx?: SxProps<Theme> }> =
+  {
+    default: { color: 'default', variant: 'outlined' },
+    secondary: { color: 'primary', variant: 'outlined' },
+    destructive: { color: 'error', variant: 'outlined' },
+    outline: { color: 'default', variant: 'outlined' },
+    success: { color: 'success', variant: 'outlined' },
   };
 
+export interface BadgeProps extends Omit<ChipProps, 'variant' | 'color'> {
+  variant?: Variant;
+}
+
+export const Badge = forwardRef<HTMLDivElement, BadgeProps>(({ variant = 'default', sx, ...props }, ref) => {
+  const data = variantMap[variant];
+
   return (
-    <div
-      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition-all focus:outline-none focus:ring-2 focus:ring-sky-400/60 focus:ring-offset-2 focus:ring-offset-slate-950 ${variants[variant]} ${className || ''}`}
+    <Chip
+      ref={ref}
+      variant={data.variant}
+      color={data.color}
+      size="small"
+      sx={[
+        {
+          borderRadius: 9999,
+          fontWeight: 600,
+          letterSpacing: '0.08em',
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
       {...props}
     />
   );
-}
+});
 
-export { Badge };
+Badge.displayName = 'Badge';
+
+export default Badge;

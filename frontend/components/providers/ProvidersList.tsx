@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Box, Stack, Typography, Divider } from '@mui/material';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +38,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
     switch (type) {
       case 'google':
         return (
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
+          <svg width={24} height={24} viewBox="0 0 24 24">
             <path
               fill="#4285F4"
               d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -58,7 +59,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
         );
       case 'microsoft':
         return (
-          <svg className="w-5 h-5" viewBox="0 0 23 23">
+          <svg width={24} height={24} viewBox="0 0 23 23">
             <path fill="#f3f3f3" d="M0 0h23v23H0z" />
             <path fill="#f35325" d="M1 1h10v10H1z" />
             <path fill="#81bc06" d="M12 1h10v10H12z" />
@@ -68,12 +69,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
         );
       default:
         return (
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg width={24} height={24} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -112,17 +108,17 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
   if (providers.length === 0) {
     return (
       <Card>
-        <CardContent className="pt-6">
-          <p className="text-center text-slate-300">
+        <CardContent sx={{ pt: 6 }}>
+          <Typography variant="body2" color="text.secondary" align="center">
             No providers connected yet. Connect a provider to get started.
-          </p>
+          </Typography>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <Stack spacing={3}>
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -130,96 +126,111 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
       )}
 
       {providers.map((provider) => (
-        <Card key={provider.id}>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                {getProviderIcon(provider.providerType)}
-                <div>
-                  <CardTitle className="text-lg">{provider.email}</CardTitle>
-                  <CardDescription>
-                    {getProviderName(provider.providerType)}
-                    {provider.displayName && ` • ${provider.displayName}`}
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {provider.isDefault && <Badge variant="success">Default</Badge>}
-                {provider.isActive ? (
-                  <Badge variant="outline">Active</Badge>
-                ) : (
-                  <Badge variant="destructive">Inactive</Badge>
-                )}
-              </div>
-            </div>
+        <Card key={provider.id} sx={{ borderRadius: 3 }}>
+          <CardHeader
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              gap: 2,
+              alignItems: { xs: 'flex-start', md: 'center' },
+              justifyContent: 'space-between',
+            }}
+          >
+            <Stack direction="row" spacing={2} alignItems="center">
+              {getProviderIcon(provider.providerType)}
+              <Box>
+                <CardTitle variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  {provider.email}
+                </CardTitle>
+                <CardDescription>
+                  {getProviderName(provider.providerType)}
+                  {provider.displayName && ` — ${provider.displayName}`}
+                </CardDescription>
+              </Box>
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              {provider.isDefault && (
+                <Badge variant="success" label="Default" sx={{ fontSize: '0.7rem', px: 1.5, py: 0.25 }} />
+              )}
+              {provider.isActive ? (
+                <Badge variant="outline" label="Active" sx={{ fontSize: '0.7rem', px: 1.5, py: 0.25 }} />
+              ) : (
+                <Badge
+                  variant="destructive"
+                  label="Inactive"
+                  sx={{ fontSize: '0.7rem', px: 1.5, py: 0.25 }}
+                />
+              )}
+            </Stack>
           </CardHeader>
+          <Divider />
           <CardContent>
-            <div className="space-y-3">
-              {/* Capabilities */}
-              <div className="flex gap-2 flex-wrap">
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 {provider.supportsEmail && (
-                  <Badge variant="secondary">
-                    <svg
-                      className="w-3 h-3 mr-1"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Email
-                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    icon={
+                      <Box component="span" sx={{ display: 'inline-flex', mr: 0.5 }}>
+                        <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </Box>
+                    }
+                    label="Email"
+                    sx={{ fontSize: '0.72rem', px: 1.25, py: 0.25 }}
+                  />
                 )}
                 {provider.supportsCalendar && (
-                  <Badge variant="secondary">
-                    <svg
-                      className="w-3 h-3 mr-1"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Calendar
-                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    icon={
+                      <Box component="span" sx={{ display: 'inline-flex', mr: 0.5 }}>
+                        <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </Box>
+                    }
+                    label="Calendar"
+                    sx={{ fontSize: '0.72rem', px: 1.25, py: 0.25 }}
+                  />
                 )}
                 {provider.supportsContacts && (
-                  <Badge variant="secondary">
-                    <svg
-                      className="w-3 h-3 mr-1"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                      />
-                    </svg>
-                    Contacts
-                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    icon={
+                      <Box component="span" sx={{ display: 'inline-flex', mr: 0.5 }}>
+                        <svg width={14} height={14} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                          />
+                        </svg>
+                      </Box>
+                    }
+                    label="Contacts"
+                    sx={{ fontSize: '0.72rem', px: 1.25, py: 0.25 }}
+                  />
                 )}
-              </div>
+              </Stack>
 
-              {/* Last Synced */}
-              <div className="text-sm text-slate-300">
+              <Typography variant="caption" color="text.secondary">
                 Last synced: {formatDate(provider.lastSyncedAt)}
-              </div>
+              </Typography>
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
+              <Box>
                 <Button
                   variant="destructive"
                   size="sm"
@@ -228,14 +239,11 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
                 >
                   {deletingId === provider.id ? 'Disconnecting...' : 'Disconnect'}
                 </Button>
-              </div>
-            </div>
+              </Box>
+            </Stack>
           </CardContent>
         </Card>
       ))}
-    </div>
+    </Stack>
   );
 }
-
-
-

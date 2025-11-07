@@ -1,47 +1,88 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
+import { forwardRef } from 'react';
+import MuiButton, { ButtonProps as MuiButtonProps } from '@mui/material/Button';
+import type { SxProps, Theme } from '@mui/material/styles';
+import type { SystemStyleObject } from '@mui/system';
 
-const buttonVariants = {
-  default:
-    'bg-sky-600 text-white shadow-lg shadow-sky-900/30 hover:bg-sky-500 focus-visible:ring-sky-400',
-  destructive:
-    'bg-rose-600 text-white shadow-lg shadow-rose-900/30 hover:bg-rose-500 focus-visible:ring-rose-400',
-  outline:
-    'border border-white/20 bg-transparent text-slate-200 hover:bg-white/10 hover:text-white focus-visible:ring-slate-300',
-  secondary:
-    'bg-white/10 text-slate-100 hover:bg-white/15 shadow-inner shadow-slate-950/50 focus-visible:ring-slate-300',
-  ghost:
-    'bg-transparent text-slate-200 hover:bg-white/10 hover:text-white focus-visible:ring-slate-300',
-  link: 'text-sky-400 underline-offset-4 hover:text-sky-300 hover:underline',
+type Variant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+type Size = 'sm' | 'default' | 'lg' | 'icon';
+
+const variantMap: Record<
+  Variant,
+  { muiVariant: MuiButtonProps['variant']; color: MuiButtonProps['color']; sx?: SxProps<Theme> }
+> = {
+  default: { muiVariant: 'contained', color: 'primary' },
+  destructive: { muiVariant: 'contained', color: 'error' },
+  outline: { muiVariant: 'outlined', color: 'primary' },
+  secondary: { muiVariant: 'contained', color: 'secondary' },
+  ghost: {
+    muiVariant: 'text',
+    color: 'primary',
+    sx: { bgcolor: 'transparent', '&:hover': { bgcolor: 'action.hover' } },
+  },
+  link: {
+    muiVariant: 'text',
+    color: 'primary',
+    sx: { textDecoration: 'underline', textUnderlineOffset: 4 },
+  },
 };
 
-const sizeVariants = {
-  default: 'h-10 px-5 text-sm',
-  sm: 'h-9 rounded-lg px-3 text-xs',
-  lg: 'h-11 rounded-xl px-6 text-base',
-  icon: 'h-10 w-10',
+const sizeMap: Record<Size, { size: MuiButtonProps['size']; sx?: SxProps<Theme> }> = {
+  sm: { size: 'small', sx: { borderRadius: 2 } },
+  default: { size: 'medium', sx: { borderRadius: 3 } },
+  lg: { size: 'large', sx: { borderRadius: 3.5, px: 3 } },
+  icon: {
+    size: 'medium',
+    sx: {
+      borderRadius: '50%',
+      minWidth: 48,
+      width: 48,
+      height: 48,
+      p: 0,
+    },
+  },
 };
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: keyof typeof buttonVariants;
-  size?: keyof typeof sizeVariants;
+export interface ButtonProps extends Omit<MuiButtonProps, 'variant' | 'color' | 'size'> {
+  variant?: Variant;
+  size?: Size;
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'default', size = 'default', ...props }, ref) => (
-    <button
-      className={cn(
-        'inline-flex items-center justify-center rounded-xl font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed',
-        buttonVariants[variant],
-        sizeVariants[size],
-        className,
-      )}
-      ref={ref}
-      {...props}
-    />
-  ),
+const toSxArray = (value?: SxProps<Theme>): SxProps<Theme>[] => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'default', size = 'default', sx, ...props }, ref) => {
+    const variantStyles = variantMap[variant];
+    const sizeStyles = sizeMap[size];
+
+    const baseStyles: SystemStyleObject<Theme> = {
+      textTransform: 'none',
+      fontWeight: 600,
+      borderRadius: 3,
+    };
+
+    const combinedSx = [
+      baseStyles,
+      ...toSxArray(variantStyles.sx),
+      ...toSxArray(sizeStyles.sx),
+      ...toSxArray(sx),
+    ] as SxProps<Theme>;
+
+    return (
+      <MuiButton
+        {...props}
+        ref={ref}
+        variant={variantStyles.muiVariant}
+        color={variantStyles.color}
+        size={sizeStyles.size}
+        sx={combinedSx}
+      />
+    );
+  },
 );
 
 Button.displayName = 'Button';
 
-export { Button };
+export default Button;

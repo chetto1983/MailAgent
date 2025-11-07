@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Box, Stack, Typography } from '@mui/material';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -34,7 +35,13 @@ export function MicrosoftProviderCard({ onSuccess }: MicrosoftProviderCardProps)
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-3 text-slate-100">
+        <CardTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+          }}
+        >
           <svg className="h-6 w-6" viewBox="0 0 23 23">
             <path fill="#f3f3f3" d="M0 0h23v23H0z" />
             <path fill="#f35325" d="M1 1h10v10H1z" />
@@ -46,23 +53,40 @@ export function MicrosoftProviderCard({ onSuccess }: MicrosoftProviderCardProps)
         </CardTitle>
         <CardDescription>Connect Outlook and Microsoft 365</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}
+      >
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <div className="space-y-2 text-slate-300">
-          <p className="text-sm">
+        <Stack spacing={1.5}>
+          <Typography variant="body2" color="text.secondary">
             Connect your Microsoft account to sync emails and calendar events.
-          </p>
-          <ul className="list-disc space-y-1 pl-5 text-sm">
+          </Typography>
+          <Box
+            component="ul"
+            sx={{
+              pl: 3,
+              m: 0,
+              listStyle: 'disc',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.5,
+              color: 'text.secondary',
+            }}
+          >
             <li>Read and send emails via Outlook</li>
             <li>Access Microsoft Calendar events</li>
             <li>Sync contacts (optional)</li>
-          </ul>
-        </div>
+          </Box>
+        </Stack>
 
         <Button onClick={handleConnect} disabled={loading} className="w-full">
           {loading ? 'Connecting...' : 'Connect Microsoft Account'}

@@ -17,11 +17,9 @@ import {
   Paper,
   Avatar,
   useTheme,
-  useMediaQuery,
   Divider,
   Menu,
   MenuItem,
-  ListItemAvatar,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -46,6 +44,9 @@ const navItems = [
 ];
 
 interface MaterialDashboardLayoutProps {
+  title?: string;
+  description?: string;
+  actions?: React.ReactNode;
   children: React.ReactNode;
   onLogout?: () => void;
 }
@@ -62,13 +63,15 @@ interface MaterialDashboardLayoutProps {
  * - Touch targets >= 48px
  */
 export function MaterialDashboardLayout({
+  title,
+  description,
+  actions,
   children,
   onLogout,
 }: MaterialDashboardLayoutProps) {
   const router = useRouter();
   const muiTheme = useTheme();
   const { theme, setTheme } = useNextTheme();
-  const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -390,6 +393,49 @@ export function MaterialDashboardLayout({
             mb: { xs: 8, md: 0 }, // Space for bottom nav on mobile
           }}
         >
+          {/* Page Header (if title provided) */}
+          {(title || description || actions) && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: { xs: 2, md: 3 },
+                mb: 3,
+                borderRadius: 2,
+                bgcolor: 'background.paper',
+                borderBottom: 1,
+                borderColor: 'divider',
+              }}
+            >
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  alignItems: { xs: 'flex-start', md: 'center' },
+                  justifyContent: 'space-between',
+                  gap: 2,
+                }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  {title && (
+                    <Typography variant="h4" component="h1" gutterBottom>
+                      {title}
+                    </Typography>
+                  )}
+                  {description && (
+                    <Typography variant="body1" color="text.secondary">
+                      {description}
+                    </Typography>
+                  )}
+                </Box>
+                {actions && (
+                  <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                    {actions}
+                  </Box>
+                )}
+              </Box>
+            </Paper>
+          )}
+
           {children}
         </Container>
       </Box>
@@ -410,7 +456,7 @@ export function MaterialDashboardLayout({
       >
         <BottomNavigation
           value={router.pathname}
-          onChange={(event, newValue) => handleNavigation(newValue)}
+          onChange={(_event, newValue) => handleNavigation(newValue)}
           sx={{
             height: 64, // Increased for better touch targets
             '& .MuiBottomNavigationAction-root': {

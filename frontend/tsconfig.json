@@ -41,6 +41,9 @@
       "@/hooks/*": [
         "./hooks/*"
       ],
+      "@/locales/*": [
+        "./locales/*"
+      ],
       "@/types/*": [
         "./types/*"
       ]

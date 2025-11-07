@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { EmailSyncBackService } from './email-sync-back.service';
 
 export interface EmailListFilters {
   folder?: string;
@@ -24,7 +25,10 @@ export interface EmailListParams {
 export class EmailsService {
   private readonly logger = new Logger(EmailsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailSyncBack: EmailSyncBackService,
+  ) {}
 
   /**
    * Get paginated list of emails with filters
@@ -132,7 +136,7 @@ export class EmailsService {
   }
 
   /**
-   * Update email flags
+   * Update email flags - syncs back to provider
    */
   async updateEmail(
     id: string,
@@ -147,15 +151,72 @@ export class EmailsService {
       throw new NotFoundException('Email not found');
     }
 
-    return this.prisma.email.update({
+    // Update in database first
+    const updated = await this.prisma.email.update({
       where: { id },
       data,
     });
+
+    // Sync changes back to provider (async, don't wait)
+    this.syncChangesToProvider(email, data).catch((error) => {
+      this.logger.error(`Failed to sync email update to provider: ${error.message}`);
+    });
+
+    return updated;
+  }
+
+  /**
+   * Sync email changes back to provider
+   */
+  private async syncChangesToProvider(
+    email: any,
+    changes: { isRead?: boolean; isStarred?: boolean; folder?: string },
+  ) {
+    const operations = [];
+
+    // Handle read/unread
+    if (changes.isRead !== undefined) {
+      operations.push({
+        emailId: email.id,
+        externalId: email.externalId,
+        providerId: email.providerId,
+        tenantId: email.tenantId,
+        operation: changes.isRead ? ('markRead' as const) : ('markUnread' as const),
+      });
+    }
+
+    // Handle star/unstar
+    if (changes.isStarred !== undefined) {
+      operations.push({
+        emailId: email.id,
+        externalId: email.externalId,
+        providerId: email.providerId,
+        tenantId: email.tenantId,
+        operation: changes.isStarred ? ('star' as const) : ('unstar' as const),
+      });
+    }
+
+    // Handle folder move
+    if (changes.folder) {
+      operations.push({
+        emailId: email.id,
+        externalId: email.externalId,
+        providerId: email.providerId,
+        tenantId: email.tenantId,
+        operation: 'moveToFolder' as const,
+        folder: changes.folder,
+      });
+    }
+
+    // Sync all operations
+    if (operations.length > 0) {
+      await this.emailSyncBack.syncOperationsBatch(operations);
+    }
   }
 
   /**
    * Delete email - Mark as deleted and move to TRASH
-   * This will be synced to the server on next sync
+   * Syncs to provider immediately
    */
   async deleteEmail(id: string, tenantId: string) {
     const email = await this.prisma.email.findFirst({
@@ -175,7 +236,20 @@ export class EmailsService {
       },
     });
 
-    this.logger.log(`Email ${id} marked as deleted and moved to TRASH`);
+    // Sync delete to provider (async, don't wait)
+    this.emailSyncBack
+      .syncOperationToProvider({
+        emailId: email.id,
+        externalId: email.externalId,
+        providerId: email.providerId,
+        tenantId: email.tenantId,
+        operation: 'delete',
+      })
+      .catch((error) => {
+        this.logger.error(`Failed to sync email deletion to provider: ${error.message}`);
+      });
+
+    this.logger.log(`Email ${id} marked as deleted and synced to provider`);
     return { success: true };
   }
 
@@ -211,19 +285,47 @@ export class EmailsService {
   }
 
   /**
-   * Mark multiple emails as read/unread
+   * Mark multiple emails as read/unread - syncs to provider
    */
   async bulkUpdateRead(
     emailIds: string[],
     tenantId: string,
     isRead: boolean,
   ) {
+    // Get emails for syncing
+    const emails = await this.prisma.email.findMany({
+      where: {
+        id: { in: emailIds },
+        tenantId,
+      },
+      select: {
+        id: true,
+        externalId: true,
+        providerId: true,
+        tenantId: true,
+      },
+    });
+
+    // Update in database
     const result = await this.prisma.email.updateMany({
       where: {
         id: { in: emailIds },
         tenantId,
       },
       data: { isRead },
+    });
+
+    // Sync to provider (async, don't wait)
+    const operations = emails.map((email) => ({
+      emailId: email.id,
+      externalId: email.externalId,
+      providerId: email.providerId,
+      tenantId: email.tenantId,
+      operation: isRead ? ('markRead' as const) : ('markUnread' as const),
+    }));
+
+    this.emailSyncBack.syncOperationsBatch(operations).catch((error) => {
+      this.logger.error(`Failed to sync bulk read update to provider: ${error.message}`);
     });
 
     return { updated: result.count };

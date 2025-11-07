@@ -1,195 +1,489 @@
-import React, { useMemo, useState } from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
 import { useRouter } from 'next/router';
-import { Menu, X, LogOut, Mail, Sparkles, Settings, ServerCog } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import {
+  AppBar,
+  Toolbar,
+  IconButton,
+  Typography,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Box,
+  Container,
+  BottomNavigation,
+  BottomNavigationAction,
+  Paper,
+  Avatar,
+  useTheme,
+  Divider,
+  Menu,
+  MenuItem,
+} from '@mui/material';
+import {
+  Menu as MenuIcon,
+  Mail,
+  Sparkles,
+  ServerCog,
+  Settings,
+  LogOut,
+  User,
+  Moon,
+  Sun,
+} from 'lucide-react';
+import { useTheme as useNextTheme } from 'next-themes';
+
+const drawerWidth = 260;
 
 const navItems = [
-  { href: '/dashboard/index', label: 'AI Copilot', icon: Sparkles },
-  { href: '/dashboard/email', label: 'Inbox', icon: Mail },
-  { href: '/dashboard/providers', label: 'Providers', icon: ServerCog },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+  { path: '/dashboard/email', label: 'Inbox', icon: Mail },
+  { path: '/dashboard/providers', label: 'Providers', icon: ServerCog },
+  { path: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
-interface DashboardLayoutProps {
-  title: string;
+interface MaterialDashboardLayoutProps {
+  title?: string;
   description?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
   onLogout?: () => void;
 }
 
-export function DashboardLayout({
+/**
+ * Material Design 3 Dashboard Layout
+ *
+ * Features:
+ * - Persistent drawer on desktop (>= md breakpoint)
+ * - Temporary drawer on mobile
+ * - Bottom navigation on mobile
+ * - Responsive AppBar with theme toggle
+ * - WCAG 2.1 AA compliant
+ * - Touch targets >= 48px
+ */
+export function MaterialDashboardLayout({
   title,
   description,
   actions,
   children,
   onLogout,
-}: DashboardLayoutProps) {
+}: MaterialDashboardLayoutProps) {
   const router = useRouter();
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const muiTheme = useTheme();
+  const { theme, setTheme } = useNextTheme();
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-  const currentPath = useMemo(() => {
-    // Normalise Next.js dynamic routes and trailing slashes
-    const normalized = router.pathname.replace(/\/$/, '');
-    return normalized === '' ? '/' : normalized;
-  }, [router.pathname]);
+  const handleDrawerToggle = () => {
+    setMobileDrawerOpen(!mobileDrawerOpen);
+  };
+
+  const handleNavigation = (path: string) => {
+    router.push(path);
+    setMobileDrawerOpen(false);
+  };
+
+  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleProfileMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleThemeToggle = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+    handleProfileMenuClose();
+  };
+
+  const handleLogout = () => {
+    handleProfileMenuClose();
+    onLogout?.();
+  };
+
+  // Drawer content (shared between permanent and temporary)
+  const drawerContent = (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Toolbar sx={{ display: { md: 'none' } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+            }}
+          >
+            <Sparkles size={20} />
+          </Box>
+          <Typography variant="h6" component="div">
+            MailAgent
+          </Typography>
+        </Box>
+      </Toolbar>
+      <Divider sx={{ display: { md: 'none' } }} />
+
+      <List sx={{ flex: 1, px: 2, pt: 2 }}>
+        {navItems.map((item) => {
+          const isActive =
+            router.pathname === item.path ||
+            (item.path === '/dashboard/index' && router.pathname === '/dashboard');
+
+          return (
+            <ListItemButton
+              key={item.path}
+              selected={isActive}
+              onClick={() => handleNavigation(item.path)}
+              sx={{
+                borderRadius: 2,
+                mb: 0.5,
+                minHeight: 48, // Touch target
+                '&.Mui-selected': {
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '&:hover': {
+                    bgcolor: 'primary.dark',
+                  },
+                  '& .MuiListItemIcon-root': {
+                    color: 'primary.contrastText',
+                  },
+                },
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: 40,
+                  color: isActive ? 'primary.contrastText' : 'text.secondary',
+                }}
+              >
+                <item.icon size={20} />
+              </ListItemIcon>
+              <ListItemText
+                primary={item.label}
+                primaryTypographyProps={{
+                  variant: 'body2',
+                  fontWeight: isActive ? 600 : 400,
+                }}
+              />
+            </ListItemButton>
+          );
+        })}
+      </List>
+
+      <Divider />
+
+      {/* User section in drawer (mobile only) */}
+      <Box sx={{ p: 2, display: { md: 'none' } }}>
+        <ListItemButton
+          onClick={handleLogout}
+          sx={{
+            borderRadius: 2,
+            minHeight: 48,
+            color: 'error.main',
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 40, color: 'error.main' }}>
+            <LogOut size={20} />
+          </ListItemIcon>
+          <ListItemText
+            primary="Logout"
+            primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+          />
+        </ListItemButton>
+      </Box>
+    </Box>
+  );
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-50">
-      {/* Decorative glows */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-0 flex justify-center">
-        <div className="h-64 w-[40rem] bg-sky-500/20 blur-[120px]" />
-      </div>
-      <div className="pointer-events-none fixed inset-y-0 left-0 z-0 w-40 bg-emerald-500/10 blur-[140px]" />
-
-      <div className="relative z-10 flex min-h-screen flex-col">
-        {/* Top Navigation */}
-        <header className="sticky top-0 z-20 border-b border-white/5 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 lg:px-6">
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard/index" className="group flex items-center gap-2">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/20 text-sky-300 shadow-inner shadow-sky-500/40 transition group-hover:scale-105">
-                  <Sparkles className="h-5 w-5" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">
-                    MailAgent
-                  </p>
-                  <p className="text-sm text-slate-300">PMSync workspace</p>
-                </div>
-              </Link>
-            </div>
-
-            <nav className="hidden items-center gap-2 rounded-full border border-white/5 bg-white/5 px-2 py-1 shadow-lg shadow-slate-950/40 backdrop-blur lg:flex">
-              {navItems.map((item) => {
-                const isActive = currentPath.startsWith(item.href.replace(/\/index$/, ''));
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm transition ${
-                      isActive
-                        ? 'bg-sky-500/20 text-sky-200 shadow-inner shadow-sky-500/20'
-                        : 'text-slate-300 hover:text-slate-50 hover:bg-white/10'
-                    }`}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-
-            <div className="flex items-center gap-2">
-              {actions}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden h-10 w-10 rounded-full border border-white/10 text-slate-300 transition hover:border-sky-500/40 hover:bg-sky-500/10 hover:text-sky-200 lg:flex"
-                onClick={onLogout}
-                aria-label="Logout"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
-
-              <button
-                type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-slate-200 transition hover:border-sky-500/40 hover:bg-sky-500/10 lg:hidden"
-                onClick={() => setMobileNavOpen((prev) => !prev)}
-                aria-label="Toggle navigation menu"
-              >
-                {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile nav sheet */}
-          <div
-            className={`lg:hidden transition-transform duration-300 ${
-              mobileNavOpen ? 'translate-y-0' : '-translate-y-full'
-            }`}
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      {/* App Bar */}
+      <AppBar
+        position="fixed"
+        elevation={0}
+        sx={{
+          zIndex: muiTheme.zIndex.drawer + 1,
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Toolbar>
+          {/* Mobile menu button */}
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{
+              mr: 2,
+              display: { md: 'none' },
+              width: 48,
+              height: 48,
+            }}
+            aria-label="open navigation menu"
           >
-            <div className="space-y-2 border-t border-white/5 bg-slate-950/95 px-4 pb-4 pt-3 shadow-lg shadow-slate-950/30 backdrop-blur">
-              {navItems.map((item) => {
-                const isActive = currentPath.startsWith(item.href.replace(/\/index$/, ''));
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 rounded-2xl border px-3 py-2 text-sm transition ${
-                      isActive
-                        ? 'border-sky-500/40 bg-sky-500/10 text-sky-200'
-                        : 'border-white/10 bg-white/5 text-slate-300 hover:border-sky-500/30 hover:bg-sky-500/5 hover:text-slate-50'
-                    }`}
-                    onClick={() => setMobileNavOpen(false)}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-              <Button
-                variant="ghost"
-                className="w-full justify-start rounded-2xl border border-white/10 text-slate-300 hover:border-sky-500/40 hover:bg-sky-500/10 hover:text-sky-200"
-                onClick={onLogout}
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </header>
+            <MenuIcon size={24} />
+          </IconButton>
 
-        <main className="flex-1">
-          <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 lg:px-6 lg:py-10">
-            <div className="flex flex-col gap-4 rounded-3xl border border-white/5 bg-white/5 p-6 shadow-xl shadow-slate-950/40 backdrop-blur">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h1 className="text-2xl font-semibold text-slate-50 md:text-3xl">{title}</h1>
-                  {description && (
-                    <p className="text-sm text-slate-300 md:text-base">{description}</p>
+          {/* Logo & Title (Desktop only) */}
+          <Box
+            sx={{
+              display: { xs: 'none', md: 'flex' },
+              alignItems: 'center',
+              gap: 1.5,
+            }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+              }}
+            >
+              <Sparkles size={20} />
+            </Box>
+            <Typography variant="h6" noWrap component="div">
+              MailAgent
+            </Typography>
+          </Box>
+
+          {/* Spacer */}
+          <Box sx={{ flexGrow: 1 }} />
+
+          {/* Theme toggle (Desktop) */}
+          <IconButton
+            onClick={handleThemeToggle}
+            sx={{
+              mr: 1,
+              display: { xs: 'none', md: 'flex' },
+              width: 40,
+              height: 40,
+            }}
+            aria-label="toggle theme"
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </IconButton>
+
+          {/* Profile button */}
+          <IconButton
+            edge="end"
+            onClick={handleProfileMenuOpen}
+            sx={{ width: 48, height: 48 }}
+            aria-label="account menu"
+            aria-controls="profile-menu"
+            aria-haspopup="true"
+          >
+            <Avatar
+              sx={{
+                width: 32,
+                height: 32,
+                bgcolor: 'secondary.main',
+                color: 'secondary.contrastText',
+              }}
+            >
+              <User size={18} />
+            </Avatar>
+          </IconButton>
+
+          {/* Profile menu */}
+          <Menu
+            id="profile-menu"
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleProfileMenuClose}
+            anchorOrigin={{
+              vertical: 'bottom',
+              horizontal: 'right',
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right',
+            }}
+            sx={{ mt: 1 }}
+          >
+            <MenuItem onClick={() => handleNavigation('/dashboard/settings')}>
+              <ListItemIcon>
+                <Settings size={18} />
+              </ListItemIcon>
+              Settings
+            </MenuItem>
+            <MenuItem onClick={handleThemeToggle}>
+              <ListItemIcon>
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </ListItemIcon>
+              {theme === 'dark' ? 'Light' : 'Dark'} mode
+            </MenuItem>
+            <Divider />
+            <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
+              <ListItemIcon sx={{ color: 'error.main' }}>
+                <LogOut size={18} />
+              </ListItemIcon>
+              Logout
+            </MenuItem>
+          </Menu>
+        </Toolbar>
+      </AppBar>
+
+      {/* Desktop Permanent Drawer */}
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', md: 'block' },
+          width: drawerWidth,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: drawerWidth,
+            boxSizing: 'border-box',
+            borderRight: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.default',
+          },
+        }}
+      >
+        <Toolbar /> {/* Spacer for AppBar */}
+        {drawerContent}
+      </Drawer>
+
+      {/* Mobile Temporary Drawer */}
+      <Drawer
+        variant="temporary"
+        open={mobileDrawerOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{ keepMounted: true }} // Better mobile performance
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': {
+            width: drawerWidth,
+            boxSizing: 'border-box',
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+
+      {/* Main Content */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <Toolbar /> {/* Spacer for AppBar */}
+
+        <Container
+          maxWidth="xl"
+          sx={{
+            flex: 1,
+            py: { xs: 2, md: 3 },
+            px: { xs: 2, md: 3 },
+            mb: { xs: 8, md: 0 }, // Space for bottom nav on mobile
+          }}
+        >
+          {/* Page Header (if title provided) */}
+          {(title || description || actions) && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: { xs: 2, md: 3 },
+                mb: 3,
+                borderRadius: 2,
+                bgcolor: 'background.paper',
+                borderBottom: 1,
+                borderColor: 'divider',
+              }}
+            >
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  alignItems: { xs: 'flex-start', md: 'center' },
+                  justifyContent: 'space-between',
+                  gap: 2,
+                }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  {title && (
+                    <Typography variant="h4" component="h1" gutterBottom>
+                      {title}
+                    </Typography>
                   )}
-                </div>
-                <div className="flex shrink-0 items-center gap-2 lg:hidden">{actions}</div>
-              </div>
-            </div>
+                  {description && (
+                    <Typography variant="body1" color="text.secondary">
+                      {description}
+                    </Typography>
+                  )}
+                </Box>
+                {actions && (
+                  <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                    {actions}
+                  </Box>
+                )}
+              </Box>
+            </Paper>
+          )}
 
-            <div className="flex flex-col gap-6 pb-12">{children}</div>
-          </div>
-        </main>
+          {children}
+        </Container>
+      </Box>
 
-        {/* Mobile bottom nav */}
-        <nav className="fixed inset-x-0 bottom-4 mx-auto flex w-[min(420px,90%)] items-center justify-between rounded-full border border-white/10 bg-slate-950/90 px-3 py-2 shadow-2xl shadow-slate-950/70 backdrop-blur lg:hidden">
-          {navItems.map((item) => {
-            const isActive = currentPath.startsWith(item.href.replace(/\/index$/, ''));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex flex-1 flex-col items-center gap-1 rounded-full px-2 py-1 text-xs transition ${
-                  isActive
-                    ? 'text-sky-300'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
-                }`}
-              >
-                <item.icon className={`h-4 w-4 ${isActive ? 'text-sky-300' : ''}`} />
-                {item.label}
-              </Link>
-            );
-          })}
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/20 text-sky-200 transition hover:scale-105"
-            onClick={onLogout}
-            aria-label="Logout"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </nav>
-      </div>
-    </div>
+      {/* Mobile Bottom Navigation */}
+      <Paper
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          display: { md: 'none' },
+          zIndex: muiTheme.zIndex.appBar,
+          borderTop: 1,
+          borderColor: 'divider',
+        }}
+        elevation={8}
+      >
+        <BottomNavigation
+          value={router.pathname}
+          onChange={(_event, newValue) => handleNavigation(newValue)}
+          sx={{
+            height: 64, // Increased for better touch targets
+            '& .MuiBottomNavigationAction-root': {
+              minWidth: 'auto',
+              padding: '8px 12px',
+            },
+          }}
+        >
+          {navItems.map((item) => (
+            <BottomNavigationAction
+              key={item.path}
+              label={item.label}
+              value={item.path}
+              icon={<item.icon size={20} />}
+              sx={{
+                '&.Mui-selected': {
+                  color: 'primary.main',
+                },
+              }}
+            />
+          ))}
+        </BottomNavigation>
+      </Paper>
+    </Box>
   );
 }
 
-export default DashboardLayout;
+// Named export for backwards compatibility
+export { MaterialDashboardLayout as DashboardLayout };
+
+export default MaterialDashboardLayout;

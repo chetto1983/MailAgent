@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { Box, Container, Stack, Typography } from '@mui/material';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 export default function LoginPage() {
   const router = useRouter();
   const { setToken, setUser } = useAuthStore();
+  const translations = useTranslations();
 
   const [step, setStep] = useState<'login' | 'otp'>('login');
   const [email, setEmail] = useState('');
@@ -24,6 +27,10 @@ export default function LoginPage() {
       setEmail(router.query.email as string);
     }
   }, [router.query.email]);
+
+  const loginCopy = translations.auth.login;
+  const otpCopy = translations.auth.otp;
+  const copy = step === 'login' ? loginCopy : otpCopy;
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -45,8 +52,8 @@ export default function LoginPage() {
         router.push('/dashboard');
       }
     } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'Login failed');
+      const errorResponse = err as { response?: { data?: { message?: string } } };
+      setError(errorResponse.response?.data?.message || translations.common.genericError);
     } finally {
       setLoading(false);
     }
@@ -69,108 +76,119 @@ export default function LoginPage() {
         router.push('/dashboard');
       }
     } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'OTP verification failed');
+      const errorResponse = err as { response?: { data?: { message?: string } } };
+      setError(errorResponse.response?.data?.message || translations.common.genericError);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Sign In</CardTitle>
-          <CardDescription>
-            {step === 'login' ? 'Enter your email and password' : 'Enter the OTP code sent to your email'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        display: 'flex',
+        alignItems: 'center',
+        py: 6,
+      }}
+    >
+      <Container maxWidth="sm">
+        <Card>
+          <CardHeader>
+            <CardTitle>{copy.title}</CardTitle>
+            <CardDescription>{copy.subtitle}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <Alert variant="destructive" sx={{ mb: 3 }}>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-          {step === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
+            {step === 'login' ? (
+              <Stack component="form" spacing={3} onSubmit={handleLogin}>
                 <Input
                   type="email"
-                  placeholder="you@example.com"
+                  label={loginCopy.form.emailLabel}
+                  placeholder={translations.common.emailPlaceholder}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   required
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Password</label>
                 <Input
                   type="password"
-                  placeholder="Enter your password"
+                  label={loginCopy.form.passwordLabel}
+                  placeholder={translations.common.passwordPlaceholder}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   required
                 />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Signing in...' : 'Sign In'}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleOtpVerify} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
+                <Button type="submit" disabled={loading} fullWidth>
+                  {loading ? translations.common.loading : loginCopy.form.submit}
+                </Button>
+              </Stack>
+            ) : (
+              <Stack component="form" spacing={3} onSubmit={handleOtpVerify}>
                 <Input
                   type="email"
-                  placeholder="you@example.com"
+                  label={loginCopy.form.emailLabel}
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   required
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">OTP Code</label>
                 <Input
                   type="text"
-                  placeholder="000000"
+                  label={otpCopy.form.otpLabel}
+                  placeholder={translations.common.otpPlaceholder}
                   value={otp}
                   onChange={(event) => setOtp(event.target.value)}
-                  maxLength={6}
+                  inputProps={{ maxLength: 6 }}
                   required
                 />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Verifying...' : 'Verify OTP'}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  setStep('login');
-                  setOtp('');
-                }}
-              >
-                Back to Login
-              </Button>
-            </form>
-          )}
+                <Button type="submit" disabled={loading} fullWidth>
+                  {loading ? translations.common.loading : otpCopy.form.submit}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  fullWidth
+                  onClick={() => {
+                    setStep('login');
+                    setOtp('');
+                  }}
+                >
+                  {translations.common.backToLogin}
+                </Button>
+              </Stack>
+            )}
 
-          <p className="text-sm text-center mt-4">
-            Don&apos;t have an account?{' '}
-            <Link href="/auth/register" className="text-blue-600 hover:underline">
-              Sign up
-            </Link>
-          </p>
-          <p className="text-sm text-center mt-2">
-            <Link href="/auth/forgot-password" className="text-blue-600 hover:underline">
-              Forgot password?
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+            <Stack spacing={2} sx={{ mt: 4 }}>
+              {loginCopy.links?.secondary && (
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  <Link href={loginCopy.links.secondary.href}>{loginCopy.links.secondary.label}</Link>
+                </Typography>
+              )}
+              {loginCopy.links?.primary && step === 'login' && (
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  {loginCopy.form.cta}{' '}
+                  <Link href={loginCopy.links.primary.href}>{loginCopy.links.primary.label}</Link>
+                </Typography>
+              )}
+              {otpCopy.links?.primary && step === 'otp' && (
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  <Link href={otpCopy.links.primary.href}>{otpCopy.links.primary.label}</Link>
+                </Typography>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }
+
+// Force SSR to avoid NextRouter SSR errors
+export const getServerSideProps = async () => {
+  return { props: {} };
+};

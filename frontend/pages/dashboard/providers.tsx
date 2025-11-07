@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { RefreshCw } from 'lucide-react';
+import { Box } from '@mui/material';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
@@ -105,7 +106,11 @@ export default function ProvidersPage() {
       variant="outline"
       size="sm"
       onClick={loadProviders}
-      className="rounded-full border-white/10 bg-white/5 text-slate-200 hover:border-sky-400/40 hover:bg-sky-500/10 hover:text-sky-100"
+      className="rounded-full"
+      style={{
+        borderColor: 'var(--mui-palette-divider)',
+        backgroundColor: 'var(--mui-palette-action-hover)',
+      }}
     >
       <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
       Refresh
@@ -139,16 +144,12 @@ export default function ProvidersPage() {
 
       <Tabs defaultValue="connected" className="w-full space-y-6">
         <TabsList className="grid w-full grid-cols-1 gap-2 md:grid-cols-2">
-          <TabsTrigger value="connected" className="w-full">
-            Connected Providers
-          </TabsTrigger>
-          <TabsTrigger value="add" className="w-full">
-            Add Provider
-          </TabsTrigger>
+          <TabsTrigger value="connected" className="w-full" label="Connected Providers" />
+          <TabsTrigger value="add" className="w-full" label="Add Provider" />
         </TabsList>
 
         <TabsContent value="connected" className="space-y-4">
-          <Card className="border-white/10 bg-white/5">
+          <Card>
             <CardHeader>
               <CardTitle>Your Connected Providers</CardTitle>
               <CardDescription>
@@ -157,7 +158,15 @@ export default function ProvidersPage() {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="py-10 text-center text-slate-400">Loading providers...</div>
+                <Box
+                  sx={{
+                    py: 10,
+                    textAlign: 'center',
+                    color: 'text.secondary',
+                  }}
+                >
+                  Loading providers...
+                </Box>
               ) : (
                 <ProvidersList providers={providers} onDelete={handleProviderDelete} />
               )}
@@ -187,34 +196,53 @@ export default function ProvidersPage() {
             <CardHeader>
               <CardTitle>Need Help?</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-slate-300">
-              <p>
-                <strong>Google:</strong> Click &quot;Connect Google Account&quot; and sign in with your Google
-                credentials. Grant access to Gmail, Calendar, and Contacts.
-              </p>
-              <p>
-                <strong>Microsoft:</strong> Use &quot;Connect Microsoft Account&quot; and sign in with your
-                Outlook/Microsoft 365 credentials.
-              </p>
-              <p>
-                <strong>Generic IMAP:</strong> Provide IMAP/SMTP server details from your provider.
-                CalDAV enables calendar sync.
-              </p>
-              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="mb-2 font-semibold text-slate-100">Common IMAP/SMTP Settings:</p>
-                <ul className="space-y-1 text-slate-300">
-                  <li>
-                    <strong>Gmail:</strong> imap.gmail.com:993, smtp.gmail.com:587 (requires app
-                    password)
-                  </li>
-                  <li>
-                    <strong>Outlook.com:</strong> outlook.office365.com:993, smtp.office365.com:587
-                  </li>
-                  <li>
-                    <strong>Yahoo:</strong> imap.mail.yahoo.com:993, smtp.mail.yahoo.com:587
-                  </li>
-                </ul>
-              </div>
+            <CardContent>
+              <Box
+                component="div"
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                  fontSize: '0.875rem',
+                  color: 'text.primary',
+                }}
+              >
+                <p>
+                  <strong>Google:</strong> Click &quot;Connect Google Account&quot; and sign in with your Google
+                  credentials. Grant access to Gmail, Calendar, and Contacts.
+                </p>
+                <p>
+                  <strong>Microsoft:</strong> Use &quot;Connect Microsoft Account&quot; and sign in with your
+                  Outlook/Microsoft 365 credentials.
+                </p>
+                <p>
+                  <strong>Generic IMAP:</strong> Provide IMAP/SMTP server details from your provider.
+                  CalDAV enables calendar sync.
+                </p>
+                <Box
+                  sx={{
+                    mt: 2,
+                    borderRadius: 3,
+                    border: 1,
+                    borderColor: 'divider',
+                    bgcolor: 'action.hover',
+                    p: 2,
+                  }}
+                >
+                  <p style={{ marginBottom: '0.5rem', fontWeight: 600 }}>Common IMAP/SMTP Settings:</p>
+                  <Box component="ul" sx={{ pl: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <li>
+                      <strong>Gmail:</strong> imap.gmail.com:993, smtp.gmail.com:587 (requires app password)
+                    </li>
+                    <li>
+                      <strong>Outlook.com:</strong> outlook.office365.com:993, smtp.office365.com:587
+                    </li>
+                    <li>
+                      <strong>Yahoo:</strong> imap.mail.yahoo.com:993, smtp.mail.yahoo.com:587
+                    </li>
+                  </Box>
+                </Box>
+              </Box>
             </CardContent>
           </Card>
         </TabsContent>
@@ -222,3 +250,8 @@ export default function ProvidersPage() {
     </DashboardLayout>
   );
 }
+
+// Force SSR to avoid NextRouter SSR errors
+export const getServerSideProps = async () => {
+  return { props: {} };
+};

@@ -8,59 +8,49 @@ import { useRouter } from 'next/router';
 import {
   RefreshCw,
   Plus,
-  Sparkles,
+  Search,
+  Mail,
+  MailOpen,
+  Trash2,
+  X,
 } from 'lucide-react';
+import {
+  Box,
+  Grid,
+  TextField,
+  InputAdornment,
+  Typography,
+  Fab,
+  Stack,
+  CircularProgress,
+  Paper,
+  IconButton,
+} from '@mui/material';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { emailApi, type Email, type EmailStats } from '@/lib/api/email';
-import { aiApi, type ChatMessage } from '@/lib/api/ai';
 import { useLocale } from '@/lib/hooks/use-locale';
+import { useTranslations } from '@/lib/hooks/use-translations';
 import { EmailList } from '@/components/dashboard/EmailList';
 import { EmailView } from '@/components/dashboard/EmailView';
-import { AiAssistant } from '@/components/dashboard/AiAssistant';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
-import {
-  Dialog,
-  DialogContent,
-} from '@/components/ui/dialog';
 import { EmailComposer, type EmailDraft } from '@/components/dashboard/email/EmailComposer';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { FolderNavigation, type FolderType } from '@/components/dashboard/FolderNavigation';
 
-const translations = {
-  en: {
-    title: 'Inbox',
-    description: (unread: number) => `${unread} unread – focus on what matters`,
-    searchPlaceholder: 'Search emails...',
-    compose: 'Compose',
-    refresh: 'Refresh',
-    toggleAi: 'Toggle AI',
-    selectEmail: 'Select an email to read',
-    noProviders: 'Connect a provider to send and receive email.',
-  },
-  it: {
-    title: 'Posta',
-    description: (unread: number) => `${unread} non lette – concentrati su ciò che conta`,
-    searchPlaceholder: 'Cerca email...',
-    compose: 'Scrivi',
-    refresh: 'Aggiorna',
-    toggleAi: 'AI',
-    selectEmail: 'Seleziona un\'email da leggere',
-    noProviders: 'Collega un provider per inviare e ricevere email.',
-  },
-} as const;
-
-type LocaleKey = keyof typeof translations;
-
-const resolveLocale = (value: string): LocaleKey => (value === 'it' ? 'it' : 'en');
 
 export default function EmailPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { logout } = useAuthStore();
   const locale = useLocale();
-  const localeKey = resolveLocale(locale);
-  const t = translations[localeKey];
+  const localized = useTranslations();
+  const common = localized.common;
+  const emailCopy = localized.dashboard.email;
+  const emailListCopy = localized.dashboard.emailList;
+  const emailViewCopy = localized.dashboard.emailView;
 
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
@@ -68,16 +58,15 @@ export default function EmailPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [showAiChat, setShowAiChat] = useState(true);
-  const [aiSessionId, setAiSessionId] = useState<string | null>(null);
-  const [aiMessages, setAiMessages] = useState<ChatMessage[]>([]);
-  const [aiInput, setAiInput] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
   const [emailProviders, setEmailProviders] = useState<ProviderConfig[]>([]);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'forward'>('compose');
   const [composeOriginalEmail, setComposeOriginalEmail] = useState<Email | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<FolderType>('INBOX');
+  const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   const hasEmailProviders = emailProviders.length > 0;
   const defaultProviderId = useMemo(
@@ -85,42 +74,39 @@ export default function EmailPage() {
     [emailProviders],
   );
 
-  const loadEmails = useCallback(async () => {
+  const loadEmails = useCallback(async (folder?: FolderType, search?: string) => {
     if (!user) return;
     try {
       setLoading(true);
 
-      const response = await emailApi.getConversations({
+      // If search query is provided, use search endpoint
+      if (search && search.trim()) {
+        const response = await emailApi.searchEmails(search.trim());
+        setEmails(response.data.emails || []);
+        return;
+      }
+
+      // Determine folder filter for API
+      let folderFilter: string | undefined;
+      let isStarredFilter: boolean | undefined;
+
+      if (folder && folder !== 'ALL') {
+        if (folder === 'STARRED') {
+          isStarredFilter = true;
+        } else {
+          folderFilter = folder;
+        }
+      }
+
+      // Use conversations endpoint for threaded view
+      const response = await emailApi.listEmails({
         page: 1,
-        limit: 60,
+        limit: 100,
+        folder: folderFilter,
+        isStarred: isStarredFilter,
       });
 
-      const conversationEmails: Email[] = response.data.conversations.map((conv) => ({
-        id: conv.latestEmailId,
-        threadId: conv.threadId,
-        from: conv.from,
-        to: conv.to,
-        subject: conv.subject + (conv.emailCount > 1 ? ` (${conv.emailCount})` : ''),
-        snippet: conv.snippet,
-        folder: conv.folder,
-        labels: conv.labels,
-        isRead: conv.isRead,
-        isStarred: conv.isStarred,
-        isFlagged: conv.isFlagged,
-        receivedAt: conv.receivedAt,
-        sentAt: conv.sentAt,
-        tenantId: '',
-        providerId: '',
-        externalId: '',
-        cc: [],
-        bcc: [],
-        isDraft: false,
-        isDeleted: false,
-        createdAt: conv.receivedAt,
-        updatedAt: conv.receivedAt,
-      }));
-
-      setEmails(conversationEmails);
+      setEmails(response.data.emails || []);
     } catch (error) {
       console.error('Failed to load emails:', error);
       setEmails([]);
@@ -155,8 +141,8 @@ export default function EmailPage() {
 
   useEffect(() => {
     if (!user) return;
-    loadEmails();
-  }, [loadEmails, user]);
+    loadEmails(selectedFolder);
+  }, [loadEmails, user, selectedFolder]);
 
   useEffect(() => {
     if (!user) return;
@@ -167,11 +153,16 @@ export default function EmailPage() {
     loadProviders();
   }, [loadProviders]);
 
+  const clearSelection = useCallback(() => {
+    setSelectedEmailIds(new Set());
+    setLastSelectedIndex(null);
+  }, []);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadEmails(), loadStats()]);
+    await Promise.all([loadEmails(selectedFolder, searchQuery), loadStats()]);
     setRefreshing(false);
-  }, [loadEmails, loadStats]);
+  }, [loadEmails, loadStats, selectedFolder, searchQuery]);
 
   const handleLogout = useCallback(() => {
     logout();
@@ -215,10 +206,6 @@ export default function EmailPage() {
           }
         }
 
-        setAiSessionId(null);
-        setAiMessages([]);
-        setAiInput('');
-
         if (typeof window !== 'undefined' && window.innerWidth < 1024) {
           setMobileDetailOpen(true);
         }
@@ -235,20 +222,27 @@ export default function EmailPage() {
   const handleSearch = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!searchQuery.trim()) return;
 
-      try {
-        setLoading(true);
-        const response = await emailApi.searchEmails(searchQuery);
-        setEmails(response.data.emails);
-      } catch (error) {
-        console.error('Failed to search emails:', error);
-        setEmails([]);
-      } finally {
-        setLoading(false);
+      // If search is cleared, reload current folder
+      if (!searchQuery.trim()) {
+        loadEmails(selectedFolder);
+        return;
       }
+
+      // Otherwise, search
+      loadEmails(selectedFolder, searchQuery);
     },
-    [searchQuery],
+    [searchQuery, loadEmails, selectedFolder],
+  );
+
+  const handleFolderChange = useCallback(
+    (folder: FolderType) => {
+      setSelectedFolder(folder);
+      setSearchQuery(''); // Clear search when changing folders
+      setSelectedEmail(null); // Clear selected email
+      clearSelection();
+    },
+    [clearSelection],
   );
 
   const handleToggleRead = useCallback(
@@ -330,59 +324,103 @@ export default function EmailPage() {
     return match ? match[1].trim() : from.split('@')[0];
   }, []);
 
-  const handleAiQuickAction = useCallback(
-    async (action: string) => {
-      if (!selectedEmail) return;
+  const handleEmailSelect = useCallback(
+    (email: Email, index: number, options: { checked: boolean; shiftKey: boolean }) => {
+      setSelectedEmailIds((prev) => {
+        const next = new Set(prev);
+        let newAnchor = lastSelectedIndex;
 
-      setAiLoading(true);
-      try {
-        const response = await aiApi.sendAgentMessage({
-          sessionId: aiSessionId ?? undefined,
-          message: action,
-          context: {
-            emailId: selectedEmail.id,
-          },
-        });
-
-        if (!aiSessionId) {
-          setAiSessionId(response.data.sessionId);
+        if (options.shiftKey && lastSelectedIndex !== null && options.checked) {
+          const start = Math.min(lastSelectedIndex, index);
+          const end = Math.max(lastSelectedIndex, index);
+          for (let i = start; i <= end; i += 1) {
+            const rangeEmail = emails[i];
+            if (rangeEmail) {
+              next.add(rangeEmail.id);
+            }
+          }
+          newAnchor = index;
+        } else if (options.checked) {
+          next.add(email.id);
+          newAnchor = index;
+        } else {
+          next.delete(email.id);
+          if (next.size === 0) {
+            newAnchor = null;
+          }
         }
 
-        setAiMessages(response.data.messages);
-      } catch (error) {
-        console.error('Failed to run AI quick action:', error);
-      } finally {
-        setAiLoading(false);
-      }
+        if (newAnchor !== lastSelectedIndex) {
+          setLastSelectedIndex(newAnchor);
+        }
+
+        return next;
+      });
     },
-    [aiSessionId, selectedEmail],
+    [emails, lastSelectedIndex],
   );
 
-  const handleAiSend = useCallback(async () => {
-    if (!aiInput.trim() || !selectedEmail) return;
-
-    setAiLoading(true);
-    try {
-      const response = await aiApi.sendAgentMessage({
-        sessionId: aiSessionId ?? undefined,
-        message: aiInput,
-        context: {
-          emailId: selectedEmail.id,
-        },
+  useEffect(() => {
+    setSelectedEmailIds((prev) => {
+      const allowed = new Set(emails.map((email) => email.id));
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (allowed.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
       });
-
-      if (!aiSessionId) {
-        setAiSessionId(response.data.sessionId);
+      if (!changed) {
+        return prev;
       }
+      if (next.size === 0) {
+        setLastSelectedIndex(null);
+      }
+      return next;
+    });
+  }, [emails]);
 
-      setAiMessages(response.data.messages);
-      setAiInput('');
+  const selectedIdsArray = useMemo(() => Array.from(selectedEmailIds), [selectedEmailIds]);
+  const hasSelection = selectedIdsArray.length > 0;
+
+  const handleSelectAllVisible = () => {
+    setSelectedEmailIds(new Set(emails.map((email) => email.id)));
+    setLastSelectedIndex(null);
+  };
+
+  const handleBulkMarkRead = async (isRead: boolean) => {
+    if (!selectedIdsArray.length) return;
+    setBulkActionLoading(true);
+    try {
+      await emailApi.bulkMarkRead(selectedIdsArray, isRead);
+      setEmails((prev) =>
+        prev.map((email) => (selectedIdsArray.includes(email.id) ? { ...email, isRead } : email)),
+      );
+      await loadStats();
+      clearSelection();
     } catch (error) {
-      console.error('Failed to send AI message:', error);
+      console.error('Bulk mark read failed', error);
     } finally {
-      setAiLoading(false);
+      setBulkActionLoading(false);
     }
-  }, [aiInput, aiSessionId, selectedEmail]);
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedIdsArray.length) return;
+    setBulkActionLoading(true);
+    try {
+      await Promise.all(selectedIdsArray.map((id) => emailApi.deleteEmail(id)));
+      setEmails((prev) => prev.filter((email) => !selectedIdsArray.includes(email.id)));
+      await loadStats();
+      clearSelection();
+    } catch (error) {
+      console.error('Bulk delete failed', error);
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
 
   const handleComposeOpenChange = useCallback((open: boolean) => {
     setIsComposeOpen(open);
@@ -499,205 +537,275 @@ export default function EmailPage() {
         setIsComposeOpen(false);
         setComposeOriginalEmail(null);
         setComposeMode('compose');
-        await Promise.all([loadEmails(), loadStats()]);
+        await Promise.all([loadEmails(selectedFolder), loadStats()]);
       } catch (error) {
         console.error('Failed to send email:', error);
         alert('Failed to send email. Please try again.');
       }
     },
-    [composeMode, composeOriginalEmail, fileToBase64, loadEmails, loadStats],
+    [composeMode, composeOriginalEmail, fileToBase64, loadEmails, loadStats, selectedFolder],
   );
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">
-        Loading your workspace...
-      </div>
+      <Box
+        sx={{
+          display: 'flex',
+          minHeight: '100vh',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'background.default',
+          color: 'text.primary',
+        }}
+      >
+        <Typography variant="body1">{common.loading}</Typography>
+      </Box>
     );
   }
 
   const layoutActions = (
-    <div className="hidden items-center gap-2 lg:flex">
+    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ display: { xs: 'none', lg: 'flex' } }}>
       <Button
         variant="outline"
         size="sm"
         onClick={handleRefresh}
         disabled={refreshing}
-        className="rounded-full border-white/10 bg-white/5 text-slate-200 hover:border-sky-400/40 hover:bg-sky-500/10 hover:text-sky-100"
+        startIcon={refreshing ? <CircularProgress size={16} /> : <RefreshCw size={16} />}
       >
-        <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-        {t.refresh}
+        {common.refresh}
       </Button>
-      <Button
-        size="sm"
-        className="rounded-full bg-gradient-to-r from-sky-500 to-sky-400 text-white shadow-lg shadow-sky-900/40 transition hover:from-sky-400 hover:to-sky-300 hover:shadow-sky-900/60"
-        onClick={openCompose}
-      >
-        <Plus className="mr-2 h-4 w-4" />
-        {t.compose}
+      <Button size="sm" onClick={openCompose} startIcon={<Plus size={16} />}>
+        {common.compose}
       </Button>
-      <Button
-        variant={showAiChat ? 'default' : 'outline'}
-        size="sm"
-        onClick={() => setShowAiChat((prev) => !prev)}
-        className={`rounded-full ${showAiChat ? 'bg-sky-500/20 text-sky-100 hover:bg-sky-500/30' : 'border-white/10 bg-white/5 text-slate-200 hover:border-sky-400/40 hover:bg-sky-500/10 hover:text-sky-100'}`}
-      >
-        <Sparkles className="mr-2 h-4 w-4" />
-        {t.toggleAi}
-      </Button>
-    </div>
+    </Stack>
   );
 
-  const description = stats ? t.description(stats.unread) : t.description(0);
+  const formatDescription = (count: number) =>
+    emailCopy.descriptionTemplate.replace('{count}', String(Math.max(0, count)));
+  const description = formatDescription(stats?.unread ?? 0);
+
+  // Get the folder display name
+  const getFolderDisplayName = (folder: FolderType): string => {
+    const folderNames: Record<FolderType, string> = {
+      ALL: 'All Mail',
+      INBOX: 'Inbox',
+      SENT: 'Sent',
+      DRAFTS: 'Drafts',
+      TRASH: 'Trash',
+      STARRED: 'Starred',
+    };
+    return folderNames[folder] || 'Inbox';
+  };
 
   return (
     <>
       <DashboardLayout
-        title={t.title}
+        title={getFolderDisplayName(selectedFolder)}
         description={description}
         actions={layoutActions}
         onLogout={handleLogout}
       >
-        <form
+        <Stack
+          component="form"
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
           onSubmit={handleSearch}
-          className="flex w-full max-w-xl items-center rounded-full border border-white/10 bg-white/5 px-4 py-2 shadow-lg shadow-slate-950/50 backdrop-blur"
         >
-          <input
+          <TextField
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.searchPlaceholder}
-            className="w-full bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+            placeholder={emailCopy.searchPlaceholder}
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search size={16} />
+                </InputAdornment>
+              ),
+            }}
           />
-          <Button
-            type="submit"
-            variant="ghost"
-            size="sm"
-            className="rounded-full border border-white/10 px-3 text-xs text-slate-300 hover:border-sky-400/40 hover:bg-sky-500/10 hover:text-sky-100"
-          >
-            Go
+          <Button type="submit" size="sm" variant="outline">
+            {common.search}
           </Button>
-        </form>
+        </Stack>
 
-        {!hasEmailProviders && (
-          <div className="rounded-3xl border border-dashed border-amber-400/40 bg-amber-500/10 px-4 py-4 text-sm text-amber-200 shadow-inner shadow-amber-500/10">
-            {t.noProviders}
-          </div>
+        {hasSelection && (
+          <Paper
+            elevation={0}
+            sx={{
+              mt: 2,
+              px: 2,
+              py: 1.5,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'divider',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 1,
+              alignItems: 'center',
+            }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {emailCopy.bulkBar.selected.replace('{count}', selectedIdsArray.length.toString())}
+            </Typography>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleBulkMarkRead(false)}
+              disabled={bulkActionLoading}
+              startIcon={<Mail size={16} />}
+            >
+              {emailCopy.bulkBar.markUnread}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleBulkMarkRead(true)}
+              disabled={bulkActionLoading}
+              startIcon={<MailOpen size={16} />}
+            >
+              {emailCopy.bulkBar.markRead}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={bulkActionLoading}
+              startIcon={<Trash2 size={16} />}
+            >
+              {emailCopy.bulkBar.delete}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleSelectAllVisible}>
+              {emailCopy.bulkBar.selectAll}
+            </Button>
+            <IconButton
+              size="small"
+              onClick={clearSelection}
+              disabled={bulkActionLoading}
+              sx={{ ml: 'auto' }}
+              aria-label={emailCopy.bulkBar.clear}
+            >
+              <X size={16} />
+            </IconButton>
+          </Paper>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
-          <EmailList
-            emails={emails}
-            selectedEmail={selectedEmail}
-            onEmailClick={handleEmailClick}
-            loading={loading}
-            t={{
-              ...t,
-              folders: { inbox: 'Inbox' },
-              loading: 'Loading emails...',
-              noEmails: 'No emails to display',
+        {!hasEmailProviders && (
+          <Box
+            sx={{
+              borderRadius: 3,
+              border: '1px dashed',
+              borderColor: 'warning.main',
+              bgcolor: 'warning.light',
+              color: 'warning.contrastText',
+              px: 3,
+              py: 2,
             }}
-            formatDate={formatDate}
-            extractDisplayName={extractDisplayName}
-          />
+          >
+            <Typography variant="body2">{emailCopy.noProviders}</Typography>
+          </Box>
+        )}
 
-          <EmailView
-            selectedEmail={selectedEmail}
-            showAiChat={showAiChat}
-            onToggleStar={handleToggleStar}
-            onToggleRead={handleToggleRead}
-            onDelete={handleDelete}
-            onReply={openReply}
-            onForward={openForward}
-            onClose={closeMobileDetail}
-            className="hidden lg:flex"
-            t={{
-              ...t,
-              folderLabel: 'Folder',
-              attachments: 'Attachments',
-              to: 'To',
-              cc: 'Cc',
-              labels: 'Labels',
-              date: 'Date',
-            }}
-            locale={locale}
-          />
-
-          {showAiChat && (
-            <AiAssistant
-              selectedEmail={selectedEmail}
-              onHide={() => setShowAiChat(false)}
-              t={{
-                ...t,
-                aiAssistant: 'Workspace AI',
-                hideAi: 'Hide',
-                aiQuickActions: 'Quick actions',
-                aiEmailContext: 'Email context',
-                aiPlaceholder: 'Select an email to unlock AI insights.',
-                aiInputPlaceholder: 'Ask MailAgent anything...',
-                aiSend: 'Send',
-                thinking: 'Thinking',
-              }}
-              locale={locale}
-              extractDisplayName={extractDisplayName}
-              aiMessages={aiMessages}
-              aiInput={aiInput}
-              aiLoading={aiLoading}
-              onAiInputChange={setAiInput}
-              onAiSend={handleAiSend}
-              onQuickAction={handleAiQuickAction}
+        <Grid container spacing={3} alignItems="flex-start">
+          <Grid item xs={12} sx={{ display: { xs: 'block', lg: 'none' } }}>
+            <FolderNavigation
+              selectedFolder={selectedFolder}
+              onFolderChange={handleFolderChange}
+              stats={stats}
             />
-          )}
-        </div>
+          </Grid>
+
+          <Grid item xs={12} lg={3} sx={{ display: { xs: 'none', lg: 'block' } }}>
+            <FolderNavigation
+              selectedFolder={selectedFolder}
+              onFolderChange={handleFolderChange}
+              stats={stats}
+            />
+          </Grid>
+
+          <Grid item xs={12} lg={4}>
+            <EmailList
+              emails={emails}
+              selectedEmail={selectedEmail}
+              onEmailClick={handleEmailClick}
+              loading={loading}
+              t={emailListCopy}
+              selectedEmailIds={selectedEmailIds}
+              onSelectEmail={handleEmailSelect}
+              formatDate={formatDate}
+              extractDisplayName={extractDisplayName}
+            />
+          </Grid>
+
+          <Grid item xs={12} lg={5} sx={{ display: { xs: 'none', lg: 'block' } }}>
+            <EmailView
+              selectedEmail={selectedEmail}
+              onToggleStar={handleToggleStar}
+              onToggleRead={handleToggleRead}
+              onDelete={handleDelete}
+              onReply={openReply}
+              onForward={openForward}
+              onClose={closeMobileDetail}
+              t={emailViewCopy}
+              locale={locale}
+            />
+          </Grid>
+        </Grid>
       </DashboardLayout>
 
-      <Dialog open={isComposeOpen} onOpenChange={handleComposeOpenChange}>
-        <DialogContent className="max-w-4xl bg-transparent border-none p-0 shadow-none">
-          <EmailComposer
-            key={`${composeMode}-${composeOriginalEmail?.id ?? 'new'}`}
-            mode={composeMode}
-            originalEmail={composeOriginalEmail ?? undefined}
-            onSend={handleComposerSend}
-            onClose={() => handleComposeOpenChange(false)}
-            providers={emailProviders}
-            defaultProviderId={composeOriginalEmail?.providerId ?? defaultProviderId ?? undefined}
-          />
-        </DialogContent>
-      </Dialog>
+      <EmailComposer
+        key={`${composeMode}-${composeOriginalEmail?.id ?? 'new'}`}
+        open={isComposeOpen}
+        mode={composeMode}
+        originalEmail={composeOriginalEmail ?? undefined}
+        onSend={handleComposerSend}
+        onClose={() => handleComposeOpenChange(false)}
+        providers={emailProviders}
+        defaultProviderId={composeOriginalEmail?.providerId ?? defaultProviderId ?? undefined}
+      />
 
-      <Dialog open={mobileDetailOpen && Boolean(selectedEmail)} onOpenChange={setMobileDetailOpen}>
-        <DialogContent className="max-w-3xl bg-transparent border-none p-0 shadow-none">
+      <Dialog
+        open={mobileDetailOpen && Boolean(selectedEmail)}
+        onOpenChange={setMobileDetailOpen}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogContent sx={{ p: 0 }}>
           <EmailView
             selectedEmail={selectedEmail}
-            showAiChat={false}
             onToggleStar={handleToggleStar}
             onToggleRead={handleToggleRead}
             onDelete={handleDelete}
             onReply={openReply}
             onForward={openForward}
             onClose={closeMobileDetail}
-            t={{
-              ...t,
-              folderLabel: 'Folder',
-              attachments: 'Attachments',
-              to: 'To',
-              cc: 'Cc',
-              labels: 'Labels',
-              date: 'Date',
-            }}
+            t={emailViewCopy}
             locale={locale}
           />
         </DialogContent>
       </Dialog>
 
       {hasEmailProviders && (
-        <Button
-          className="fixed bottom-24 right-6 h-14 w-14 rounded-full bg-gradient-to-br from-sky-500 to-sky-400 text-white shadow-xl shadow-slate-950/60 transition hover:scale-105 lg:hidden"
+        <Fab
+          color="primary"
           onClick={openCompose}
+          sx={{
+            position: 'fixed',
+            bottom: 96,
+            right: 24,
+            display: { xs: 'flex', lg: 'none' },
+          }}
+          aria-label={common.compose}
         >
-          <Plus className="h-5 w-5" />
-        </Button>
+          <Plus size={20} />
+        </Fab>
       )}
     </>
   );
 }
+
+// Force SSR to avoid NextRouter SSR errors
+export const getServerSideProps = async () => {
+  return { props: {} };
+};

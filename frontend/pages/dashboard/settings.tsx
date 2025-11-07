@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Settings2, ShieldAlert, UserCircle } from 'lucide-react';
+import { Box } from '@mui/material';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
@@ -80,7 +81,11 @@ export default function SettingsPage() {
     <Button
       variant="outline"
       size="sm"
-      className="rounded-full border-white/10 bg-white/5 text-slate-200 hover:border-sky-400/40 hover:bg-sky-500/10 hover:text-sky-100"
+      className="rounded-full"
+      style={{
+        borderColor: 'var(--mui-palette-divider)',
+        backgroundColor: 'var(--mui-palette-action-hover)',
+      }}
     >
       <Settings2 className="mr-2 h-4 w-4" />
       Preferences
@@ -107,59 +112,109 @@ export default function SettingsPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-12">
-        <Card className="lg:col-span-7 border-white/10 bg-white/5">
-          <CardHeader className="flex flex-col gap-2">
-            <div className="flex items-center gap-3 text-slate-300">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-300 shadow-inner shadow-sky-500/30">
+        <Card className="lg:col-span-7">
+          <CardHeader>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 3,
+                  bgcolor: 'primary.light',
+                  color: 'primary.contrastText',
+                }}
+              >
                 <UserCircle className="h-5 w-5" />
-              </span>
+              </Box>
               <div>
                 <CardTitle>Profile Settings</CardTitle>
                 <CardDescription>Keep your personal information up to date.</CardDescription>
               </div>
-            </div>
+            </Box>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleProfileUpdate} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-300">
+                <Box>
+                  <Box
+                    component="label"
+                    sx={{
+                      mb: 1,
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      color: 'text.primary',
+                    }}
+                  >
                     First Name
-                  </label>
+                  </Box>
                   <Input
                     type="text"
                     value={profile.firstName}
                     onChange={(e) =>
                       setProfile((prev) => ({ ...prev, firstName: e.target.value }))
                     }
-                    className="border-white/10 bg-white/5 text-slate-100"
+                    style={{
+                      borderColor: 'var(--mui-palette-divider)',
+                      backgroundColor: 'var(--mui-palette-background-paper)',
+                      color: 'var(--mui-palette-text-primary)',
+                    }}
                   />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-300">
+                </Box>
+                <Box>
+                  <Box
+                    component="label"
+                    sx={{
+                      mb: 1,
+                      display: 'block',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      color: 'text.primary',
+                    }}
+                  >
                     Last Name
-                  </label>
+                  </Box>
                   <Input
                     type="text"
                     value={profile.lastName}
                     onChange={(e) =>
                       setProfile((prev) => ({ ...prev, lastName: e.target.value }))
                     }
-                    className="border-white/10 bg-white/5 text-slate-100"
+                    style={{
+                      borderColor: 'var(--mui-palette-divider)',
+                      backgroundColor: 'var(--mui-palette-background-paper)',
+                      color: 'var(--mui-palette-text-primary)',
+                    }}
                   />
-                </div>
+                </Box>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">
+              <Box>
+                <Box
+                  component="label"
+                  sx={{
+                    mb: 1,
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    color: 'text.primary',
+                  }}
+                >
                   Email (read-only)
-                </label>
+                </Box>
                 <Input
                   type="email"
                   value={user.email}
                   disabled
-                  className="border-white/10 bg-white/5 text-slate-400"
+                  style={{
+                    borderColor: 'var(--mui-palette-divider)',
+                    backgroundColor: 'var(--mui-palette-action-disabledBackground)',
+                    color: 'var(--mui-palette-text-disabled)',
+                  }}
                 />
-              </div>
+              </Box>
               <Button type="submit" disabled={loading}>
                 {loading ? 'Saving...' : 'Save changes'}
               </Button>
@@ -168,7 +223,7 @@ export default function SettingsPage() {
         </Card>
 
         <div className="lg:col-span-5 space-y-6">
-          <Card className="border-white/10 bg-white/5">
+          <Card>
             <CardHeader>
               <CardTitle>Email & Calendar Providers</CardTitle>
               <CardDescription>
@@ -186,20 +241,33 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border border-rose-500/40 bg-rose-500/10 text-rose-100 shadow-2xl shadow-rose-900/30">
-            <CardHeader className="flex flex-row items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-100 shadow-inner shadow-rose-900/50">
-                <ShieldAlert className="h-5 w-5" />
-              </span>
-              <div>
-                <CardTitle className="text-rose-100">Danger Zone</CardTitle>
-                <CardDescription className="text-rose-100/70">
-                  Delete your account and all associated data permanently.
-                </CardDescription>
-              </div>
+          <Card className="border-red-500/40 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/30 shadow-lg shadow-red-900/20 dark:shadow-red-950/40">
+            <CardHeader>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 40,
+                    height: 40,
+                    borderRadius: 3,
+                    bgcolor: 'error.light',
+                    color: 'error.contrastText',
+                  }}
+                >
+                  <ShieldAlert className="h-5 w-5" />
+                </Box>
+                <div>
+                  <CardTitle className="text-red-700 dark:text-red-400">Danger Zone</CardTitle>
+                  <CardDescription className="text-red-600/70 dark:text-red-400/70">
+                    Delete your account and all associated data permanently.
+                  </CardDescription>
+                </div>
+              </Box>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-rose-100/80">
+              <p className="text-sm text-red-700 dark:text-red-400/80">
                 This action cannot be undone. Please make sure you have exported any important
                 information before proceeding.
               </p>
@@ -218,3 +286,8 @@ export default function SettingsPage() {
     </DashboardLayout>
   );
 }
+
+// Force SSR to avoid NextRouter SSR errors
+export const getServerSideProps = async () => {
+  return { props: {} };
+};

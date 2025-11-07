@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { Box, Container, Grid, Stack, Typography } from '@mui/material';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiClient } from '@/lib/api-client';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const translations = useTranslations();
+  const copy = translations.auth.register;
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -32,7 +36,7 @@ export default function RegisterPage() {
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError(translations.common.passwordMismatch);
       return;
     }
 
@@ -53,100 +57,108 @@ export default function RegisterPage() {
         });
       }
     } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'Registration failed');
+      const errorResponse = err as { response?: { data?: { message?: string } } };
+      setError(errorResponse.response?.data?.message || translations.common.genericError);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Create Account</CardTitle>
-          <CardDescription>Sign up with your email to get started.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        display: 'flex',
+        alignItems: 'center',
+        py: 6,
+      }}
+    >
+      <Container maxWidth="sm">
+        <Card>
+          <CardHeader>
+            <CardTitle>{copy.title}</CardTitle>
+            <CardDescription>{copy.subtitle}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <Alert variant="destructive" sx={{ mb: 3 }}>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">First Name</label>
-                <Input
-                  type="text"
-                  name="firstName"
-                  placeholder="John"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Last Name</label>
-                <Input
-                  type="text"
-                  name="lastName"
-                  placeholder="Doe"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
+            <Stack component="form" spacing={3} onSubmit={handleSubmit}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Input
+                    type="text"
+                    name="firstName"
+                    label={copy.form.firstNameLabel}
+                    placeholder="Alex"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Input
+                    type="text"
+                    name="lastName"
+                    label={copy.form.lastNameLabel}
+                    placeholder="Rossi"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                  />
+                </Grid>
+              </Grid>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
               <Input
                 type="email"
                 name="email"
-                placeholder="you@example.com"
+                label={copy.form.emailLabel}
+                placeholder={translations.common.emailPlaceholder}
                 value={formData.email}
                 onChange={handleChange}
                 required
               />
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
               <Input
                 type="password"
                 name="password"
-                placeholder="Create a strong password"
+                label={copy.form.passwordLabel}
+                placeholder={translations.common.passwordPlaceholder}
                 value={formData.password}
                 onChange={handleChange}
                 required
               />
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Confirm Password</label>
               <Input
                 type="password"
                 name="confirmPassword"
-                placeholder="Confirm your password"
+                label={copy.form.confirmPasswordLabel}
+                placeholder={translations.common.confirmPasswordPlaceholder}
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
               />
-            </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating account...' : 'Create Account'}
-            </Button>
-          </form>
+              <Button type="submit" disabled={loading} fullWidth>
+                {loading ? translations.common.loading : copy.form.submit}
+              </Button>
+            </Stack>
 
-          <p className="text-sm text-center mt-4">
-            Already have an account?{' '}
-            <Link href="/auth/login" className="text-blue-600 hover:underline">
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+            {copy.links?.primary && (
+              <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mt: 4 }}>
+                <Link href={copy.links.primary.href}>{copy.links.primary.label}</Link>
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+      </Container>
+    </Box>
   );
 }
+
+// Force SSR to avoid NextRouter SSR errors
+export const getServerSideProps = async () => {
+  return { props: {} };
+};

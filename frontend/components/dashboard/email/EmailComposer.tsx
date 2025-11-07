@@ -4,6 +4,30 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  IconButton,
+  Box,
+  Chip,
+  Stack,
+  Typography,
+  useMediaQuery,
+  useTheme,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Alert,
+  Divider,
+  ToggleButton,
+  ToggleButtonGroup,
+  CircularProgress,
+} from '@mui/material';
+import {
   Bold,
   Italic,
   List,
@@ -13,14 +37,12 @@ import {
   Save,
   X,
   Paperclip,
-  Loader2,
+  Check,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
 import type { ProviderConfig } from '@/lib/api/providers';
 
 export interface EmailComposerProps {
+  open: boolean;
   mode?: 'compose' | 'reply' | 'forward';
   originalEmail?: {
     id: string;
@@ -54,7 +76,20 @@ export interface EmailDraft {
   attachments?: File[];
 }
 
+/**
+ * Material Design 3 Email Composer
+ *
+ * UX Features:
+ * - Full-screen dialog on mobile
+ * - Clear validation states
+ * - Auto-save indicator
+ * - Loading states for all actions
+ * - Success/error feedback
+ * - Accessible keyboard shortcuts
+ * - Touch-friendly toolbar
+ */
 export function EmailComposer({
+  open,
   mode = 'compose',
   originalEmail,
   onSend,
@@ -65,6 +100,10 @@ export function EmailComposer({
   providers,
   defaultProviderId,
 }: EmailComposerProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // Form state
   const [providerId, setProviderId] = useState<string>(defaultProviderId ?? providers[0]?.id ?? '');
   const [to, setTo] = useState<string>(defaultTo.join(', '));
   const [cc, setCc] = useState<string>('');
@@ -73,22 +112,26 @@ export function EmailComposer({
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+
+  // Action states
   const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [error, setError] = useState<string>('');
+
   const canSaveDraft = Boolean(onSaveDraft);
   const hasProviders = providers.length > 0;
 
-  const buildProviderLabel = (provider: ProviderConfig) =>
-    `${provider.displayName ?? provider.email} (${provider.providerType})`;
-
+  // TipTap editor
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        link: false,
+      }),
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
-          class: 'text-sky-400 underline',
+          class: 'text-primary underline',
         },
       }),
       Placeholder.configure({
@@ -98,15 +141,16 @@ export function EmailComposer({
     content: '',
     editorProps: {
       attributes: {
-        class:
-          'prose prose-invert mx-auto max-w-2xl focus:outline-none min-h-[260px] px-4 py-3 text-[15px] leading-relaxed',
+        class: 'prose max-w-none focus:outline-none min-h-[200px] p-3 text-base',
+        style: 'font-family: inherit',
       },
     },
     immediatelyRender: false,
   });
 
+  // Initialize from original email
   useEffect(() => {
-    if (!editor || !originalEmail) return;
+    if (!editor || !originalEmail || !open) return;
 
     if (mode === 'reply') {
       setTo(originalEmail.from);
@@ -115,7 +159,7 @@ export function EmailComposer({
         : `Re: ${originalEmail.subject}`;
       setSubject(reSubject);
       const quotedText = originalEmail.bodyHtml || originalEmail.bodyText || '';
-      const quotedHtml = `<p><br></p><p>On ${new Date().toLocaleDateString()}, ${originalEmail.from} wrote:</p><blockquote>${quotedText}</blockquote>`;
+      const quotedHtml = `<p><br></p><p><em>On ${new Date().toLocaleDateString()}, ${originalEmail.from} wrote:</em></p><blockquote>${quotedText}</blockquote>`;
       editor.commands.setContent(quotedHtml);
     } else if (mode === 'forward') {
       const fwdSubject = originalEmail.subject.startsWith('Fwd:')
@@ -123,16 +167,18 @@ export function EmailComposer({
         : `Fwd: ${originalEmail.subject}`;
       setSubject(fwdSubject);
       const forwardedText = originalEmail.bodyHtml || originalEmail.bodyText || '';
-      const forwardedHtml = `<p><br></p><p>---------- Forwarded message ---------</p><p>From: ${originalEmail.from}</p><p>Subject: ${originalEmail.subject}</p><p><br></p>${forwardedText}`;
+      const forwardedHtml = `<p><br></p><hr><p><strong>Forwarded message</strong></p><p><strong>From:</strong> ${originalEmail.from}</p><p><strong>Subject:</strong> ${originalEmail.subject}</p><br>${forwardedText}`;
       editor.commands.setContent(forwardedHtml);
     }
-  }, [editor, mode, originalEmail]);
+  }, [editor, mode, originalEmail, open]);
 
+  // Auto-save draft every 30s
   const handleSaveDraft = useCallback(async () => {
     if (!editor || !onSaveDraft || !providerId) return;
     if (!to.trim() && !subject.trim() && editor.isEmpty) return;
 
     setSaving(true);
+    setError('');
     try {
       const draft: EmailDraft = {
         providerId,
@@ -149,63 +195,55 @@ export function EmailComposer({
 
       await onSaveDraft(draft);
       setLastSaved(new Date());
-    } catch (error) {
-      console.error('Failed to save draft:', error);
-      alert('Failed to save draft. Please try again.');
+    } catch (err) {
+      console.error('Failed to save draft:', err);
+      setError('Failed to save draft');
     } finally {
       setSaving(false);
     }
   }, [attachments, bcc, cc, editor, onSaveDraft, originalEmail, providerId, subject, to]);
 
   useEffect(() => {
-    if (!editor || !onSaveDraft) return;
+    if (!editor || !onSaveDraft || !open) return;
 
     const interval = setInterval(() => {
       handleSaveDraft();
-    }, 30000);
+    }, 30000); // Auto-save every 30s
 
     return () => clearInterval(interval);
-  }, [editor, onSaveDraft, handleSaveDraft]);
+  }, [editor, onSaveDraft, handleSaveDraft, open]);
 
-  useEffect(() => {
-    if (!providers || providers.length === 0) {
-      setProviderId('');
-      return;
-    }
-    setProviderId((current) => {
-      if (current) return current;
-      if (defaultProviderId && providers.some((p) => p.id === defaultProviderId)) {
-        return defaultProviderId;
-      }
-      return providers[0].id;
-    });
-  }, [providers, defaultProviderId]);
-
+  // Handle attachments
   const handleAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
-    setAttachments(Array.from(event.target.files));
+    const newFiles = Array.from(event.target.files);
+    setAttachments((prev) => [...prev, ...newFiles]);
   };
 
   const removeAttachment = (index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Send email
   const handleSend = async () => {
     if (!editor || !onSend) return;
+
+    // Validation
     if (!providerId) {
-      alert('Please select a from address');
+      setError('Please select a from address');
       return;
     }
     if (!to.trim()) {
-      alert('Please enter at least one recipient');
+      setError('Please enter at least one recipient');
       return;
     }
     if (!subject.trim()) {
-      alert('Please enter a subject');
+      setError('Please enter a subject');
       return;
     }
 
     setSending(true);
+    setError('');
     try {
       const draft: EmailDraft = {
         providerId,
@@ -222,260 +260,340 @@ export function EmailComposer({
 
       await onSend(draft);
 
+      // Reset form
       setTo('');
       setCc('');
       setBcc('');
       setSubject('');
       editor.commands.clearContent();
       setAttachments([]);
+      setError('');
 
       if (onClose) onClose();
-    } catch (error) {
-      console.error('Failed to send email:', error);
-      alert('Failed to send email. Please try again.');
+    } catch (err) {
+      console.error('Failed to send email:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send email. Please try again.';
+      setError(errorMessage);
     } finally {
       setSending(false);
     }
   };
 
+  // Toolbar actions
+  const toggleBold = () => editor?.chain().focus().toggleBold().run();
+  const toggleItalic = () => editor?.chain().focus().toggleItalic().run();
+  const toggleBulletList = () => editor?.chain().focus().toggleBulletList().run();
+  const toggleOrderedList = () => editor?.chain().focus().toggleOrderedList().run();
+  const setLink = () => {
+    const url = window.prompt('Enter URL');
+    if (url) {
+      editor?.chain().focus().setLink({ href: url }).run();
+    }
+  };
+
   if (!editor) return null;
 
+  const titleText =
+    mode === 'reply' ? 'Reply' : mode === 'forward' ? 'Forward' : 'New Message';
+
   return (
-    <Card className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-gradient-to-b from-slate-950/85 via-slate-950/70 to-slate-950/80 shadow-2xl shadow-slate-950/50 backdrop-blur">
-      <div className="space-y-4 p-5 md:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.32em] text-slate-400">
-              {mode === 'reply' ? 'Reply' : mode === 'forward' ? 'Forward' : 'Compose'}
-            </p>
-            <h3 className="text-xl font-semibold text-slate-100">
-              {mode === 'reply'
-                ? 'Reply to message'
-                : mode === 'forward'
-                ? 'Forward message'
-                : 'New message'}
-            </h3>
-          </div>
-          <div className="flex items-center gap-2">
-            {lastSaved && (
-              <span className="text-xs text-slate-400">Saved {lastSaved.toLocaleTimeString()}</span>
-            )}
-            {onClose && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-                className="rounded-full border border-white/10"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      fullScreen={isMobile}
+      PaperProps={{
+        sx: {
+          borderRadius: isMobile ? 0 : 2,
+          maxHeight: { xs: '100%', sm: '90vh' },
+        },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Box>
+          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.1em' }}>
+            {mode.toUpperCase()}
+          </Typography>
+          <Typography variant="h6" component="h2">
+            {titleText}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* Auto-save indicator */}
+          {lastSaved && !sending && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Check size={14} color={theme.palette.success.main} />
+              <Typography variant="caption" color="text.secondary">
+                Saved {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Typography>
+            </Box>
+          )}
+          {saving && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <CircularProgress size={14} />
+              <Typography variant="caption" color="text.secondary">
+                Saving...
+              </Typography>
+            </Box>
+          )}
+          <IconButton edge="end" onClick={onClose} aria-label="close">
+            <X size={20} />
+          </IconButton>
+        </Box>
+      </DialogTitle>
 
-        <div className="space-y-3">
-          <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-              From
-            </label>
-            <select
-              className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none disabled:opacity-60"
-              value={providerId}
-              onChange={(event) => setProviderId(event.target.value)}
-              disabled={!hasProviders}
-            >
-              {providers.map((provider) => (
-                <option key={provider.id} value={provider.id} className="bg-slate-900 text-slate-100">
-                  {buildProviderLabel(provider)}
-                </option>
-              ))}
-            </select>
-            {!hasProviders && (
-              <p className="text-xs text-red-400">
-                Connect an email provider before sending messages.
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <Input
-              placeholder="To"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="bg-transparent text-sm text-slate-100"
-            />
-            <div className="flex gap-2 text-xs text-slate-400">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowCc(!showCc)}
-                className="rounded-full border border-white/10 px-3 text-xs"
-              >
-                Cc
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowBcc(!showBcc)}
-                className="rounded-full border border-white/10 px-3 text-xs"
-              >
-                Bcc
-              </Button>
-            </div>
-
-            {showCc && (
-              <Input
-                placeholder="Cc"
-                value={cc}
-                onChange={(e) => setCc(e.target.value)}
-                className="bg-transparent text-sm text-slate-100"
-              />
-            )}
-
-            {showBcc && (
-              <Input
-                placeholder="Bcc"
-                value={bcc}
-                onChange={(e) => setBcc(e.target.value)}
-                className="bg-transparent text-sm text-slate-100"
-              />
-            )}
-
-            <Input
-              placeholder="Subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="bg-transparent text-sm text-slate-100"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-white/5 px-2 py-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleBold}
-            className={editor.isActive('bold') ? 'bg-white/10' : ''}
-          >
-            <Bold className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleItalic}
-            className={editor.isActive('italic') ? 'bg-white/10' : ''}
-          >
-            <Italic className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleBulletList}
-            className={editor.isActive('bulletList') ? 'bg-white/10' : ''}
-          >
-            <List className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleOrderedList}
-            className={editor.isActive('orderedList') ? 'bg-white/10' : ''}
-          >
-            <ListOrdered className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={setLink}
-            className={editor.isActive('link') ? 'bg-white/10' : ''}
-          >
-            <LinkIcon className="w-4 h-4" />
-          </Button>
-          <div className="flex-1" />
-          <label>
-            <Button variant="ghost" size="sm" asChild>
-              <span>
-                <Paperclip className="w-4 h-4" />
-              </span>
-            </Button>
-            <input type="file" multiple onChange={handleAttachment} className="hidden" />
-          </label>
-        </div>
-
-        <div className="custom-scroll rounded-2xl border border-white/10 bg-slate-950/60">
-          <EditorContent editor={editor} className="max-h-[50vh] overflow-y-auto" />
-        </div>
-
-        {attachments.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-sm text-slate-400">Attachments ({attachments.length})</p>
-            <div className="flex flex-wrap gap-2">
-              {attachments.map((file, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm text-slate-100"
-                >
-                  <Paperclip className="h-3 w-3" />
-                  <span className="truncate">{file.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(index)}
-                    className="text-red-400 transition hover:text-red-300"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div
-          className={`flex items-center pt-2 ${canSaveDraft ? 'justify-between' : 'justify-end'}`}
-        >
-          {canSaveDraft && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSaveDraft}
-              disabled={saving || sending || !providerId}
-              className="rounded-full px-4"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save draft
-                </>
-              )}
-            </Button>
+      <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
+        <Stack spacing={2}>
+          {/* Error alert */}
+          {error && (
+            <Alert severity="error" onClose={() => setError('')}>
+              {error}
+            </Alert>
           )}
 
-          <Button
-            variant="default"
-            size="sm"
-            onClick={handleSend}
-            disabled={sending || saving || !providerId || !hasProviders}
-            className="rounded-full px-5"
+          {/* Provider warning */}
+          {!hasProviders && (
+            <Alert severity="warning">
+              Connect an email provider before sending messages.
+            </Alert>
+          )}
+
+          {/* From */}
+          <FormControl fullWidth size="small">
+            <InputLabel id="from-label">From</InputLabel>
+            <Select
+              labelId="from-label"
+              value={providerId}
+              onChange={(e) => setProviderId(e.target.value)}
+              disabled={!hasProviders}
+              label="From"
+            >
+              {providers.map((provider) => (
+                <MenuItem key={provider.id} value={provider.id}>
+                  {provider.displayName ?? provider.email} ({provider.providerType})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* To */}
+          <TextField
+            label="To"
+            placeholder="recipient@example.com, ..."
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            fullWidth
+            size="small"
+            required
+            error={!to.trim() && error !== ''}
+          />
+
+          {/* Cc/Bcc toggle */}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              size="small"
+              variant={showCc ? 'contained' : 'outlined'}
+              onClick={() => setShowCc(!showCc)}
+            >
+              Cc
+            </Button>
+            <Button
+              size="small"
+              variant={showBcc ? 'contained' : 'outlined'}
+              onClick={() => setShowBcc(!showBcc)}
+            >
+              Bcc
+            </Button>
+          </Box>
+
+          {/* Cc */}
+          {showCc && (
+            <TextField
+              label="Cc"
+              placeholder="cc@example.com, ..."
+              value={cc}
+              onChange={(e) => setCc(e.target.value)}
+              fullWidth
+              size="small"
+            />
+          )}
+
+          {/* Bcc */}
+          {showBcc && (
+            <TextField
+              label="Bcc"
+              placeholder="bcc@example.com, ..."
+              value={bcc}
+              onChange={(e) => setBcc(e.target.value)}
+              fullWidth
+              size="small"
+            />
+          )}
+
+          {/* Subject */}
+          <TextField
+            label="Subject"
+            placeholder="Email subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            fullWidth
+            size="small"
+            required
+            error={!subject.trim() && error !== ''}
+          />
+
+          <Divider />
+
+          {/* Formatting toolbar */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              flexWrap: 'wrap',
+              p: 1,
+              bgcolor: 'background.default',
+              borderRadius: 1,
+            }}
           >
-            {sending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="mr-2 h-4 w-4" />
-                Send
-              </>
-            )}
+            <ToggleButtonGroup size="small" exclusive>
+              <ToggleButton
+                value="bold"
+                selected={editor.isActive('bold')}
+                onChange={toggleBold}
+                aria-label="bold"
+              >
+                <Bold size={18} />
+              </ToggleButton>
+              <ToggleButton
+                value="italic"
+                selected={editor.isActive('italic')}
+                onChange={toggleItalic}
+                aria-label="italic"
+              >
+                <Italic size={18} />
+              </ToggleButton>
+              <ToggleButton
+                value="bulletList"
+                selected={editor.isActive('bulletList')}
+                onChange={toggleBulletList}
+                aria-label="bullet list"
+              >
+                <List size={18} />
+              </ToggleButton>
+              <ToggleButton
+                value="orderedList"
+                selected={editor.isActive('orderedList')}
+                onChange={toggleOrderedList}
+                aria-label="ordered list"
+              >
+                <ListOrdered size={18} />
+              </ToggleButton>
+              <ToggleButton
+                value="link"
+                selected={editor.isActive('link')}
+                onChange={setLink}
+                aria-label="insert link"
+              >
+                <LinkIcon size={18} />
+              </ToggleButton>
+            </ToggleButtonGroup>
+
+            <Box sx={{ flex: 1 }} />
+
+            {/* Attach button */}
+            <label>
+              <IconButton component="span" size="small" aria-label="attach files">
+                <Paperclip size={18} />
+              </IconButton>
+              <input
+                type="file"
+                multiple
+                onChange={handleAttachment}
+                aria-label="file upload"
+                style={{ display: 'none' }}
+              />
+            </label>
+          </Box>
+
+          {/* Editor */}
+          <Box
+            sx={{
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+              minHeight: { xs: 200, sm: 300 },
+              maxHeight: { xs: 300, sm: 400 },
+              overflow: 'auto',
+              bgcolor: 'background.paper',
+            }}
+          >
+            <EditorContent editor={editor} />
+          </Box>
+
+          {/* Attachments */}
+          {attachments.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Attachments ({attachments.length})
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {attachments.map((file, index) => (
+                  <Chip
+                    key={index}
+                    label={file.name}
+                    icon={<Paperclip size={14} />}
+                    onDelete={() => removeAttachment(index)}
+                    size="small"
+                    variant="outlined"
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </Stack>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+        {/* Save draft button */}
+        {canSaveDraft && (
+          <Button
+            onClick={handleSaveDraft}
+            disabled={saving || sending || !providerId}
+            startIcon={saving ? <CircularProgress size={16} /> : <Save size={16} />}
+          >
+            {saving ? 'Saving...' : 'Save Draft'}
           </Button>
-        </div>
-      </div>
-    </Card>
+        )}
+
+        <Box sx={{ flex: 1 }} />
+
+        {/* Cancel/Send buttons */}
+        <Stack direction="row" spacing={1}>
+          <Button onClick={onClose} variant="outlined">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSend}
+            variant="contained"
+            disabled={sending || saving || !providerId || !hasProviders}
+            startIcon={sending ? <CircularProgress size={16} /> : <Send size={16} />}
+          >
+            {sending ? 'Sending...' : 'Send'}
+          </Button>
+        </Stack>
+      </DialogActions>
+    </Dialog>
   );
 }
+
+export default EmailComposer;

@@ -1,47 +1,65 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
+import { forwardRef } from 'react';
+import MuiAlert, { AlertProps as MuiAlertProps } from '@mui/material/Alert';
+import MuiAlertTitle from '@mui/material/AlertTitle';
+import Typography, { TypographyProps } from '@mui/material/Typography';
 
-const alertVariants = {
-  default: 'border-white/10 bg-white/5 text-slate-100 shadow-lg shadow-slate-950/30',
-  destructive:
-    'border-rose-500/60 bg-rose-500/10 text-rose-200 [&>svg]:text-rose-300 shadow-lg shadow-rose-900/30',
+type Variant = 'default' | 'destructive';
+
+const severityMap: Record<Variant, MuiAlertProps['severity']> = {
+  default: 'info',
+  destructive: 'error',
 };
 
-interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: keyof typeof alertVariants;
+export interface AlertProps extends Omit<MuiAlertProps, 'variant' | 'severity'> {
+  variant?: Variant;
 }
 
-const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  ({ className, variant = 'default', ...props }, ref) => (
-    <div
+export const Alert = forwardRef<HTMLDivElement, AlertProps>(
+  ({ variant = 'default', sx, ...props }, ref) => (
+    <MuiAlert
       ref={ref}
-      role="alert"
-      className={cn(
-        'relative w-full rounded-2xl border p-4 backdrop-blur',
-        alertVariants[variant],
-        className,
-      )}
+      severity={severityMap[variant]}
+      variant={variant === 'default' ? 'outlined' : 'filled'}
+      sx={[
+        {
+          borderRadius: 3,
+          alignItems: 'flex-start',
+          borderWidth: 1.5,
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
       {...props}
     />
   ),
 );
-
 Alert.displayName = 'Alert';
 
-const AlertTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h5 ref={ref} className={cn('mb-1 font-medium leading-none tracking-tight', className)} {...props} />
+export const AlertTitle = forwardRef<HTMLDivElement, TypographyProps<'h5'>>(
+  ({ children, ...props }, ref) => (
+    <MuiAlertTitle
+      ref={ref}
+      sx={{ fontWeight: 600, letterSpacing: '-0.01em' }}
+      {...props}
+    >
+      {children}
+    </MuiAlertTitle>
   ),
 );
-
 AlertTitle.displayName = 'AlertTitle';
 
-const AlertDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('text-sm text-slate-200 [&_p]:leading-relaxed', className)} {...props} />
+export const AlertDescription = forwardRef<HTMLParagraphElement, TypographyProps<'p'>>(
+  ({ children, ...props }, ref) => (
+    <Typography
+      ref={ref}
+      component="div"
+      variant="body2"
+      sx={{ mt: 0.5 }}
+      {...props}
+    >
+      {children}
+    </Typography>
   ),
 );
-
 AlertDescription.displayName = 'AlertDescription';
 
-export { Alert, AlertTitle, AlertDescription };
+export default Alert;

@@ -1,4 +1,4 @@
-import { createTheme, ThemeOptions, alpha } from '@mui/material/styles';
+import { createTheme, ThemeOptions } from '@mui/material/styles';
 
 /**
  * Material Design 3 Theme Configuration for MailAgent

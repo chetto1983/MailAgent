@@ -1,18 +1,41 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Paper,
+  Typography,
+  Box,
+  Avatar,
+  Chip,
+  IconButton,
+  Button,
+  Stack,
+} from '@mui/material';
 import {
   Mail,
   Star,
+  StarOff,
   Trash2,
   Reply,
   Forward,
   X,
+  MailOpen,
+  Paperclip,
 } from 'lucide-react';
 import type { Email } from '@/lib/api/email';
 
+interface EmailViewCopy {
+  selectEmail: string;
+  folderLabel: string;
+  attachments: string;
+  to: string;
+  cc: string;
+  labels: string;
+  date: string;
+  reply: string;
+  forward: string;
+}
+
 interface EmailViewProps {
   selectedEmail: Email | null;
-  showAiChat: boolean;
   onToggleStar: (email: Email) => void;
   onToggleRead: (email: Email) => void;
   onDelete: (email: Email) => void;
@@ -20,14 +43,23 @@ interface EmailViewProps {
   onForward: (email: Email) => void;
   onClose?: () => void;
   className?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
+  t: EmailViewCopy;
   locale: string;
 }
 
+/**
+ * Material Design 3 Email View Component
+ *
+ * Features:
+ * - Material elevation system
+ * - WCAG 2.1 AA compliant
+ * - Responsive layout
+ * - Action buttons with proper touch targets
+ * - Support for HTML and text emails
+ * - Attachments display
+ */
 export function EmailView({
   selectedEmail,
-  showAiChat,
   onToggleStar,
   onToggleRead,
   onDelete,
@@ -38,176 +70,384 @@ export function EmailView({
   t,
   locale,
 }: EmailViewProps) {
+  const [iframeHeight, setIframeHeight] = useState(600);
+
+  useEffect(() => {
+    setIframeHeight(600);
+  }, [selectedEmail?.id]);
+
+  const htmlDocument = useMemo(() => {
+    if (!selectedEmail?.bodyHtml) return '';
+    return `<!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <style>
+          body {
+            margin: 0;
+            padding: 16px;
+            font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+            background: #ffffff;
+            color: #111;
+          }
+          img, video, iframe {
+            max-width: 100%;
+            height: auto;
+          }
+          table {
+            width: 100% !important;
+          }
+        </style>
+      </head>
+      <body>${selectedEmail.bodyHtml}</body>
+    </html>`;
+  }, [selectedEmail?.bodyHtml]);
+
+  const handleIframeLoad = (event: React.SyntheticEvent<HTMLIFrameElement>) => {
+    const iframe = event.currentTarget;
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc?.body) {
+        const newHeight = doc.body.scrollHeight;
+        if (newHeight) {
+          setIframeHeight(Math.max(newHeight, 400));
+        }
+      }
+    } catch (error) {
+      console.warn('Unable to compute iframe height', error);
+    }
+  };
+
+  // Empty state
   if (!selectedEmail) {
     return (
-      <section
-        className={`${showAiChat ? 'lg:col-span-5' : 'lg:col-span-7'} col-span-full flex min-h-[340px] flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-white/10 bg-slate-950/65 p-6 text-center text-slate-400 shadow-inner shadow-slate-950/40 backdrop-blur ${className}`}
+      <Paper
+        elevation={1}
+        sx={{
+          borderRadius: 2,
+          p: 6,
+          minHeight: 340,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
+          border: '2px dashed',
+          borderColor: 'divider',
+          bgcolor: 'background.default',
+        }}
+        className={className}
       >
-        <Mail className="h-12 w-12 text-slate-500/70" />
-        <p className="max-w-sm text-sm leading-relaxed">{t.selectEmail}</p>
-      </section>
+        <Mail size={48} style={{ opacity: 0.3 }} />
+        <Typography
+          variant="body1"
+          color="text.secondary"
+          textAlign="center"
+          maxWidth="sm"
+        >
+          {t.selectEmail}
+        </Typography>
+      </Paper>
     );
   }
 
-  return (
-    <section
-      className={`${showAiChat ? 'lg:col-span-5' : 'lg:col-span-7'} col-span-full flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/80 shadow-2xl shadow-slate-950/50 backdrop-blur ${className}`}
-    >
-      <header className="border-b border-white/10 bg-slate-950/70 px-6 py-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-400">
-              {t.folderLabel}: {selectedEmail.folder}
-            </div>
-            <h2 className="text-2xl font-semibold leading-tight text-slate-50 md:text-[28px]">
-              {selectedEmail.subject || '(No subject)'}
-            </h2>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-              <span className="font-medium text-slate-100">{selectedEmail.from}</span>
-              <span className="text-slate-400">
-                {new Date(selectedEmail.receivedAt).toLocaleString(locale)}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onToggleStar(selectedEmail)}
-              className="rounded-full border border-white/10 text-amber-300 transition hover:border-amber-200 hover:bg-amber-500/10"
-            >
-              <Star
-                className={`h-4 w-4 ${selectedEmail.isStarred ? 'fill-amber-300 text-amber-300' : ''}`}
-              />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onToggleRead(selectedEmail)}
-              className="rounded-full border border-white/10 text-slate-300 transition hover:border-sky-300 hover:bg-sky-500/10 hover:text-sky-200"
-            >
-              <Mail className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onDelete(selectedEmail)}
-              className="rounded-full border border-white/10 text-red-300 transition hover:border-red-300 hover:bg-red-500/10 hover:text-red-200"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-            {onClose && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="rounded-full border border-white/10 text-slate-300 transition hover:border-slate-200 hover:bg-white/10 hover:text-slate-50 lg:hidden"
-                aria-label="Close message"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
+  const displayName = selectedEmail.from?.split('<')[0].trim() || selectedEmail.from;
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onReply(selectedEmail)}
-            className="rounded-full border-sky-400/40 bg-sky-500/10 text-sky-200 transition hover:bg-sky-500/20 hover:text-sky-100"
+  return (
+    <Paper
+      elevation={1}
+      sx={{
+        borderRadius: 2,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+      }}
+      className={className}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          p: { xs: 2, md: 3 },
+          borderBottom: 1,
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+        }}
+      >
+        {/* Folder label */}
+        <Chip
+          label={`${t.folderLabel}: ${selectedEmail.folder || 'Inbox'}`}
+          size="small"
+          variant="outlined"
+          sx={{ mb: 2, fontSize: '0.6875rem', letterSpacing: '0.1em' }}
+        />
+
+        {/* Title and meta */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 3 }}>
+          <Avatar
+            sx={{
+              bgcolor: 'primary.main',
+              width: { xs: 40, md: 48 },
+              height: { xs: 40, md: 48 },
+              fontSize: '1.25rem',
+            }}
           >
-            <Reply className="mr-2 h-4 w-4" />
+            {displayName[0]?.toUpperCase() || 'E'}
+          </Avatar>
+
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="h5"
+              component="h2"
+              gutterBottom
+              sx={{
+                fontSize: { xs: '1.25rem', md: '1.75rem' },
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {selectedEmail.subject || '(No subject)'}
+            </Typography>
+            <Typography variant="body2" color="text.primary" gutterBottom>
+              <strong>From:</strong> {displayName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {new Date(selectedEmail.receivedAt).toLocaleString(locale, {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })}
+            </Typography>
+          </Box>
+
+          {/* Action buttons */}
+          <Stack direction="row" spacing={0.5}>
+            <IconButton
+              size="small"
+              aria-label={selectedEmail.isStarred ? 'Unstar email' : 'Star email'}
+              onClick={() => onToggleStar(selectedEmail)}
+              sx={{
+                width: 40,
+                height: 40,
+                color: selectedEmail.isStarred ? 'warning.main' : 'text.secondary',
+              }}
+            >
+              {selectedEmail.isStarred ? (
+                <Star size={18} fill="currentColor" />
+              ) : (
+                <StarOff size={18} />
+              )}
+            </IconButton>
+
+            <IconButton
+              size="small"
+              aria-label={selectedEmail.isRead ? 'Mark as unread' : 'Mark as read'}
+              onClick={() => onToggleRead(selectedEmail)}
+              sx={{ width: 40, height: 40 }}
+            >
+              {selectedEmail.isRead ? <MailOpen size={18} /> : <Mail size={18} />}
+            </IconButton>
+
+            <IconButton
+              size="small"
+              aria-label="Delete email"
+              onClick={() => onDelete(selectedEmail)}
+              color="error"
+              sx={{ width: 40, height: 40 }}
+            >
+              <Trash2 size={18} />
+            </IconButton>
+
+            {onClose && (
+              <IconButton
+                size="small"
+                aria-label="Close email"
+                onClick={onClose}
+                sx={{ width: 40, height: 40, display: { md: 'none' } }}
+              >
+                <X size={18} />
+              </IconButton>
+            )}
+          </Stack>
+        </Box>
+
+        {/* Reply/Forward buttons */}
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button
+            variant="contained"
+            startIcon={<Reply />}
+            onClick={() => onReply(selectedEmail)}
+            size="small"
+          >
             {t.reply}
           </Button>
           <Button
-            variant="outline"
-            size="sm"
+            variant="outlined"
+            startIcon={<Forward />}
             onClick={() => onForward(selectedEmail)}
-            className="rounded-full border-white/10 bg-white/5 text-slate-200 transition hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-sky-100"
+            size="small"
           >
-            <Forward className="mr-2 h-4 w-4" />
             {t.forward}
           </Button>
-        </div>
-      </header>
+        </Stack>
+      </Box>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-5">
-          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/5 bg-white/5 px-4 py-2 text-xs text-slate-300 lg:text-sm">
+      {/* Email metadata (To, CC, Labels) */}
+      {(selectedEmail.to || selectedEmail.cc || selectedEmail.labels) && (
+        <Box
+          sx={{
+            px: { xs: 2, md: 3 },
+            py: 2,
+            bgcolor: 'background.default',
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
+        >
+          <Stack spacing={1}>
             {selectedEmail.to && selectedEmail.to.length > 0 && (
-              <span>
-                <span className="font-semibold text-slate-200">{t.to}:</span>{' '}
-                {selectedEmail.to.join(', ')}
-              </span>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{t.to}:</strong>{' '}
+                {Array.isArray(selectedEmail.to)
+                  ? selectedEmail.to.join(', ')
+                  : selectedEmail.to}
+              </Typography>
             )}
             {selectedEmail.cc && selectedEmail.cc.length > 0 && (
-              <span>
-                <span className="font-semibold text-slate-200">{t.cc}:</span>{' '}
-                {selectedEmail.cc.join(', ')}
-              </span>
+              <Typography variant="body2" color="text.secondary">
+                <strong>{t.cc}:</strong>{' '}
+                {Array.isArray(selectedEmail.cc)
+                  ? selectedEmail.cc.join(', ')
+                  : selectedEmail.cc}
+              </Typography>
             )}
             {selectedEmail.labels && selectedEmail.labels.length > 0 && (
-              <span className="flex flex-wrap items-center gap-1">
-                <span className="font-semibold text-slate-200">{t.labels}:</span>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>{t.labels}:</strong>
+                </Typography>
                 {selectedEmail.labels.map((label) => (
-                  <span
-                    key={label}
-                    className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-sky-200"
-                  >
-                    {label}
-                  </span>
+                  <Chip key={label} label={label} size="small" variant="outlined" />
                 ))}
-              </span>
+              </Box>
             )}
-          </div>
+          </Stack>
+        </Box>
+      )}
 
-          <article className="custom-scroll max-h-[58vh] overflow-y-auto rounded-2xl border border-white/5 bg-white/5 px-6 py-7 shadow-inner shadow-slate-950/40">
-            {selectedEmail.bodyHtml ? (
-              <div
-                // eslint-disable-next-line react/no-danger
-                dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
-                className="prose prose-invert mx-auto max-w-2xl text-[15px] leading-relaxed text-slate-100"
+      {/* Email body */}
+      <Box
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          p: { xs: 2, md: 3 },
+        }}
+      >
+        <Box sx={{ maxWidth: '48rem', mx: 'auto' }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 0,
+              bgcolor: 'background.default',
+              borderRadius: 2,
+              maxHeight: { md: '58vh' },
+              overflow: 'auto',
+            }}
+          >
+            {selectedEmail.bodyHtml && htmlDocument ? (
+              <iframe
+                title="email-body"
+                srcDoc={htmlDocument}
+                style={{
+                  border: 'none',
+                  width: '100%',
+                  height: iframeHeight,
+                }}
+                onLoad={handleIframeLoad}
+                sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-scripts"
               />
             ) : (
-              <pre className="mx-auto max-w-2xl whitespace-pre-wrap font-sans text-[15px] leading-relaxed text-slate-100">
+              <Typography
+                component="pre"
+                sx={{
+                  fontFamily: 'inherit',
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  fontSize: '15px',
+                  lineHeight: 1.7,
+                  m: 0,
+                  p: { xs: 2, md: 3 },
+                }}
+              >
                 {selectedEmail.bodyText}
-              </pre>
+              </Typography>
             )}
-          </article>
+          </Paper>
 
+          {/* Attachments */}
           {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-200">
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Paperclip size={16} />
                 {t.attachments} ({selectedEmail.attachments.length})
-              </h3>
-              <div className="grid gap-3 md:grid-cols-2">
+              </Typography>
+              <Stack spacing={1}>
                 {selectedEmail.attachments.map((attachment) => (
-                  <div
+                  <Paper
                     key={attachment.id}
-                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200"
+                    variant="outlined"
+                    sx={{
+                      p: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderRadius: 2,
+                    }}
                   >
-                    <span className="truncate">{attachment.filename}</span>
-                    <span className="text-xs text-slate-400">
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        mr: 2,
+                      }}
+                    >
+                      {attachment.filename}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
                       {Math.round(attachment.size / 1024)} KB
-                    </span>
-                  </div>
+                    </Typography>
+                  </Paper>
                 ))}
-              </div>
-            </div>
+              </Stack>
+            </Box>
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
 
-      <footer className="border-t border-white/10 bg-slate-950/65 px-6 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs text-slate-400 lg:text-sm">
-            <span className="font-semibold text-slate-200">{t.date}:</span>{' '}
-            {new Date(selectedEmail.sentAt || selectedEmail.receivedAt).toLocaleString(locale)}
-          </div>
-        </div>
-      </footer>
-    </section>
+      {/* Footer */}
+      <Box
+        sx={{
+          px: { xs: 2, md: 3 },
+          py: 2,
+          borderTop: 1,
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+        }}
+      >
+        <Typography variant="caption" color="text.secondary">
+          <strong>{t.date}:</strong>{' '}
+          {new Date(selectedEmail.sentAt || selectedEmail.receivedAt).toLocaleString(
+            locale,
+            {
+              dateStyle: 'full',
+              timeStyle: 'medium',
+            }
+          )}
+        </Typography>
+      </Box>
+    </Paper>
   );
 }
 

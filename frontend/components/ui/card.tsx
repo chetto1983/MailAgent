@@ -1,67 +1,105 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
+import { forwardRef } from 'react';
+import Paper, { PaperProps } from '@mui/material/Paper';
+import Box, { BoxProps } from '@mui/material/Box';
+import Typography, { TypographyProps } from '@mui/material/Typography';
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        'rounded-3xl border border-white/10 bg-white/5 text-slate-100 shadow-xl shadow-slate-950/40 backdrop-blur',
-        className,
-      )}
-      {...props}
-    />
-  ),
-);
-
+export const Card = forwardRef<HTMLDivElement, PaperProps>(({ sx, ...props }, ref) => (
+  <Paper
+    ref={ref}
+    elevation={1}
+    sx={{
+      borderRadius: 3,
+      border: '1px solid',
+      borderColor: 'divider',
+      bgcolor: 'background.paper',
+      overflow: 'hidden',
+      ...sx,
+    }}
+    {...props}
+  />
+));
 Card.displayName = 'Card';
 
-const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn('flex flex-col space-y-1.5 px-6 pt-6 pb-2 text-slate-200', className)}
-      {...props}
-    />
-  ),
-);
-
+export const CardHeader = forwardRef<HTMLDivElement, BoxProps>(({ sx, ...props }, ref) => (
+  <Box
+    ref={ref}
+    sx={{
+      px: { xs: 3, md: 4 },
+      pt: { xs: 3, md: 4 },
+      pb: 2,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 0.75,
+      ...sx,
+    }}
+    {...props}
+  />
+));
 CardHeader.displayName = 'CardHeader';
 
-const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h2
+export const CardTitle = forwardRef<HTMLHeadingElement, TypographyProps<'h2'>>(
+  ({ sx, variant = 'h6', ...props }, ref) => (
+    <Typography
       ref={ref}
-      className={cn('text-lg font-semibold leading-tight text-slate-100 md:text-xl', className)}
+      variant={variant}
+      component="h2"
+      sx={{
+        fontWeight: 600,
+        lineHeight: 1.3,
+        ...sx,
+      }}
       {...props}
     />
   ),
 );
-
 CardTitle.displayName = 'CardTitle';
 
-const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <p ref={ref} className={cn('text-sm text-slate-400', className)} {...props} />
+export const CardDescription = forwardRef<HTMLParagraphElement, TypographyProps<'p'>>(
+  ({ sx, variant = 'body2', ...props }, ref) => (
+    <Typography
+      ref={ref}
+      variant={variant}
+      component="p"
+      color="text.secondary"
+      sx={{ ...sx }}
+      {...props}
+    />
   ),
 );
-
 CardDescription.displayName = 'CardDescription';
 
-const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('px-6 pb-6 pt-0 text-slate-200', className)} {...props} />
-  ),
-);
-
+export const CardContent = forwardRef<HTMLDivElement, BoxProps>(({ sx, ...props }, ref) => (
+  <Box
+    ref={ref}
+    sx={{
+      px: { xs: 3, md: 4 },
+      pb: { xs: 3, md: 4 },
+      pt: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2,
+      ...sx,
+    }}
+    {...props}
+  />
+));
 CardContent.displayName = 'CardContent';
 
-const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex items-center p-6 pt-0', className)} {...props} />
-  ),
-);
-
+export const CardFooter = forwardRef<HTMLDivElement, BoxProps>(({ sx, ...props }, ref) => (
+  <Box
+    ref={ref}
+    sx={{
+      px: { xs: 3, md: 4 },
+      pb: { xs: 3, md: 4 },
+      pt: 0,
+      display: 'flex',
+      gap: 1,
+      alignItems: 'center',
+      ...sx,
+    }}
+    {...props}
+  />
+));
 CardFooter.displayName = 'CardFooter';
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
+export default Card;

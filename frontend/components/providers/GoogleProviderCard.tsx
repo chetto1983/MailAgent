@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Box, Stack, Typography } from '@mui/material';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -34,7 +35,13 @@ export function GoogleProviderCard({ onSuccess }: GoogleProviderCardProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-3 text-slate-100">
+        <CardTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+          }}
+        >
           <svg className="h-6 w-6" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
@@ -57,23 +64,41 @@ export function GoogleProviderCard({ onSuccess }: GoogleProviderCardProps) {
         </CardTitle>
         <CardDescription>Connect Gmail and Google Calendar</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}
+      >
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <div className="space-y-2 text-slate-300">
-          <p className="text-sm">
+        <Stack spacing={1.5}>
+          <Typography variant="body2" color="text.secondary">
             Connect your Google account to sync emails and calendar events.
-          </p>
-          <ul className="list-disc space-y-1 pl-5 text-sm">
+          </Typography>
+
+          <Box
+            component="ul"
+            sx={{
+              pl: 3,
+              m: 0,
+              listStyle: 'disc',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.5,
+              color: 'text.secondary',
+            }}
+          >
             <li>Read and send emails via Gmail</li>
             <li>Access Google Calendar events</li>
             <li>Sync contacts (optional)</li>
-          </ul>
-        </div>
+          </Box>
+        </Stack>
 
         <Button onClick={handleConnect} disabled={loading} className="w-full">
           {loading ? 'Connecting...' : 'Connect Google Account'}
