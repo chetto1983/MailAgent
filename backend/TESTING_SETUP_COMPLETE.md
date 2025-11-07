@@ -12,17 +12,20 @@ Jest + ts-jest è stato configurato e testato con successo per il backend MailAg
 
 | Metrica | Valore | Target | Status |
 |---------|--------|--------|--------|
-| **Test Suites** | 3 passed | - | ✅ |
-| **Tests** | 74 passed | - | ✅ |
+| **Test Suites** | 10 passed | - | ✅ |
+| **Tests** | 140 passed | - | ✅ |
 | **Statements Coverage** | 7.14% | 50%+ | 🟡 Doubled! |
 | **Branches Coverage** | 4.13% | 50%+ | 🟡 Progress |
 | **Functions Coverage** | 4.54% | 50%+ | 🟡 Progress |
 | **Lines Coverage** | 7.18% | 50%+ | 🟡 Doubled! |
 
-**Latest Update (7 Nov 2025 - 18:00)**:
+**Latest Update (7 Nov 2025 - 16:50)**:
 - ✅ AuthService tests completed (42 tests, 100% coverage)
-- 📈 Overall coverage doubled from 3.53% to 7.14%
-- 🎯 Test count: 32 → 74 tests (+131% increase)
+- 🧪 ChatSessionService tests added (9 tests covering FIFO cleanup, smart titles, deletes)
+- 🤖 AgentService tests added (3 tests covering API key guard, tool wiring, fallback messaging)
+- 🗂️ EmailRetentionService tests added (5 tests covering archiving, stats, cron helpers)
+- 🔌 ProviderConfigService tests added (5 tests covering Google/multi-channel integrations + IMAP diagnostics)
+- 📈 Overall coverage doubled from 3.53% to 7.14% (next refresh pending)
 
 ---
 
@@ -73,6 +76,27 @@ Jest + ts-jest è stato configurato e testato con successo per il backend MailAg
    - resetPassword() method (6 tests)
    - logout() method (3 tests)
    - Deprecated OAuth methods (2 tests)
+
+7. **`src/modules/ai/services/chat-session.service.spec.ts`** - 9 test per ChatSessionService ✅ (NEW!)
+   - listSessions/getSession scoping
+   - locale-aware createSession defaults + FIFO cleanup
+   - saveSessionMessages (Mistral title & fallback) + deleteSession
+
+8. **`src/modules/ai/services/agent.service.spec.ts`** - 3 test per AgentService ✅ (NEW!)
+   - API key guard
+   - Happy-path execution with tool formatting
+   - Default messaging when agent output is empty
+
+9. **`src/modules/email/services/email-retention.service.spec.ts`** - 5 test per EmailRetentionService ✅ (NEW!)
+   - archiveOldEmails (no matches + archival path)
+   - runManualRetention date math
+   - getRetentionStats aggregation
+   - runRetentionPolicy delegation
+
+10. **`src/modules/providers/services/provider-config.service.spec.ts`** - 5 test per ProviderConfigService ✅ (NEW!)
+    - connectGoogleProvider happy path + mismatch validation
+    - connectGenericProvider (connection checks + secret encryption)
+    - testImapConnection success / missing-provider guards
 
 ---
 
@@ -189,6 +213,36 @@ Jest + ts-jest è stato configurato e testato con successo per il backend MailAg
    - ✅ should encrypt/decrypt Google access token
    - ✅ should encrypt/decrypt Microsoft access token
    - ✅ should store encrypted credentials separately from IV (database pattern)
+
+### ChatSessionService (9 tests) ✅
+
+**Focus areas**:
+- lists/retrieves sessions with tenant+user scoping and guards empty ids.
+- enforces locale-specific default titles plus FIFO trimming on create.
+- saves messages with smart titles (Mistral + fallback) and throws when missing.
+- deletes sessions gracefully whether or not the record exists.
+
+### AgentService (3 tests) ✅
+
+**Focus areas**:
+- refuses to run when no API key is configured (config + env guard).
+- happy-path run persists Prisma messages, wires tools, and formats tool output.
+- falls back to the default assistant string when the agent output is empty.
+
+### EmailRetentionService (5 tests) ✅
+
+**Focus areas**:
+- `archiveOldEmails` success/no-op paths, including Prisma queries and bulk updates.
+- `runManualRetention` date math (retentionDays override) plus delegation to archiver.
+- `getRetentionStats` aggregation of four Prisma counts and derived MB estimate.
+- `runRetentionPolicy` cron helper delegating to the archiver with default window.
+
+### ProviderConfigService (5 tests) ✅
+
+**Focus areas**:
+- `connectGoogleProvider` encrypts tokens, handles mismatched OAuth emails, and sanitizes DB output.
+- `connectGenericProvider` exercises IMAP/SMTP/CalDAV/CardDAV connection tests and secret encryption.
+- `testImapConnection` verifies missing-provider guards plus decrypt + IMAP handshake parameters.
 
 ---
 
