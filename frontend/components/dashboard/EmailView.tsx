@@ -21,6 +21,9 @@ import {
   Paperclip,
 } from 'lucide-react';
 import type { Email } from '@/lib/api/email';
+import { EmailSummary } from '@/components/dashboard/ai/EmailSummary';
+import { SmartReply } from '@/components/dashboard/ai/SmartReply';
+import { LabelSuggestions } from '@/components/dashboard/ai/LabelSuggestions';
 
 interface EmailViewCopy {
   selectEmail: string;
@@ -32,6 +35,15 @@ interface EmailViewCopy {
   date: string;
   reply: string;
   forward: string;
+  summaryTitle: string;
+  summaryGenerate: string;
+  summaryRegenerate: string;
+  summaryEmpty: string;
+  smartRepliesTitle: string;
+  smartRepliesLoading: string;
+  smartRepliesEmpty: string;
+  labelTitle: string;
+  labelEmpty: string;
 }
 
 interface EmailViewProps {
@@ -41,6 +53,7 @@ interface EmailViewProps {
   onDelete: (email: Email) => void;
   onReply: (email: Email) => void;
   onForward: (email: Email) => void;
+  onSmartReplySelect: (text: string) => void;
   onClose?: () => void;
   className?: string;
   t: EmailViewCopy;
@@ -65,6 +78,7 @@ export function EmailView({
   onDelete,
   onReply,
   onForward,
+  onSmartReplySelect,
   onClose,
   className = '',
   t,
@@ -291,6 +305,39 @@ export function EmailView({
           </Button>
         </Stack>
       </Box>
+
+      {selectedEmail && (
+        <Stack spacing={2} sx={{ mb: 3 }}>
+          <EmailSummary
+            emailId={selectedEmail.id}
+            locale={locale}
+            t={{
+              summaryTitle: t.summaryTitle,
+              summaryGenerate: t.summaryGenerate,
+              summaryRegenerate: t.summaryRegenerate,
+              summaryEmpty: t.summaryEmpty,
+            }}
+          />
+          <SmartReply
+            emailId={selectedEmail.id}
+            locale={locale}
+            t={{
+              smartRepliesTitle: t.smartRepliesTitle,
+              smartRepliesLoading: t.smartRepliesLoading,
+              smartRepliesEmpty: t.smartRepliesEmpty,
+            }}
+            onSelect={onSmartReplySelect}
+          />
+          <LabelSuggestions
+            emailId={selectedEmail.id}
+            locale={locale}
+            t={{
+              labelTitle: t.labelTitle,
+              labelEmpty: t.labelEmpty,
+            }}
+          />
+        </Stack>
+      )}
 
       {/* Email metadata (To, CC, Labels) */}
       {(selectedEmail.to || selectedEmail.cc || selectedEmail.labels) && (

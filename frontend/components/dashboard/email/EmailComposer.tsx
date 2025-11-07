@@ -59,6 +59,7 @@ export interface EmailComposerProps {
   onClose?: () => void;
   defaultTo?: string[];
   defaultSubject?: string;
+  defaultBody?: string;
   providers: ProviderConfig[];
   defaultProviderId?: string;
 }
@@ -97,6 +98,7 @@ export function EmailComposer({
   onClose,
   defaultTo = [],
   defaultSubject = '',
+  defaultBody = '',
   providers,
   defaultProviderId,
 }: EmailComposerProps) {
@@ -122,6 +124,12 @@ export function EmailComposer({
   const canSaveDraft = Boolean(onSaveDraft);
   const hasProviders = providers.length > 0;
 
+  const formatPlainTextToHtml = (value: string) =>
+    value
+      .split(/\n+/)
+      .map((line) => (line.trim().length ? `<p>${line}</p>` : '<p><br></p>'))
+      .join('');
+
   // TipTap editor
   const editor = useEditor({
     extensions: [
@@ -138,7 +146,7 @@ export function EmailComposer({
         placeholder: 'Compose your message...',
       }),
     ],
-    content: '',
+    content: defaultBody || '',
     editorProps: {
       attributes: {
         class: 'prose max-w-none focus:outline-none min-h-[200px] p-3 text-base',
@@ -160,7 +168,11 @@ export function EmailComposer({
       setSubject(reSubject);
       const quotedText = originalEmail.bodyHtml || originalEmail.bodyText || '';
       const quotedHtml = `<p><br></p><p><em>On ${new Date().toLocaleDateString()}, ${originalEmail.from} wrote:</em></p><blockquote>${quotedText}</blockquote>`;
-      editor.commands.setContent(quotedHtml);
+      const suggestionBlock =
+        defaultBody && defaultBody.trim().length > 0
+          ? `${formatPlainTextToHtml(defaultBody)}<p><br></p>`
+          : '<p><br></p>';
+      editor.commands.setContent(`${suggestionBlock}${quotedHtml}`);
     } else if (mode === 'forward') {
       const fwdSubject = originalEmail.subject.startsWith('Fwd:')
         ? originalEmail.subject
@@ -168,9 +180,24 @@ export function EmailComposer({
       setSubject(fwdSubject);
       const forwardedText = originalEmail.bodyHtml || originalEmail.bodyText || '';
       const forwardedHtml = `<p><br></p><hr><p><strong>Forwarded message</strong></p><p><strong>From:</strong> ${originalEmail.from}</p><p><strong>Subject:</strong> ${originalEmail.subject}</p><br>${forwardedText}`;
-      editor.commands.setContent(forwardedHtml);
+      const suggestionBlock =
+        defaultBody && defaultBody.trim().length > 0
+          ? `${formatPlainTextToHtml(defaultBody)}<p><br></p>`
+          : '';
+      editor.commands.setContent(`${suggestionBlock}${forwardedHtml}`);
     }
-  }, [editor, mode, originalEmail, open]);
+  }, [defaultBody, editor, mode, originalEmail, open]);
+
+  useEffect(() => {
+    if (!editor || !open) return;
+    if (mode !== 'compose') return;
+
+    if (defaultBody && defaultBody.trim().length > 0) {
+      editor.commands.setContent(formatPlainTextToHtml(defaultBody));
+    } else if (!originalEmail) {
+      editor.commands.clearContent(true);
+    }
+  }, [defaultBody, editor, mode, open, originalEmail]);
 
   // Auto-save draft every 30s
   const handleSaveDraft = useCallback(async () => {

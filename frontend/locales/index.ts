@@ -138,6 +138,15 @@ export interface AppTranslations {
       selectEmail: string;
       reply: string;
       forward: string;
+      summaryTitle: string;
+      summaryGenerate: string;
+      summaryRegenerate: string;
+      summaryEmpty: string;
+      smartRepliesTitle: string;
+      smartRepliesLoading: string;
+      smartRepliesEmpty: string;
+      labelTitle: string;
+      labelEmpty: string;
     };
   };
 }
@@ -351,6 +360,15 @@ export const translations: Record<LocaleKey, AppTranslations> = {
         selectEmail: 'Select an email to preview the full thread.',
         reply: 'Reply',
         forward: 'Forward',
+        summaryTitle: 'AI summary',
+        summaryGenerate: 'Generate summary',
+        summaryRegenerate: 'Refresh summary',
+        summaryEmpty: 'Ask the Copilot to explain this conversation.',
+        smartRepliesTitle: 'Smart replies',
+        smartRepliesLoading: 'Fetching smart replies...',
+        smartRepliesEmpty: 'No smart replies available yet.',
+        labelTitle: 'Suggested labels',
+        labelEmpty: 'AI suggested labels will appear here.',
       },
     },
   },
@@ -566,6 +584,15 @@ export const translations: Record<LocaleKey, AppTranslations> = {
         selectEmail: 'Seleziona un’email per vedere l’intera conversazione.',
         reply: 'Rispondi',
         forward: 'Inoltra',
+        summaryTitle: 'Riassunto AI',
+        summaryGenerate: 'Genera riassunto',
+        summaryRegenerate: 'Rigenera riassunto',
+        summaryEmpty: 'Chiedi al Copilot di spiegare questa conversazione.',
+        smartRepliesTitle: 'Risposte suggerite',
+        smartRepliesLoading: 'Recupero delle risposte suggerite...',
+        smartRepliesEmpty: 'Nessuna risposta suggerita al momento.',
+        labelTitle: 'Etichette suggerite',
+        labelEmpty: 'Qui appariranno le etichette proposte dall’AI.',
       },
     },
   },

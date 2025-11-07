@@ -5,6 +5,7 @@ import { MistralService } from '../services/mistral.service';
 import { AgentService } from '../services/agent.service';
 import { AuthenticatedRequest } from '../../../common/types/request.types';
 import { ChatSessionService, StoredChatMessage } from '../services/chat-session.service';
+import { EmailInsightsService } from '../services/email-insights.service';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard, TenantGuard)
@@ -13,6 +14,7 @@ export class AiController {
     private readonly mistralService: MistralService,
     private readonly agentService: AgentService,
     private readonly chatSessionService: ChatSessionService,
+    private readonly emailInsightsService: EmailInsightsService,
   ) {}
 
   /**
@@ -188,6 +190,69 @@ export class AiController {
       messages: updatedMessages,
       response: result.output,
       steps: result.intermediateSteps ?? [],
+    };
+  }
+
+  /**
+   * POST /ai/summarize/:emailId - Generate AI summary for an email
+   */
+  @Post('summarize/:emailId')
+  async summarizeEmail(
+    @Request() req: AuthenticatedRequest,
+    @Param('emailId') emailId: string,
+    @Body() body?: { locale?: string },
+  ) {
+    const summary = await this.emailInsightsService.summarizeEmail(
+      req.user.tenantId,
+      emailId,
+      body?.locale,
+    );
+
+    return {
+      success: true,
+      summary,
+    };
+  }
+
+  /**
+   * POST /ai/smart-reply/:emailId - Generate smart reply suggestions
+   */
+  @Post('smart-reply/:emailId')
+  async smartReply(
+    @Request() req: AuthenticatedRequest,
+    @Param('emailId') emailId: string,
+    @Body() body?: { locale?: string },
+  ) {
+    const suggestions = await this.emailInsightsService.generateSmartReplies(
+      req.user.tenantId,
+      emailId,
+      body?.locale,
+    );
+
+    return {
+      success: true,
+      suggestions,
+    };
+  }
+
+  /**
+   * POST /ai/categorize/:emailId - Suggest labels for an email
+   */
+  @Post('categorize/:emailId')
+  async categorizeEmail(
+    @Request() req: AuthenticatedRequest,
+    @Param('emailId') emailId: string,
+    @Body() body?: { locale?: string },
+  ) {
+    const labels = await this.emailInsightsService.categorizeEmail(
+      req.user.tenantId,
+      emailId,
+      body?.locale,
+    );
+
+    return {
+      success: true,
+      labels,
     };
   }
 }

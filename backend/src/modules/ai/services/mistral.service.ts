@@ -70,6 +70,46 @@ export class MistralService {
     return this.createClient(apiKey);
   }
 
+  async completePrompt(options: {
+    systemPrompt?: string;
+    userPrompt: string;
+    temperature?: number;
+    maxTokens?: number;
+  }): Promise<string> {
+    const { systemPrompt, userPrompt, temperature = 0.4, maxTokens = 512 } = options;
+
+    try {
+      const client = await this.createMistralClient();
+      const messages: MistralChatMessage[] = [];
+
+      if (systemPrompt) {
+        messages.push({ role: 'system', content: systemPrompt });
+      }
+
+      messages.push({ role: 'user', content: userPrompt });
+
+      const completion = await client.chat.complete({
+        model: this.getModel(),
+        messages,
+        temperature,
+        maxTokens,
+      });
+
+      const text = this.extractAssistantContent(completion.choices?.[0]?.message).trim();
+
+      if (!text) {
+        throw new Error('Empty response from AI service');
+      }
+
+      return text;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Prompt completion failed: ${message}`, stack);
+      throw error;
+    }
+  }
+
   private createClient(apiKey: string): Mistral {
     return new Mistral({
       apiKey,

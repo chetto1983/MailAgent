@@ -8,6 +8,7 @@ import { KnowledgeBaseController } from './controllers/knowledge-base.controller
 import { EmailEmbeddingQueueService } from './services/email-embedding.queue';
 import { AgentService } from './services/agent.service';
 import { ChatSessionService } from './services/chat-session.service';
+import { EmailInsightsService } from './services/email-insights.service';
 
 @Module({
   imports: [PrismaModule],
@@ -18,6 +19,7 @@ import { ChatSessionService } from './services/chat-session.service';
     EmailEmbeddingQueueService,
     AgentService,
     ChatSessionService,
+    EmailInsightsService,
   ],
   controllers: [AiController, KnowledgeBaseController],
   exports: [
@@ -27,6 +29,7 @@ import { ChatSessionService } from './services/chat-session.service';
     EmailEmbeddingQueueService,
     AgentService,
     ChatSessionService,
+    EmailInsightsService,
   ],
 })
 export class AiModule {}

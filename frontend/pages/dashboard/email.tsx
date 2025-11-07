@@ -64,6 +64,7 @@ export default function EmailPage() {
   const [composeOriginalEmail, setComposeOriginalEmail] = useState<Email | null>(null);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<FolderType>('INBOX');
+  const [composerBodyPrefill, setComposerBodyPrefill] = useState('');
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -427,6 +428,7 @@ export default function EmailPage() {
     if (!open) {
       setComposeMode('compose');
       setComposeOriginalEmail(null);
+      setComposerBodyPrefill('');
     }
   }, []);
 
@@ -437,33 +439,44 @@ export default function EmailPage() {
     }
     setComposeMode('compose');
     setComposeOriginalEmail(null);
+    setComposerBodyPrefill('');
     setIsComposeOpen(true);
   }, [hasEmailProviders, router]);
 
   const openReply = useCallback(
-    (email: Email) => {
+    (email: Email, body?: string) => {
       if (!hasEmailProviders) {
         router.push('/dashboard/providers');
         return;
       }
       setComposeMode('reply');
       setComposeOriginalEmail(email);
+      setComposerBodyPrefill(body ?? '');
       setIsComposeOpen(true);
     },
     [hasEmailProviders, router],
   );
 
   const openForward = useCallback(
-    (email: Email) => {
+    (email: Email, body?: string) => {
       if (!hasEmailProviders) {
         router.push('/dashboard/providers');
         return;
       }
       setComposeMode('forward');
       setComposeOriginalEmail(email);
+      setComposerBodyPrefill(body ?? '');
       setIsComposeOpen(true);
     },
     [hasEmailProviders, router],
+  );
+
+  const handleSmartReplySelect = useCallback(
+    (text: string) => {
+      if (!selectedEmail) return;
+      openReply(selectedEmail, text);
+    },
+    [openReply, selectedEmail],
   );
 
   const fileToBase64 = useCallback(
@@ -746,6 +759,7 @@ export default function EmailPage() {
               onDelete={handleDelete}
               onReply={openReply}
               onForward={openForward}
+              onSmartReplySelect={handleSmartReplySelect}
               onClose={closeMobileDetail}
               t={emailViewCopy}
               locale={locale}
@@ -761,6 +775,7 @@ export default function EmailPage() {
         originalEmail={composeOriginalEmail ?? undefined}
         onSend={handleComposerSend}
         onClose={() => handleComposeOpenChange(false)}
+        defaultBody={composerBodyPrefill}
         providers={emailProviders}
         defaultProviderId={composeOriginalEmail?.providerId ?? defaultProviderId ?? undefined}
       />
@@ -779,6 +794,7 @@ export default function EmailPage() {
             onDelete={handleDelete}
             onReply={openReply}
             onForward={openForward}
+            onSmartReplySelect={handleSmartReplySelect}
             onClose={closeMobileDetail}
             t={emailViewCopy}
             locale={locale}

@@ -48,4 +48,22 @@ export const aiApi = {
       steps?: Array<{ tool: string; output: string }>;
     }>('/ai/agent', payload);
   },
+  summarizeEmail(emailId: string, locale?: string) {
+    return apiClient.post<{ success: boolean; summary: string }>(
+      `/ai/summarize/${emailId}`,
+      locale ? { locale } : undefined,
+    );
+  },
+  generateSmartReplies(emailId: string, locale?: string) {
+    return apiClient.post<{ success: boolean; suggestions: string[] }>(
+      `/ai/smart-reply/${emailId}`,
+      locale ? { locale } : undefined,
+    );
+  },
+  categorizeEmail(emailId: string, locale?: string) {
+    return apiClient.post<{ success: boolean; labels: string[] }>(
+      `/ai/categorize/${emailId}`,
+      locale ? { locale } : undefined,
+    );
+  },
 };
