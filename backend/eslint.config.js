@@ -38,6 +38,10 @@ module.exports = tseslint.config(
   {
     files: ['**/*.spec.ts', '**/*.test.ts'],
     languageOptions: {
+      parserOptions: {
+        project: './tsconfig.test.json',
+        tsconfigRootDir: __dirname,
+      },
       globals: {
         describe: 'readonly',
         it: 'readonly',

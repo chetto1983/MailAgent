@@ -83,7 +83,7 @@ export class EmailInsightsService {
         maxTokens: 500,
       });
 
-      const suggestions = this.parseJsonArray(raw, 'replies') ?? this.extractLines(raw);
+      const suggestions = parseArrayFromAiPayload(raw, 'replies') ?? this.extractLines(raw);
 
       if (!suggestions.length) {
         throw new Error('Empty smart replies');
@@ -118,7 +118,7 @@ export class EmailInsightsService {
         maxTokens: 300,
       });
 
-      let labels = this.parseJsonArray(raw, 'labels');
+      let labels = parseArrayFromAiPayload(raw, 'labels');
       if (!labels || labels.length === 0) {
         labels = this.guessLabelsFromText(raw);
       }
@@ -195,76 +195,9 @@ export class EmailInsightsService {
     return '(content unavailable)';
   }
 
-  private stripCodeFences(payload: string): string {
-    return payload.replace(/```json/gi, '').replace(/```/g, '').trim();
-  }
-
-  private tryParseArray(text: string, key: string): string[] | null {
-    try {
-      const parsed = JSON.parse(text);
-      const value = parsed?.[key];
-      if (Array.isArray(value)) {
-        return value
-          .map((item) => (typeof item === 'string' ? item.trim() : ''))
-          .filter(Boolean);
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  private extractFirstJsonObject(payload: string): string | null {
-    const stripped = this.stripCodeFences(payload);
-    let depth = 0;
-    let start = -1;
-    let inString = false;
-    let escape = false;
-
-    for (let i = 0; i < stripped.length; i += 1) {
-      const char = stripped[i];
-      if (inString) {
-        if (escape) {
-          escape = false;
-        } else if (char === '\\') {
-          escape = true;
-        } else if (char === '"') {
-          inString = false;
-        }
-        continue;
-      }
-      if (char === '"') {
-        inString = true;
-        continue;
-      }
-      if (char === '{') {
-        if (depth === 0) start = i;
-        depth += 1;
-      } else if (char === '}') {
-        depth -= 1;
-        if (depth === 0 && start >= 0) {
-          return stripped.slice(start, i + 1);
-        }
-      }
-    }
-    return null;
-  }
-
   private parseJsonArray(payload: string, key: string): string[] | null {
-    const stripped = this.stripCodeFences(payload);
-    const direct = this.tryParseArray(stripped, key);
-    if (direct?.length) {
-      return direct;
-    }
-
-    const jsonBlock = this.extractFirstJsonObject(stripped);
-    if (jsonBlock) {
-      const blockResult = this.tryParseArray(jsonBlock, key);
-      if (blockResult?.length) {
-        return blockResult;
-      }
-    }
-    return null;
+    const parsed = parseArrayFromAiPayload(payload, key);
+    return parsed.length ? parsed : null;
   }
 
   private extractLines(payload: string): string[] {
@@ -300,4 +233,10 @@ export class EmailInsightsService {
     return error instanceof Error ? error.message : String(error);
   }
 }
+
+
+
+
+
+
 
