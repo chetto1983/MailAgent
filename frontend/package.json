@@ -6,7 +6,7 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "lint": "next lint",
+    "lint": "eslint . --ext .ts,.tsx --report-unused-disable-directives --max-warnings=0",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -27,7 +27,7 @@
     "clsx": "^2.1.0",
     "jose": "^5.4.0",
     "lucide-react": "^0.408.0",
-    "next": "^14.2.0",
+    "next": "^16.0.1",
     "next-themes": "^0.3.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
@@ -42,8 +42,8 @@
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.0",
+    "eslint": "^9.11.1",
+    "eslint-config-next": "^16.0.1",
     "postcss": "^8.4.47",
     "typescript": "^5.7.0"
   }

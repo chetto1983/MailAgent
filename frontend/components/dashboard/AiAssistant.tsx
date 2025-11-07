@@ -14,11 +14,20 @@ import remarkGfm from 'remark-gfm';
 import type { Email } from '@/lib/api/email';
 import type { ChatMessage } from '@/lib/api/ai';
 
+interface AiAssistantCopy {
+  aiAssistant: string;
+  hideAi: string;
+  aiEmailContext: string;
+  aiPlaceholder: string;
+  thinking: string;
+  aiInputPlaceholder: string;
+  aiSend: string;
+}
+
 interface AiAssistantProps {
   selectedEmail: Email | null;
   onHide: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  t: any;
+  t: AiAssistantCopy;
   locale: string;
   extractDisplayName: (from: string) => string;
   aiMessages: ChatMessage[];
