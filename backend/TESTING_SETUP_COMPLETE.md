@@ -12,19 +12,22 @@ Jest + ts-jest è stato configurato e testato con successo per il backend MailAg
 
 | Metrica | Valore | Target | Status |
 |---------|--------|--------|--------|
-| **Test Suites** | 10 passed | - | ✅ |
-| **Tests** | 140 passed | - | ✅ |
+| **Test Suites** | 13 passed | - | ✅ |
+| **Tests** | 170 passed | - | ✅ |
 | **Statements Coverage** | 7.14% | 50%+ | 🟡 Doubled! |
 | **Branches Coverage** | 4.13% | 50%+ | 🟡 Progress |
 | **Functions Coverage** | 4.54% | 50%+ | 🟡 Progress |
 | **Lines Coverage** | 7.18% | 50%+ | 🟡 Doubled! |
 
-**Latest Update (7 Nov 2025 - 16:50)**:
+**Latest Update (7 Nov 2025 - 17:10)**:
 - ✅ AuthService tests completed (42 tests, 100% coverage)
 - 🧪 ChatSessionService tests added (9 tests covering FIFO cleanup, smart titles, deletes)
 - 🤖 AgentService tests added (3 tests covering API key guard, tool wiring, fallback messaging)
 - 🗂️ EmailRetentionService tests added (5 tests covering archiving, stats, cron helpers)
 - 🔌 ProviderConfigService tests added (5 tests covering Google/multi-channel integrations + IMAP diagnostics)
+- 🔁 SyncSchedulerService tests added (15 tests covering queue scheduling, priority logic, manual triggers)
+- 📦 QueueService tests added (7 tests covering enqueueing, queue controls, job cleanup, metrics)
+- ✉️ GoogleSyncService helper tests added (8 tests covering folder/status metadata logic)
 - 📈 Overall coverage doubled from 3.53% to 7.14% (next refresh pending)
 
 ---
@@ -97,6 +100,22 @@ Jest + ts-jest è stato configurato e testato con successo per il backend MailAg
     - connectGoogleProvider happy path + mismatch validation
     - connectGenericProvider (connection checks + secret encryption)
     - testImapConnection success / missing-provider guards
+
+11. **`src/modules/email-sync/services/sync-scheduler.service.spec.ts`** - 15 test per SyncSchedulerService ✅ (NEW!)
+    - scheduleSyncJobs concurrency + enqueue/no-op paths
+    - priority/sync-type derivation helpers
+    - manual trigger validation
+    - sync statistics aggregation
+
+12. **`src/modules/email-sync/services/queue.service.spec.ts`** - 7 test per QueueService ✅ (NEW!)
+    - addSyncJob / addBulkSyncJobs
+    - pause/resume/obliterate controls
+    - queue status snapshots + tenant cleanup
+    - metrics summary helpers
+
+13. **`src/modules/email-sync/services/google-sync.service.spec.ts`** - 8 test per GoogleSyncService ✅ (NEW!)
+    - Folder resolution across system/category labels
+    - Metadata merge/apply logic handles deleted/active transitions without redundant writes
 
 ---
 
@@ -243,6 +262,28 @@ Jest + ts-jest è stato configurato e testato con successo per il backend MailAg
 - `connectGoogleProvider` encrypts tokens, handles mismatched OAuth emails, and sanitizes DB output.
 - `connectGenericProvider` exercises IMAP/SMTP/CalDAV/CardDAV connection tests and secret encryption.
 - `testImapConnection` verifies missing-provider guards plus decrypt + IMAP handshake parameters.
+
+### SyncSchedulerService (15 tests) ✅
+
+**Focus areas**:
+- `scheduleSyncJobs` concurrency guard, provider selection, and enqueue/no-op flows.
+- `createSyncJobs`, `determinePriority`, and `determineSyncType` logic for multiple scenarios.
+- `syncProviderNow` validation for missing/inactive providers plus queue submission payloads.
+- `getSyncStats` aggregation of queue status and Prisma counts.
+
+### QueueService (7 tests) ✅
+
+**Focus areas**:
+- `addSyncJob` and `addBulkSyncJobs` route jobs to correct queues with generated job ids.
+- `pauseQueue`, `resumeQueue`, and `obliterateQueue` invoke BullMQ controls.
+- `getQueueStatus` aggregates counts per queue; `removeJobsForTenant` removes pending jobs.
+- Metrics helpers (`recordCompletion`/`recordFailure`) feed into `getQueueMetricsSummary`.
+
+### GoogleSyncService (8 tests) ✅
+
+**Focus areas**:
+- `determineFolderFromLabels` maps Gmail system/category labels to our canonical folders.
+- `mergeEmailStatusMetadata` + `applyStatusMetadata` correctly track deleted/active states without redundant DB writes.
 
 ---
 
