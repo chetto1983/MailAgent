@@ -8,6 +8,7 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "esModuleInterop": true,
+    "isolatedModules": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,

@@ -16,7 +16,7 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../modules/auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../modules/auth/guards/tenant.guard';
 import { AuthenticatedRequest } from '../../../common/types/request.types';
-import { KnowledgeBaseService } from '../services/knowledge-base.service';
+import { KnowledgeBaseService, type KnowledgeBaseSearchHit } from '../services/knowledge-base.service';
 import {
   BackfillEmailsDto,
   ListEmbeddingsQueryDto,
@@ -146,7 +146,7 @@ export class KnowledgeBaseController {
   async searchKnowledgeBase(
     @Request() req: AuthenticatedRequest,
     @Body() body: SearchKnowledgeBaseDto,
-  ) {
+  ): Promise<{ success: true; usedQuery: string; items: KnowledgeBaseSearchHit[] }> {
     const result = await this.knowledgeBaseService.searchKnowledgeBase({
       tenantId: req.user.tenantId,
       query: body.query,

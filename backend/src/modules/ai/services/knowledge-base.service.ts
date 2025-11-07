@@ -43,7 +43,7 @@ interface KnowledgeBaseSearchOptions {
   limit?: number;
 }
 
-interface KnowledgeBaseSearchHit {
+export interface KnowledgeBaseSearchHit {
   id: string;
   subject: string | null;
   snippet: string;

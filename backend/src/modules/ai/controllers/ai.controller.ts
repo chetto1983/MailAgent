@@ -6,7 +6,7 @@ import { AgentService } from '../services/agent.service';
 import { AuthenticatedRequest } from '../../../common/types/request.types';
 import { ChatSessionService, StoredChatMessage } from '../services/chat-session.service';
 import { EmailInsightsService } from '../services/email-insights.service';
-import { KnowledgeBaseService } from '../services/knowledge-base.service';
+import { KnowledgeBaseService, type KnowledgeBaseSearchHit } from '../services/knowledge-base.service';
 import { SearchKnowledgeBaseDto } from '../dto/knowledge-base.dto';
 
 @Controller('ai')
@@ -266,7 +266,7 @@ export class AiController {
   async searchMemory(
     @Request() req: AuthenticatedRequest,
     @Body() body: SearchKnowledgeBaseDto,
-  ) {
+  ): Promise<{ success: true; usedQuery: string; items: KnowledgeBaseSearchHit[] }> {
     const result = await this.knowledgeBaseService.searchKnowledgeBase({
       tenantId: req.user.tenantId,
       emailId: body.emailId,

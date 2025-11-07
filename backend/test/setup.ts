@@ -11,7 +11,7 @@ process.env.AES_SECRET_KEY = 'test-aes-256-secret-key-32chars!';
 process.env.DATABASE_URL = 'postgresql://testuser:testpass@localhost:5432/mailagent_test';
 process.env.REDIS_HOST = 'localhost';
 process.env.REDIS_PORT = '6379';
-process.env.MISTRAL_API_KEY = 'test-mistral-api-key';
+process.env.MISTRAL_API_KEY = '50yMLyTFFOyyqc1AqMLpE6Y5N4tT5GPW';
 
 // Increase timeout for integration tests
 jest.setTimeout(10000);

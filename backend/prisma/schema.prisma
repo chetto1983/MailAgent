@@ -232,6 +232,7 @@ model Email {
   attachments EmailAttachment[]
 
   @@unique([providerId, externalId]) // Prevent duplicates
+  @@unique([tenantId, messageId])
   @@index([tenantId, folder, receivedAt]) // List emails by folder
   @@index([tenantId, isRead]) // Unread emails
   @@index([tenantId, threadId]) // Thread grouping

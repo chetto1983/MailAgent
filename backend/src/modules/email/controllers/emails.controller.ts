@@ -1,22 +1,24 @@
 import {
-  Controller,
-  Get,
-  Patch,
-  Delete,
-  Post,
-  Param,
-  Query,
   Body,
-  UseGuards,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
   HttpCode,
   HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { EmailsService, EmailListFilters } from '../services/emails.service';
 import { EmailRetentionService } from '../services/email-retention.service';
 import { EmailFetchService } from '../services/email-fetch.service';
 import { EmailSendService } from '../services/email-send.service';
+import { EmailCleanupService } from '../services/email-cleanup.service';
 import {
   ReplyForwardEmailRequestDto,
   SendEmailRequestDto,
@@ -43,6 +45,7 @@ export class EmailsController {
     private retentionService: EmailRetentionService,
     private fetchService: EmailFetchService,
     private emailSendService: EmailSendService,
+    private cleanupService: EmailCleanupService,
   ) {}
 
   /**
@@ -102,12 +105,14 @@ export class EmailsController {
     @Query('limit') limit?: string,
   ) {
     const tenantId = req.user.tenantId;
-    return this.emailsService.searchEmails(
+    const emails = await this.emailsService.searchEmails(
       tenantId,
       query,
       providerId,
       limit ? parseInt(limit) : 20,
     );
+
+    return { emails };
   }
 
   /**
@@ -243,6 +248,18 @@ export class EmailsController {
   async fetchArchivedEmail(@Req() req: any, @Param('id') id: string) {
     const tenantId = req.user.tenantId;
     return this.fetchService.fetchArchivedEmail(id, tenantId);
+  }
+
+  /**
+   * POST /emails/maintenance/cleanup - Remove duplicates and purge deleted emails for current tenant
+   */
+  @Post('maintenance/cleanup')
+  async runTenantCleanup(@Req() req: any) {
+    if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+      throw new ForbiddenException('Administrator access required');
+    }
+
+    return this.cleanupService.runTenantMaintenance(req.user.tenantId);
   }
 
   /**

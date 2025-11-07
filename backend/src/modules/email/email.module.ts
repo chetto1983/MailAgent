@@ -5,12 +5,14 @@ import { EmailFetchService } from './services/email-fetch.service';
 import { EmailRetentionService } from './services/email-retention.service';
 import { EmailSendService } from './services/email-send.service';
 import { EmailSyncBackService } from './services/email-sync-back.service';
+import { EmailCleanupService } from './services/email-cleanup.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
+import { AiModule } from '../ai/ai.module';
 import { EmailsController } from './controllers/emails.controller';
 
 @Module({
-  imports: [PrismaModule, ProvidersModule],
+  imports: [PrismaModule, ProvidersModule, AiModule],
   providers: [
     EmailService,
     EmailsService,
@@ -18,6 +20,7 @@ import { EmailsController } from './controllers/emails.controller';
     EmailFetchService,
     EmailSendService,
     EmailSyncBackService,
+    EmailCleanupService,
   ],
   controllers: [EmailsController],
   exports: [
@@ -27,6 +30,7 @@ import { EmailsController } from './controllers/emails.controller';
     EmailFetchService,
     EmailSendService,
     EmailSyncBackService,
+    EmailCleanupService,
   ],
 })
 export class EmailModule {}

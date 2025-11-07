@@ -21,11 +21,6 @@ import {
   Paperclip,
 } from 'lucide-react';
 import type { Email } from '@/lib/api/email';
-import { EmailSummary } from '@/components/dashboard/ai/EmailSummary';
-import { MemorySearch } from '@/components/dashboard/ai/MemorySearch';
-import { SmartReply } from '@/components/dashboard/ai/SmartReply';
-import { LabelSuggestions } from '@/components/dashboard/ai/LabelSuggestions';
-
 interface EmailViewCopy {
   selectEmail: string;
   folderLabel: string;
@@ -77,7 +72,6 @@ interface EmailViewProps {
   onDelete: (email: Email) => void;
   onReply: (email: Email) => void;
   onForward: (email: Email) => void;
-  onSmartReplySelect: (text: string) => void;
   onClose?: () => void;
   className?: string;
   t: EmailViewCopy;
@@ -102,7 +96,6 @@ export function EmailView({
   onDelete,
   onReply,
   onForward,
-  onSmartReplySelect,
   onClose,
   className = '',
   t,
@@ -331,206 +324,128 @@ export function EmailView({
       </Box>
 
       {selectedEmail && (
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: { xs: 'column', lg: 'row' },
-            gap: { xs: 2, lg: 3 },
-            alignItems: 'stretch',
-            px: { xs: 2, md: 3 },
-            py: 3,
-          }}
-        >
-          <Stack
-            spacing={2}
-            sx={{
-              width: { lg: '22rem' },
-              flexShrink: 0,
-            }}
-          >
-            <EmailSummary
-              emailId={selectedEmail.id}
-              locale={locale}
-              t={{
-                summaryTitle: t.summaryTitle,
-                summaryGenerate: t.summaryGenerate,
-                summaryRegenerate: t.summaryRegenerate,
-                summaryEmpty: t.summaryEmpty,
-              }}
-            />
-            <MemorySearch
-              emailId={selectedEmail.id}
-              locale={locale}
-              onSelectSnippet={onSmartReplySelect}
-              t={{
-                memoryTitle: t.memoryTitle,
-                memoryDescription: t.memoryDescription,
-                memoryPlaceholder: t.memoryPlaceholder,
-                memoryGenerate: t.memoryGenerate,
-                memoryRegenerate: t.memoryRegenerate,
-                memoryLoading: t.memoryLoading,
-                memoryEmpty: t.memoryEmpty,
-                memoryCopy: t.memoryCopy,
-                memoryCopied: t.memoryCopied,
-                memoryUse: t.memoryUse,
-                memoryQueryRequired: t.memoryQueryRequired,
-                memorySourceEmail: t.memorySourceEmail,
-                memorySourceDocument: t.memorySourceDocument,
-                memoryConfidenceLabel: t.memoryConfidenceLabel,
-                memoryConfidenceHigh: t.memoryConfidenceHigh,
-                memoryConfidenceMedium: t.memoryConfidenceMedium,
-                memoryConfidenceLow: t.memoryConfidenceLow,
-                memoryUnknownSender: t.memoryUnknownSender,
-                memoryLastQueryPrefix: t.memoryLastQueryPrefix,
-                memoryCopyError: t.memoryCopyError,
-                memoryError: t.memoryError,
-              }}
-            />
-            <SmartReply
-              emailId={selectedEmail.id}
-              locale={locale}
-              t={{
-                smartRepliesTitle: t.smartRepliesTitle,
-                smartRepliesGenerate: t.smartRepliesGenerate,
-                smartRepliesRegenerate: t.smartRepliesRegenerate,
-                smartRepliesLoading: t.smartRepliesLoading,
-                smartRepliesEmpty: t.smartRepliesEmpty,
-              }}
-              onSelect={onSmartReplySelect}
-            />
-            <LabelSuggestions
-              emailId={selectedEmail.id}
-              locale={locale}
-              t={{
-                labelTitle: t.labelTitle,
-                labelEmpty: t.labelEmpty,
-              }}
-            />
-          </Stack>
-
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            {(selectedEmail.to || selectedEmail.cc || selectedEmail.labels) && (
-              <Box
-                sx={{
-                  mb: 2,
-                  bgcolor: 'background.default',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  p: 2,
-                }}
-              >
-                <Stack spacing={1}>
-                  {selectedEmail.to && selectedEmail.to.length > 0 && (
-                    <Typography variant="body2" color="text.secondary">
-                      <strong>{t.to}:</strong>{' '}
-                      {Array.isArray(selectedEmail.to)
-                        ? selectedEmail.to.join(', ')
-                        : selectedEmail.to}
-                    </Typography>
-                  )}
-                  {selectedEmail.cc && selectedEmail.cc.length > 0 && (
-                    <Typography variant="body2" color="text.secondary">
-                      <strong>{t.cc}:</strong>{' '}
-                      {Array.isArray(selectedEmail.cc)
-                        ? selectedEmail.cc.join(', ')
-                        : selectedEmail.cc}
-                    </Typography>
-                  )}
-                  {selectedEmail.labels && selectedEmail.labels.length > 0 && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>{t.labels}:</strong>
-                      </Typography>
-                      {selectedEmail.labels.map((label) => (
-                        <Chip key={label} label={label} size="small" variant="outlined" />
-                      ))}
-                    </Box>
-                  )}
-                </Stack>
-              </Box>
-            )}
-
-            <Paper
-              elevation={0}
+        <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
+          {(selectedEmail.to || selectedEmail.cc || selectedEmail.labels) && (
+            <Box
               sx={{
-                p: 0,
                 bgcolor: 'background.default',
+                border: '1px solid',
+                borderColor: 'divider',
                 borderRadius: 2,
-                maxHeight: { md: '58vh' },
-                overflow: 'auto',
+                p: 2,
+                mb: 2,
               }}
             >
-              {selectedEmail.bodyHtml && htmlDocument ? (
-                <iframe
-                  title="email-body"
-                  srcDoc={htmlDocument}
-                  style={{
-                    border: 'none',
-                    width: '100%',
-                    height: iframeHeight,
-                  }}
-                  onLoad={handleIframeLoad}
-                  sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-scripts"
-                />
-              ) : (
-                <Typography
-                  component="pre"
-                  sx={{
-                    fontFamily: 'inherit',
-                    whiteSpace: 'pre-wrap',
-                    wordWrap: 'break-word',
-                    fontSize: '15px',
-                    lineHeight: 1.7,
-                    m: 0,
-                    p: { xs: 2, md: 3 },
-                  }}
-                >
-                  {selectedEmail.bodyText}
-                </Typography>
-              )}
-            </Paper>
+              <Stack spacing={1}>
+                {selectedEmail.to && selectedEmail.to.length > 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>{t.to}:</strong>{' '}
+                    {Array.isArray(selectedEmail.to)
+                      ? selectedEmail.to.join(', ')
+                      : selectedEmail.to}
+                  </Typography>
+                )}
+                {selectedEmail.cc && selectedEmail.cc.length > 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>{t.cc}:</strong>{' '}
+                    {Array.isArray(selectedEmail.cc)
+                      ? selectedEmail.cc.join(', ')
+                      : selectedEmail.cc}
+                  </Typography>
+                )}
+                {selectedEmail.labels && selectedEmail.labels.length > 0 && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      <strong>{t.labels}:</strong>
+                    </Typography>
+                    {selectedEmail.labels.map((label) => (
+                      <Chip key={label} label={label} size="small" variant="outlined" />
+                    ))}
+                  </Box>
+                )}
+              </Stack>
+            </Box>
+          )}
 
-            {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Paperclip size={16} />
-                  {t.attachments} ({selectedEmail.attachments.length})
-                </Typography>
-                <Stack spacing={1}>
-                  {selectedEmail.attachments.map((attachment) => (
-                    <Paper
-                      key={attachment.id}
-                      variant="outlined"
+          <Paper
+            elevation={0}
+            sx={{
+              p: 0,
+              bgcolor: 'background.default',
+              borderRadius: 2,
+              maxHeight: { md: '58vh' },
+              overflow: 'auto',
+            }}
+          >
+            {selectedEmail.bodyHtml && htmlDocument ? (
+              <iframe
+                title="email-body"
+                srcDoc={htmlDocument}
+                style={{
+                  border: 'none',
+                  width: '100%',
+                  height: iframeHeight,
+                }}
+                onLoad={handleIframeLoad}
+                sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-scripts"
+              />
+            ) : (
+              <Typography
+                component="pre"
+                sx={{
+                  fontFamily: 'inherit',
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  fontSize: '15px',
+                  lineHeight: 1.7,
+                  m: 0,
+                  p: { xs: 2, md: 3 },
+                }}
+              >
+                {selectedEmail.bodyText}
+              </Typography>
+            )}
+          </Paper>
+
+          {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Paperclip size={16} />
+                {t.attachments} ({selectedEmail.attachments.length})
+              </Typography>
+              <Stack spacing={1}>
+                {selectedEmail.attachments.map((attachment) => (
+                  <Paper
+                    key={attachment.id}
+                    variant="outlined"
+                    sx={{
+                      p: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderRadius: 2,
+                    }}
+                  >
+                    <Typography
+                      variant="body2"
                       sx={{
-                        p: 1.5,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        borderRadius: 2,
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        mr: 2,
                       }}
                     >
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          flex: 1,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          mr: 2,
-                        }}
-                      >
-                        {attachment.filename}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {Math.round(attachment.size / 1024)} KB
-                      </Typography>
-                    </Paper>
-                  ))}
-                </Stack>
-              </Box>
-            )}
-          </Box>
+                      {attachment.filename}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {Math.round(attachment.size / 1024)} KB
+                    </Typography>
+                  </Paper>
+                ))}
+              </Stack>
+            </Box>
+          )}
         </Box>
       )}
 

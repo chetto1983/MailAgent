@@ -5,15 +5,7 @@ import React, {
   useCallback,
 } from 'react';
 import { useRouter } from 'next/router';
-import {
-  RefreshCw,
-  Plus,
-  Search,
-  Mail,
-  MailOpen,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { RefreshCw, Plus, Search, Mail, MailOpen, Trash2, X } from 'lucide-react';
 import {
   Box,
   Grid,
@@ -34,6 +26,9 @@ import { useLocale } from '@/lib/hooks/use-locale';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { EmailList } from '@/components/dashboard/EmailList';
 import { EmailView } from '@/components/dashboard/EmailView';
+import { EmailSummary } from '@/components/dashboard/ai/EmailSummary';
+import { SmartReply } from '@/components/dashboard/ai/SmartReply';
+import { LabelSuggestions } from '@/components/dashboard/ai/LabelSuggestions';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { EmailComposer, type EmailDraft } from '@/components/dashboard/email/EmailComposer';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
@@ -479,6 +474,60 @@ export default function EmailPage() {
     [openReply, selectedEmail],
   );
 
+  const renderAssistantPanel = useCallback(() => {
+    if (!selectedEmail) {
+      return (
+        <Paper
+          variant="outlined"
+          sx={{
+            mt: 3,
+            borderRadius: 2,
+            p: 2,
+            color: 'text.secondary',
+            fontSize: 14,
+          }}
+        >
+          {emailViewCopy.selectEmail}
+        </Paper>
+      );
+    }
+
+    return (
+      <Stack spacing={2} sx={{ mt: 3 }}>
+        <EmailSummary
+          emailId={selectedEmail.id}
+          locale={locale}
+          t={{
+            summaryTitle: emailViewCopy.summaryTitle,
+            summaryGenerate: emailViewCopy.summaryGenerate,
+            summaryRegenerate: emailViewCopy.summaryRegenerate,
+            summaryEmpty: emailViewCopy.summaryEmpty,
+          }}
+        />
+        <SmartReply
+          emailId={selectedEmail.id}
+          locale={locale}
+          t={{
+            smartRepliesTitle: emailViewCopy.smartRepliesTitle,
+            smartRepliesGenerate: emailViewCopy.smartRepliesGenerate,
+            smartRepliesRegenerate: emailViewCopy.smartRepliesRegenerate,
+            smartRepliesLoading: emailViewCopy.smartRepliesLoading,
+            smartRepliesEmpty: emailViewCopy.smartRepliesEmpty,
+          }}
+          onSelect={handleSmartReplySelect}
+        />
+        <LabelSuggestions
+          emailId={selectedEmail.id}
+          locale={locale}
+          t={{
+            labelTitle: emailViewCopy.labelTitle,
+            labelEmpty: emailViewCopy.labelEmpty,
+          }}
+        />
+      </Stack>
+    );
+  }, [selectedEmail, locale, emailViewCopy, handleSmartReplySelect]);
+
   const fileToBase64 = useCallback(
     (file: File) =>
       new Promise<string>((resolve, reject) => {
@@ -721,21 +770,23 @@ export default function EmailPage() {
         )}
 
         <Grid container spacing={3} alignItems="flex-start">
-          <Grid item xs={12} sx={{ display: { xs: 'block', lg: 'none' } }}>
-            <FolderNavigation
-              selectedFolder={selectedFolder}
-              onFolderChange={handleFolderChange}
-              stats={stats}
-            />
-          </Grid>
+        <Grid item xs={12} sx={{ display: { xs: 'block', lg: 'none' } }}>
+          <FolderNavigation
+            selectedFolder={selectedFolder}
+            onFolderChange={handleFolderChange}
+            stats={stats}
+          />
+          {renderAssistantPanel()}
+        </Grid>
 
-          <Grid item xs={12} lg={3} sx={{ display: { xs: 'none', lg: 'block' } }}>
-            <FolderNavigation
-              selectedFolder={selectedFolder}
-              onFolderChange={handleFolderChange}
-              stats={stats}
-            />
-          </Grid>
+        <Grid item xs={12} lg={3} sx={{ display: { xs: 'none', lg: 'block' } }}>
+          <FolderNavigation
+            selectedFolder={selectedFolder}
+            onFolderChange={handleFolderChange}
+            stats={stats}
+          />
+          {renderAssistantPanel()}
+        </Grid>
 
           <Grid item xs={12} lg={4}>
             <EmailList
@@ -759,7 +810,6 @@ export default function EmailPage() {
               onDelete={handleDelete}
               onReply={openReply}
               onForward={openForward}
-              onSmartReplySelect={handleSmartReplySelect}
               onClose={closeMobileDetail}
               t={emailViewCopy}
               locale={locale}
@@ -794,7 +844,6 @@ export default function EmailPage() {
             onDelete={handleDelete}
             onReply={openReply}
             onForward={openForward}
-            onSmartReplySelect={handleSmartReplySelect}
             onClose={closeMobileDetail}
             t={emailViewCopy}
             locale={locale}

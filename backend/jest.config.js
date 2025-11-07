@@ -16,8 +16,21 @@ module.exports = {
 
   // Transform files with ts-jest
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    '^.+\\.(t|j)s$': [
+      'ts-jest',
+      {
+        tsconfig: {
+          esModuleInterop: true,
+          allowSyntheticDefaultImports: true,
+        },
+      },
+    ],
   },
+
+  // Transform ESM modules from node_modules
+  transformIgnorePatterns: [
+    'node_modules/(?!(nanoid)/)',
+  ],
 
   // Coverage collection
   collectCoverageFrom: [
@@ -37,7 +50,7 @@ module.exports = {
   coverageDirectory: './coverage',
 
   // Coverage thresholds (will enforce quality)
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
       branches: 50,
       functions: 50,
@@ -56,17 +69,6 @@ module.exports = {
 
   // Setup files (run before tests)
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
-
-  // Globals for ts-jest
-  globals: {
-    'ts-jest': {
-      isolatedModules: true,
-      tsconfig: {
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-      },
-    },
-  },
 
   // Verbose output
   verbose: true,

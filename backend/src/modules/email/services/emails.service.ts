@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { EmailSyncBackService } from './email-sync-back.service';
+import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 
 export interface EmailListFilters {
   folder?: string;
@@ -28,6 +29,7 @@ export class EmailsService {
   constructor(
     private prisma: PrismaService,
     private emailSyncBack: EmailSyncBackService,
+    private knowledgeBaseService: KnowledgeBaseService,
   ) {}
 
   /**
@@ -236,6 +238,8 @@ export class EmailsService {
       },
     });
 
+    await this.knowledgeBaseService.deleteEmbeddingsForEmail(tenantId, id);
+
     // Sync delete to provider (async, don't wait)
     this.emailSyncBack
       .syncOperationToProvider({
@@ -343,6 +347,8 @@ export class EmailsService {
     const where: Prisma.EmailWhereInput = {
       tenantId,
       ...(providerId && { providerId }),
+      isDeleted: false,
+      folder: { notIn: ['TRASH', 'SPAM'] },
       OR: [
         { subject: { contains: query, mode: 'insensitive' } },
         { from: { contains: query, mode: 'insensitive' } },
