@@ -68,7 +68,9 @@ export class EmbeddingsService {
   /**
    * Perform similarity search using pgvector <-> operator.
    */
-  async findSimilarContent<T extends { id: string; content: string; documentName: string | null; metadata: any }>(
+  async findSimilarContent<
+    T extends { id: string; content: string; documentName: string | null; metadata: any; distance?: number }
+  >(
     tenantId: string,
     embedding: number[],
     limit: number,
@@ -82,7 +84,7 @@ export class EmbeddingsService {
     try {
       const results = await this.prisma.$queryRaw<T[]>(
         Prisma.sql`
-          SELECT "id", "content", "documentName", "metadata"
+          SELECT "id", "content", "documentName", "metadata", ("vector" <-> ${vectorLiteral}) AS "distance"
           FROM "embeddings"
           WHERE "tenantId" = ${tenantId}
           ORDER BY "vector" <-> ${vectorLiteral}

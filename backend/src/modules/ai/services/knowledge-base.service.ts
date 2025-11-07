@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { MistralService } from './mistral.service';
@@ -34,6 +34,26 @@ interface CreateEmailEmbeddingOptions {
   bodyHtml?: string | null;
   from?: string | null;
   receivedAt?: Date | string | null;
+}
+
+interface KnowledgeBaseSearchOptions {
+  tenantId: string;
+  query?: string;
+  emailId?: string;
+  limit?: number;
+}
+
+interface KnowledgeBaseSearchHit {
+  id: string;
+  subject: string | null;
+  snippet: string;
+  source: string | null;
+  emailId: string | null;
+  from: string | null;
+  receivedAt: string | null;
+  distance: number | null;
+  score: number | null;
+  metadata: Record<string, any> | null;
 }
 
 @Injectable()
@@ -263,6 +283,189 @@ export class KnowledgeBaseService {
     return result.count;
   }
 
+  async searchKnowledgeBase(options: KnowledgeBaseSearchOptions): Promise<{
+    usedQuery: string;
+    items: KnowledgeBaseSearchHit[];
+  }> {
+    const limit = options.limit && options.limit > 0 ? Math.min(options.limit, 10) : 5;
+    const trimmedQuery = options.query?.trim() ?? '';
+    let searchText = trimmedQuery;
+
+    if (!searchText && options.emailId) {
+      const email = await this.prisma.email.findFirst({
+        where: { id: options.emailId, tenantId: options.tenantId },
+        select: {
+          subject: true,
+          snippet: true,
+          bodyText: true,
+          bodyHtml: true,
+        },
+      });
+
+      if (email) {
+        searchText =
+          this.composeEmailEmbeddingContent({
+            subject: email.subject ?? null,
+            snippet: email.snippet,
+            bodyText: email.bodyText,
+            bodyHtml: email.bodyHtml,
+          }) ?? '';
+      }
+    }
+
+    if (!searchText) {
+      throw new BadRequestException(
+        'Provide a free-text query or an email with content to search the knowledge base.',
+      );
+    }
+
+    const client = await this.mistralService.createMistralClient();
+    const embedding = await this.mistralService.generateEmbedding(searchText, client);
+    const matches = await this.embeddingsService.findSimilarContent(
+      options.tenantId,
+      embedding,
+      limit,
+    );
+
+    if (!matches.length) {
+      return {
+        usedQuery: searchText,
+        items: [],
+      };
+    }
+
+    const items = await this.hydrateKnowledgeHits(matches, options.tenantId);
+
+    return {
+      usedQuery: searchText,
+      items,
+    };
+  }
+
+
+  private async hydrateKnowledgeHits(
+    matches: Array<{
+      id: string;
+      content: string;
+      documentName: string | null;
+      metadata: any;
+      distance?: number;
+    }>,
+    tenantId: string,
+  ): Promise<KnowledgeBaseSearchHit[]> {
+    const metadataList = matches.map((match) => this.normaliseMetadata(match.metadata));
+
+    const emailIds = Array.from(
+      new Set(
+        metadataList
+          .map((meta) => (this.isString(meta.emailId) ? (meta.emailId as string) : null))
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+
+    const emailMap = await this.fetchEmailHydrationMap(tenantId, emailIds);
+
+    return matches.map((match, index) => {
+      const metadata = metadataList[index];
+      const emailId = this.isString(metadata.emailId) ? (metadata.emailId as string) : null;
+      const emailDetails = emailId ? emailMap.get(emailId) : undefined;
+
+      const subject =
+        (this.isString(metadata.subject) && metadata.subject.trim()) ||
+        emailDetails?.subject ||
+        match.documentName ||
+        null;
+
+      const from =
+        (this.isString(metadata.from) && metadata.from.trim()) || emailDetails?.from || null;
+
+      const receivedAt =
+        (this.isString(metadata.receivedAt) && metadata.receivedAt) ||
+        emailDetails?.receivedAt ||
+        null;
+
+      const source =
+        (this.isString(metadata.source) && metadata.source) || (emailId ? 'email' : null);
+
+      const distance =
+        typeof match.distance === 'number' && Number.isFinite(match.distance)
+          ? match.distance
+          : null;
+      const score =
+        distance === null
+          ? null
+          : Number((1 - Math.min(Math.max(distance, 0), 1)).toFixed(3));
+
+      return {
+        id: match.id,
+        subject,
+        snippet: this.truncateMemorySnippet(match.content),
+        source,
+        emailId,
+        from,
+        receivedAt,
+        distance,
+        score,
+        metadata: Object.keys(metadata).length ? metadata : null,
+      };
+    });
+  }
+
+  private async fetchEmailHydrationMap(
+    tenantId: string,
+    emailIds: string[],
+  ): Promise<Map<string, { subject: string | null; from: string | null; receivedAt: string | null }>> {
+    if (!emailIds.length) {
+      return new Map();
+    }
+
+    const rows = await this.prisma.email.findMany({
+      where: {
+        tenantId,
+        id: {
+          in: emailIds,
+        },
+      },
+      select: {
+        id: true,
+        subject: true,
+        from: true,
+        receivedAt: true,
+      },
+    });
+
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        {
+          subject: row.subject,
+          from: row.from,
+          receivedAt: row.receivedAt ? row.receivedAt.toISOString() : null,
+        },
+      ]),
+    );
+  }
+
+  private normaliseMetadata(value: unknown): Record<string, any> {
+    if (!value || typeof value !== 'object') {
+      return {};
+    }
+    return value as Record<string, any>;
+  }
+
+  private truncateMemorySnippet(value: string, limit = 320): string {
+    if (!value) {
+      return '';
+    }
+
+    const normalised = value.replace(/\s+/g, ' ').trim();
+    return normalised.length > limit ? `${normalised.slice(0, limit)}...` : normalised;
+  }
+
+  private isString(value: unknown): value is string {
+    return typeof value === 'string' && value.length > 0;
+  }
+
   private async fetchEmailsWithoutEmbeddings(
     tenantId: string,
     limit: number,
@@ -333,7 +536,7 @@ export class KnowledgeBaseService {
   }
 
   private composeEmailEmbeddingContent(email: {
-    subject: string;
+    subject: string | null;
     snippet: string | null;
     bodyText: string | null;
     bodyHtml: string | null;

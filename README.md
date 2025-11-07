@@ -1,19 +1,37 @@
 # MailAgent - AI-Powered Multi-Tenant Email Assistant
 
+![Backend](https://img.shields.io/badge/Backend-85%25-success?style=flat-square)
+![Frontend](https://img.shields.io/badge/Frontend-90%25-success?style=flat-square)
+![Testing](https://img.shields.io/badge/Testing-5%25-critical?style=flat-square)
+![Version](https://img.shields.io/badge/Version-2.0.0-blue?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+
 MailAgent è una piattaforma full-stack completa e moderna per la gestione intelligente della posta elettronica con supporto IA, riconoscimento vocale (STT) e sintesi vocale (TTS). Progettato per supportare multi-tenancy con isolamento completo dei dati.
 
-## Features
+## ✨ Features
+
+### 🚀 Core Features (Production Ready)
 
 - ✅ **Multi-Tenant Architecture**: Isolamento completo dei dati con supporto per più tenant
-- ✅ **AI Assistant**: Integrazione con Mistral AI per risposte intelligenti e RAG (Retrieval-Augmented Generation)
-- ✅ **Email Integration**: Supporto per Gmail, Outlook/Microsoft Graph e IMAP
-- ✅ **Voice Support**: STT (Speech-to-Text) e TTS (Text-to-Speech) con supporto italiano
-- ✅ **Advanced Authentication**: Email/Password + OTP/MFA per ogni login
+- ✅ **Email Management UI**: Viewer, composer (TipTap), threading, folders, search 🎉 **NEW!**
+- ✅ **Email Sync**: Gmail API, Microsoft Graph, IMAP con auto-refresh token
+- ✅ **AI Email Insights**: Email summarization, smart replies, auto-categorization 🎉 **NEW!**
+- ✅ **AI Assistant**: Chat con Mistral AI e RAG (Retrieval-Augmented Generation)
+- ✅ **Knowledge Base**: Semantic search con pgvector embeddings
+- ✅ **Provider Integration**: Gmail, Outlook/Microsoft Graph e IMAP/SMTP
+- ✅ **Advanced Authentication**: Email/Password + OTP/MFA obbligatorio
 - ✅ **Password Recovery**: Reset password sicuro con token temporaneo
-- ✅ **GDPR Compliance**: Crittografia dei dati sensibili, audit log, diritto all'oblio
-- ✅ **Real-time Chat**: Dashboard interattiva con chat in tempo reale
-- ✅ **Dark/Light Mode**: UI responsive con tema personalizzabile
-- ✅ **Docker**: Containerizzazione completa con orchestrazione via docker-compose
+- ✅ **GDPR Compliance**: Crittografia AES-256, audit log, diritto all'oblio
+- ✅ **Material Design 3**: UI moderna, responsive, dark/light mode
+- ✅ **Docker**: Containerizzazione completa con orchestrazione
+
+### 🚧 Coming Soon
+
+- ⏳ **Calendar Sync**: Google Calendar, Microsoft Calendar, CalDAV
+- ⏳ **Contacts Sync**: Google Contacts, Microsoft Contacts, CardDAV
+- ⏳ **Daily Reports**: AI-generated activity summaries
+- ⏳ **Follow-up Alerts**: Automatic detection of emails needing response
+- 💡 **Voice Support**: STT (Speech-to-Text) e TTS (Text-to-Speech)
 
 ## Architettura
 
@@ -48,23 +66,26 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 
 ## Technology Stack
 
-### Backend
+### Backend (85% Complete ✅)
 - **Framework**: NestJS (TypeScript)
 - **Database**: PostgreSQL 15+ con pgvector per RAG
 - **ORM**: Prisma
 - **Cache**: Redis
-- **Job Queue**: BullMQ
-- **AI**: Mistral API
+- **Job Queue**: BullMQ (34 concurrent workers)
+- **AI**: Mistral API (mistral-large-latest + mistral-embed)
 - **Email**: nodemailer, IMAP-Flow, googleapis, microsoft-graph-client
 - **Auth**: JWT, bcrypt, OTP
-- **Voice**: Vosk (STT), Piper (TTS)
+- **Encryption**: AES-256-CBC per token e password
+- **Voice**: Vosk (STT), Piper (TTS) - Planned
 
-### Frontend
+### Frontend (90% Complete ✅)
 - **Framework**: Next.js 14 con React 18
-- **Styling**: TailwindCSS + ShadCN UI
-- **State Management**: Zustand
+- **Styling**: TailwindCSS + Material UI
+- **Rich Text Editor**: TipTap
+- **State Management**: Zustand + React Context
 - **HTTP Client**: Axios
-- **Icons**: Lucide React
+- **Icons**: Lucide React + Material Icons
+- **i18n**: English + Italian support
 
 ### DevOps
 - **Containerization**: Docker + docker-compose

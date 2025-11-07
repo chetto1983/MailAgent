@@ -32,6 +32,21 @@ Let me know if you need more help.
     ]);
   });
 
+  it('parses replies returned as objects', () => {
+    const payload = `{
+      "replies": [
+        { "subject": "Re: New sign-in detected", "body": "Thanks, I just logged in from a new device." },
+        { "body": "This looks suspicious, please block the attempt." }
+      ]
+    }`;
+
+    const result = parseArrayFromAiPayload(payload, 'replies');
+    expect(result).toEqual([
+      'Re: New sign-in detected\n\nThanks, I just logged in from a new device.',
+      'This looks suspicious, please block the attempt.',
+    ]);
+  });
+
   it('falls back to empty array when JSON missing', () => {
     const payload = 'No structured data here.';
     const result = parseArrayFromAiPayload(payload, 'replies');

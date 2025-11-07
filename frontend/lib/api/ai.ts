@@ -14,6 +14,19 @@ export type ChatSession = {
   updatedAt: string;
 };
 
+export type MemorySearchItem = {
+  id: string;
+  subject: string | null;
+  snippet: string;
+  source: string | null;
+  emailId: string | null;
+  from: string | null;
+  receivedAt: string | null;
+  distance: number | null;
+  score: number | null;
+  metadata: Record<string, unknown> | null;
+};
+
 export const aiApi = {
   listSessions() {
     return apiClient.get<{ success: boolean; sessions: ChatSession[] }>('/ai/chat/sessions');
@@ -64,6 +77,12 @@ export const aiApi = {
     return apiClient.post<{ success: boolean; labels: string[] }>(
       `/ai/categorize/${emailId}`,
       locale ? { locale } : undefined,
+    );
+  },
+  searchMemory(payload: { emailId?: string; query?: string; locale?: string; limit?: number }) {
+    return apiClient.post<{ success: boolean; usedQuery: string; items: MemorySearchItem[] }>(
+      '/ai/memory/search',
+      payload,
     );
   },
 };

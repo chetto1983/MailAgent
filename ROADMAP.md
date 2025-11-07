@@ -1,364 +1,535 @@
 # 🗺️ ROADMAP MAILAGENT
-
-**Data creazione**: 5 Novembre 2025
-**Versione**: 1.0
+**Data aggiornamento**: 7 Novembre 2025
+**Versione**: 2.0 (AGGIORNATO!)
 **Periodo**: Novembre 2025 - Marzo 2026
+
+---
+
+## ⚠️ IMPORTANTE: STATO PROGETTO AGGIORNATO
+
+**Questo roadmap è stato completamente aggiornato** per riflettere le implementazioni recenti:
+- ✅ **Email UI** - COMPLETATO al 90% (non 0%!)
+- ✅ **Email Composer** - IMPLEMENTATO con TipTap
+- ✅ **AI Insights** - IMPLEMENTATO (summarization, smart replies, categorization)
+- ✅ **Email Sending** - IMPLEMENTATO (send, reply, forward con attachments)
 
 ---
 
 ## 🎯 OBIETTIVO GENERALE
 
-Trasformare MailAgent da **backend completo** (78%) a **applicazione completa** (100%) con focus su:
-1. ✉️ Email management UI (priorità massima)
-2. 🧪 Quality assurance e testing
-3. 🤖 AI smart features
-4. 📅👥 Calendar & Contacts UI
-5. 🚀 Production deployment
+Completare MailAgent da **85% backend + 90% frontend** a **applicazione production-ready** (100%) con focus su:
+1. 🧪 Testing & Quality Assurance (priorità massima)
+2. 📅👥 Calendar & Contacts Sync Workers + UI
+3. 📊 Reports & Alerts
+4. 🚀 Production deployment
+5. 💡 Advanced features (voice, PWA, etc.)
 
 ---
 
-## 📊 STATO ATTUALE (5 Novembre 2025)
+## 📊 STATO ATTUALE (7 Novembre 2025)
 
-### ✅ Completamente Funzionante (Backend 78%)
+### ✅ Backend: 85% Completo
 
 | Componente | Status | Note |
 |------------|--------|------|
-| **Authentication** | ✅ 100% | Login, OTP/MFA, Password Reset |
+| **Authentication** | ✅ 100% | Login, OTP/MFA, Password Reset funzionante |
 | **Provider Integration** | ✅ 100% | Google, Microsoft, IMAP OAuth + auto-refresh testato |
-| **Email Sync Backend** | ✅ 100% | Gmail API, Microsoft Graph, IMAP - tutti implementati |
-| **Email Queue System** | ✅ 100% | BullMQ con 34 concurrent workers (high/normal/low) |
+| **Email Sync** | ✅ 100% | Gmail API, MS Graph, IMAP - Queue con 34 workers |
+| **Email Sending** | ✅ 100% | Send, Reply, Forward con attachments |
 | **AI/RAG** | ✅ 95% | Mistral, embeddings, knowledge base, chat sessions |
+| **Email Insights** | ✅ 100% | Summarization, Smart Replies, Categorization |
 | **Calendar Test API** | ✅ 100% | Test endpoints Google/Microsoft/CalDAV funzionanti |
-| **Calendar Sync Worker** | 🔴 0% | Sync automatico NON implementato |
+| **Calendar Sync Worker** | 🔴 0% | **DA IMPLEMENTARE** - Sync automatico mancante |
 | **Contacts Test API** | ✅ 100% | Test endpoints Google/Microsoft/CardDAV funzionanti |
-| **Contacts Sync Worker** | 🔴 0% | Sync automatico NON implementato |
+| **Contacts Sync Worker** | 🔴 0% | **DA IMPLEMENTARE** - Sync automatico mancante |
 | **Database** | ✅ 100% | Prisma + PostgreSQL + pgvector |
+| **Queue System** | ✅ 100% | BullMQ con priorità high/normal/low |
 | **Infrastructure** | ✅ 100% | Docker, Redis, Nginx, Prometheus, Grafana |
 
-### 🔴 Da Implementare (Frontend 45%)
+### ✅ Frontend: 90% Completo (AGGIORNATO!)
 
-| Componente | Status | Blocco |
-|------------|--------|--------|
-| **Email UI Viewer** | 🔴 0% | CRITICO - Utenti non vedono email |
-| **Email Composer** | 🔴 0% | CRITICO - Utenti non possono inviare |
-| **Calendar Sync Worker** | 🔴 0% | Backend sync automatico mancante |
-| **Calendar UI** | 🔴 0% | Frontend UI mancante |
-| **Contacts Sync Worker** | 🔴 0% | Backend sync automatico mancante |
-| **Contacts UI** | 🔴 0% | Frontend UI mancante |
-| **Testing Suite** | 🔴 0% | Zero test automatizzati |
-| **AI Smart Features** | 🔴 0% | Smart reply, summarization |
+| Componente | Status | Note |
+|------------|--------|------|
+| **Authentication UI** | ✅ 100% | Login, Register, OTP, Password Reset |
+| **Dashboard Layout** | ✅ 100% | MaterialDashboardLayout responsive |
+| **Email List** | ✅ 100% | Threading, filters, search, pagination |
+| **Email Viewer** | ✅ 100% | HTML rendering, attachments, actions |
+| **Email Composer** | ✅ 100% | **TipTap editor implementato!** |
+| **Email Actions** | ✅ 100% | Send, Reply, Forward, Mark read, Star, Delete |
+| **AI Integration** | ✅ 90% | EmailSummary, SmartReply, LabelSuggestions components |
+| **Provider Settings** | ✅ 100% | Connect/disconnect Google, Microsoft, IMAP |
+| **User Settings** | ✅ 100% | Profile, password change, account deletion |
+| **Calendar UI** | 🔴 0% | **DA IMPLEMENTARE** |
+| **Contacts UI** | 🔴 0% | **DA IMPLEMENTARE** |
+| **Reports UI** | 🔴 0% | **DA IMPLEMENTARE** |
+
+### 🔴 Testing: 5% Completo (CRITICO!)
+
+| Categoria | Status | Note |
+|-----------|--------|------|
+| **Unit Tests Backend** | 5% 🔴 | Solo `ai-output.utils.spec.ts` (4 test) |
+| **Integration Tests** | 0% 🔴 | Zero test |
+| **E2E Tests** | 0% 🔴 | Zero test |
+| **Frontend Tests** | 0% 🔴 | Zero test |
+| **Target Coverage** | 70% backend, 50% frontend | **PRIORITÀ MASSIMA** |
 
 ---
 
-## 🛤️ MILESTONE DETTAGLIATE
+## 🎯 NUOVE MILESTONE (Aggiornate)
+
+### ✅ ~~Milestone 1: Email Experience Complete~~ - COMPLETATO! 🎉
+**Status**: ✅ **GIÀ IMPLEMENTATO**
+**Completato**: 5-7 Novembre 2025
+
+**Implementazioni completate**:
+- ✅ EmailList component con threading
+- ✅ EmailView component con HTML rendering sicuro
+- ✅ EmailComposer component con TipTap rich text editor
+- ✅ Email send/reply/forward con attachments
+- ✅ AI integrations: EmailSummary, SmartReply, LabelSuggestions
+- ✅ Email filters, search, pagination
+- ✅ Mark read, star, delete actions
+
+**Git Commits**:
+- `13b2a9a0` - Email insights refactoring
+- `3d0db541` - Email insights features implementation
+- `fb4c2048` - Email send/reply/forward endpoints
+- `6d12049e` - MaterialDashboardLayout component
+
+**Files Implementati**:
+- `frontend/components/dashboard/EmailView.tsx` (506 righe)
+- `frontend/components/dashboard/ai/SmartReply.tsx`
+- `frontend/components/dashboard/ai/EmailSummary.tsx`
+- `frontend/components/dashboard/ai/LabelSuggestions.tsx`
+- `backend/src/modules/ai/services/email-insights.service.ts`
+- `backend/src/modules/ai/utils/ai-output.utils.ts`
+- `backend/test/ai-output.utils.spec.ts`
 
 ---
 
-### 🎯 Milestone 1: Email Experience Complete
-**Durata**: 2 settimane (5-19 Novembre 2025)
-**Obiettivo**: App funzionante per gestione email completa
+### 🧪 Milestone 2: Testing & Quality Assurance (NUOVA PRIORITÀ #1)
+**Durata**: 2 settimane (8-21 Novembre 2025)
+**Obiettivo**: Test coverage 70% backend, 50% frontend
 **Priorità**: 🔥🔥🔥 MASSIMA
 
-#### Settimana 1 (5-12 Nov): Email UI Viewer
+#### Settimana 1 (8-14 Nov): Backend Unit Tests
 
-**Giorni 1-2 (Mar 5 - Mer 6)** - Setup & Lista Base
-- [ ] Creare struttura pagina `frontend/pages/dashboard/email.tsx`
-- [ ] Setup routing in Next.js
-- [ ] Creare API client `frontend/lib/api/email.ts`
-- [ ] Creare componente `EmailList.tsx` base
-- [ ] Fetch email da API e rendering lista
+**Giorni 1-2 (Ven 8 - Sab 9)** - Setup & Auth Tests
+- [ ] Setup Jest + ts-jest per backend
+- [ ] Configure coverage reporting
+- [ ] Auth Service tests:
+  - Register flow
+  - Login flow
+  - OTP generation/verification
+  - Password reset
+  - JWT token validation
+- [ ] Target: Auth module 80% coverage
 
-**Giorni 3-4 (Gio 7 - Ven 8)** - Preview & Full View
-- [ ] Implementare `EmailPreview.tsx` con card design
-- [ ] Implementare `EmailViewer.tsx` per visualizzazione completa
-- [ ] HTML sanitization e rendering sicuro
-- [ ] Text/HTML toggle
-- [ ] Pagination component
+**Giorni 3-4 (Dom 10 - Lun 11)** - Provider & Crypto Tests
+- [ ] Crypto Service tests:
+  - AES-256 encryption/decryption
+  - IV generation
+  - Error handling
+- [ ] Provider Services tests:
+  - Google OAuth flow
+  - Microsoft OAuth flow
+  - Token refresh logic
+  - IMAP connection
+- [ ] Target: Crypto 90% coverage, Providers 70% coverage
 
-**Giorni 5-7 (Lun 11 - Mar 12)** - Filters & Actions
-- [ ] Implementare `EmailFilters.tsx` (inbox/sent/trash/starred)
-- [ ] Search bar con debounce
-- [ ] Mark as read/unread
-- [ ] Star/unstar
-- [ ] Delete/archive
-- [ ] Polish UI + responsive design
-- [ ] Testing manuale completo
+**Giorni 5-7 (Mar 12 - Gio 14)** - Email Sync & AI Tests
+- [ ] Email Sync Services tests:
+  - Google sync (Gmail API)
+  - Microsoft sync (MS Graph)
+  - IMAP sync (ImapFlow)
+  - Queue service (BullMQ)
+- [ ] AI Services tests:
+  - Mistral service (chat, embeddings)
+  - Email insights service (summarize, smart replies, categorize)
+  - Agent service (LangChain tools)
+- [ ] Target: Sync 60% coverage, AI 70% coverage
 
-**Deliverable**: ✉️ Utenti possono vedere e gestire email
-
-**Metriche di successo**:
-- [ ] Visualizzare almeno 100 email senza lag
-- [ ] Search < 500ms
-- [ ] Mark as read in < 200ms
-- [ ] UI responsive su mobile
-
----
-
-#### Settimana 2 (13-19 Nov): Email Composer + Basic Testing
-
-**Giorni 1-3 (Mer 13 - Ven 15)** - Email Composer
-- [ ] Setup rich text editor (TipTap)
-- [ ] Creare componente `EmailComposer.tsx`
-- [ ] To/Cc/Bcc fields con autocomplete
-- [ ] Subject field
-- [ ] Formatting toolbar (bold, italic, lists, links)
-- [ ] Attachments upload (frontend + backend integration)
-- [ ] Send email via API
-- [ ] Draft auto-save (localStorage + API)
-- [ ] Load draft functionality
-
-**Giorni 4-7 (Lun 18 - Mar 19)** - Testing Base
-- [ ] Setup Jest + Testing Library
-- [ ] Unit tests Auth service
-- [ ] Unit tests Email services (google-sync, microsoft-sync, imap-sync)
-- [ ] Integration test login flow
-- [ ] Integration test email send flow
-- [ ] Fix bug critici trovati
-- [ ] Update documentation
-
-**Deliverable**: ✉️ Email management completo (view + send) + test base
-
-**Metriche di successo**:
-- [ ] Email send success rate > 98%
-- [ ] Draft save < 500ms
-- [ ] Test coverage > 30%
+**Deliverable Settimana 1**: Backend test coverage > 60%
 
 ---
 
-### 🧪 Milestone 2: Quality Assurance
-**Durata**: 1 settimana (20-26 Novembre 2025)
-**Obiettivo**: Test coverage 70%, codice stabile
+#### Settimana 2 (15-21 Nov): Integration, E2E & Frontend Tests
+
+**Giorni 1-2 (Ven 15 - Sab 16)** - Integration Tests
+- [ ] Auth flow integration tests (register → login → OTP)
+- [ ] Provider connection integration tests (OAuth complete flow)
+- [ ] Email sync integration tests (trigger → queue → sync → database)
+- [ ] Email send integration tests (compose → send → SMTP)
+- [ ] Target: Critical paths covered
+
+**Giorni 3-4 (Dom 17 - Lun 18)** - E2E Tests
+- [ ] Setup Playwright
+- [ ] E2E: User registration and login
+- [ ] E2E: Connect Google provider
+- [ ] E2E: View and read emails
+- [ ] E2E: Compose and send email
+- [ ] E2E: AI features (summary, smart reply)
+- [ ] Target: Main user workflows covered
+
+**Giorni 5-7 (Mar 19 - Gio 21)** - Frontend Tests & Cleanup
+- [ ] Setup React Testing Library
+- [ ] Component tests:
+  - EmailList rendering
+  - EmailView rendering
+  - EmailComposer interactions
+  - AI components (Summary, SmartReply, Labels)
+- [ ] API client tests (mocked)
+- [ ] Fix all failing tests
+- [ ] Cleanup and documentation
+- [ ] Target: Frontend 50% coverage
+
+**Deliverable Milestone 2**:
+- ✅ Backend coverage > 70%
+- ✅ Frontend coverage > 50%
+- ✅ All critical paths tested (E2E)
+- ✅ CI/CD pipeline con test automatici
+- ✅ Zero failing tests
+
+**Metriche di successo**:
+- [ ] 70%+ backend test coverage
+- [ ] 50%+ frontend test coverage
+- [ ] Zero critical bugs
+- [ ] All E2E tests passing
+- [ ] CI/CD green builds
+
+---
+
+### 📅 Milestone 3: Calendar Sync & UI Complete
+**Durata**: 3 settimane (22 Nov - 12 Dic 2025)
+**Obiettivo**: Calendar management completo (Backend Sync + Frontend UI)
 **Priorità**: 🔥🔥 ALTA
 
-#### Settimana (20-26 Nov): Testing Completo
+#### Settimana 1 (22-28 Nov): Calendar Sync Workers (Backend)
 
-**Giorni 1-2 (Mer 20 - Gio 21)** - Backend Unit Tests
-- [ ] Auth Service tests (login, register, OTP, password reset)
-- [ ] Provider Service tests (OAuth flow, token refresh)
-- [ ] Crypto Service tests (encryption/decryption)
-- [ ] Google Sync Service tests
-- [ ] Microsoft Sync Service tests
-- [ ] IMAP Sync Service tests
-- [ ] Target coverage: 70%+
+**Giorni 1-3 (Ven 22 - Dom 24)** - Calendar Sync Services
+- [ ] Creare `backend/src/modules/calendar-sync/` module
+- [ ] Implementare `GoogleCalendarSyncService`:
+  - Google Calendar API v3 integration
+  - Delta sync con `syncToken`
+  - Event mapping to database model
+- [ ] Implementare `MicrosoftCalendarSyncService`:
+  - Microsoft Graph Calendar API
+  - Delta queries con `deltaLink`
+  - Event mapping to database model
+- [ ] Implementare `CalDavSyncService`:
+  - CalDAV protocol support (tsdav library)
+  - Event parsing (iCal format)
 
-**Giorni 3-4 (Ven 22 - Lun 25)** - Integration & E2E Tests
-- [ ] Setup Playwright
-- [ ] E2E test: Complete auth flow (register → OTP → login)
-- [ ] E2E test: Provider connection (Google OAuth)
-- [ ] E2E test: Email viewing
-- [ ] E2E test: Email sending
-- [ ] Integration test: Email sync flow completo
-- [ ] Performance test: 1000+ emails load
+**Giorni 4-5 (Lun 25 - Mar 26)** - Database & Queue
+- [ ] Aggiungere Prisma models:
+  ```prisma
+  model CalendarEvent {
+    id          String   @id @default(cuid())
+    tenantId    String
+    providerId  String
+    externalId  String
+    calendarId  String
+    title       String
+    description String?
+    startTime   DateTime
+    endTime     DateTime
+    location    String?
+    attendees   Json?
+    metadata    Json?
+    @@unique([providerId, externalId])
+    @@index([tenantId, startTime])
+  }
 
-**Giorni 5-7 (Mar 26)** - Frontend Tests + Bug Fixing
-- [ ] Component tests (EmailList, EmailViewer, EmailComposer)
-- [ ] Auth flow tests frontend
-- [ ] Fix tutti i bug critici trovati
-- [ ] Performance optimization
-- [ ] Documentation test suite
+  model Calendar {
+    id          String   @id @default(cuid())
+    tenantId    String
+    providerId  String
+    externalId  String
+    name        String
+    isDefault   Boolean  @default(false)
+    @@unique([providerId, externalId])
+  }
+  ```
+- [ ] Run database migration
+- [ ] Integrare calendar sync in BullMQ:
+  - Create `calendar-sync` queue
+  - Schedule sync every 15 minutes
+  - Priority: normal (between high and low)
 
-**Deliverable**: 🧪 Codebase testato e stabile
-
-**Metriche di successo**:
-- [ ] Test coverage backend > 70%
-- [ ] Test coverage frontend > 50%
-- [ ] Zero failing tests
-- [ ] Zero critical bugs
-- [ ] CI/CD pipeline setup
-
----
-
-### 🤖 Milestone 3: AI Smart Features
-**Durata**: 1 settimana (27 Nov - 3 Dicembre 2025)
-**Obiettivo**: AI assistente email intelligente
-**Priorità**: ⚡ MEDIA
-
-**NOTA**: RAG, embeddings, knowledge base sono già implementati (95%). Questa milestone aggiunge solo smart features.
-
-#### Settimana (27 Nov - 3 Dic): Smart AI Features
-
-**Giorni 1-2 (Mer 27 - Gio 28)** - Smart Reply
-- [ ] Creare `SmartReplyService.ts`
-- [ ] Endpoint `POST /ai/smart-reply`
-- [ ] Analizza email ricevuta
-- [ ] Genera 3 possibili risposte contestuali
-- [ ] Frontend: mostra suggerimenti in EmailViewer
-- [ ] Testing smart reply
-
-**Giorni 3-4 (Ven 29 - Lun 2 Dic)** - Email Summarization
-- [ ] Creare `SummarizationService.ts`
-- [ ] Endpoint `POST /ai/summarize-email`
-- [ ] Riassunto email lunghe (> 500 parole)
-- [ ] Frontend: pulsante "Summarize" in EmailViewer
-- [ ] Cache summaries in database
-- [ ] Testing summarization
-
-**Giorni 5-7 (Mar 3 Dic)** - Auto-categorization
-- [ ] Creare `CategorizationService.ts`
-- [ ] Endpoint `POST /ai/suggest-labels`
-- [ ] Analizza contenuto e suggerisce label/categorie
-- [ ] Frontend: mostra label suggestions
-- [ ] Auto-apply labels con ML confidence > 90%
-- [ ] Testing + documentation
-
-**Deliverable**: 🤖 AI features differenzianti
-
-**Metriche di successo**:
-- [ ] Smart reply generation < 2s
-- [ ] Summary quality > 80% user satisfaction
-- [ ] Label suggestion accuracy > 85%
-
----
-
-### 📅👥 Milestone 4: Calendar & Contacts Complete
-**Durata**: 3 settimane (4-24 Dicembre 2025)
-**Obiettivo**: Gestione completa agenda e rubrica (Backend + Frontend)
-**Priorità**: ⚡ MEDIA
-
-**⚠️ CORREZIONE IMPORTANTE**: API test endpoints funzionanti, ma **SYNC WORKERS non implementati**.
-Solo email ha sync automatico. Calendar e Contacts richiedono implementazione worker.
-
-#### Settimana 1 (4-10 Dic): Calendar Sync Worker (Backend)
-
-**Giorni 1-3 (Mer 4 - Ven 6)** - Calendar Sync Service
-- [ ] Creare `backend/src/modules/calendar-sync/services/google-calendar-sync.service.ts`
-- [ ] Implementare Google Calendar API sync con delta
-- [ ] Creare `backend/src/modules/calendar-sync/services/microsoft-calendar-sync.service.ts`
-- [ ] Implementare Microsoft Calendar sync con delta
-- [ ] Creare `backend/src/modules/calendar-sync/services/caldav-sync.service.ts`
-- [ ] CalDAV sync support
-
-**Giorni 4-5 (Lun 9 - Mar 10)** - Database & Queue Integration
-- [ ] Aggiungere `CalendarEvent` model in Prisma schema
-- [ ] Migration database
-- [ ] Integrare calendar sync in BullMQ queue system (stile email-sync)
-- [ ] Schedule automatico ogni 15 minuti
-- [ ] Testing sync automatico
-
-**Deliverable**: 📅 Calendar sync automatico funzionante (backend)
-
----
-
-#### Settimana 2 (11-17 Dic): Calendar UI + Contacts Sync Worker
-
-**Giorni 1-3 (Mer 11 - Ven 13)** - Calendar UI
-- [ ] Creare `frontend/pages/dashboard/calendar.tsx`
-- [ ] Setup `@fullcalendar/react`
-- [ ] API client `frontend/lib/api/calendar.ts`
-- [ ] Calendar view (month/week/day) con eventi synced
-- [ ] Event details modal
-- [ ] Multi-calendar support
-
-**Giorni 4-7 (Lun 16 - Mar 17)** - Contacts Sync Worker (Backend)
-- [ ] Creare `backend/src/modules/contacts-sync/services/google-contacts-sync.service.ts`
-- [ ] Creare `backend/src/modules/contacts-sync/services/microsoft-contacts-sync.service.ts`
-- [ ] Creare `backend/src/modules/contacts-sync/services/carddav-sync.service.ts`
-- [ ] Aggiungere `Contact` model in Prisma schema
-- [ ] Migration database
-- [ ] Integrare in BullMQ queue
-- [ ] Testing sync automatico
-
-**Deliverable**: 📅 Calendar UI + 👥 Contacts sync backend
-
----
-
-#### Settimana 3 (18-24 Dic): Contacts UI + Testing
-
-**Giorni 1-3 (Mer 18 - Ven 20)** - Contacts UI
-- [ ] Creare `frontend/pages/dashboard/contacts.tsx`
-- [ ] API client `frontend/lib/api/contacts.ts`
-- [ ] Componente `ContactsList.tsx` con contatti synced
-- [ ] Contact details view
-- [ ] Search/filter
-- [ ] vCard import/export
-
-**Giorni 4-7 (Lun 23 - Mar 24)** - Testing & Polish
-- [ ] Testing calendar sync automatico
-- [ ] Testing contacts sync automatico
-- [ ] Fix bug trovati
-- [ ] Performance optimization
+**Giorni 6-7 (Mer 27 - Gio 28)** - Testing & Polish
+- [ ] Unit tests per sync services
+- [ ] Integration test: calendar sync flow
+- [ ] Performance testing: 100+ events
+- [ ] Error handling e retry logic
 - [ ] Documentation
 
-**Deliverable**: 📅👥 Calendar & Contacts completi (sync + UI)
+**Deliverable Settimana 1**: Calendar sync automatico funzionante
+
+---
+
+#### Settimana 2 (29 Nov - 5 Dic): Calendar UI
+
+**Giorni 1-3 (Ven 29 - Dom 1 Dic)** - Calendar View
+- [ ] Setup FullCalendar library (`@fullcalendar/react`)
+- [ ] Creare `frontend/pages/dashboard/calendar.tsx`
+- [ ] Creare `frontend/lib/api/calendar.ts` API client
+- [ ] Calendar component con views:
+  - Month view
+  - Week view
+  - Day view
+- [ ] Event fetching da API
+- [ ] Multi-calendar support (toggle calendars)
+- [ ] Color coding per calendar
+
+**Giorni 4-5 (Lun 2 - Mar 3 Dic)** - Event Details & Actions
+- [ ] Event detail modal
+- [ ] Event viewer con:
+  - Title, description, location
+  - Start/end time
+  - Attendees list
+  - Calendar name
+- [ ] Event actions:
+  - View in provider (link to Gmail/Outlook)
+  - Export to iCal
+- [ ] Responsive design
+
+**Giorni 6-7 (Mer 4 - Gio 5 Dic)** - Testing & Polish
+- [ ] Component tests
+- [ ] E2E test: view calendar
+- [ ] E2E test: switch views
+- [ ] Performance: rendering 100+ events
+- [ ] UI polish e accessibility
+
+**Deliverable Settimana 2**: Calendar UI completo e responsive
+
+---
+
+#### Settimana 3 (6-12 Dic): Contacts Sync & UI
+
+**Giorni 1-3 (Ven 6 - Dom 8 Dic)** - Contacts Sync Workers
+- [ ] Creare `backend/src/modules/contacts-sync/` module
+- [ ] Implementare `GoogleContactsSyncService` (Google People API)
+- [ ] Implementare `MicrosoftContactsSyncService` (MS Graph)
+- [ ] Implementare `CardDavSyncService` (CardDAV protocol)
+- [ ] Database models:
+  ```prisma
+  model Contact {
+    id          String   @id @default(cuid())
+    tenantId    String
+    providerId  String
+    externalId  String
+    firstName   String?
+    lastName    String?
+    email       String?
+    phone       String?
+    company     String?
+    jobTitle    String?
+    metadata    Json?
+    @@unique([providerId, externalId])
+    @@index([tenantId, email])
+  }
+  ```
+- [ ] BullMQ integration (sync every 30 minutes)
+
+**Giorni 4-5 (Lun 9 - Mar 10 Dic)** - Contacts UI
+- [ ] Creare `frontend/pages/dashboard/contacts.tsx`
+- [ ] Creare `frontend/lib/api/contacts.ts`
+- [ ] Contacts list component:
+  - Alphabetical grouping
+  - Search/filter
+  - Avatar placeholders
+- [ ] Contact detail view
+- [ ] vCard import/export support
+
+**Giorni 6-7 (Mer 11 - Gio 12 Dic)** - Testing & Documentation
+- [ ] Unit tests contacts sync
+- [ ] Component tests contacts UI
+- [ ] E2E test: view contacts
+- [ ] Documentation aggiornata
+
+**Deliverable Milestone 3**:
+- ✅ Calendar sync automatico funzionante
+- ✅ Calendar UI completo (month/week/day views)
+- ✅ Contacts sync automatico funzionante
+- ✅ Contacts UI completo (list, detail, search)
+- ✅ Test coverage mantenuto > 60%
 
 **Metriche di successo**:
 - [ ] Calendar sync < 2min per 100 eventi
 - [ ] Contacts sync < 1min per 500 contatti
-- [ ] Calendar rendering < 1s per 100 eventi
-- [ ] Contacts list < 500ms per 1000 contatti
+- [ ] Calendar UI rendering < 1s (100 eventi)
+- [ ] Contacts list < 500ms (1000 contatti)
 - [ ] Sync success rate > 95%
 
 ---
 
-### 🚀 Milestone 5: Production Ready
-**Durata**: 1 settimana (25-31 Dicembre 2025)
-**Obiettivo**: Deploy in produzione
+### 📊 Milestone 4: Reports & Alerts
+**Durata**: 1 settimana (13-19 Dicembre 2025)
+**Obiettivo**: Report generation e follow-up alerts
+**Priorità**: ⚡ MEDIA
+
+#### Settimana (13-19 Dic): Reports Implementation
+
+**Giorni 1-3 (Ven 13 - Dom 15)** - Report Generation Service
+- [ ] Creare `backend/src/modules/reports/` module
+- [ ] Implementare `ReportService`:
+  - Daily report generation (cron @daily)
+  - Weekly report generation (cron @weekly)
+  - Monthly report generation (cron @monthly)
+- [ ] Report content:
+  - Email statistics (sent, received, read rate)
+  - Calendar statistics (meetings attended)
+  - Top contacts (most interactions)
+  - AI-generated summary (Mistral)
+- [ ] Store reports in database:
+  ```prisma
+  model Report {
+    id        String   @id @default(cuid())
+    tenantId  String
+    userId    String
+    type      String   // 'daily', 'weekly', 'monthly'
+    period    String   // '2025-11-07'
+    content   Json
+    createdAt DateTime @default(now())
+    @@index([tenantId, userId, period])
+  }
+  ```
+
+**Giorni 4-5 (Lun 16 - Mar 17)** - Follow-up Detection
+- [ ] Implementare `FollowUpService`:
+  - Detect sent emails without reply (> 3 days)
+  - Use AI to determine if follow-up needed
+  - Rank by urgency
+- [ ] Email alerts:
+  - Send daily digest of follow-ups
+  - Use existing email service
+
+**Giorni 6-7 (Mer 18 - Gio 19)** - Reports UI & Testing
+- [ ] Creare `frontend/pages/dashboard/reports.tsx`
+- [ ] Report list component
+- [ ] Report viewer (display JSON as formatted content)
+- [ ] Follow-up alerts widget on dashboard
+- [ ] Testing e documentation
+
+**Deliverable Milestone 4**:
+- ✅ Daily/weekly/monthly reports generation
+- ✅ Follow-up detection automatico
+- ✅ Email alerts funzionanti
+- ✅ Reports UI completo
+
+---
+
+### 🚀 Milestone 5: Production Readiness
+**Durata**: 1 settimana (20-26 Dicembre 2025)
+**Obiettivo**: Deploy in produzione sicuro
 **Priorità**: 🔥 ALTA
 
-#### Settimana (25-31 Dic): Production Deployment
+#### Settimana (20-26 Dic): Production Hardening
 
-**Giorni 1-2 (Mer 25 - Gio 26)** - Security & Performance
-- [ ] Security audit completo
-- [ ] Penetration testing
+**Giorni 1-2 (Ven 20 - Sab 21)** - Security Audit
+- [ ] Security audit completo:
+  - OWASP Top 10 check
+  - npm audit
+  - Dependency vulnerabilities
+- [ ] Penetration testing:
+  - Auth bypass attempts
+  - SQL injection tests
+  - XSS tests
+  - CSRF tests
 - [ ] Fix vulnerabilità trovate
-- [ ] Performance optimization database queries
-- [ ] Rate limiting configurato correttamente
-- [ ] CORS production setup
-- [ ] Environment variables production
+- [ ] Rate limiting review (migrate to Redis-based)
 
-**Giorni 3-4 (Ven 27 - Lun 30)** - Infrastructure
-- [ ] SSL/HTTPS certificati (Let's Encrypt)
-- [ ] Nginx production config
-- [ ] Prometheus + Grafana dashboard setup
-- [ ] Database backup strategy (daily automated)
-- [ ] Redis persistence configurato
-- [ ] Log rotation setup
-- [ ] Health checks configurati
+**Giorni 3-4 (Dom 22 - Lun 23)** - Infrastructure Setup
+- [ ] SSL/HTTPS setup:
+  - Let's Encrypt certificates
+  - Auto-renewal cron
+  - SSL A+ rating (SSLLabs)
+- [ ] Nginx production config:
+  - Gzip compression
+  - Static assets caching
+  - Security headers
+- [ ] Database:
+  - Automated daily backups (pg_dump)
+  - Backup retention policy (30 days)
+  - Point-in-time recovery setup
+- [ ] Redis:
+  - Persistence configurato (AOF + RDB)
+  - Memory limits
+- [ ] Secrets management:
+  - Environment variables separate per env
+  - Consider Vault/AWS Secrets Manager
 
-**Giorni 5-7 (Mar 31)** - Documentation & Launch
-- [ ] Production deployment guide
-- [ ] Environment setup guide
-- [ ] Backup & restore guide
-- [ ] Monitoring guide
-- [ ] User guide
-- [ ] API documentation finale
-- [ ] Staging deploy + testing
-- [ ] Production deploy
-- [ ] Smoke tests produzione
+**Giorni 5-7 (Mar 24 - Gio 26)** - Monitoring & Launch
+- [ ] Prometheus + Grafana:
+  - Dashboard completo (CPU, memory, API latency)
+  - Alerts configurati (email/Slack)
+- [ ] Log management:
+  - Log rotation (logrotate)
+  - Centralized logging (consider ELK stack)
+- [ ] Health checks:
+  - `/health/ready` (Kubernetes readiness)
+  - `/health/live` (Kubernetes liveness)
+  - `/health/metrics` (Prometheus)
+- [ ] Documentation finale:
+  - Production deployment guide
+  - Runbook (troubleshooting)
+  - Disaster recovery plan
+- [ ] Staging deploy + smoke tests
+- [ ] **Production deploy** 🚀
+- [ ] Post-deploy monitoring (24h)
 
-**Deliverable**: 🚀 App live in produzione
+**Deliverable Milestone 5**:
+- ✅ App live in produzione
+- ✅ SSL/HTTPS configurato
+- ✅ Automated backups funzionanti
+- ✅ Monitoring attivo
+- ✅ Zero vulnerabilità critiche
 
 **Metriche di successo**:
 - [ ] Uptime > 99.5%
 - [ ] API response time p95 < 200ms
 - [ ] Zero critical vulnerabilities
 - [ ] SSL A+ rating
-- [ ] Automated backups funzionanti
+- [ ] Automated backups verified
 
 ---
 
-### 💡 Milestone 6: Advanced Features (Opzionale)
+### 💡 Milestone 6: Advanced Features (Opzionale - Q1 2026)
 **Durata**: Q1 2026 (Gennaio - Marzo)
 **Obiettivo**: Feature premium differenzianti
-**Priorità**: 💡 BASSA
-
-Questa milestone è **opzionale** e da valutare dopo il successo in produzione.
+**Priorità**: 💡 BASSA (post-MVP)
 
 #### Gennaio 2026: Voice & Search
 
-**Voice Support (1-2 settimane)**
-- [ ] STT (Speech-to-Text) con Vosk
-- [ ] TTS (Text-to-Speech) con Piper
-- [ ] Microfono recording UI
-- [ ] Voice commands per email ("Read latest emails")
-- [ ] Audio playback email
+**Voice Support (2 settimane)**
+- [ ] STT (Speech-to-Text):
+  - Vosk library (offline, privacy-first)
+  - Google Cloud Speech-to-Text (online fallback)
+- [ ] TTS (Text-to-Speech):
+  - Piper (offline)
+  - Google Cloud Text-to-Speech (online fallback)
+- [ ] Frontend UI:
+  - Microphone recording button
+  - Audio visualizer
+  - Voice commands: "Read latest emails", "Compose email to..."
+- [ ] Backend endpoints:
+  - `POST /voice/transcribe` (audio → text)
+  - `POST /voice/synthesize` (text → audio)
 
 **Advanced Search (1 settimana)**
-- [ ] PostgreSQL full-text search
-- [ ] Search operators (from:, to:, subject:, has:attachment)
-- [ ] Advanced filters UI
-- [ ] Search history
-- [ ] Saved searches
+- [ ] PostgreSQL full-text search:
+  - tsvector column on emails
+  - GIN index
+- [ ] Search operators:
+  - `from:john@example.com`
+  - `to:me`
+  - `subject:"project alpha"`
+  - `has:attachment`
+  - `is:unread`
+  - `before:2025-11-01`
+  - `after:2025-10-01`
+- [ ] Search history + saved searches
+- [ ] Frontend advanced search UI
 
 ---
 
@@ -366,79 +537,109 @@ Questa milestone è **opzionale** e da valutare dopo il successo in produzione.
 
 **Push Notifications (1 settimana)**
 - [ ] Web Push API setup
-- [ ] Service Worker
-- [ ] Notification preferences
-- [ ] Email alerts
-- [ ] Calendar reminders
+- [ ] Service Worker registration
+- [ ] Push subscription management
+- [ ] Notification preferences:
+  - New email alerts
+  - Calendar reminders (15min before)
+  - Follow-up alerts
+- [ ] Backend:
+  - `POST /notifications/subscribe`
+  - Notification queue (BullMQ)
+  - Push delivery service
 
 **Mobile PWA (2 settimane)**
-- [ ] PWA manifest
-- [ ] Service Worker per offline
-- [ ] Install prompt
-- [ ] Mobile-optimized UI
-- [ ] Touch gestures
-- [ ] Mobile navigation
+- [ ] PWA manifest (`manifest.json`):
+  - App name, icons, colors
+  - Display: standalone
+  - Start URL
+- [ ] Service Worker:
+  - Offline page caching
+  - API response caching
+  - Background sync
+- [ ] Install prompt UI
+- [ ] Mobile-optimized UI:
+  - Touch gestures (swipe actions)
+  - Bottom navigation
+  - Pull-to-refresh
+- [ ] Testing on iOS/Android devices
 
 ---
 
 #### Marzo 2026: Admin Panel & Templates
 
-**Admin Panel Avanzato (1-2 settimane)**
-- [ ] Super admin dashboard
-- [ ] Tenant analytics
-- [ ] User management avanzato
-- [ ] System monitoring dashboard
-- [ ] Audit log viewer
-- [ ] Configuration management UI
+**Admin Panel Avanzato (2 settimane)**
+- [ ] Super admin dashboard:
+  - Tenant list e statistics
+  - User management (view, suspend, delete)
+  - System health metrics
+  - Audit log viewer (filterable)
+  - Configuration editor
+- [ ] Analytics dashboard:
+  - Active users (DAU, MAU)
+  - Email volume trends
+  - API usage by endpoint
+  - Error rates
+- [ ] Role-based access control (RBAC):
+  - Super admin
+  - Tenant admin
+  - Regular user
 
 **Email Templates (1 settimana)**
-- [ ] Template library
-- [ ] Template editor
-- [ ] Variables support
-- [ ] Save custom templates
-- [ ] Share templates
+- [ ] Template library:
+  - Pre-built templates (welcome, follow-up, thank you)
+  - User custom templates
+- [ ] Template editor:
+  - Rich text editor
+  - Variable placeholders: `{{firstName}}`, `{{company}}`
+  - Preview mode
+- [ ] Template management:
+  - Save, edit, delete
+  - Share templates (within tenant)
+- [ ] Use templates in composer
 
 **Bulk Operations (1 settimana)**
-- [ ] Bulk delete
-- [ ] Bulk move
-- [ ] Bulk label
-- [ ] Bulk archive
-- [ ] Progress indicators
+- [ ] Bulk actions UI:
+  - Select multiple emails (checkboxes)
+  - Select all (with pagination handling)
+- [ ] Bulk operations:
+  - Mark as read/unread
+  - Move to folder
+  - Apply labels
+  - Delete
+  - Archive
+- [ ] Progress indicator (for large batches)
+- [ ] Backend:
+  - `POST /emails/bulk/mark-read`
+  - `POST /emails/bulk/move`
+  - `POST /emails/bulk/label`
+  - `POST /emails/bulk/delete`
 
 ---
 
-## 📊 GANTT TIMELINE
+## 📊 GANTT TIMELINE (Aggiornato)
 
 ```
 Nov 2025        | Week 1 | Week 2 | Week 3 | Week 4 |
 ----------------|--------|--------|--------|--------|
-Email UI Viewer |████████████    |        |        |
-Email Composer  |        |████████████    |        |
-Testing Suite   |        |        |████████████    |
+Email UI/AI     |✅✅✅✅✅|✅✅✅✅  |        |        |  ← COMPLETATO!
+Testing Suite   |        |████████████████████████| ← PRIORITÀ #1
 
 Dec 2025        | Week 1 | Week 2 | Week 3 | Week 4 |
 ----------------|--------|--------|--------|--------|
-AI Smart        |████████████    |        |        |
-Calendar Worker |        |████████████    |        |
-Calendar UI     |        |        |████    |        |
-Contacts Worker |        |        |████████|        |
-Contacts UI     |        |        |        |████████|
+Calendar Sync   |████████████    |        |        |
+Calendar UI     |        |████████████    |        |
+Contacts        |        |        |████████████    |
+Reports         |        |        |        |████████|
 
-Jan 2026        | Week 1 | Week 2 | Week 3 | Week 4 |
+Q1 2026         | Week 1 | Week 2 | Week 3 | Week 4 |
 ----------------|--------|--------|--------|--------|
 Voice Support   |████████████████████    |        |
 Advanced Search |        |        |████████████    |
-
-Feb 2026        | Week 1 | Week 2 | Week 3 | Week 4 |
-----------------|--------|--------|--------|--------|
 Notifications   |████████████    |        |        |
 Mobile PWA      |        |████████████████████████|
-
-Mar 2026        | Week 1 | Week 2 | Week 3 | Week 4 |
-----------------|--------|--------|--------|--------|
 Admin Panel     |████████████████████    |        |
-Templates       |        |        |████████████    |
-Bulk Operations |        |        |        |████████|
+Templates/Bulk  |        |        |████████████████|
 ```
 
 ---
@@ -446,7 +647,7 @@ Bulk Operations |        |        |        |████████|
 ## 🎯 METRICHE DI SUCCESSO GLOBALI
 
 ### Code Quality
-- [ ] Test coverage backend > 70%
+- [ ] Test coverage backend > 70% ← **PRIORITÀ #1**
 - [ ] Test coverage frontend > 50%
 - [ ] Zero TypeScript errors
 - [ ] Zero ESLint criticals
@@ -462,7 +663,7 @@ Bulk Operations |        |        |        |████████|
 - [ ] Zero vulnerabilità critiche (npm audit)
 - [ ] Penetration test passed
 - [ ] GDPR compliant
-- [ ] Encryption verified
+- [ ] Encryption verified (AES-256)
 - [ ] SSL A+ rating
 
 ### User Experience
@@ -483,91 +684,81 @@ Bulk Operations |        |        |        |████████|
 
 ## ⚠️ RISCHI E MITIGAZIONI
 
-### Rischio 1: Performance Degradation con 1000+ Tenant
-**Probabilità**: Media
-**Impatto**: Alto
+### Rischio 1: Testing Insufficiente (ALTA PROBABILITÀ)
+**Impatto**: Alto - Bugs in produzione
+**Mitigazione**:
+- ✅ Milestone 2 dedicata esclusivamente a testing
+- ✅ Target 70% backend, 50% frontend
+- ✅ CI/CD con test obbligatori prima del merge
+- ✅ E2E test per critical paths
+
+### Rischio 2: Performance Degradation con 1000+ Tenant
+**Impatto**: Alto - Sync delays, API slowness
 **Mitigazione**:
 - ✅ Worker concurrency già ottimizzata (34 workers)
-- ✅ Queue prioritization implementata
+- ✅ Database indexing strategico
 - [ ] Load testing con 1000+ tenant
-- [ ] Database indexing ottimizzato
-- [ ] Redis caching strategico
+- [ ] Redis caching layer
+- [ ] Consider horizontal scaling
 
-### Rischio 2: OAuth Token Expiration Issues
-**Probabilità**: Bassa
-**Impatto**: Alto
+### Rischio 3: Calendar/Contacts Sync Complexity
+**Impatto**: Medio - Implementazione più lunga del previsto
 **Mitigazione**:
-- ✅ Auto-refresh testato e funzionante
-- ✅ Graceful error handling
-- [ ] Monitor token health
-- [ ] Alert su failure rate > 5%
+- ✅ Test API endpoints già funzionanti
+- ✅ Pattern stabilito da email sync
+- [ ] Allocare buffer time (settimana extra)
+- [ ] Phased rollout (Google first, poi Microsoft, poi CalDAV)
 
-### Rischio 3: Testing Coverage Insufficiente
-**Probabilità**: Alta
-**Impatto**: Alto
+### Rischio 4: Scope Creep
+**Impatto**: Medio - Timeline slippage
 **Mitigazione**:
-- [ ] Milestone 2 dedicata a testing
-- [ ] Target coverage 70%+
-- [ ] CI/CD con test obbligatori
-- [ ] Playwright E2E tests
-
-### Rischio 4: Scope Creep (Feature Creep)
-**Probabilità**: Alta
-**Impatto**: Medio
-**Mitigazione**:
-- ✅ Milestone chiare e definite
-- ✅ Priorità esplicite (🔥 ⚡ 💡)
-- [ ] Milestone 6 marcata come opzionale
-- [ ] Focus su MVP fino a M5
-
----
-
-## 📞 SUPPORTO & RISORSE
-
-### Team
-- **Backend**: NestJS, Prisma, BullMQ, Redis
-- **Frontend**: Next.js, React, TailwindCSS
-- **AI**: Mistral, LangChain, pgvector
-- **DevOps**: Docker, Nginx, Prometheus, Grafana
-
-### Documentazione
-- [PROJECT_CHECKLIST.md](PROJECT_CHECKLIST.md) - Stato dettagliato progetto
-- [README.md](README.md) - Introduzione e setup
-- [docs/](docs/) - Documentazione tecnica completa
-  - Setup guides
-  - OAuth guides
-  - Implementation guides
-  - Testing results
-  - Scalability analysis
-
-### Scripts Utili
-- `scripts/test/` - Test API
-- `scripts/diagnostics/` - Diagnostica
-- `scripts/scalability/` - Test performance
+- ✅ Milestone 6 chiaramente marcata come "opzionale"
+- ✅ Focus su MVP (Milestone 2-5)
+- ✅ Feature freeze dopo Milestone 5
+- [ ] Regular roadmap review
 
 ---
 
 ## ✅ PROSSIMI PASSI IMMEDIATI
 
-### Questa Settimana (5-12 Novembre)
+### Questa Settimana (8-14 Novembre)
 
-**Giorno 1-2 (Mar 5 - Mer 6)**:
-1. ✅ Creare `frontend/pages/dashboard/email.tsx`
-2. ✅ Creare `frontend/lib/api/email.ts`
-3. ✅ Implementare `EmailList.tsx`
+**Venerdì 8**:
+1. ✅ Setup Jest + ts-jest per backend
+2. ✅ Creare struttura test files
+3. ✅ Scrivere primi Auth Service tests
 
-**Giorno 3-4 (Gio 7 - Ven 8)**:
-1. ✅ Implementare `EmailPreview.tsx`
-2. ✅ Implementare `EmailViewer.tsx`
+**Sabato 9 - Domenica 10**:
+1. ✅ Completare Auth Service tests (target 80% coverage)
+2. ✅ Crypto Service tests (target 90% coverage)
 
-**Giorno 5-7 (Lun 11 - Mar 12)**:
-1. ✅ Implementare `EmailFilters.tsx`
-2. ✅ Actions (mark read, delete, archive)
-3. ✅ Testing manuale
+**Lunedì 11 - Martedì 12**:
+1. ✅ Provider Services tests (Google, Microsoft, IMAP)
+2. ✅ Email Sync Services tests (Queue, Google, Microsoft, IMAP)
+
+**Mercoledì 13 - Giovedì 14**:
+1. ✅ AI Services tests (Mistral, Email Insights, Agent)
+2. ✅ Target: Backend coverage > 60%
 
 ---
 
-**Ultima revisione**: 5 Novembre 2025
-**Prossima review**: 19 Novembre 2025 (fine Milestone 1)
+## 📞 SUPPORTO & RISORSE
+
+### Documentazione Chiave
+- [DOCUMENTATION_CLEANUP_REPORT.md](docs/DOCUMENTATION_CLEANUP_REPORT.md) - Report pulizia docs (7 nov)
+- [MULTI_AGENT_RAG_ARCHITECTURE.md](docs/Strategy/MULTI_AGENT_RAG_ARCHITECTURE.md) - Strategia multi-agent
+- [RAG_TOOLS_SPECIFICATION.md](docs/Strategy/RAG_TOOLS_SPECIFICATION.md) - Tool per RAG
+- [PROJECT_STATUS_2025-11-07.md](docs/PROJECT_STATUS_2025-11-07.md) - Snapshot stato (da creare)
+
+### Git Commits Chiave (Implementazioni Recenti)
+- `13b2a9a0` - Email insights refactoring con tests
+- `3d0db541` - Email insights features (summarization, smart replies, categorization)
+- `fb4c2048` - Email send/reply/forward endpoints
+- `6d12049e` - MaterialDashboardLayout component
+
+---
+
+**Ultima revisione**: 7 Novembre 2025
+**Prossima review**: 21 Novembre 2025 (fine Milestone 2 - Testing)
 **Owner**: Team MailAgent
-**Status**: 🟢 Active Development
+**Status**: 🟢 Active Development - Focus on Testing!

@@ -143,10 +143,33 @@ export interface AppTranslations {
       summaryRegenerate: string;
       summaryEmpty: string;
       smartRepliesTitle: string;
+      smartRepliesGenerate: string;
+      smartRepliesRegenerate: string;
       smartRepliesLoading: string;
       smartRepliesEmpty: string;
       labelTitle: string;
       labelEmpty: string;
+      memoryTitle: string;
+      memoryDescription: string;
+      memoryPlaceholder: string;
+      memoryGenerate: string;
+      memoryRegenerate: string;
+      memoryLoading: string;
+      memoryEmpty: string;
+      memoryCopy: string;
+      memoryCopied: string;
+      memoryUse: string;
+      memoryQueryRequired: string;
+      memorySourceEmail: string;
+      memorySourceDocument: string;
+      memoryConfidenceLabel: string;
+      memoryConfidenceHigh: string;
+      memoryConfidenceMedium: string;
+      memoryConfidenceLow: string;
+      memoryUnknownSender: string;
+      memoryLastQueryPrefix: string;
+      memoryCopyError: string;
+      memoryError: string;
     };
   };
 }
@@ -365,10 +388,33 @@ export const translations: Record<LocaleKey, AppTranslations> = {
         summaryRegenerate: 'Refresh summary',
         summaryEmpty: 'Ask the Copilot to explain this conversation.',
         smartRepliesTitle: 'Smart replies',
+        smartRepliesGenerate: 'Generate smart replies',
+        smartRepliesRegenerate: 'Refresh replies',
         smartRepliesLoading: 'Fetching smart replies...',
         smartRepliesEmpty: 'No smart replies available yet.',
         labelTitle: 'Suggested labels',
         labelEmpty: 'AI suggested labels will appear here.',
+        memoryTitle: 'Workspace memory',
+        memoryDescription: 'Search the RAG layer for similar conversations, docs, and prior decisions.',
+        memoryPlaceholder: 'Add keywords to refine the search (optional)',
+        memoryGenerate: 'Search memory',
+        memoryRegenerate: 'Refresh memory',
+        memoryLoading: 'Pulling relevant memories...',
+        memoryEmpty: 'No relevant memories yet. Try refining the search.',
+        memoryCopy: 'Copy',
+        memoryCopied: 'Copied',
+        memoryUse: 'Use in reply',
+        memoryQueryRequired: 'Enter a search query or open an email to search.',
+        memorySourceEmail: 'Email',
+        memorySourceDocument: 'Document',
+        memoryConfidenceLabel: 'Match strength',
+        memoryConfidenceHigh: 'High',
+        memoryConfidenceMedium: 'Medium',
+        memoryConfidenceLow: 'Light',
+        memoryUnknownSender: 'Unknown sender',
+        memoryLastQueryPrefix: 'Using query:',
+        memoryCopyError: 'Unable to copy this memory right now.',
+        memoryError: 'Unable to search memory right now.',
       },
     },
   },
@@ -589,10 +635,33 @@ export const translations: Record<LocaleKey, AppTranslations> = {
         summaryRegenerate: 'Rigenera riassunto',
         summaryEmpty: 'Chiedi al Copilot di spiegare questa conversazione.',
         smartRepliesTitle: 'Risposte suggerite',
+        smartRepliesGenerate: 'Genera risposte suggerite',
+        smartRepliesRegenerate: 'Rigenera risposte',
         smartRepliesLoading: 'Recupero delle risposte suggerite...',
         smartRepliesEmpty: 'Nessuna risposta suggerita al momento.',
         labelTitle: 'Etichette suggerite',
         labelEmpty: 'Qui appariranno le etichette proposte dall’AI.',
+        memoryTitle: 'Memoria del workspace',
+        memoryDescription: 'Consulta il livello RAG per recuperare conversazioni simili, documenti e decisioni passate.',
+        memoryPlaceholder: 'Aggiungi parole chiave per affinare la ricerca (facoltativo)',
+        memoryGenerate: 'Cerca nella memoria',
+        memoryRegenerate: 'Aggiorna memoria',
+        memoryLoading: 'Recupero dei ricordi più rilevanti...',
+        memoryEmpty: 'Nessun ricordo trovato. Prova con un termine diverso.',
+        memoryCopy: 'Copia',
+        memoryCopied: 'Copiato',
+        memoryUse: 'Usa nella risposta',
+        memoryQueryRequired: 'Inserisci una ricerca o apri un’email per usare la memoria.',
+        memorySourceEmail: 'Email',
+        memorySourceDocument: 'Documento',
+        memoryConfidenceLabel: 'Forza corrispondenza',
+        memoryConfidenceHigh: 'Alta',
+        memoryConfidenceMedium: 'Media',
+        memoryConfidenceLow: 'Bassa',
+        memoryUnknownSender: 'Mittente sconosciuto',
+        memoryLastQueryPrefix: 'Ricerca usata:',
+        memoryCopyError: 'Impossibile copiare questo elemento ora.',
+        memoryError: 'Impossibile interrogare la memoria al momento.',
       },
     },
   },

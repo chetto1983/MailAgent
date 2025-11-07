@@ -6,6 +6,8 @@ import { AgentService } from '../services/agent.service';
 import { AuthenticatedRequest } from '../../../common/types/request.types';
 import { ChatSessionService, StoredChatMessage } from '../services/chat-session.service';
 import { EmailInsightsService } from '../services/email-insights.service';
+import { KnowledgeBaseService } from '../services/knowledge-base.service';
+import { SearchKnowledgeBaseDto } from '../dto/knowledge-base.dto';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard, TenantGuard)
@@ -15,6 +17,7 @@ export class AiController {
     private readonly agentService: AgentService,
     private readonly chatSessionService: ChatSessionService,
     private readonly emailInsightsService: EmailInsightsService,
+    private readonly knowledgeBaseService: KnowledgeBaseService,
   ) {}
 
   /**
@@ -253,6 +256,27 @@ export class AiController {
     return {
       success: true,
       labels,
+    };
+  }
+
+  /**
+   * POST /ai/memory/search - Retrieve semantic memories (RAG) scoped to the tenant
+   */
+  @Post('memory/search')
+  async searchMemory(
+    @Request() req: AuthenticatedRequest,
+    @Body() body: SearchKnowledgeBaseDto,
+  ) {
+    const result = await this.knowledgeBaseService.searchKnowledgeBase({
+      tenantId: req.user.tenantId,
+      emailId: body.emailId,
+      query: body.query,
+      limit: body.limit,
+    });
+
+    return {
+      success: true,
+      ...result,
     };
   }
 }

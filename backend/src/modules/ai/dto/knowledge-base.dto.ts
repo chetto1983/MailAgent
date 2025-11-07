@@ -57,3 +57,24 @@ export class TenantScopedQueryDto {
   @IsString()
   tenantId?: string;
 }
+
+export class SearchKnowledgeBaseDto {
+  @IsOptional()
+  @IsString()
+  query?: string;
+
+  @IsOptional()
+  @IsString()
+  emailId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  locale?: string;
+}

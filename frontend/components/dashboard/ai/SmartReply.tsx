@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Box, Button, CircularProgress, Stack, Typography, Alert } from '@mui/material';
 import { aiApi } from '@/lib/api/ai';
 
@@ -8,49 +8,56 @@ interface SmartReplyProps {
   disabled?: boolean;
   t: {
     smartRepliesTitle: string;
+    smartRepliesGenerate: string;
+    smartRepliesRegenerate: string;
     smartRepliesLoading: string;
     smartRepliesEmpty: string;
   };
   onSelect: (reply: string) => void;
 }
 
+const normalizeReply = (value: string): string =>
+  value
+    .replace(/```/g, '')
+    .replace(/^"+|"+$/g, '')
+    .replace(/\\n/g, ' ')
+    .replace(/\s*\n+\s*/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
 export function SmartReply({ emailId, locale, disabled, t, onSelect }: SmartReplyProps) {
   const [replies, setReplies] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    setReplies([]);
-    setError('');
-    setLoading(true);
-
-    aiApi
-      .generateSmartReplies(emailId, locale)
-      .then(({ data }) => {
-        if (!active) return;
-        setReplies(data.suggestions);
-      })
-      .catch((err) => {
-        if (!active) return;
-        const message =
-          err && typeof err === 'object' && 'message' in err
-            ? (err as { message?: string }).message
-            : 'Unable to fetch smart replies';
-        setError(message ?? 'Unable to fetch smart replies');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [emailId, locale]);
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const handleApply = (reply: string) => {
     onSelect(reply);
   };
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    setError('');
+    setReplies([]);
+    setHasGenerated(true);
+    try {
+      const { data } = await aiApi.generateSmartReplies(emailId, locale);
+      const normalized = Array.isArray(data?.suggestions)
+        ? data.suggestions.map((item: string) => normalizeReply(item)).filter(Boolean)
+        : [];
+      setReplies(normalized);
+    } catch (err) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message?: string }).message
+          : 'Unable to fetch smart replies';
+      setError(message ?? 'Unable to fetch smart replies');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showPlaceholder = !hasGenerated && !loading;
 
   return (
     <Box
@@ -66,13 +73,28 @@ export function SmartReply({ emailId, locale, disabled, t, onSelect }: SmartRepl
         {t.smartRepliesTitle}
       </Typography>
 
+      <Button
+        size="small"
+        variant="outlined"
+        onClick={handleGenerate}
+        disabled={loading}
+        startIcon={loading ? <CircularProgress size={14} /> : undefined}
+        sx={{ mb: 1.5, alignSelf: 'flex-start' }}
+      >
+        {hasGenerated ? t.smartRepliesRegenerate : t.smartRepliesGenerate}
+      </Button>
+
       {error && (
         <Alert severity="error" sx={{ mb: 1.5 }}>
           {error}
         </Alert>
       )}
 
-      {loading ? (
+      {showPlaceholder ? (
+        <Typography variant="body2" color="text.secondary">
+          {t.smartRepliesEmpty}
+        </Typography>
+      ) : loading ? (
         <Stack direction="row" spacing={1} alignItems="center">
           <CircularProgress size={16} />
           <Typography variant="body2" color="text.secondary">
@@ -88,9 +110,20 @@ export function SmartReply({ emailId, locale, disabled, t, onSelect }: SmartRepl
               size="small"
               onClick={() => handleApply(reply)}
               disabled={disabled}
-              sx={{ textTransform: 'none', justifyContent: 'flex-start', maxWidth: '100%' }}
+              title={reply}
+              sx={{
+                textTransform: 'none',
+                justifyContent: 'flex-start',
+                maxWidth: '100%',
+                minHeight: 40,
+                whiteSpace: 'normal',
+              }}
             >
-              <Typography variant="body2" sx={{ maxWidth: 240 }} noWrap>
+              <Typography
+                variant="body2"
+                sx={{ maxWidth: 260, textAlign: 'left' }}
+                noWrap
+              >
                 {reply}
               </Typography>
             </Button>

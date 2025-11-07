@@ -83,7 +83,9 @@ export class EmailInsightsService {
         maxTokens: 500,
       });
 
-      const suggestions = parseArrayFromAiPayload(raw, 'replies') ?? this.extractLines(raw);
+      const parsedReplies = parseArrayFromAiPayload(raw, 'replies');
+      const candidates = parsedReplies.length ? parsedReplies : this.extractLines(raw);
+      const suggestions = this.formatSmartReplyCandidates(candidates);
 
       if (!suggestions.length) {
         throw new Error('Empty smart replies');
@@ -119,7 +121,7 @@ export class EmailInsightsService {
       });
 
       let labels = parseArrayFromAiPayload(raw, 'labels');
-      if (!labels || labels.length === 0) {
+      if (!labels.length) {
         labels = this.guessLabelsFromText(raw);
       }
 
@@ -195,17 +197,14 @@ export class EmailInsightsService {
     return '(content unavailable)';
   }
 
-  private parseJsonArray(payload: string, key: string): string[] | null {
-    const parsed = parseArrayFromAiPayload(payload, key);
-    return parsed.length ? parsed : null;
-  }
-
   private extractLines(payload: string): string[] {
     return payload
       .split(/\n+/)
       .map((line) => line.replace(/^[\-\*\d.\s]+/, '').trim())
       .filter(Boolean)
-      .slice(0, 3);
+      .filter((line) => !/^```/.test(line))
+      .filter((line) => !/^[\{\}\[\]]+$/.test(line))
+      .filter((line) => !/^"?(replies|labels|subject|body|text|message|reply|content)"?\s*:/.test(line));
   }
 
   private guessLabelsFromText(payload: string): string[] {
@@ -231,6 +230,39 @@ export class EmailInsightsService {
 
   private getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private formatSmartReplyCandidates(candidates: string[]): string[] {
+    const normalized: string[] = [];
+    const seen = new Set<string>();
+
+    candidates.forEach((candidate) => {
+      if (!candidate) {
+        return;
+      }
+
+      const cleaned = candidate
+        .replace(/```/g, '')
+        .replace(/^"+|"+$/g, '')
+        .replace(/\\n/g, ' ')
+        .replace(/\\"/g, '"')
+        .replace(/\s*\n+\s*/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/^[\-\*\d.\s]+/, '')
+        .trim();
+
+      if (!cleaned) {
+        return;
+      }
+
+      const dedupeKey = cleaned.toLowerCase();
+      if (!seen.has(dedupeKey)) {
+        normalized.push(cleaned);
+        seen.add(dedupeKey);
+      }
+    });
+
+    return normalized;
   }
 }
 

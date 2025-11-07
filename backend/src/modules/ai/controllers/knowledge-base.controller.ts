@@ -21,6 +21,7 @@ import {
   BackfillEmailsDto,
   ListEmbeddingsQueryDto,
   TenantScopedQueryDto,
+  SearchKnowledgeBaseDto,
 } from '../dto/knowledge-base.dto';
 
 @ApiTags('AI Knowledge Base')
@@ -135,6 +136,27 @@ export class KnowledgeBaseController {
       success: true,
       purged: count,
       emailId,
+    };
+  }
+
+  @Post('search')
+  @ApiOperation({
+    summary: 'Search the tenant knowledge base using semantic similarity (RAG memory)',
+  })
+  async searchKnowledgeBase(
+    @Request() req: AuthenticatedRequest,
+    @Body() body: SearchKnowledgeBaseDto,
+  ) {
+    const result = await this.knowledgeBaseService.searchKnowledgeBase({
+      tenantId: req.user.tenantId,
+      query: body.query,
+      emailId: body.emailId,
+      limit: body.limit,
+    });
+
+    return {
+      success: true,
+      ...result,
     };
   }
 
