@@ -94,3 +94,4 @@ frontend/.cache/
 .claude/
 .claude/settings.local.json
 .claude/settings.local.json
+backend/.env
