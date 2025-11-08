@@ -1,7 +1,11 @@
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth-store';
 
-const apiBaseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const apiBaseURL = process.env.NEXT_PUBLIC_API_URL;
+
+if (!apiBaseURL) {
+  throw new Error('NEXT_PUBLIC_API_URL is not configured. Please set it in the frontend environment.');
+}
 
 export const apiClient = axios.create({
   baseURL: apiBaseURL,

@@ -43,6 +43,15 @@ services:
     networks:
       - mailagent-net
 
+  rgrock:
+    image: ngrok/ngrok:latest
+    container_name: mailagent-rgrock
+    network_mode: host
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-2xsFXxK01GM9Qx6WuWLJGdMfjCZ_3M2VgajeXYhzEBhU4dye6}
+    command: >
+      http --url=cordell-uncompounded-elene.ngrok-free.dev 3000
+
 volumes:
   postgres_data:
   redis_data:
