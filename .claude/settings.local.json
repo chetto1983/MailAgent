@@ -63,7 +63,11 @@
       "Bash(npx tsc:*)",
       "Bash(tree:*)",
       "Bash(npm test:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(psql:*)",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\16\\bin\\psql.exe\" -h localhost -U postgres -d mailagent -c \"CREATE EXTENSION IF NOT EXISTS vector;\")",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\15\\bin\\psql.exe\" -h localhost -U postgres -d mailagent -c \"CREATE EXTENSION IF NOT EXISTS vector;\")",
+      "Bash(timeout 5 sleep:*)"
     ],
     "deny": [],
     "ask": []

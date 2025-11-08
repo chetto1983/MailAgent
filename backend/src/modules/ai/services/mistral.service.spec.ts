@@ -27,13 +27,7 @@ const {
     embeddingsCreate: mockEmbeddingsCreate,
     ctor: mockConstructor,
   },
-} = jest.requireMock('@mistralai/mistralai') as {
-  __mocks: {
-    chatComplete: jest.Mock;
-    embeddingsCreate: jest.Mock;
-    ctor: jest.Mock;
-  };
-};
+} = jest.requireMock('@mistralai/mistralai');
 
 describe('MistralService', () => {
   let service: MistralService;

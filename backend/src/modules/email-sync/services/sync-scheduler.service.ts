@@ -14,6 +14,24 @@ export class SyncSchedulerService {
   private readonly SYNC_INTERVAL_MINUTES = 5; // Sync every 5 minutes
   private readonly INCREMENTAL_THRESHOLD_HOURS = 6; // Use incremental if last sync < 6h ago (was 1h - more aggressive)
 
+  // Smart Sync Configuration - Adaptive Polling Intervals
+  private readonly SYNC_INTERVALS = {
+    HIGH: 3 * 60 * 1000, // 3 minutes (Priority 1)
+    MEDIUM_HIGH: 15 * 60 * 1000, // 15 minutes (Priority 2)
+    MEDIUM: 30 * 60 * 1000, // 30 minutes (Priority 3)
+    LOW: 2 * 60 * 60 * 1000, // 2 hours (Priority 4)
+    VERY_LOW: 6 * 60 * 60 * 1000, // 6 hours (Priority 5)
+  };
+
+  // Activity thresholds (emails per hour)
+  private readonly ACTIVITY_THRESHOLDS = {
+    HIGH: 4, // 4+ emails/hour = High activity (Priority 1)
+    MEDIUM_HIGH: 2, // 2-4 emails/hour = Medium-High (Priority 2)
+    MEDIUM: 0.5, // 0.5-2 emails/hour = Medium (Priority 3)
+    LOW: 0.1, // 0.1-0.5 emails/hour = Low (Priority 4)
+    // < 0.1 emails/hour = Very Low (Priority 5)
+  };
+
   constructor(
     private prisma: PrismaService,
     private queueService: QueueService,
@@ -61,32 +79,31 @@ export class SyncSchedulerService {
    * Get providers that need syncing
    * Criteria:
    * - Active providers
-   * - Not synced in last 5 minutes (or never synced)
-   * - Order by last sync time (oldest first)
+   * - nextSyncAt is in the past (or null for never synced)
+   * - Order by priority (high first), then nextSyncAt (oldest first)
    * - Limit to batch size
    */
   private async getProvidersToSync() {
-    const cutoffTime = new Date(Date.now() - this.SYNC_INTERVAL_MINUTES * 60 * 1000);
+    const now = new Date();
 
     const providers = await this.prisma.providerConfig.findMany({
       where: {
         isActive: true,
         OR: [
-          { lastSyncedAt: null }, // Never synced
-          { lastSyncedAt: { lt: cutoffTime } }, // Not synced recently
+          { nextSyncAt: null }, // Never synced
+          { nextSyncAt: { lte: now } }, // Due for sync
         ],
       },
       include: {
         tenant: {
           select: {
             id: true,
-            // Add tenant priority field if you have it
-            // tier: true,
           },
         },
       },
       orderBy: [
-        { lastSyncedAt: 'asc' }, // Oldest first
+        { syncPriority: 'asc' }, // Priority 1 first (high priority)
+        { nextSyncAt: 'asc' }, // Then oldest due first
       ],
       take: this.BATCH_SIZE,
     });
@@ -119,35 +136,67 @@ export class SyncSchedulerService {
   }
 
   /**
-   * Determine job priority based on tenant tier and sync history
-   * OPTIMIZED: More aggressive prioritization for better throughput
+   * Determine job priority based on syncPriority field
+   * Smart Sync: Uses pre-calculated priority based on activity rate
    */
   private determinePriority(provider: any): 'high' | 'normal' | 'low' {
-    // Check if tenant has premium tier (if you implement this)
-    // if (provider.tenant.tier === 'premium') {
-    //   return 'high';
-    // }
+    const priority = provider.syncPriority ?? 3; // Default to medium
 
-    // If never synced, use high priority for fast onboarding
-    if (!provider.lastSyncedAt) {
-      return 'high';
-    }
-
-    // Check how long since last sync
-    const hoursSinceLastSync =
-      (Date.now() - provider.lastSyncedAt.getTime()) / (1000 * 60 * 60);
-
-    // OPTIMIZED: More balanced distribution across queues
-    if (hoursSinceLastSync > 48) {
-      // Not synced in 48 hours - low priority (inactive user)
-      return 'low';
-    } else if (hoursSinceLastSync > 6) {
-      // Not synced in 6 hours - normal priority
-      return 'normal';
+    // Map syncPriority (1-5) to queue priority (high/normal/low)
+    if (priority === 1) {
+      return 'high'; // Very active accounts
+    } else if (priority === 2 || priority === 3) {
+      return 'normal'; // Medium activity
     } else {
-      // Synced recently - high priority (active user)
-      return 'high';
+      return 'low'; // Low activity or inactive
     }
+  }
+
+  /**
+   * Calculate sync priority based on activity rate
+   * Priority 1 (High) -> 5 (Very Low) based on emails per hour
+   */
+  private calculateSyncPriority(avgActivityRate: number): number {
+    if (avgActivityRate >= this.ACTIVITY_THRESHOLDS.HIGH) {
+      return 1; // High activity
+    } else if (avgActivityRate >= this.ACTIVITY_THRESHOLDS.MEDIUM_HIGH) {
+      return 2; // Medium-High activity
+    } else if (avgActivityRate >= this.ACTIVITY_THRESHOLDS.MEDIUM) {
+      return 3; // Medium activity
+    } else if (avgActivityRate >= this.ACTIVITY_THRESHOLDS.LOW) {
+      return 4; // Low activity
+    } else {
+      return 5; // Very low activity / inactive
+    }
+  }
+
+  /**
+   * Calculate next sync time based on priority
+   */
+  private calculateNextSyncTime(priority: number): Date {
+    const now = Date.now();
+    let interval: number;
+
+    switch (priority) {
+      case 1:
+        interval = this.SYNC_INTERVALS.HIGH; // 3 min
+        break;
+      case 2:
+        interval = this.SYNC_INTERVALS.MEDIUM_HIGH; // 15 min
+        break;
+      case 3:
+        interval = this.SYNC_INTERVALS.MEDIUM; // 30 min
+        break;
+      case 4:
+        interval = this.SYNC_INTERVALS.LOW; // 2 hours
+        break;
+      case 5:
+      default:
+        interval = this.SYNC_INTERVALS.VERY_LOW; // 6 hours
+        break;
+    }
+
+    return new Date(now + interval);
   }
 
   /**
@@ -167,6 +216,103 @@ export class SyncSchedulerService {
     }
 
     return 'full';
+  }
+
+  /**
+   * Update activity rate and sync priority for a provider
+   * Called after each successful sync
+   */
+  async updateProviderActivity(providerId: string): Promise<void> {
+    try {
+      // Count emails received in last 24 hours
+      const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      const emailCount = await this.prisma.email.count({
+        where: {
+          providerId,
+          receivedAt: { gte: last24Hours },
+          folder: 'INBOX', // Only count inbox emails for activity
+        },
+      });
+
+      // Get current provider data
+      const provider = await this.prisma.providerConfig.findUnique({
+        where: { id: providerId },
+        select: { avgActivityRate: true, syncPriority: true },
+      });
+
+      // Calculate new activity rate (emails per hour)
+      const newActivityRate = emailCount / 24;
+
+      // Use exponential moving average for smoothing (70% new, 30% old)
+      const currentRate = provider?.avgActivityRate ?? 0;
+      const avgActivityRate = currentRate > 0
+        ? newActivityRate * 0.7 + currentRate * 0.3
+        : newActivityRate;
+
+      // Calculate new priority based on activity
+      const syncPriority = this.calculateSyncPriority(avgActivityRate);
+
+      // Calculate next sync time
+      const nextSyncAt = this.calculateNextSyncTime(syncPriority);
+
+      // Update provider
+      await this.prisma.providerConfig.update({
+        where: { id: providerId },
+        data: {
+          avgActivityRate,
+          syncPriority,
+          nextSyncAt,
+          emailsReceivedLast24h: emailCount,
+          lastActivityCheck: new Date(),
+          errorStreak: 0, // Reset error streak on successful sync
+        },
+      });
+
+      this.logger.debug(
+        `Updated activity for ${providerId}: ${avgActivityRate.toFixed(2)} emails/hr, priority ${syncPriority}`,
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error updating provider activity: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Update error streak for a provider (called on sync failure)
+   */
+  async incrementErrorStreak(providerId: string): Promise<void> {
+    try {
+      const provider = await this.prisma.providerConfig.findUnique({
+        where: { id: providerId },
+        select: { errorStreak: true, syncPriority: true },
+      });
+
+      const errorStreak = (provider?.errorStreak ?? 0) + 1;
+
+      // If too many errors, lower priority
+      let syncPriority = provider?.syncPriority ?? 3;
+      if (errorStreak >= 3 && syncPriority < 5) {
+        syncPriority = Math.min(5, syncPriority + 1); // Demote priority
+        this.logger.warn(
+          `Provider ${providerId} has ${errorStreak} consecutive errors, lowering priority to ${syncPriority}`,
+        );
+      }
+
+      const nextSyncAt = this.calculateNextSyncTime(syncPriority);
+
+      await this.prisma.providerConfig.update({
+        where: { id: providerId },
+        data: {
+          errorStreak,
+          syncPriority,
+          nextSyncAt,
+        },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error incrementing error streak: ${errorMessage}`);
+    }
   }
 
   /**
@@ -229,6 +375,25 @@ export class SyncSchedulerService {
       },
     });
 
+    // Smart Sync statistics
+    const priorityDistribution = await this.prisma.providerConfig.groupBy({
+      by: ['syncPriority'],
+      where: { isActive: true },
+      _count: true,
+    });
+
+    const providersWithErrors = await this.prisma.providerConfig.count({
+      where: {
+        isActive: true,
+        errorStreak: { gt: 0 },
+      },
+    });
+
+    const avgActivityRate = await this.prisma.providerConfig.aggregate({
+      where: { isActive: true },
+      _avg: { avgActivityRate: true },
+    });
+
     return {
       queues: queueStatus,
       providers: {
@@ -241,6 +406,35 @@ export class SyncSchedulerService {
         batchSize: this.BATCH_SIZE,
         intervalMinutes: this.SYNC_INTERVAL_MINUTES,
       },
+      smartSync: {
+        priorityDistribution: priorityDistribution.map((p) => ({
+          priority: p.syncPriority ?? 0,
+          count: p._count,
+          description: this.getPriorityDescription(p.syncPriority ?? 0),
+        })),
+        avgActivityRate: avgActivityRate._avg.avgActivityRate ?? 0,
+        providersWithErrors,
+      },
     };
+  }
+
+  /**
+   * Get human-readable description for priority level
+   */
+  private getPriorityDescription(priority: number): string {
+    switch (priority) {
+      case 1:
+        return 'High (3 min)';
+      case 2:
+        return 'Medium-High (15 min)';
+      case 3:
+        return 'Medium (30 min)';
+      case 4:
+        return 'Low (2 hours)';
+      case 5:
+        return 'Very Low (6 hours)';
+      default:
+        return 'Unknown';
+    }
   }
 }

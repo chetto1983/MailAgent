@@ -163,6 +163,14 @@ model ProviderConfig {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // Smart Sync - Intelligent Synchronization Fields
+  avgActivityRate       Float?    @default(0.0) // Average emails per hour (moving average)
+  syncPriority          Int?      @default(3) // 1=High, 2-3=Medium, 4-5=Low
+  nextSyncAt            DateTime? // When to schedule next sync
+  emailsReceivedLast24h Int?      @default(0) // Counter for activity tracking
+  errorStreak           Int?      @default(0) // Consecutive sync errors (for monitoring)
+  lastActivityCheck     DateTime? // Last time activity rate was calculated
+
   // Relations
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   emails Email[]
@@ -170,6 +178,8 @@ model ProviderConfig {
   @@unique([tenantId, email, providerType])
   @@index([tenantId, isDefault])
   @@index([userId])
+  @@index([nextSyncAt, isActive]) // For scheduler queries
+  @@index([syncPriority, nextSyncAt]) // For priority-based scheduling
   @@map("provider_configs")
 }
 
@@ -369,6 +379,42 @@ model JobQueue {
   @@index([tenantId, status])
   @@index([createdAt])
   @@map("job_queue")
+}
+
+// ===== WEBHOOK SUBSCRIPTION MODEL (for real-time sync) =====
+model WebhookSubscription {
+  id             String   @id @default(cuid())
+  providerId     String   @unique // One webhook per provider
+  providerType   String // "google", "microsoft"
+
+  // Provider-specific subscription ID
+  subscriptionId String // Gmail historyId, Microsoft subscription ID
+
+  // Webhook details
+  webhookUrl     String? // For Microsoft Graph
+  resourcePath   String? // Resource being watched
+
+  // Lifecycle
+  isActive       Boolean  @default(true)
+  expiresAt      DateTime // When subscription expires
+  lastRenewedAt  DateTime @default(now())
+
+  // Metadata
+  metadata       Json? // Provider-specific data (topic name, etc.)
+
+  // Tracking
+  lastNotificationAt DateTime?
+  notificationCount  Int       @default(0)
+  errorCount         Int       @default(0)
+  lastError          String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([providerId, isActive])
+  @@index([expiresAt]) // For renewal queries
+  @@index([providerType])
+  @@map("webhook_subscriptions")
 }
 
 // ===== HEALTH CHECK =====

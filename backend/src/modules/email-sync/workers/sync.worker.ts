@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +8,7 @@ import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { GoogleSyncService } from '../services/google-sync.service';
 import { MicrosoftSyncService } from '../services/microsoft-sync.service';
 import { ImapSyncService } from '../services/imap-sync.service';
+import { SyncSchedulerService } from '../services/sync-scheduler.service';
 
 @Injectable()
 export class SyncWorker implements OnModuleInit, OnModuleDestroy {
@@ -35,6 +36,8 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     private googleSync: GoogleSyncService,
     private microsoftSync: MicrosoftSyncService,
     private imapSync: ImapSyncService,
+    @Inject(forwardRef(() => SyncSchedulerService))
+    private syncScheduler: SyncSchedulerService,
   ) {}
 
   async onModuleInit() {
@@ -152,10 +155,16 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
         },
       });
 
+      // Update activity rate and sync priority (Smart Sync)
+      await this.syncScheduler.updateProviderActivity(providerId);
+
       result.syncDuration = Date.now() - startTime;
       return result;
     } catch (error) {
       this.logger.error(`Sync failed for ${email}:`, error);
+
+      // Increment error streak (Smart Sync)
+      await this.syncScheduler.incrementErrorStreak(providerId);
 
       // Return error result
       const errorMessage = error instanceof Error ? error.message : String(error);

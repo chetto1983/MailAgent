@@ -358,7 +358,7 @@ export class KnowledgeBaseService {
     const emailIds = Array.from(
       new Set(
         metadataList
-          .map((meta) => (this.isString(meta.emailId) ? (meta.emailId as string) : null))
+          .map((meta) => (this.isString(meta.emailId) ? (meta.emailId) : null))
           .filter((value): value is string => Boolean(value)),
       ),
     );
@@ -367,7 +367,7 @@ export class KnowledgeBaseService {
 
     return matches.map((match, index) => {
       const metadata = metadataList[index];
-      const emailId = this.isString(metadata.emailId) ? (metadata.emailId as string) : null;
+      const emailId = this.isString(metadata.emailId) ? (metadata.emailId) : null;
       const emailDetails = emailId ? emailMap.get(emailId) : undefined;
 
       const subject =

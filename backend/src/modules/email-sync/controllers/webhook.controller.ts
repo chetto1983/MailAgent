@@ -1,0 +1,104 @@
+import {
+  Controller,
+  Post,
+  Body,
+  Headers,
+  Logger,
+  HttpCode,
+  HttpStatus,
+  Query,
+  Get,
+  BadRequestException,
+} from '@nestjs/common';
+import { GmailWebhookService } from '../services/gmail-webhook.service';
+import { MicrosoftWebhookService } from '../services/microsoft-webhook.service';
+import {
+  GmailPubSubMessage,
+  MicrosoftGraphWebhookPayload,
+} from '../interfaces/webhook.interface';
+
+@Controller('webhooks')
+export class WebhookController {
+  private readonly logger = new Logger(WebhookController.name);
+
+  constructor(
+    private gmailWebhook: GmailWebhookService,
+    private microsoftWebhook: MicrosoftWebhookService,
+  ) {}
+
+  /**
+   * Gmail Pub/Sub webhook endpoint
+   * Receives push notifications from Google Cloud Pub/Sub
+   */
+  @Post('gmail/push')
+  @HttpCode(HttpStatus.OK)
+  async handleGmailPush(@Body() payload: GmailPubSubMessage) {
+    try {
+      this.logger.log('Received Gmail Pub/Sub notification');
+
+      // Decode and process the message
+      await this.gmailWebhook.handleNotification(payload);
+
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Error handling Gmail webhook:', error);
+      // Return 200 anyway to prevent Pub/Sub retries
+      return { success: false, error: 'Processing failed' };
+    }
+  }
+
+  /**
+   * Microsoft Graph webhook endpoint
+   * Receives notifications from Microsoft Graph API
+   * Handles both validation and notifications
+   */
+  @Post('microsoft/notifications')
+  @HttpCode(HttpStatus.OK)
+  async handleMicrosoftNotification(
+    @Body() payload: MicrosoftGraphWebhookPayload,
+    @Query('validationToken') validationToken?: string,
+  ) {
+    try {
+      // Handle subscription validation (initial setup)
+      if (validationToken) {
+        this.logger.log('Microsoft webhook validation requested');
+        // Return the validation token in plain text
+        return validationToken;
+      }
+
+      // Handle notification
+      this.logger.log(
+        `Received Microsoft Graph notification with ${payload.value?.length || 0} items`,
+      );
+
+      if (!payload.value || payload.value.length === 0) {
+        throw new BadRequestException('No notifications in payload');
+      }
+
+      // Process each notification
+      await this.microsoftWebhook.handleNotifications(payload.value);
+
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Error handling Microsoft webhook:', error);
+      // Return error to Microsoft for retry
+      throw error;
+    }
+  }
+
+  /**
+   * Health check endpoint for webhook service
+   */
+  @Get('health')
+  async getWebhookHealth() {
+    const gmailStats = await this.gmailWebhook.getStats();
+    const microsoftStats = await this.microsoftWebhook.getStats();
+
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      gmail: gmailStats,
+      microsoft: microsoftStats,
+    };
+  }
+}
