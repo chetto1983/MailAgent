@@ -92,6 +92,10 @@ export const providersApi = {
   // Common
   async getProviders(): Promise<ProviderConfig[]> {
     const response = await apiClient.get('/providers');
+    console.log('Raw providers response:', response);
+    console.log('Response data type:', typeof response.data);
+    console.log('Is array:', Array.isArray(response.data));
+    console.log('Response data:', response.data);
     return response.data;
   },
 

@@ -125,6 +125,12 @@ export default function EmailPage() {
     if (!user) return;
     try {
       const data = await providersApi.getProviders();
+      // Ensure data is an array before filtering
+      if (!Array.isArray(data)) {
+        console.error('Providers API returned non-array data:', data);
+        setEmailProviders([]);
+        return;
+      }
       const activeEmailProviders = data.filter(
         (provider) => provider.supportsEmail && provider.isActive,
       );
