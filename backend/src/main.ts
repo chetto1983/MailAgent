@@ -20,7 +20,7 @@ async function bootstrap() {
     origin: config.api.corsOrigins,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type,Authorization',
+    allowedHeaders: 'Content-Type,Authorization,ngrok-skip-browser-warning',
   });
 
   // Global pipes
