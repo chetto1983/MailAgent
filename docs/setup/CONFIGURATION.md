@@ -28,6 +28,7 @@ LOG_LEVEL=debug                         # debug | info | warn | error
 ```env
 API_PORT=3000                           # Porta backend
 API_HOST=backend                        # Hostname backend (docker service name)
+API_PUBLIC_URL=http://backend:3000      # URL pubblico opzionale (https://domain.tld)
 ```
 
 ### Database Components
@@ -121,7 +122,9 @@ PIPER_LANGUAGE=it_IT
 ```env
 FRONTEND_URL=http://localhost:3001
 FRONTEND_PORT=3001
+CORS_ALLOWED_ORIGINS=
 ```
+> `CORS_ALLOWED_ORIGINS` accetta una lista separata da virgole (es. `https://app.example.com,https://admin.example.com`) e viene aggiunta agli origin permessi oltre al `FRONTEND_URL`.
 
 ## Derived Variables
 
@@ -129,8 +132,8 @@ Queste variabili sono **costruite automaticamente** dal file `backend/src/config
 
 ### API URLs
 ```typescript
-API_URL = `http://${API_HOST}:${API_PORT}`
-// Esempio: http://backend:3000
+API_URL = API_PUBLIC_URL || `http://${API_HOST}:${API_PORT}`
+// Esempio: https://cordell-uncompounded-elene.ngrok-free.dev
 ```
 
 ### Database
@@ -147,14 +150,15 @@ REDIS_URL = `redis://${REDIS_HOST}:${REDIS_PORT}`
 
 ### CORS Origins
 ```typescript
-corsOrigins = [
+corsOrigins = unique([
   API_URL,
   `http://localhost:${API_PORT}`,
   FRONTEND_URL,
   'https://localhost',
-  'https://localhost:443'
-]
-// Esempio: ['http://backend:3000', 'http://localhost:3000', 'http://localhost:3001', ...]
+  'https://localhost:443',
+  ...CORS_ALLOWED_ORIGINS.split(',')
+])
+// Esempio: ['http://backend:3000', 'http://localhost:3000', 'http://localhost:3001', 'https://myapp.vercel.app']
 ```
 
 ### OAuth Redirect URIs

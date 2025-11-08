@@ -106,16 +106,25 @@ export function loadConfiguration(): Configuration {
   // API configuration - built from components
   const apiHost = process.env.API_HOST || 'localhost';
   const apiPort = parseInt(process.env.API_PORT || '3000');
-  const apiUrl = `http://${apiHost}:${apiPort}`;
+  const defaultApiUrl = `http://${apiHost}:${apiPort}`;
+  const apiUrl = process.env.API_PUBLIC_URL || defaultApiUrl;
 
   // CORS origins
-  const corsOrigins = [
-    apiUrl,
-    `http://localhost:${apiPort}`,
-    process.env.FRONTEND_URL || 'http://localhost:3001',
-    'https://localhost',
-    'https://localhost:443',
-  ].filter(Boolean);
+  const extraCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
+  const corsOrigins = Array.from(
+    new Set([
+      apiUrl,
+      `http://localhost:${apiPort}`,
+      process.env.FRONTEND_URL || 'http://localhost:3001',
+      'https://localhost',
+      'https://localhost:443',
+      ...extraCorsOrigins,
+    ].filter(Boolean)),
+  );
 
   // OAuth redirect URIs - built from API_URL
   const gmailRedirectUri = `${apiUrl}/auth/gmail/callback`;
