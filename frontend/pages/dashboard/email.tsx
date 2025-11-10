@@ -88,6 +88,19 @@ export default function EmailPage() {
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const updateEmailState = useCallback((nextEmails: Email[]) => {
+    setEmails(nextEmails);
+    setSelectedEmail((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      const updated = nextEmails.find((email) => email.id === prev.id);
+      if (!updated) {
+        return prev;
+      }
+      return { ...prev, ...updated };
+    });
+  }, []);
 
   const hasEmailProviders = emailProviders.length > 0;
   const defaultProviderId = useMemo(
@@ -103,7 +116,8 @@ export default function EmailPage() {
       // If search query is provided, use search endpoint
       if (search && search.trim()) {
         const response = await emailApi.searchEmails(search.trim());
-        setEmails(response.data.emails || []);
+        const nextEmails = response.data.emails || [];
+        updateEmailState(nextEmails);
         return;
       }
 
@@ -127,14 +141,15 @@ export default function EmailPage() {
         isStarred: isStarredFilter,
       });
 
-      setEmails(response.data.emails || []);
+      const nextEmails = response.data.emails || [];
+      updateEmailState(nextEmails);
     } catch (error) {
       console.error('Failed to load emails:', error);
-      setEmails([]);
+      updateEmailState([]);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, updateEmailState]);
 
   const loadStats = useCallback(async () => {
     if (!user) return;
