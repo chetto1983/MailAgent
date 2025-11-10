@@ -29,11 +29,14 @@ CORS_ALLOWED_ORIGINS=https://mail-agent-indol.vercel.app,...
 
 1. Vai su **APIs & Services** → **Credentials**
 2. Click sul tuo OAuth 2.0 Client ID esistente
-3. Nella sezione **Authorized redirect URIs**, aggiungi:
+3. Nella sezione **Authorized redirect URIs**, aggiungi ENTRAMBI questi URI:
 
 ```
+https://mail-agent-indol.vercel.app/dashboard/providers?provider=google
 https://mail-agent-indol.vercel.app/dashboard/providers
 ```
+
+**Nota:** Devi aggiungere entrambi! Il primo (con `?provider=google`) è quello che userà il backend, il secondo è un fallback.
 
 4. **Salva**
 
@@ -41,9 +44,13 @@ https://mail-agent-indol.vercel.app/dashboard/providers
 
 ```
 Authorized redirect URIs:
+  ✅ https://mail-agent-indol.vercel.app/dashboard/providers?provider=google (NUOVO - richiesto!)
   ✅ https://mail-agent-indol.vercel.app/dashboard/providers
+  ✅ http://localhost:3001/dashboard/providers?provider=google (mantieni per test locale)
   ✅ http://localhost:3001/dashboard/providers (mantieni per test locale)
 ```
+
+**IMPORTANTE:** Il parametro `?provider=google` è necessario per far sapere al frontend quale provider sta connettendo!
 
 ---
 
@@ -56,11 +63,14 @@ Authorized redirect URIs:
 1. Vai su **Azure Active Directory** (o **Microsoft Entra ID**)
 2. **App registrations** → Seleziona la tua app
 3. **Authentication** → **Platform configurations** → **Web**
-4. Nella sezione **Redirect URIs**, aggiungi:
+4. Nella sezione **Redirect URIs**, aggiungi ENTRAMBI questi URI:
 
 ```
+https://mail-agent-indol.vercel.app/dashboard/providers?provider=microsoft
 https://mail-agent-indol.vercel.app/dashboard/providers
 ```
+
+**Nota:** Devi aggiungere entrambi! Il primo (con `?provider=microsoft`) è quello che userà il backend, il secondo è un fallback.
 
 5. **Salva**
 
@@ -68,9 +78,13 @@ https://mail-agent-indol.vercel.app/dashboard/providers
 
 ```
 Redirect URIs:
+  ✅ https://mail-agent-indol.vercel.app/dashboard/providers?provider=microsoft (NUOVO - richiesto!)
   ✅ https://mail-agent-indol.vercel.app/dashboard/providers
+  ✅ http://localhost:3001/dashboard/providers?provider=microsoft (mantieni per test locale)
   ✅ http://localhost:3001/dashboard/providers (mantieni per test locale)
 ```
+
+**IMPORTANTE:** Il parametro `?provider=microsoft` è necessario per far sapere al frontend quale provider sta connettendo!
 
 ---
 
@@ -124,6 +138,17 @@ docker-compose restart backend
 
 ## ⚠️ Troubleshooting
 
+### Errore: OAuth redirect funziona ma account non vengono salvati
+
+**Causa:** Il redirect URI non include il parametro `provider`, quindi il frontend non sa quale provider connettere
+
+**Soluzione:**
+1. Aggiungi il redirect URI con il parametro provider:
+   - **Google:** `https://mail-agent-indol.vercel.app/dashboard/providers?provider=google`
+   - **Microsoft:** `https://mail-agent-indol.vercel.app/dashboard/providers?provider=microsoft`
+2. Riavvia il backend (già fatto ✅)
+3. Riprova la connessione
+
 ### Errore: "redirect_uri_mismatch" (Google)
 
 **Causa:** Redirect URI non configurato correttamente in Google Cloud Console
@@ -131,6 +156,7 @@ docker-compose restart backend
 **Soluzione:**
 1. Verifica di aver salvato **esattamente**:
    ```
+   https://mail-agent-indol.vercel.app/dashboard/providers?provider=google
    https://mail-agent-indol.vercel.app/dashboard/providers
    ```
    (Nota: NO trailing slash `/` alla fine!)
@@ -144,8 +170,9 @@ docker-compose restart backend
 **Soluzione:**
 1. Azure Portal → App registrations → tua app
 2. Authentication → Web → Redirect URIs
-3. Aggiungi:
+3. Aggiungi entrambi:
    ```
+   https://mail-agent-indol.vercel.app/dashboard/providers?provider=microsoft
    https://mail-agent-indol.vercel.app/dashboard/providers
    ```
 4. Salva e riprova

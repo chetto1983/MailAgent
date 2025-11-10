@@ -126,9 +126,9 @@ export function loadConfiguration(): Configuration {
     ].filter(Boolean)),
   );
 
-  // OAuth redirect URIs - built from API_URL
-  const gmailRedirectUri = `${apiUrl}/auth/gmail/callback`;
-  const microsoftRedirectUri = `${apiUrl}/auth/microsoft/callback`;
+  // OAuth redirect URIs - use explicit environment variables or fallback to API_URL
+  const gmailRedirectUri = process.env.GOOGLE_REDIRECT_URI || `${apiUrl}/auth/gmail/callback`;
+  const microsoftRedirectUri = process.env.MICROSOFT_REDIRECT_URI || `${apiUrl}/auth/microsoft/callback`;
 
   // SMTP config
   const smtpFromEmail = process.env.SMTP_FROM_EMAIL || 'noreply';
