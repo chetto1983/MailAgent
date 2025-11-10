@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { CryptoService } from '../../common/services/crypto.service';
 import { EmailSyncModule } from '../email-sync/email-sync.module';
+import { AiModule } from '../ai/ai.module';
 
 // Services
 import { GoogleOAuthService } from './services/google-oauth.service';
@@ -15,7 +16,7 @@ import { ProvidersController } from './controllers/providers.controller';
 import { OAuthCallbackController } from './controllers/oauth-callback.controller';
 
 @Module({
-  imports: [PrismaModule, forwardRef(() => EmailSyncModule)],
+  imports: [PrismaModule, forwardRef(() => EmailSyncModule), AiModule],
   providers: [
     // Common services
     CryptoService,

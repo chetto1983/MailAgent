@@ -11,6 +11,7 @@ describe('ProviderConfigService', () => {
   let syncScheduler: any;
   let webhookLifecycle: any;
   let queueService: any;
+  let emailEmbeddingQueue: any;
   let service: ProviderConfigService;
 
   const TENANT_ID = 'tenant-1';
@@ -67,6 +68,10 @@ describe('ProviderConfigService', () => {
       removeJobsForProvider: jest.fn().mockResolvedValue(0),
     };
 
+    emailEmbeddingQueue = {
+      removeJobsForProvider: jest.fn().mockResolvedValue(0),
+    };
+
     service = new ProviderConfigService(
       prisma,
       crypto,
@@ -77,6 +82,7 @@ describe('ProviderConfigService', () => {
       syncScheduler,
       webhookLifecycle,
       queueService,
+      emailEmbeddingQueue,
     );
   });
 
@@ -264,6 +270,7 @@ describe('ProviderConfigService', () => {
       expect(queueService.removeJobsForProvider).toHaveBeenCalledWith('provider-x');
       expect(webhookLifecycle.removeWebhookForProvider).toHaveBeenCalledWith('provider-x');
       expect(prisma.email.deleteMany).toHaveBeenCalledWith({ where: { providerId: 'provider-x' } });
+      expect(emailEmbeddingQueue.removeJobsForProvider).toHaveBeenCalledWith('provider-x');
       expect(prisma.providerConfig.delete).toHaveBeenCalledWith({ where: { id: 'provider-x' } });
     });
 

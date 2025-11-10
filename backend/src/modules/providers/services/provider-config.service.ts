@@ -15,6 +15,7 @@ import { CalDavService } from './caldav.service';
 import { SyncSchedulerService } from '../../email-sync/services/sync-scheduler.service';
 import { WebhookLifecycleService } from '../../email-sync/services/webhook-lifecycle.service';
 import { QueueService } from '../../email-sync/services/queue.service';
+import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import {
   ConnectGoogleProviderDto,
   ConnectMicrosoftProviderDto,
@@ -38,6 +39,7 @@ export class ProviderConfigService {
     private readonly webhookLifecycle: WebhookLifecycleService,
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
+    private readonly emailEmbeddingQueue: EmailEmbeddingQueueService,
   ) {}
 
   /**
@@ -399,6 +401,14 @@ export class ProviderConfigService {
     await this.queueService.removeJobsForProvider(provider.id).catch((error) => {
       this.logger.warn(
         `Failed to remove queued jobs for provider ${provider.id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    });
+
+    await this.emailEmbeddingQueue.removeJobsForProvider(provider.id).catch((error) => {
+      this.logger.warn(
+        `Failed to remove embedding jobs for provider ${provider.id}: ${
           error instanceof Error ? error.message : error
         }`,
       );
