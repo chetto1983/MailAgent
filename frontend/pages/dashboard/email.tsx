@@ -327,9 +327,14 @@ export default function EmailPage() {
           const threadResponse = await emailApi.getThread(email.threadId);
           const threadEmails = threadResponse.data;
           const fullEmail = threadEmails.find((e) => e.id === email.id) || threadEmails.at(-1)!;
-          setSelectedEmail(fullEmail);
-
           const unreadIds = threadEmails.filter((e) => !e.isRead).map((e) => e.id);
+
+          const normalizedEmail =
+            unreadIds.length > 0 && !fullEmail.isRead
+              ? { ...fullEmail, isRead: true }
+              : fullEmail;
+          setSelectedEmail(normalizedEmail);
+
           if (unreadIds.length > 0) {
             emailApi.bulkMarkRead(unreadIds, true).then(() => {
               setEmails((prev) =>
@@ -345,7 +350,10 @@ export default function EmailPage() {
           }
         } else {
           const response = await emailApi.getEmail(email.id);
-          setSelectedEmail(response.data);
+          const normalizedEmail = !email.isRead
+            ? { ...response.data, isRead: true }
+            : response.data;
+          setSelectedEmail(normalizedEmail);
 
           if (!email.isRead) {
             emailApi.updateEmail(email.id, { isRead: true }).then(() => {
