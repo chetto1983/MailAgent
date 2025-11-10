@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
 } from 'react';
 import { useRouter } from 'next/router';
 import { RefreshCw, Plus, Search, Mail, MailOpen, Trash2, X } from 'lucide-react';
@@ -144,16 +145,47 @@ export default function EmailPage() {
   useEffect(() => {
     if (!user) return;
     loadEmails(selectedFolder);
-  }, [loadEmails, user, selectedFolder]);
-
-  useEffect(() => {
-    if (!user) return;
     loadStats();
-  }, [loadStats, user]);
+  }, [loadEmails, loadStats, user, selectedFolder]);
 
   useEffect(() => {
     loadProviders();
   }, [loadProviders]);
+
+  const selectedFolderRef = useRef<FolderType>(selectedFolder);
+  const searchQueryRef = useRef<string>(searchQuery);
+
+  useEffect(() => {
+    selectedFolderRef.current = selectedFolder;
+  }, [selectedFolder]);
+
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (!user || typeof window === 'undefined' || typeof document === 'undefined') {
+      return undefined;
+    }
+
+    const refreshMailbox = () => {
+      const activeFolder = selectedFolderRef.current;
+      const activeSearch = searchQueryRef.current.trim();
+      loadEmails(activeFolder, activeSearch ? activeSearch : undefined);
+      loadStats();
+    };
+
+    const intervalId = window.setInterval(() => {
+      if (document.hidden) {
+        return;
+      }
+      refreshMailbox();
+    }, 30000); // refresh every 30s to keep counts in sync
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [user, loadEmails, loadStats]);
 
   const clearSelection = useCallback(() => {
     setSelectedEmailIds(new Set());
