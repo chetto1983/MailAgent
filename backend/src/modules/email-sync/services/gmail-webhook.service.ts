@@ -11,6 +11,8 @@ import {
 } from '../interfaces/webhook.interface';
 import { SyncJobData } from '../interfaces/sync-job.interface';
 import { google } from 'googleapis';
+import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
+import { CryptoService } from '../../../common/services/crypto.service';
 
 @Injectable()
 export class GmailWebhookService {
@@ -23,6 +25,8 @@ export class GmailWebhookService {
     private prisma: PrismaService,
     private queueService: QueueService,
     private configService: ConfigService,
+    private googleOAuthService: GoogleOAuthService,
+    private cryptoService: CryptoService,
   ) {}
 
   /**
@@ -82,6 +86,69 @@ export class GmailWebhookService {
   }
 
   /**
+   * Get fresh access token for a provider (decrypt + refresh if needed)
+   */
+  private async getFreshAccessToken(providerId: string): Promise<string> {
+    const provider = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+    });
+
+    if (!provider || provider.providerType !== 'google') {
+      throw new Error('Invalid Gmail provider');
+    }
+
+    if (!provider.accessToken || !provider.tokenEncryptionIv) {
+      throw new Error('Provider has no access token');
+    }
+
+    // Decrypt access token
+    let accessToken = this.cryptoService.decrypt(
+      provider.accessToken,
+      provider.tokenEncryptionIv,
+    );
+
+    // Check if token needs refresh (expires in less than 1 minute)
+    const needsRefresh =
+      !provider.tokenExpiresAt ||
+      provider.tokenExpiresAt.getTime() <= Date.now() + 60 * 1000;
+
+    if (needsRefresh && provider.refreshToken && provider.refreshTokenEncryptionIv) {
+      this.logger.log(`Refreshing expired access token for provider ${providerId}`);
+
+      try {
+        const refreshToken = this.cryptoService.decrypt(
+          provider.refreshToken,
+          provider.refreshTokenEncryptionIv,
+        );
+
+        const refreshed = await this.googleOAuthService.refreshAccessToken(refreshToken);
+        accessToken = refreshed.accessToken;
+
+        // Save refreshed token to database
+        const encryptedAccess = this.cryptoService.encrypt(refreshed.accessToken);
+
+        await this.prisma.providerConfig.update({
+          where: { id: provider.id },
+          data: {
+            accessToken: encryptedAccess.encrypted,
+            tokenEncryptionIv: encryptedAccess.iv,
+            tokenExpiresAt: refreshed.expiresAt,
+          },
+        });
+
+        this.logger.log(`Successfully refreshed token for provider ${providerId}, expires at ${refreshed.expiresAt.toISOString()}`);
+      } catch (error) {
+        this.logger.error(
+          `Failed to refresh Google access token for provider ${provider.id}: ${error instanceof Error ? error.message : error}`,
+        );
+        throw new Error('Failed to refresh access token');
+      }
+    }
+
+    return accessToken;
+  }
+
+  /**
    * Create a Gmail watch subscription for a provider
    */
   async createSubscription(
@@ -90,7 +157,7 @@ export class GmailWebhookService {
     const { providerId } = options;
 
     try {
-      // Get provider credentials
+      // Get provider info
       const provider = await this.prisma.providerConfig.findUnique({
         where: { id: providerId },
       });
@@ -99,21 +166,23 @@ export class GmailWebhookService {
         throw new Error('Invalid Gmail provider');
       }
 
+      // Get fresh access token (decrypt + refresh if needed)
+      const accessToken = await this.getFreshAccessToken(providerId);
+
       // Get Pub/Sub topic name from config
       const topicName = this.configService.get<string>(
-        'GMAIL_PUBSUB_TOPIC',
+        'GOOGLE_PUBSUB_TOPIC',
         'projects/YOUR_PROJECT/topics/gmail-notifications',
       );
 
-      // Initialize Gmail API client
+      // Initialize Gmail API client with fresh token
       const oauth2Client = new google.auth.OAuth2(
         this.configService.get<string>('GOOGLE_CLIENT_ID'),
         this.configService.get<string>('GOOGLE_CLIENT_SECRET'),
       );
 
       oauth2Client.setCredentials({
-        access_token: provider.accessToken,
-        refresh_token: provider.refreshToken,
+        access_token: accessToken,
       });
 
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
@@ -230,15 +299,17 @@ export class GmailWebhookService {
         throw new Error('Provider not found');
       }
 
-      // Initialize Gmail API client
+      // Get fresh access token (decrypt + refresh if needed)
+      const accessToken = await this.getFreshAccessToken(providerId);
+
+      // Initialize Gmail API client with fresh token
       const oauth2Client = new google.auth.OAuth2(
         this.configService.get<string>('GOOGLE_CLIENT_ID'),
         this.configService.get<string>('GOOGLE_CLIENT_SECRET'),
       );
 
       oauth2Client.setCredentials({
-        access_token: provider.accessToken,
-        refresh_token: provider.refreshToken,
+        access_token: accessToken,
       });
 
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });

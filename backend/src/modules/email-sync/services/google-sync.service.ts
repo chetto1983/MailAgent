@@ -755,6 +755,7 @@ export class GoogleSyncService {
         try {
           await this.emailEmbeddingQueue.enqueue({
             tenantId,
+            providerId,
             emailId: emailRecord.id,
             subject,
             snippet,

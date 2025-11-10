@@ -11,6 +11,7 @@ describe('SyncSchedulerService', () => {
     providerType: 'google',
     email: 'user@example.com',
     lastSyncedAt: null as Date | null,
+    syncPriority: 1,
     tenant: { id: 'tenant-1' },
   };
 
@@ -20,6 +21,8 @@ describe('SyncSchedulerService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn(),
         count: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
+        aggregate: jest.fn().mockResolvedValue({ _avg: { avgActivityRate: 0 } }),
       },
     };
 
@@ -101,30 +104,24 @@ describe('SyncSchedulerService', () => {
   });
 
   describe('determinePriority', () => {
-    it('returns high for never-synced providers', () => {
-      const priority = (service as any).determinePriority({ lastSyncedAt: null });
+    it('returns high when syncPriority is 1', () => {
+      const priority = (service as any).determinePriority({ syncPriority: 1 });
       expect(priority).toBe('high');
     });
 
-    it('returns low when older than 48 hours', () => {
-      const priority = (service as any).determinePriority({
-        lastSyncedAt: new Date(Date.now() - 49 * 60 * 60 * 1000),
-      });
-      expect(priority).toBe('low');
+    it('returns normal when syncPriority is 2 or 3', () => {
+      expect((service as any).determinePriority({ syncPriority: 2 })).toBe('normal');
+      expect((service as any).determinePriority({ syncPriority: 3 })).toBe('normal');
     });
 
-    it('returns normal when between 6 and 48 hours', () => {
-      const priority = (service as any).determinePriority({
-        lastSyncedAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      });
+    it('returns low when syncPriority is 4 or greater', () => {
+      expect((service as any).determinePriority({ syncPriority: 4 })).toBe('low');
+      expect((service as any).determinePriority({ syncPriority: 5 })).toBe('low');
+    });
+
+    it('defaults to normal when syncPriority missing', () => {
+      const priority = (service as any).determinePriority({});
       expect(priority).toBe('normal');
-    });
-
-    it('returns high when synced recently', () => {
-      const priority = (service as any).determinePriority({
-        lastSyncedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      });
-      expect(priority).toBe('high');
     });
   });
 
@@ -191,12 +188,24 @@ describe('SyncSchedulerService', () => {
       prisma.providerConfig.count
         .mockResolvedValueOnce(100) // total active
         .mockResolvedValueOnce(5) // never synced
-        .mockResolvedValueOnce(40); // synced today
+        .mockResolvedValueOnce(40) // synced today
+        .mockResolvedValueOnce(7); // providers with errors
+
+      prisma.providerConfig.groupBy.mockResolvedValue([
+        { syncPriority: 1, _count: 10 },
+        { syncPriority: 3, _count: 30 },
+      ]);
+
+      prisma.providerConfig.aggregate.mockResolvedValue({
+        _avg: { avgActivityRate: 1.25 },
+      });
 
       const result = await service.getSyncStats();
 
       expect(queueService.getQueueStatus).toHaveBeenCalled();
-      expect(prisma.providerConfig.count).toHaveBeenCalledTimes(3);
+      expect(prisma.providerConfig.count).toHaveBeenCalledTimes(4);
+      expect(prisma.providerConfig.groupBy).toHaveBeenCalled();
+      expect(prisma.providerConfig.aggregate).toHaveBeenCalled();
       expect(result).toEqual({
         queues: { summary: true },
         providers: {
@@ -208,6 +217,22 @@ describe('SyncSchedulerService', () => {
           isRunning: false,
           batchSize: expect.any(Number),
           intervalMinutes: expect.any(Number),
+        },
+        smartSync: {
+          priorityDistribution: [
+            {
+              priority: 1,
+              count: 10,
+              description: 'High (3 min)',
+            },
+            {
+              priority: 3,
+              count: 30,
+              description: 'Medium (30 min)',
+            },
+          ],
+          avgActivityRate: 1.25,
+          providersWithErrors: 7,
         },
       });
     });

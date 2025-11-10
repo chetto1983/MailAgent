@@ -1,10 +1,20 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from './google-oauth.service';
 import { MicrosoftOAuthService } from './microsoft-oauth.service';
 import { ImapService } from './imap.service';
 import { CalDavService } from './caldav.service';
+import { SyncSchedulerService } from '../../email-sync/services/sync-scheduler.service';
+import { WebhookLifecycleService } from '../../email-sync/services/webhook-lifecycle.service';
+import { QueueService } from '../../email-sync/services/queue.service';
 import {
   ConnectGoogleProviderDto,
   ConnectMicrosoftProviderDto,
@@ -22,6 +32,12 @@ export class ProviderConfigService {
     private readonly microsoftOAuth: MicrosoftOAuthService,
     private readonly imap: ImapService,
     private readonly caldav: CalDavService,
+    @Inject(forwardRef(() => SyncSchedulerService))
+    private readonly syncScheduler: SyncSchedulerService,
+    @Inject(forwardRef(() => WebhookLifecycleService))
+    private readonly webhookLifecycle: WebhookLifecycleService,
+    @Inject(forwardRef(() => QueueService))
+    private readonly queueService: QueueService,
   ) {}
 
   /**
@@ -86,9 +102,13 @@ export class ProviderConfigService {
         },
       });
 
+      const sanitized = this.sanitizeProviderConfig(providerConfig);
+
+      await this.triggerInitialSync(providerConfig);
+
       this.logger.log(`Google provider connected for ${email}`);
 
-      return this.sanitizeProviderConfig(providerConfig);
+      return sanitized;
     } catch (error) {
       this.logger.error('Failed to connect Google provider:', error);
       throw error;
@@ -157,9 +177,13 @@ export class ProviderConfigService {
         },
       });
 
+      const sanitized = this.sanitizeProviderConfig(providerConfig);
+
+      await this.triggerInitialSync(providerConfig);
+
       this.logger.log(`Microsoft provider connected for ${email}`);
 
-      return this.sanitizeProviderConfig(providerConfig);
+      return sanitized;
     } catch (error) {
       this.logger.error('Failed to connect Microsoft provider:', error);
       throw error;
@@ -320,9 +344,13 @@ export class ProviderConfigService {
         },
       });
 
+      const sanitized = this.sanitizeProviderConfig(providerConfig);
+
+      await this.triggerInitialSync(providerConfig);
+
       this.logger.log(`Generic provider connected for ${dto.email}`);
 
-      return this.sanitizeProviderConfig(providerConfig);
+      return sanitized;
     } catch (error) {
       this.logger.error('Failed to connect generic provider:', error);
       throw error;
@@ -360,8 +388,36 @@ export class ProviderConfigService {
    * Delete a provider config
    */
   async deleteProviderConfig(tenantId: string, configId: string) {
-    await this.prisma.providerConfig.delete({
+    const provider = await this.prisma.providerConfig.findFirst({
       where: { id: configId, tenantId },
+    });
+
+    if (!provider) {
+      throw new NotFoundException('Provider config not found');
+    }
+
+    await this.queueService.removeJobsForProvider(provider.id).catch((error) => {
+      this.logger.warn(
+        `Failed to remove queued jobs for provider ${provider.id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    });
+
+    await this.webhookLifecycle.removeWebhookForProvider(provider.id).catch((error) => {
+      this.logger.warn(
+        `Failed to remove webhook for provider ${provider.id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    });
+
+    await this.prisma.email.deleteMany({
+      where: { providerId: provider.id },
+    });
+
+    await this.prisma.providerConfig.delete({
+      where: { id: provider.id },
     });
 
     this.logger.log(`Provider config ${configId} deleted`);
@@ -530,5 +586,38 @@ export class ProviderConfigService {
     } = config;
 
     return sanitized;
+  }
+
+  /**
+   * Immediately queue a sync job and set up webhooks when supported.
+   */
+  private async triggerInitialSync(provider: { id: string; providerType: string }) {
+    if (!provider?.id) {
+      return;
+    }
+
+    try {
+      await this.syncScheduler.syncProviderNow(provider.id, 'high');
+    } catch (error) {
+      this.logger.error(
+        `Failed to queue initial sync for provider ${provider.id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    }
+
+    if (!['google', 'microsoft'].includes(provider.providerType)) {
+      return;
+    }
+
+    try {
+      await this.webhookLifecycle.autoCreateWebhook(provider.id);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to auto-create webhook for provider ${provider.id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    }
   }
 }

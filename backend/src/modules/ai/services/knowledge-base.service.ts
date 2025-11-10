@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { MistralService } from './mistral.service';
 import { EmbeddingsService } from './embeddings.service';
 import { EmailEmbeddingQueueService } from './email-embedding.queue';
+import { HtmlContentExtractor } from './html-content-extractor';
 
 interface BackfillResult {
   processed: number;
@@ -27,6 +28,7 @@ interface ListEmbeddingsResult<T> {
 
 interface CreateEmailEmbeddingOptions {
   tenantId: string;
+  providerId?: string;
   emailId: string;
   subject: string;
   snippet?: string | null;
@@ -102,6 +104,7 @@ export class KnowledgeBaseService {
         try {
           await this.emailEmbeddingQueue.enqueue({
             tenantId,
+            providerId: email.providerId,
             emailId: email.id,
             subject: email.subject,
             snippet: email.snippet,
@@ -473,6 +476,7 @@ export class KnowledgeBaseService {
   ): Promise<
     Array<{
       id: string;
+      providerId: string;
       subject: string;
       snippet: string | null;
       bodyText: string | null;
@@ -489,6 +493,7 @@ export class KnowledgeBaseService {
       Prisma.sql`
         SELECT
           e."id",
+          e."providerId",
           e."subject",
           e."snippet",
           e."bodyText",
@@ -551,9 +556,10 @@ export class KnowledgeBaseService {
     if (textBody) {
       pieces.push(textBody);
     } else if (email.bodyHtml) {
-      const stripped = this.stripHtml(email.bodyHtml);
-      if (stripped) {
-        pieces.push(stripped);
+      // Use Readability to extract clean content from HTML
+      const extracted = HtmlContentExtractor.extractMainContent(email.bodyHtml);
+      if (extracted) {
+        pieces.push(extracted);
       }
     } else if (email.snippet) {
       pieces.push(email.snippet);
@@ -596,7 +602,4 @@ export class KnowledgeBaseService {
     return chunks;
   }
 
-  private stripHtml(html: string): string {
-    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  }
 }

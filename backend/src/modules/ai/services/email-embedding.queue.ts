@@ -5,6 +5,7 @@ import { KnowledgeBaseService } from './knowledge-base.service';
 
 export interface EmailEmbeddingJob {
   tenantId: string;
+  providerId?: string;
   emailId: string;
   subject: string;
   snippet?: string | null;
@@ -127,6 +128,37 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
     this.logger.verbose(
       `Removed ${removed} pending email embedding job(s) for tenant ${tenantId}.`,
     );
+
+    return removed;
+  }
+
+  async removeJobsForProvider(providerId: string): Promise<number> {
+    if (!this.queue) {
+      return 0;
+    }
+
+    const removableStates: Array<'waiting' | 'delayed' | 'paused' | 'waiting-children'> = [
+      'waiting',
+      'delayed',
+      'paused',
+      'waiting-children',
+    ];
+
+    const jobs = await this.queue.getJobs(removableStates, 0, -1);
+    let removed = 0;
+
+    for (const job of jobs) {
+      if (job?.data?.providerId === providerId) {
+        await job.remove();
+        removed += 1;
+      }
+    }
+
+    if (removed > 0) {
+      this.logger.verbose(
+        `Removed ${removed} pending email embedding job(s) for provider ${providerId}.`,
+      );
+    }
 
     return removed;
   }

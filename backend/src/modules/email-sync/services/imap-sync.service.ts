@@ -510,6 +510,7 @@ export class ImapSyncService {
         try {
           await this.emailEmbeddingQueue.enqueue({
             tenantId,
+            providerId,
             emailId: emailRecord.id,
             subject,
             snippet,

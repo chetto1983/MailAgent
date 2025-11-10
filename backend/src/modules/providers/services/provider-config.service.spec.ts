@@ -8,6 +8,9 @@ describe('ProviderConfigService', () => {
   let microsoftOAuth: any;
   let imap: any;
   let caldav: any;
+  let syncScheduler: any;
+  let webhookLifecycle: any;
+  let queueService: any;
   let service: ProviderConfigService;
 
   const TENANT_ID = 'tenant-1';
@@ -20,6 +23,9 @@ describe('ProviderConfigService', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
         delete: jest.fn(),
+      },
+      email: {
+        deleteMany: jest.fn(),
       },
     };
 
@@ -48,6 +54,19 @@ describe('ProviderConfigService', () => {
       testCardDavConnection: jest.fn(),
     };
 
+    syncScheduler = {
+      syncProviderNow: jest.fn().mockResolvedValue(undefined),
+    };
+
+    webhookLifecycle = {
+      autoCreateWebhook: jest.fn().mockResolvedValue(true),
+      removeWebhookForProvider: jest.fn().mockResolvedValue(undefined),
+    };
+
+    queueService = {
+      removeJobsForProvider: jest.fn().mockResolvedValue(0),
+    };
+
     service = new ProviderConfigService(
       prisma,
       crypto,
@@ -55,6 +74,9 @@ describe('ProviderConfigService', () => {
       microsoftOAuth,
       imap,
       caldav,
+      syncScheduler,
+      webhookLifecycle,
+      queueService,
     );
   });
 
@@ -103,6 +125,8 @@ describe('ProviderConfigService', () => {
         email: dto.email,
         providerType: 'google',
       });
+      expect(syncScheduler.syncProviderNow).toHaveBeenCalledWith('config-1', 'high');
+      expect(webhookLifecycle.autoCreateWebhook).toHaveBeenCalledWith('config-1');
     });
 
     it('throws when emails mismatch', async () => {
@@ -180,6 +204,8 @@ describe('ProviderConfigService', () => {
         email: dto.email,
         providerType: 'generic',
       });
+      expect(syncScheduler.syncProviderNow).toHaveBeenCalledWith('generic-1', 'high');
+      expect(webhookLifecycle.autoCreateWebhook).not.toHaveBeenCalled();
     });
   });
 
@@ -222,6 +248,32 @@ describe('ProviderConfigService', () => {
         host: 'imap.example.com',
         port: 993,
       });
+    });
+  });
+
+  describe('deleteProviderConfig', () => {
+    it('removes jobs, webhooks, emails, and provider record', async () => {
+      prisma.providerConfig.findFirst.mockResolvedValue({
+        id: 'provider-x',
+        tenantId: TENANT_ID,
+        providerType: 'google',
+      });
+
+      await service.deleteProviderConfig(TENANT_ID, 'provider-x');
+
+      expect(queueService.removeJobsForProvider).toHaveBeenCalledWith('provider-x');
+      expect(webhookLifecycle.removeWebhookForProvider).toHaveBeenCalledWith('provider-x');
+      expect(prisma.email.deleteMany).toHaveBeenCalledWith({ where: { providerId: 'provider-x' } });
+      expect(prisma.providerConfig.delete).toHaveBeenCalledWith({ where: { id: 'provider-x' } });
+    });
+
+    it('throws when provider does not exist', async () => {
+      prisma.providerConfig.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.deleteProviderConfig(TENANT_ID, 'missing'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.providerConfig.delete).not.toHaveBeenCalled();
     });
   });
 });

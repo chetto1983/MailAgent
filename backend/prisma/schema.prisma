@@ -236,10 +236,14 @@ model Email {
   headers  Json? // Full email headers
   metadata Json? // Provider-specific metadata
 
+  // Cross-provider sync
+  crossProviderLinkId String? // Link to cross-provider group
+
   // Relations
-  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  provider    ProviderConfig    @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  attachments EmailAttachment[]
+  tenant              Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider            ProviderConfig           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  attachments         EmailAttachment[]
+  crossProviderLink   EmailCrossProviderLink?  @relation(fields: [crossProviderLinkId], references: [id], onDelete: SetNull)
 
   @@unique([providerId, externalId]) // Prevent duplicates
   @@unique([tenantId, messageId])
@@ -247,6 +251,7 @@ model Email {
   @@index([tenantId, isRead]) // Unread emails
   @@index([tenantId, threadId]) // Thread grouping
   @@index([sentAt]) // Sort by date
+  @@index([crossProviderLinkId]) // Cross-provider lookups
   @@map("emails")
 }
 
@@ -275,6 +280,44 @@ model EmailAttachment {
 
   @@index([emailId])
   @@map("email_attachments")
+}
+
+// ===== CROSS-PROVIDER EMAIL LINK MODEL =====
+// Links the same email across multiple providers (e.g., Gmail + Outlook)
+model EmailCrossProviderLink {
+  id       String @id @default(cuid())
+  tenantId String
+
+  // Content hash for deduplication (SHA-256 of messageId + subject + sentAt)
+  contentHash String
+
+  // Conflict resolution strategy for this link
+  conflictStrategy String @default("LAST_WRITE_WINS") // "LAST_WRITE_WINS", "UNION", "INTERSECTION", "PRIORITY_BASED"
+
+  // Merged state across all providers (computed from provider states)
+  mergedIsRead     Boolean   @default(false)
+  mergedIsStarred  Boolean   @default(false)
+  mergedFolder     String    @default("INBOX")
+  mergedLabels     String[]  @default([])
+
+  // Tracking
+  providerCount    Int       @default(0) // How many providers have this email
+  lastSyncedAt     DateTime  @default(now())
+  lastConflictAt   DateTime? // Last time a conflict was detected
+
+  // Conflict metadata (JSON with details about last conflict)
+  lastConflict     Json?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  emails Email[] // All emails linked to this group
+
+  @@unique([tenantId, contentHash]) // One link per unique email per tenant
+  @@index([tenantId, lastSyncedAt])
+  @@index([contentHash])
+  @@map("email_cross_provider_links")
 }
 
 // Update Tenant model to include emails relation

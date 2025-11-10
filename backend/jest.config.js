@@ -29,7 +29,7 @@ module.exports = {
 
   // Transform ESM modules from node_modules
   transformIgnorePatterns: [
-    'node_modules/(?!(nanoid)/)',
+    'node_modules/(?!(nanoid|jsdom|@mozilla/readability|parse5)/)',
   ],
 
   // Coverage collection

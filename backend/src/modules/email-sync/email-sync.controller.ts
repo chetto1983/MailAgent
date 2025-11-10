@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { QueueService } from './services/queue.service';
 import { SyncSchedulerService } from './services/sync-scheduler.service';
+import { WebhookLifecycleService } from './services/webhook-lifecycle.service';
 
 @ApiTags('Email Sync')
 @Controller('email-sync')
@@ -12,6 +13,7 @@ export class EmailSyncController {
   constructor(
     private queueService: QueueService,
     private schedulerService: SyncSchedulerService,
+    private webhookLifecycle: WebhookLifecycleService,
   ) {}
 
   @Get('status')
@@ -77,5 +79,38 @@ export class EmailSyncController {
       success: true,
       message: `Queue ${priority} cleared - all jobs deleted`,
     };
+  }
+
+  @Post('webhooks/create-all')
+  @ApiOperation({ summary: 'Create webhook subscriptions for all eligible providers' })
+  @ApiResponse({ status: 200, description: 'Webhooks created successfully' })
+  async createAllWebhooks(@Request() req: any) {
+    const result = await this.webhookLifecycle.createAllWebhooks();
+
+    return {
+      success: true,
+      created: result.created,
+      failed: result.failed,
+      message: `Created ${result.created} webhooks, ${result.failed} failed`,
+    };
+  }
+
+  @Post('webhooks/renew')
+  @ApiOperation({ summary: 'Manually trigger webhook renewal' })
+  @ApiResponse({ status: 200, description: 'Webhook renewal triggered' })
+  async renewWebhooks() {
+    await this.webhookLifecycle.renewExpiringWebhooks();
+
+    return {
+      success: true,
+      message: 'Webhook renewal completed',
+    };
+  }
+
+  @Get('webhooks/health')
+  @ApiOperation({ summary: 'Get webhook system health status' })
+  @ApiResponse({ status: 200, description: 'Returns webhook health status' })
+  async getWebhookHealth() {
+    return await this.webhookLifecycle.getHealthStatus();
   }
 }

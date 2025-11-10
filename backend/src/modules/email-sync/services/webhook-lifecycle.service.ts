@@ -21,15 +21,16 @@ export class WebhookLifecycleService {
   /**
    * Auto-create webhook subscriptions for new providers
    * Called when a new provider is added
+   * Returns true if successful, false if failed
    */
-  async autoCreateWebhook(providerId: string): Promise<void> {
+  async autoCreateWebhook(providerId: string): Promise<boolean> {
     try {
       const provider = await this.prisma.providerConfig.findUnique({
         where: { id: providerId },
       });
 
       if (!provider || !provider.isActive) {
-        return;
+        return false;
       }
 
       // Check if webhook already exists
@@ -39,7 +40,7 @@ export class WebhookLifecycleService {
 
       if (existing) {
         this.logger.debug(`Webhook already exists for provider ${providerId}`);
-        return;
+        return false;
       }
 
       // Create webhook based on provider type
@@ -62,11 +63,13 @@ export class WebhookLifecycleService {
       }
 
       this.logger.log(`Auto-created webhook for ${provider.email}`);
+      return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(
         `Error auto-creating webhook for ${providerId}: ${errorMessage}`,
       );
+      return false;
     }
   }
 
@@ -282,14 +285,10 @@ export class WebhookLifecycleService {
     });
 
     for (const provider of providers) {
-      try {
-        await this.autoCreateWebhook(provider.id);
+      const success = await this.autoCreateWebhook(provider.id);
+      if (success) {
         created++;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.logger.error(
-          `Failed to create webhook for ${provider.email}: ${errorMessage}`,
-        );
+      } else {
         failed++;
       }
     }
@@ -299,5 +298,42 @@ export class WebhookLifecycleService {
     );
 
     return { created, failed };
+  }
+
+  /**
+   * Remove webhook subscription and cancel upstream watcher for a provider.
+   */
+  async removeWebhookForProvider(providerId: string): Promise<void> {
+    const subscription = await this.prisma.webhookSubscription.findUnique({
+      where: { providerId },
+    });
+
+    if (!subscription) {
+      return;
+    }
+
+    try {
+      if (subscription.providerType === 'google') {
+        await this.gmailWebhook.cancelSubscription(providerId);
+      } else if (subscription.providerType === 'microsoft') {
+        await this.microsoftWebhook.cancelSubscription(providerId);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to cancel ${subscription.providerType} webhook for provider ${providerId}: ${message}`,
+      );
+    }
+
+    try {
+      await this.prisma.webhookSubscription.delete({
+        where: { providerId },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to delete webhook record for provider ${providerId}: ${message}`,
+      );
+    }
   }
 }

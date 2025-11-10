@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -18,6 +18,11 @@ import { GmailWebhookService } from './services/gmail-webhook.service';
 import { MicrosoftWebhookService } from './services/microsoft-webhook.service';
 import { WebhookLifecycleService } from './services/webhook-lifecycle.service';
 
+// Cross-Provider Sync Services
+import { CrossProviderDedupService } from './services/cross-provider-dedup.service';
+import { CrossProviderConflictService } from './services/cross-provider-conflict.service';
+import { CrossProviderSyncService } from './services/cross-provider-sync.service';
+
 // Workers
 import { SyncWorker } from './workers/sync.worker';
 
@@ -30,7 +35,7 @@ import { WebhookController } from './controllers/webhook.controller';
     ConfigModule,
     ScheduleModule.forRoot(),
     PrismaModule,
-    ProvidersModule, // For OAuth services and crypto
+    forwardRef(() => ProvidersModule), // For OAuth services and crypto
     AiModule,
   ],
   controllers: [
@@ -55,6 +60,11 @@ import { WebhookController } from './controllers/webhook.controller';
     MicrosoftWebhookService,
     WebhookLifecycleService,
 
+    // Cross-Provider Sync services
+    CrossProviderDedupService,
+    CrossProviderConflictService,
+    CrossProviderSyncService,
+
     // Workers
     SyncWorker,
   ],
@@ -64,6 +74,7 @@ import { WebhookController } from './controllers/webhook.controller';
     GmailWebhookService,
     MicrosoftWebhookService,
     WebhookLifecycleService,
+    CrossProviderSyncService,
   ],
 })
 export class EmailSyncModule {}

@@ -128,6 +128,22 @@ describe('QueueService', () => {
     });
   });
 
+  describe('removeJobsForProvider', () => {
+    it('removes pending jobs associated with a provider', async () => {
+      normalQueue.getJobs.mockResolvedValueOnce([
+        { data: { providerId: 'provider-a' }, remove: jest.fn() },
+        { data: { providerId: 'another' }, remove: jest.fn() },
+      ]);
+      highQueue.getJobs.mockResolvedValueOnce([]);
+      lowQueue.getJobs.mockResolvedValueOnce([]);
+
+      const removed = await service.removeJobsForProvider('provider-a');
+
+      expect(removed).toBe(1);
+      expect(normalQueue.getJobs).toHaveBeenCalled();
+    });
+  });
+
   describe('metrics summary', () => {
     it('tracks completion and failures', async () => {
       await (service as any).recordCompletion('high', highQueue, 'job-1');

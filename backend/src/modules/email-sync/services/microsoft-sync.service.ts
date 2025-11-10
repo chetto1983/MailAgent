@@ -741,6 +741,7 @@ export class MicrosoftSyncService {
         try {
           await this.emailEmbeddingQueue.enqueue({
             tenantId,
+            providerId,
             emailId: emailRecord.id,
             subject,
             snippet,

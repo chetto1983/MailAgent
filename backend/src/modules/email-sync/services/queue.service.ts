@@ -257,17 +257,51 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
     for (const { name, queue } of queues) {
       const jobs = await queue.getJobs(removableStates, 0, -1);
+      let removedFromQueue = 0;
 
       for (const job of jobs) {
         if (job?.data?.tenantId === tenantId) {
           await job.remove();
           removed += 1;
+          removedFromQueue += 1;
         }
       }
 
-      if (removed > 0) {
+      if (removedFromQueue > 0) {
         this.logger.verbose(
           `Removed pending ${name} priority sync jobs for tenant ${tenantId}.`,
+        );
+      }
+    }
+
+    return removed;
+  }
+
+  async removeJobsForProvider(providerId: string): Promise<number> {
+    const queues = [
+      { name: 'high', queue: this.highQueue },
+      { name: 'normal', queue: this.normalQueue },
+      { name: 'low', queue: this.lowQueue },
+    ];
+
+    const removableStates: JobType[] = ['waiting', 'delayed', 'paused', 'waiting-children'];
+    let removed = 0;
+
+    for (const { name, queue } of queues) {
+      const jobs = await queue.getJobs(removableStates, 0, -1);
+      let removedFromQueue = 0;
+
+      for (const job of jobs) {
+        if (job?.data?.providerId === providerId) {
+          await job.remove();
+          removed += 1;
+          removedFromQueue += 1;
+        }
+      }
+
+      if (removedFromQueue > 0) {
+        this.logger.verbose(
+          `Removed pending ${name} priority sync jobs for provider ${providerId}.`,
         );
       }
     }
