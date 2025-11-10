@@ -200,28 +200,49 @@ export function EmailView({
       {/* Header */}
       <Box
         sx={{
-          p: { xs: 2, md: 3 },
+          p: { xs: 1.5, md: 2 },
           borderBottom: 1,
           borderColor: 'divider',
           bgcolor: 'background.paper',
         }}
       >
-        {/* Folder label */}
-        <Chip
-          label={`${t.folderLabel}: ${selectedEmail.folder || 'Inbox'}`}
-          size="small"
-          variant="outlined"
-          sx={{ mb: 2, fontSize: '0.6875rem', letterSpacing: '0.1em' }}
-        />
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={1}
+          justifyContent="space-between"
+          alignItems={{ xs: 'flex-start', sm: 'center' }}
+          sx={{ mb: 1.5 }}
+        >
+          <Chip
+            label={`${t.folderLabel}: ${selectedEmail.folder || 'Inbox'}`}
+            size="small"
+            variant="outlined"
+            sx={{ fontSize: '0.65rem', letterSpacing: '0.08em', px: 0.75 }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {new Date(selectedEmail.receivedAt).toLocaleString(locale, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}
+          </Typography>
+        </Stack>
 
         {/* Title and meta */}
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 3 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            flexWrap: { xs: 'wrap', md: 'nowrap' },
+            mb: 1.5,
+          }}
+        >
           <Avatar
             sx={{
               bgcolor: 'primary.main',
-              width: { xs: 40, md: 48 },
-              height: { xs: 40, md: 48 },
-              fontSize: '1.25rem',
+              width: { xs: 36, md: 40 },
+              height: { xs: 36, md: 40 },
+              fontSize: '1.1rem',
             }}
           >
             {displayName[0]?.toUpperCase() || 'E'}
@@ -229,44 +250,40 @@ export function EmailView({
 
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography
-              variant="h5"
+              variant="h6"
               component="h2"
-              gutterBottom
               sx={{
-                fontSize: { xs: '1.25rem', md: '1.75rem' },
+                fontSize: { xs: '1.1rem', md: '1.4rem' },
+                fontWeight: 600,
+                lineHeight: 1.3,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                mb: 0.5,
               }}
             >
               {selectedEmail.subject || '(No subject)'}
             </Typography>
-            <Typography variant="body2" color="text.primary" gutterBottom>
+            <Typography variant="body2" color="text.secondary" noWrap>
               <strong>From:</strong> {displayName}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {new Date(selectedEmail.receivedAt).toLocaleString(locale, {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              })}
             </Typography>
           </Box>
 
           {/* Action buttons */}
-          <Stack direction="row" spacing={0.5}>
+          <Stack direction="row" spacing={0.25}>
             <IconButton
               size="small"
               aria-label={selectedEmail.isStarred ? 'Unstar email' : 'Star email'}
               onClick={() => onToggleStar(selectedEmail)}
               sx={{
-                width: 40,
-                height: 40,
+                width: 36,
+                height: 36,
                 color: selectedEmail.isStarred ? 'warning.main' : 'text.secondary',
               }}
             >
               {selectedEmail.isStarred ? (
-                <Star size={18} fill="currentColor" />
+                <Star size={16} fill="currentColor" />
               ) : (
-                <StarOff size={18} />
+                <StarOff size={16} />
               )}
             </IconButton>
 
@@ -274,9 +291,9 @@ export function EmailView({
               size="small"
               aria-label={selectedEmail.isRead ? 'Mark as unread' : 'Mark as read'}
               onClick={() => onToggleRead(selectedEmail)}
-              sx={{ width: 40, height: 40 }}
+              sx={{ width: 36, height: 36 }}
             >
-              {selectedEmail.isRead ? <MailOpen size={18} /> : <Mail size={18} />}
+              {selectedEmail.isRead ? <MailOpen size={16} /> : <Mail size={16} />}
             </IconButton>
 
             <IconButton
@@ -284,9 +301,9 @@ export function EmailView({
               aria-label="Delete email"
               onClick={() => onDelete(selectedEmail)}
               color="error"
-              sx={{ width: 40, height: 40 }}
+              sx={{ width: 36, height: 36 }}
             >
-              <Trash2 size={18} />
+              <Trash2 size={16} />
             </IconButton>
 
             {onClose && (
@@ -294,16 +311,16 @@ export function EmailView({
                 size="small"
                 aria-label="Close email"
                 onClick={onClose}
-                sx={{ width: 40, height: 40, display: { md: 'none' } }}
+                sx={{ width: 36, height: 36, display: { md: 'none' } }}
               >
-                <X size={18} />
+                <X size={16} />
               </IconButton>
             )}
           </Stack>
         </Box>
 
         {/* Reply/Forward buttons */}
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
           <Button
             variant="contained"
             startIcon={<Reply />}
@@ -324,7 +341,7 @@ export function EmailView({
       </Box>
 
       {selectedEmail && (
-        <Box sx={{ px: { xs: 2, md: 3 }, py: 3 }}>
+        <Box sx={{ px: { xs: 2, md: 3 }, py: 2 }}>
           {(selectedEmail.to || selectedEmail.cc || selectedEmail.labels) && (
             <Box
               sx={{
@@ -332,8 +349,8 @@ export function EmailView({
                 border: '1px solid',
                 borderColor: 'divider',
                 borderRadius: 2,
-                p: 2,
-                mb: 2,
+                p: 1.5,
+                mb: 1.5,
               }}
             >
               <Stack spacing={1}>
@@ -373,7 +390,7 @@ export function EmailView({
               p: 0,
               bgcolor: 'background.default',
               borderRadius: 2,
-              maxHeight: { md: '58vh' },
+              maxHeight: { md: '65vh' },
               overflow: 'auto',
             }}
           >

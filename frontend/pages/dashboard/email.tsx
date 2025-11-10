@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from 'react';
 import { useRouter } from 'next/router';
-import { RefreshCw, Plus, Search, Mail, MailOpen, Trash2, X } from 'lucide-react';
+import { RefreshCw, Plus, Search, Mail, MailOpen, Trash2, X, Star } from 'lucide-react';
 import {
   Box,
   Grid,
@@ -18,11 +18,15 @@ import {
   CircularProgress,
   Paper,
   IconButton,
+  MenuItem,
+  Chip,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useAuthStore } from '@/stores/auth-store';
 import { Button } from '@/components/ui/button';
-import { emailApi, type Email, type EmailStats } from '@/lib/api/email';
+import { emailApi, type Email, type EmailStats, type EmailListParams } from '@/lib/api/email';
 import { useLocale } from '@/lib/hooks/use-locale';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { EmailList } from '@/components/dashboard/EmailList';
@@ -88,6 +92,12 @@ export default function EmailPage() {
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [providerFilter, setProviderFilter] = useState<string>('all');
+  const [readFilter, setReadFilter] = useState<'all' | 'unread' | 'read'>('all');
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [fromFilter, setFromFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const updateEmailState = useCallback((nextEmails: Email[]) => {
     setEmails(nextEmails);
     setSelectedEmail((prev) => {
@@ -101,6 +111,55 @@ export default function EmailPage() {
       return { ...prev, ...updated };
     });
   }, []);
+  const applyClientFilters = useCallback(
+    (list: Email[]) => {
+      const normalizedFrom = fromFilter.trim().toLowerCase();
+      const parseDate = (value: string) => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+      };
+      const start = parseDate(startDate);
+      const end = parseDate(endDate);
+      if (end) {
+        end.setHours(23, 59, 59, 999);
+      }
+
+      return list.filter((email) => {
+        if (providerFilter !== 'all' && email.providerId !== providerFilter) {
+          return false;
+        }
+        if (readFilter === 'read' && !email.isRead) {
+          return false;
+        }
+        if (readFilter === 'unread' && email.isRead) {
+          return false;
+        }
+        if (starredOnly && !email.isStarred) {
+          return false;
+        }
+        if (normalizedFrom && !email.from.toLowerCase().includes(normalizedFrom)) {
+          return false;
+        }
+        if (start) {
+          const received = new Date(email.receivedAt);
+          if (received < start) {
+            return false;
+          }
+          if (end && received > end) {
+            return false;
+          }
+        } else if (end) {
+          const received = new Date(email.receivedAt);
+          if (received > end) {
+            return false;
+          }
+        }
+        return true;
+      });
+    },
+    [providerFilter, readFilter, starredOnly, fromFilter, startDate, endDate],
+  );
 
   const hasEmailProviders = emailProviders.length > 0;
   const defaultProviderId = useMemo(
@@ -108,48 +167,79 @@ export default function EmailPage() {
     [emailProviders],
   );
 
-  const loadEmails = useCallback(async (folder?: FolderType, search?: string) => {
-    if (!user) return;
-    try {
-      setLoading(true);
+  const loadEmails = useCallback(
+    async (folder?: FolderType, search?: string) => {
+      if (!user) return;
+      try {
+        setLoading(true);
 
-      // If search query is provided, use search endpoint
-      if (search && search.trim()) {
-        const response = await emailApi.searchEmails(search.trim());
-        const nextEmails = response.data.emails || [];
-        updateEmailState(nextEmails);
-        return;
-      }
+        const normalizedSearch = search?.trim();
+        const normalizedFrom = fromFilter.trim();
+        const providerIdFilter = providerFilter !== 'all' ? providerFilter : undefined;
+        const readFilterValue =
+          readFilter === 'all' ? undefined : readFilter === 'read';
 
-      // Determine folder filter for API
-      let folderFilter: string | undefined;
-      let isStarredFilter: boolean | undefined;
+        // Determine folder filter for API
+        let folderFilter: string | undefined;
+        let isStarredFilter: boolean | undefined = starredOnly ? true : undefined;
 
-      if (folder && folder !== 'ALL') {
-        if (folder === 'STARRED') {
-          isStarredFilter = true;
-        } else {
-          folderFilter = folder;
+        if (folder && folder !== 'ALL') {
+          if (folder === 'STARRED') {
+            isStarredFilter = true;
+          } else {
+            folderFilter = folder;
+          }
         }
+
+        if (normalizedSearch) {
+          const response = await emailApi.searchEmails(normalizedSearch);
+          const nextEmails = response.data.emails || [];
+          updateEmailState(applyClientFilters(nextEmails));
+          return;
+        }
+
+        const params: EmailListParams = {
+          page: 1,
+          limit: 100,
+          folder: folderFilter,
+          isStarred: isStarredFilter,
+          isRead: readFilterValue,
+          providerId: providerIdFilter,
+        };
+
+        if (normalizedFrom) {
+          params.from = normalizedFrom;
+        }
+        if (startDate) {
+          params.startDate = startDate;
+        }
+        if (endDate) {
+          params.endDate = endDate;
+        }
+
+        const response = await emailApi.listEmails(params);
+
+        const nextEmails = response.data.emails || [];
+        updateEmailState(applyClientFilters(nextEmails));
+      } catch (error) {
+        console.error('Failed to load emails:', error);
+        updateEmailState([]);
+      } finally {
+        setLoading(false);
       }
-
-      // Use conversations endpoint for threaded view
-      const response = await emailApi.listEmails({
-        page: 1,
-        limit: 100,
-        folder: folderFilter,
-        isStarred: isStarredFilter,
-      });
-
-      const nextEmails = response.data.emails || [];
-      updateEmailState(nextEmails);
-    } catch (error) {
-      console.error('Failed to load emails:', error);
-      updateEmailState([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, updateEmailState]);
+    },
+    [
+      user,
+      updateEmailState,
+      applyClientFilters,
+      providerFilter,
+      readFilter,
+      starredOnly,
+      fromFilter,
+      startDate,
+      endDate,
+    ],
+  );
 
   const loadStats = useCallback(async () => {
     if (!user) return;
@@ -808,6 +898,21 @@ export default function EmailPage() {
   const formatDescription = (count: number) =>
     emailCopy.descriptionTemplate.replace('{count}', String(Math.max(0, count)));
   const description = formatDescription(stats?.unread ?? 0);
+  const filtersActive =
+    providerFilter !== 'all' ||
+    readFilter !== 'all' ||
+    starredOnly ||
+    !!fromFilter.trim() ||
+    !!startDate ||
+    !!endDate;
+  const handleFilterReset = () => {
+    setProviderFilter('all');
+    setReadFilter('all');
+    setStarredOnly(false);
+    setFromFilter('');
+    setStartDate('');
+    setEndDate('');
+  };
 
   // Get the folder display name
   const getFolderDisplayName = (folder: FolderType): string => {
@@ -854,6 +959,108 @@ export default function EmailPage() {
             {common.search}
           </Button>
         </Stack>
+
+        <Paper
+          elevation={0}
+          sx={{
+            mt: 2,
+            p: 2,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={3}>
+              <TextField
+                select
+                label="Provider"
+                value={providerFilter}
+                onChange={(event) => setProviderFilter(event.target.value)}
+                fullWidth
+                size="small"
+              >
+                <MenuItem value="all">All providers</MenuItem>
+                {emailProviders.map((provider) => (
+                  <MenuItem key={provider.id} value={provider.id}>
+                    {provider.displayName || provider.email || provider.providerType || provider.id}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <TextField
+                label="From"
+                value={fromFilter}
+                onChange={(event) => setFromFilter(event.target.value)}
+                placeholder="sender@company.com"
+                fullWidth
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <TextField
+                label="Start date"
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <TextField
+                label="End date"
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                InputLabelProps={{ shrink: true }}
+                fullWidth
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={readFilter}
+                onChange={(_, next) => {
+                  if (next) {
+                    setReadFilter(next as 'all' | 'unread' | 'read');
+                  }
+                }}
+                aria-label="Read filter"
+                color="primary"
+              >
+                <ToggleButton value="all">All</ToggleButton>
+                <ToggleButton value="unread">Unread</ToggleButton>
+                <ToggleButton value="read">Read</ToggleButton>
+              </ToggleButtonGroup>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Chip
+                icon={<Star size={14} />}
+                label="Starred only"
+                color={starredOnly ? 'warning' : 'default'}
+                variant={starredOnly ? 'filled' : 'outlined'}
+                onClick={() => setStarredOnly((prev) => !prev)}
+                sx={{ width: 'fit-content' }}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={handleFilterReset}
+                disabled={!filtersActive}
+              >
+                Reset filters
+              </Button>
+            </Grid>
+          </Grid>
+        </Paper>
 
         {hasSelection && (
           <Paper
