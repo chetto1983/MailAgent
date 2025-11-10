@@ -36,6 +36,30 @@ import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { FolderNavigation, type FolderType } from '@/components/dashboard/FolderNavigation';
 
+type ParsedSseMessage = {
+  type: string;
+  data?: string;
+};
+
+const parseSseMessage = (chunk: string): ParsedSseMessage | null => {
+  if (!chunk) {
+    return null;
+  }
+
+  const lines = chunk.split(/\r?\n/);
+  let type = 'message';
+  const dataLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      type = line.slice(6).trim();
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trim());
+    }
+  }
+
+  return { type, data: dataLines.join('\n') };
+};
 
 export default function EmailPage() {
   const router = useRouter();
@@ -163,29 +187,107 @@ export default function EmailPage() {
     searchQueryRef.current = searchQuery;
   }, [searchQuery]);
 
+  const refreshCurrentMailbox = useCallback(() => {
+    const activeFolder = selectedFolderRef.current;
+    const activeSearch = searchQueryRef.current.trim();
+    loadEmails(activeFolder, activeSearch ? activeSearch : undefined);
+    loadStats();
+  }, [loadEmails, loadStats]);
+
   useEffect(() => {
-    if (!user || typeof window === 'undefined' || typeof document === 'undefined') {
+    if (!user || typeof window === 'undefined') {
       return undefined;
     }
 
-    const refreshMailbox = () => {
-      const activeFolder = selectedFolderRef.current;
-      const activeSearch = searchQueryRef.current.trim();
-      loadEmails(activeFolder, activeSearch ? activeSearch : undefined);
-      loadStats();
-    };
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!baseUrl) {
+      return undefined;
+    }
 
-    const intervalId = window.setInterval(() => {
-      if (document.hidden) {
+    let isCancelled = false;
+    let retryDelay = 2000;
+    let retryHandle: number | null = null;
+    const controller = new AbortController();
+
+    const connect = async () => {
+      if (isCancelled) {
         return;
       }
-      refreshMailbox();
-    }, 30000); // refresh every 30s to keep counts in sync
+
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          return;
+        }
+
+        const response = await fetch(`${baseUrl}/email-events/stream`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'text/event-stream',
+          },
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`SSE connection failed with status ${response.status}`);
+        }
+
+        retryDelay = 2000;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (!isCancelled) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+          buffer += decoder.decode(value, { stream: true });
+
+          let boundary = buffer.indexOf('\n\n');
+          while (boundary !== -1) {
+            const rawEvent = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            const parsed = parseSseMessage(rawEvent);
+
+            if (parsed?.type === 'emailUpdate' && parsed.data) {
+              const shouldRefresh = typeof document === 'undefined' || !document.hidden;
+              if (shouldRefresh) {
+                try {
+                  JSON.parse(parsed.data);
+                  refreshCurrentMailbox();
+                } catch (parseError) {
+                  console.warn('Failed to parse email update payload', parseError);
+                }
+              }
+            }
+
+            boundary = buffer.indexOf('\n\n');
+          }
+        }
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        const nextDelay = Math.min(retryDelay * 1.5, 30000);
+        retryHandle = window.setTimeout(() => {
+          retryDelay = nextDelay;
+          connect();
+        }, retryDelay);
+      }
+    };
+
+    connect();
 
     return () => {
-      window.clearInterval(intervalId);
+      isCancelled = true;
+      controller.abort();
+      if (retryHandle) {
+        window.clearTimeout(retryHandle);
+      }
     };
-  }, [user, loadEmails, loadStats]);
+  }, [user, refreshCurrentMailbox]);
 
   const clearSelection = useCallback(() => {
     setSelectedEmailIds(new Set());

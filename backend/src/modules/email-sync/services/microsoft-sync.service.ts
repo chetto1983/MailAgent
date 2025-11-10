@@ -7,6 +7,10 @@ import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
+import {
+  EmailEventsService,
+  EmailRealtimeReason,
+} from './email-events.service';
 
 interface MicrosoftMessage {
   id: string;
@@ -64,6 +68,7 @@ export class MicrosoftSyncService {
     private microsoftOAuth: MicrosoftOAuthService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
+    private emailEvents: EmailEventsService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -319,15 +324,7 @@ export class MicrosoftSyncService {
 
           if (item && item['@removed']) {
             if (messageId) {
-              await this.prisma.email.updateMany({
-                where: {
-                  providerId,
-                  externalId: messageId,
-                },
-                data: {
-                  isDeleted: true,
-                },
-              });
+              await this.handleRemoteRemoval(providerId, tenantId, messageId);
               messagesProcessed++;
             }
             continue;
@@ -733,6 +730,12 @@ export class MicrosoftSyncService {
 
       const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(tenantId, emailRecord.id);
 
+      this.notifyMailboxChange(tenantId, providerId, 'message-processed', {
+        emailId: emailRecord.id,
+        externalId: messageId,
+        folder,
+      });
+
       if (alreadyEmbedded) {
         this.logger.verbose(
           `Skipping embedding enqueue for Microsoft message ${messageId} - embedding already exists.`,
@@ -763,6 +766,63 @@ export class MicrosoftSyncService {
     } catch (error) {
       this.logger.error(`Failed to process message ${messageId}:`, error);
       return false;
+    }
+  }
+
+  private async handleRemoteRemoval(
+    providerId: string,
+    tenantId: string,
+    externalId: string,
+  ): Promise<void> {
+    const affected = await this.prisma.email.findMany({
+      where: {
+        providerId,
+        externalId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (affected.length === 0) {
+      return;
+    }
+
+    await this.prisma.email.updateMany({
+      where: {
+        providerId,
+        externalId,
+      },
+      data: {
+        isDeleted: true,
+        folder: 'TRASH',
+      },
+    });
+
+    for (const record of affected) {
+      this.notifyMailboxChange(tenantId, providerId, 'message-deleted', {
+        emailId: record.id,
+        externalId,
+      });
+    }
+  }
+
+  private notifyMailboxChange(
+    tenantId: string,
+    providerId: string,
+    reason: EmailRealtimeReason,
+    payload?: { emailId?: string; externalId?: string; folder?: string },
+  ): void {
+    try {
+      this.emailEvents.emitMailboxMutation(tenantId, {
+        providerId,
+        reason,
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Failed to emit Microsoft mailbox event: ${message}`);
     }
   }
 }

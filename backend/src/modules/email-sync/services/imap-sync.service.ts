@@ -6,6 +6,10 @@ import { CryptoService } from '../../../common/services/crypto.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
+import {
+  EmailEventsService,
+  EmailRealtimeReason,
+} from './email-events.service';
 
 const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
 const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -19,6 +23,7 @@ export class ImapSyncService {
     private crypto: CryptoService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
+    private emailEvents: EmailEventsService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -500,6 +505,17 @@ export class ImapSyncService {
 
       this.logger.debug(`Saved email UID ${message.uid}: ${subject} from ${from}`);
 
+      this.notifyMailboxChange(
+        tenantId,
+        providerId,
+        isDeleted ? 'message-deleted' : 'message-processed',
+        {
+          emailId: emailRecord.id,
+          externalId: message.uid.toString(),
+          folder,
+        },
+      );
+
       const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(tenantId, emailRecord.id);
 
       if (alreadyEmbedded) {
@@ -621,5 +637,24 @@ export class ImapSyncService {
 
   private stripHtml(html: string): string {
     return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  private notifyMailboxChange(
+    tenantId: string,
+    providerId: string,
+    reason: EmailRealtimeReason,
+    payload?: { emailId?: string; externalId?: string; folder?: string },
+  ): void {
+    try {
+      this.emailEvents.emitMailboxMutation(tenantId, {
+        providerId,
+        reason,
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Failed to emit IMAP mailbox event: ${message}`);
+    }
   }
 }

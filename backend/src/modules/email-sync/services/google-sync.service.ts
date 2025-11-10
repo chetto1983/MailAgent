@@ -7,6 +7,10 @@ import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
+import {
+  EmailEventsService,
+  EmailRealtimeReason,
+} from './email-events.service';
 
 @Injectable()
 export class GoogleSyncService {
@@ -19,6 +23,7 @@ export class GoogleSyncService {
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
     private knowledgeBaseService: KnowledgeBaseService,
+    private emailEvents: EmailEventsService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -375,6 +380,12 @@ export class GoogleSyncService {
             metadata,
           },
         });
+
+        this.notifyMailboxChange(tenantId, providerId, 'labels-updated', {
+          emailId: existing.id,
+          externalId: messageId,
+          folder,
+        });
       } catch (updateError) {
         const message = updateError instanceof Error ? updateError.message : String(updateError);
         this.logger.warn(
@@ -384,6 +395,11 @@ export class GoogleSyncService {
     } catch (error) {
       if (this.isNotFoundError(error)) {
         await this.enforceTrashState(existing, tenantId);
+
+        this.notifyMailboxChange(tenantId, providerId, 'message-deleted', {
+          emailId: existing.id,
+          externalId: messageId,
+        });
       } else {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(`Failed to refresh Gmail message ${messageId}: ${message}`);
@@ -746,6 +762,12 @@ export class GoogleSyncService {
         isDeleted ? 'deleted' : 'active',
       );
 
+      this.notifyMailboxChange(tenantId, providerId, 'message-processed', {
+        emailId: emailRecord.id,
+        externalId: messageId,
+        folder,
+      });
+
       const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(tenantId, emailRecord.id);
 
       if (alreadyEmbedded) {
@@ -815,5 +837,28 @@ export class GoogleSyncService {
     }
 
     await this.enforceTrashState(existing, tenantId, true);
+
+    this.notifyMailboxChange(tenantId, providerId, 'message-deleted', {
+      emailId: existing.id,
+      externalId: messageId,
+    });
+  }
+
+  private notifyMailboxChange(
+    tenantId: string,
+    providerId: string,
+    reason: EmailRealtimeReason,
+    payload?: { emailId?: string; externalId?: string; folder?: string },
+  ): void {
+    try {
+      this.emailEvents.emitMailboxMutation(tenantId, {
+        providerId,
+        reason,
+        ...payload,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Failed to emit mailbox event for ${tenantId}: ${message}`);
+    }
   }
 }
