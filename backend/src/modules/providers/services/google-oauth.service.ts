@@ -26,11 +26,12 @@ export class GoogleOAuthService {
   generateAuthUrl(scopes?: string[]): { authUrl: string; state: string } {
     const defaultScopes = [
       'https://www.googleapis.com/auth/userinfo.email',
+      'https://mail.google.com/',
       'https://www.googleapis.com/auth/gmail.modify',
       'https://www.googleapis.com/auth/gmail.send',
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/calendar.events',
-      'https://www.googleapis.com/auth/contacts.readonly',
+      'https://www.googleapis.com/auth/contacts',
     ];
 
     const requestedScopes = scopes || defaultScopes;

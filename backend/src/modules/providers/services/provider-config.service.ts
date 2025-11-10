@@ -16,6 +16,8 @@ import { SyncSchedulerService } from '../../email-sync/services/sync-scheduler.s
 import { WebhookLifecycleService } from '../../email-sync/services/webhook-lifecycle.service';
 import { QueueService } from '../../email-sync/services/queue.service';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
+import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
+import { SyncJobData } from '../../email-sync/interfaces/sync-job.interface';
 import {
   ConnectGoogleProviderDto,
   ConnectMicrosoftProviderDto,
@@ -40,6 +42,7 @@ export class ProviderConfigService {
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
     private readonly emailEmbeddingQueue: EmailEmbeddingQueueService,
+    private readonly knowledgeBaseService: KnowledgeBaseService,
   ) {}
 
   /**
@@ -422,6 +425,16 @@ export class ProviderConfigService {
       );
     });
 
+    const providerEmails = await this.prisma.email.findMany({
+      where: { providerId: provider.id },
+      select: { id: true },
+    });
+
+    const emailsToPurge = providerEmails.map((email) => email.id);
+    if (emailsToPurge.length > 0) {
+      await this.knowledgeBaseService.deleteEmbeddingsForEmails(provider.tenantId, emailsToPurge);
+    }
+
     await this.prisma.email.deleteMany({
       where: { providerId: provider.id },
     });
@@ -601,19 +614,33 @@ export class ProviderConfigService {
   /**
    * Immediately queue a sync job and set up webhooks when supported.
    */
-  private async triggerInitialSync(provider: { id: string; providerType: string }) {
+  private async triggerInitialSync(
+    provider: {
+      id: string;
+      tenantId: string;
+      providerType: string;
+      email: string;
+      lastSyncedAt?: Date | null;
+    },
+  ) {
     if (!provider?.id) {
       return;
     }
 
+    let queuedViaScheduler = false;
     try {
       await this.syncScheduler.syncProviderNow(provider.id, 'high');
+      queuedViaScheduler = true;
     } catch (error) {
       this.logger.error(
-        `Failed to queue initial sync for provider ${provider.id}: ${
+        `Failed to queue initial sync via scheduler for provider ${provider.id}: ${
           error instanceof Error ? error.message : error
         }`,
       );
+    }
+
+    if (!queuedViaScheduler) {
+      await this.enqueueFallbackSyncJob(provider);
     }
 
     if (!['google', 'microsoft'].includes(provider.providerType)) {
@@ -625,6 +652,41 @@ export class ProviderConfigService {
     } catch (error) {
       this.logger.warn(
         `Failed to auto-create webhook for provider ${provider.id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    }
+  }
+
+  private async enqueueFallbackSyncJob(
+    provider: {
+      id: string;
+      tenantId: string;
+      providerType: string;
+      email: string;
+      lastSyncedAt?: Date | null;
+    } | null,
+  ): Promise<void> {
+    if (!provider) {
+      return;
+    }
+
+    const job: SyncJobData = {
+      tenantId: provider.tenantId,
+      providerId: provider.id,
+      providerType: provider.providerType as SyncJobData['providerType'],
+      email: provider.email,
+      priority: 'high',
+      syncType: 'full',
+      lastSyncedAt: provider.lastSyncedAt ?? undefined,
+    };
+
+    try {
+      await this.queueService.addSyncJob(job);
+      this.logger.log(`Queued fallback sync job for provider ${provider.email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to enqueue fallback sync for provider ${provider.id}: ${
           error instanceof Error ? error.message : error
         }`,
       );

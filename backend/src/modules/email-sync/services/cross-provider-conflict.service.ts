@@ -311,7 +311,7 @@ export class CrossProviderConflictService {
       )
       .map(
         (link) =>
-          link.lastSyncedAt!.getTime() - link.lastConflictAt!.getTime(),
+          link.lastSyncedAt.getTime() - link.lastConflictAt!.getTime(),
       );
 
     const avgResolutionTime =

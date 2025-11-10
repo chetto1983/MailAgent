@@ -11,7 +11,7 @@ export interface EmailSyncOperation {
   externalId: string;
   providerId: string;
   tenantId: string;
-  operation: 'delete' | 'markRead' | 'markUnread' | 'star' | 'unstar' | 'moveToFolder';
+  operation: 'delete' | 'hardDelete' | 'markRead' | 'markUnread' | 'star' | 'unstar' | 'moveToFolder';
   folder?: string;
 }
 
@@ -187,6 +187,13 @@ export class EmailSyncBackService {
           },
         });
         break;
+
+      case 'hardDelete':
+        await gmail.users.messages.delete({
+          userId: 'me',
+          id: operation.externalId,
+        });
+        break;
     }
   }
 
@@ -261,6 +268,10 @@ export class EmailSyncBackService {
               flagStatus: 'notFlagged',
             },
           });
+        break;
+
+      case 'hardDelete':
+        await client.api(`/me/messages/${operation.externalId}`).delete();
         break;
     }
   }

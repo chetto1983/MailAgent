@@ -229,6 +229,27 @@ export class EmailsService {
       throw new NotFoundException('Email not found');
     }
 
+    // If the email is already in trash, perform a permanent delete
+    if (email.folder === 'TRASH' && email.isDeleted) {
+      await this.knowledgeBaseService.deleteEmbeddingsForEmail(tenantId, id);
+      await this.prisma.email.delete({ where: { id } });
+
+      this.emailSyncBack
+        .syncOperationToProvider({
+          emailId: email.id,
+          externalId: email.externalId,
+          providerId: email.providerId,
+          tenantId: email.tenantId,
+          operation: 'hardDelete',
+        })
+        .catch((error) => {
+          this.logger.error(`Failed to sync permanent email deletion to provider: ${error.message}`);
+        });
+
+      this.logger.log(`Email ${id} permanently deleted and synced to provider`);
+      return { success: true };
+    }
+
     // Mark as deleted and move to TRASH folder
     await this.prisma.email.update({
       where: { id },
@@ -248,6 +269,7 @@ export class EmailsService {
         providerId: email.providerId,
         tenantId: email.tenantId,
         operation: 'delete',
+        folder: 'TRASH',
       })
       .catch((error) => {
         this.logger.error(`Failed to sync email deletion to provider: ${error.message}`);

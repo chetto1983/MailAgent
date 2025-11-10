@@ -273,17 +273,44 @@ export class KnowledgeBaseService {
   }
 
   async deleteEmbeddingsForEmail(tenantId: string, emailId: string): Promise<number> {
-    const result = await this.prisma.embedding.deleteMany({
-      where: {
-        tenantId,
+    if (!emailId) {
+      return 0;
+    }
+    return this.deleteEmbeddingsForEmails(tenantId, [emailId]);
+  }
+
+  async deleteEmbeddingsForEmails(tenantId: string, emailIds: string[]): Promise<number> {
+    if (!emailIds || emailIds.length === 0) {
+      return 0;
+    }
+
+    const batchSize = 50;
+    let totalDeleted = 0;
+
+    for (let i = 0; i < emailIds.length; i += batchSize) {
+      const batch = emailIds.slice(i, i + batchSize).filter(Boolean);
+      if (batch.length === 0) {
+        continue;
+      }
+
+      const conditions = batch.map((emailId) => ({
         metadata: {
           path: ['emailId'],
           equals: emailId,
         },
-      },
-    });
+      }));
 
-    return result.count;
+      const result = await this.prisma.embedding.deleteMany({
+        where: {
+          tenantId,
+          OR: conditions,
+        },
+      });
+
+      totalDeleted += result.count;
+    }
+
+    return totalDeleted;
   }
 
   async searchKnowledgeBase(options: KnowledgeBaseSearchOptions): Promise<{

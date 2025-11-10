@@ -12,6 +12,7 @@ describe('ProviderConfigService', () => {
   let webhookLifecycle: any;
   let queueService: any;
   let emailEmbeddingQueue: any;
+  let knowledgeBase: any;
   let service: ProviderConfigService;
 
   const TENANT_ID = 'tenant-1';
@@ -26,6 +27,7 @@ describe('ProviderConfigService', () => {
         delete: jest.fn(),
       },
       email: {
+        findMany: jest.fn().mockResolvedValue([]),
         deleteMany: jest.fn(),
       },
     };
@@ -65,11 +67,16 @@ describe('ProviderConfigService', () => {
     };
 
     queueService = {
+      addSyncJob: jest.fn().mockResolvedValue(undefined),
       removeJobsForProvider: jest.fn().mockResolvedValue(0),
     };
 
     emailEmbeddingQueue = {
       removeJobsForProvider: jest.fn().mockResolvedValue(0),
+    };
+
+    knowledgeBase = {
+      deleteEmbeddingsForEmails: jest.fn().mockResolvedValue(0),
     };
 
     service = new ProviderConfigService(
@@ -83,6 +90,7 @@ describe('ProviderConfigService', () => {
       webhookLifecycle,
       queueService,
       emailEmbeddingQueue,
+      knowledgeBase,
     );
   });
 
@@ -131,6 +139,7 @@ describe('ProviderConfigService', () => {
         email: dto.email,
         providerType: 'google',
       });
+      expect(queueService.addSyncJob).not.toHaveBeenCalled();
       expect(syncScheduler.syncProviderNow).toHaveBeenCalledWith('config-1', 'high');
       expect(webhookLifecycle.autoCreateWebhook).toHaveBeenCalledWith('config-1');
     });
@@ -147,6 +156,34 @@ describe('ProviderConfigService', () => {
         service.connectGoogleProvider(TENANT_ID, USER_ID, dto),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.providerConfig.upsert).not.toHaveBeenCalled();
+    });
+
+    it('queues fallback sync job when scheduler fails', async () => {
+      googleOAuth.exchangeCodeForTokens.mockResolvedValue({
+        email: dto.email,
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        expiresAt: new Date('2025-01-01T00:00:00Z'),
+      });
+
+      prisma.providerConfig.upsert.mockResolvedValue({
+        id: 'config-1',
+        email: dto.email,
+        providerType: 'google',
+        tenantId: TENANT_ID,
+      });
+
+      syncScheduler.syncProviderNow.mockRejectedValue(new Error('scheduler down'));
+
+      await service.connectGoogleProvider(TENANT_ID, USER_ID, dto);
+
+      expect(queueService.addSyncJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerId: 'config-1',
+          syncType: 'full',
+          priority: 'high',
+        }),
+      );
     });
   });
 
@@ -264,11 +301,16 @@ describe('ProviderConfigService', () => {
         tenantId: TENANT_ID,
         providerType: 'google',
       });
+      prisma.email.findMany.mockResolvedValue([{ id: 'email-1' }, { id: 'email-2' }]);
 
       await service.deleteProviderConfig(TENANT_ID, 'provider-x');
 
       expect(queueService.removeJobsForProvider).toHaveBeenCalledWith('provider-x');
       expect(webhookLifecycle.removeWebhookForProvider).toHaveBeenCalledWith('provider-x');
+      expect(knowledgeBase.deleteEmbeddingsForEmails).toHaveBeenCalledWith(
+        TENANT_ID,
+        ['email-1', 'email-2'],
+      );
       expect(prisma.email.deleteMany).toHaveBeenCalledWith({ where: { providerId: 'provider-x' } });
       expect(emailEmbeddingQueue.removeJobsForProvider).toHaveBeenCalledWith('provider-x');
       expect(prisma.providerConfig.delete).toHaveBeenCalledWith({ where: { id: 'provider-x' } });
