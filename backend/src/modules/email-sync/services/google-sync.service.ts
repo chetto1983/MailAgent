@@ -470,10 +470,11 @@ export class GoogleSyncService {
       metadata: any;
     },
     tenantId: string,
+    forceHardDelete = false,
   ): Promise<void> {
     const currentLabels = Array.isArray(existing.labels) ? existing.labels : [];
 
-    if (existing.folder === 'TRASH' || existing.isDeleted) {
+    if (forceHardDelete || existing.folder === 'TRASH' || existing.isDeleted) {
       await this.removeEmailPermanently(existing.id, tenantId);
       return;
     }
@@ -775,8 +776,44 @@ export class GoogleSyncService {
 
       return true;
     } catch (error) {
+      if (this.isNotFoundError(error)) {
+        this.logger.verbose(
+          `Gmail returned 404 for message ${messageId}; marking local record as deleted if present.`,
+        );
+        await this.handleMissingRemoteMessage(providerId, tenantId, messageId);
+        return true;
+      }
+
       this.logger.error(`Failed to process message ${messageId}:`, error);
       return false;
     }
+  }
+
+  private async handleMissingRemoteMessage(
+    providerId: string,
+    tenantId: string,
+    messageId: string,
+  ): Promise<void> {
+    const existing = await this.prisma.email.findUnique({
+      where: {
+        providerId_externalId: {
+          providerId,
+          externalId: messageId,
+        },
+      },
+      select: {
+        id: true,
+        folder: true,
+        isDeleted: true,
+        labels: true,
+        metadata: true,
+      },
+    });
+
+    if (!existing) {
+      return;
+    }
+
+    await this.enforceTrashState(existing, tenantId, true);
   }
 }

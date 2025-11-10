@@ -10,7 +10,7 @@ import {
   WebhookStats,
 } from '../interfaces/webhook.interface';
 import { SyncJobData } from '../interfaces/sync-job.interface';
-import { google } from 'googleapis';
+import { google, gmail_v1 } from 'googleapis';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 
@@ -187,13 +187,23 @@ export class GmailWebhookService {
 
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
 
+      const configuredLabels = this.configService.get<string>('GMAIL_WATCH_LABELS');
+      const requestBody: gmail_v1.Schema$WatchRequest = {
+        topicName,
+        labelFilterAction: 'include',
+      };
+
+      if (configuredLabels) {
+        requestBody.labelIds = configuredLabels
+          .split(',')
+          .map((label) => label.trim())
+          .filter(Boolean);
+      }
+
       // Call Gmail watch() API
       const response = await gmail.users.watch({
         userId: 'me',
-        requestBody: {
-          topicName,
-          labelIds: ['INBOX'], // Watch only INBOX
-        },
+        requestBody,
       });
 
       const watchResponse: GmailWatchResponse = response.data as any;
