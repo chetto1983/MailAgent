@@ -11,6 +11,7 @@ import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.
 export interface CreateEventDto {
   providerId: string;
   calendarId?: string;
+  calendarName?: string;
   title: string;
   description?: string;
   location?: string;
@@ -32,6 +33,7 @@ export interface UpdateEventDto {
   timeZone?: string;
   attendees?: Array<{ email: string; name?: string }>;
   reminders?: any;
+  calendarName?: string;
 }
 
 export interface ListEventsFilters {
@@ -180,6 +182,7 @@ export class CalendarService {
         providerId: provider.id,
         externalId,
         calendarId: data.calendarId || 'primary',
+        calendarName: data.calendarName || data.calendarId || 'primary',
         iCalUID,
         title: data.title,
         description: data.description || null,
@@ -259,6 +262,9 @@ export class CalendarService {
     if (data.timeZone !== undefined) updateData.timeZone = data.timeZone;
     if (data.attendees !== undefined) updateData.attendees = data.attendees;
     if (data.reminders !== undefined) updateData.reminders = data.reminders;
+    if (data.calendarName !== undefined) {
+      updateData.calendarName = data.calendarName;
+    }
 
     const updatedEvent = await this.prisma.calendarEvent.update({
       where: { id: eventId },

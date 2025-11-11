@@ -106,7 +106,7 @@ export default function CalendarPage() {
       const providerLabel =
         event.provider?.displayName || event.provider?.email || providerId;
       const calendarId = event.calendarId || 'primary';
-      const calendarLabel = event.calendarId || calendarCopy.allCalendars;
+      const calendarLabel = event.calendarName || event.calendarId || calendarCopy.allCalendars;
       const key = makeCalendarKey(providerId, calendarId);
 
       if (!groups.has(providerId)) {
@@ -482,7 +482,7 @@ export default function CalendarPage() {
       }}
     >
       <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <Typography variant="subtitle1">{calendarCopy.title}</Typography>
+        <Typography variant="subtitle1">{calendarCopy.filterTitle ?? calendarCopy.title}</Typography>
         <Stack direction="row" spacing={1}>
           <MuiButton
             size="small"

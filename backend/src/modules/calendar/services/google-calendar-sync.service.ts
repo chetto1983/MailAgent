@@ -119,6 +119,7 @@ export class GoogleCalendarSyncService {
             provider.tenantId,
             sixtyDaysAgo.toISOString(),
             sixtyDaysAhead.toISOString(),
+            cal.summaryOverride || cal.summary || cal.description || cal.id,
           );
 
           eventsProcessed += result.eventsProcessed;
@@ -170,6 +171,7 @@ export class GoogleCalendarSyncService {
     tenantId: string,
     timeMin: string,
     timeMax: string,
+    calendarName?: string | null,
   ): Promise<{
     eventsProcessed: number;
     newEvents: number;
@@ -207,6 +209,7 @@ export class GoogleCalendarSyncService {
             calendarId,
             providerId,
             tenantId,
+            calendarName ?? calendarId,
           );
 
           eventsProcessed++;
@@ -243,6 +246,7 @@ export class GoogleCalendarSyncService {
     calendarId: string,
     providerId: string,
     tenantId: string,
+    calendarName: string,
   ): Promise<'created' | 'updated'> {
     const eventId = event.id!;
 
@@ -294,6 +298,7 @@ export class GoogleCalendarSyncService {
       providerId,
       externalId: eventId,
       calendarId,
+      calendarName,
       iCalUID,
       title,
       description,

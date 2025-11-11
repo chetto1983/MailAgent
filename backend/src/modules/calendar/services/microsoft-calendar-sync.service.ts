@@ -158,6 +158,7 @@ export class MicrosoftCalendarSyncService {
             provider.tenantId,
             sixtyDaysAgo.toISOString(),
             sixtyDaysAhead.toISOString(),
+            cal.name,
           );
 
           eventsProcessed += result.eventsProcessed;
@@ -209,6 +210,7 @@ export class MicrosoftCalendarSyncService {
     tenantId: string,
     startDateTime: string,
     endDateTime: string,
+    calendarName?: string | null,
   ): Promise<{
     eventsProcessed: number;
     newEvents: number;
@@ -243,6 +245,7 @@ export class MicrosoftCalendarSyncService {
             calendarId,
             providerId,
             tenantId,
+            calendarName ?? calendarId,
           );
 
           eventsProcessed++;
@@ -279,6 +282,7 @@ export class MicrosoftCalendarSyncService {
     calendarId: string,
     providerId: string,
     tenantId: string,
+    calendarName: string,
   ): Promise<'created' | 'updated'> {
     const eventId = event.id;
 
@@ -321,6 +325,7 @@ export class MicrosoftCalendarSyncService {
       providerId,
       externalId: eventId,
       calendarId,
+      calendarName,
       iCalUID,
       title,
       description,

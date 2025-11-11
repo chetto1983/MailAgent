@@ -393,6 +393,7 @@ model CalendarEvent {
   // External IDs for sync tracking
   externalId String // Google event ID, Microsoft event ID
   calendarId String? // Which calendar this event belongs to
+  calendarName String? // Friendly calendar name
 
   // Event metadata
   iCalUID    String? // RFC 5545 UID (for cross-provider sync)

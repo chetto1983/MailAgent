@@ -8,6 +8,7 @@ export type CalendarEvent = {
   providerId: string;
   externalId: string;
   calendarId?: string;
+  calendarName?: string;
   iCalUID?: string;
   title: string;
   description?: string;
@@ -52,6 +53,7 @@ export type CalendarEvent = {
 export type CreateEventDto = {
   providerId: string;
   calendarId?: string;
+  calendarName?: string;
   title: string;
   description?: string;
   location?: string;
@@ -85,6 +87,7 @@ export type UpdateEventDto = {
       minutes: number;
     }>;
   };
+  calendarName?: string;
 };
 
 export type CalendarEventListParams = {
