@@ -579,15 +579,17 @@ export class KnowledgeBaseService {
       pieces.push(`Oggetto: ${email.subject}`);
     }
 
-    const textBody = email.bodyText?.trim();
-    if (textBody) {
-      pieces.push(textBody);
-    } else if (email.bodyHtml) {
+    // Priority: bodyHtml > bodyText > snippet
+    // If HTML is available, use it (it's usually more complete)
+    // bodyText is often a plain-text duplicate of bodyHtml
+    if (email.bodyHtml) {
       // Use Readability to extract clean content from HTML
       const extracted = HtmlContentExtractor.extractMainContent(email.bodyHtml);
       if (extracted) {
         pieces.push(extracted);
       }
+    } else if (email.bodyText?.trim()) {
+      pieces.push(email.bodyText.trim());
     } else if (email.snippet) {
       pieces.push(email.snippet);
     }
