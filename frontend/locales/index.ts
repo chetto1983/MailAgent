@@ -317,12 +317,28 @@ export interface AppTranslations {
           company: string;
           provider: string;
           lastSynced: string;
+          actions: string;
         };
       };
       alerts: {
         loadError: string;
         syncSuccess: string;
         syncError: string;
+      };
+      editDialog: {
+        title: string;
+        description: string;
+        firstName: string;
+        lastName: string;
+        displayName: string;
+        email: string;
+        phone: string;
+        company: string;
+        jobTitle: string;
+        save: string;
+        cancel: string;
+        success: string;
+        error: string;
       };
     };
   };

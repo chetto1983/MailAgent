@@ -301,12 +301,28 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
             company: 'Company',
             provider: 'Provider',
             lastSynced: 'Last synced',
+            actions: 'Actions',
           },
         },
         alerts: {
           loadError: 'Unable to load contacts right now. Please try again.',
           syncSuccess: 'Contacts sync completed successfully.',
           syncError: 'Unable to sync contacts. Please try again.',
+        },
+        editDialog: {
+          title: 'Edit contact',
+          description: 'Update basic information for this contact.',
+          firstName: 'First name',
+          lastName: 'Last name',
+          displayName: 'Display name',
+          email: 'Primary email',
+          phone: 'Primary phone',
+          company: 'Company',
+          jobTitle: 'Job title',
+          save: 'Save changes',
+          cancel: 'Cancel',
+          success: 'Contact updated successfully.',
+          error: 'Unable to update this contact. Please try again.',
         },
       },
       providers: {
@@ -714,6 +730,7 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
             company: 'Azienda',
             provider: 'Provider',
             lastSynced: 'Ultima sincronizzazione',
+            actions: 'Azioni',
           },
         },
         alerts: {
@@ -824,4 +841,5 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
     },
   },
 };
+
 

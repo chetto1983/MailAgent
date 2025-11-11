@@ -25,12 +25,14 @@ import { useLocale } from '@/lib/hooks/use-locale';
 import {
   contactsApi,
   type Contact,
+  type UpdateContactDto,
 } from '@/lib/api/contacts';
 import {
   providersApi,
   type ProviderConfig,
 } from '@/lib/api/providers';
 import { ContactList } from '@/components/dashboard/contacts/ContactList';
+import { ContactEditDialog } from '@/components/dashboard/contacts/ContactEditDialog';
 
 type StatusMessage = {
   type: 'success' | 'error';
@@ -63,6 +65,9 @@ export default function ContactsPage() {
   const [reloadToken, setReloadToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -241,6 +246,40 @@ export default function ContactsPage() {
     </Stack>
   );
 
+  const handleOpenEdit = (contact: Contact) => {
+    setEditingContact(contact);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleCloseEdit = () => {
+    setIsEditDialogOpen(false);
+    setEditingContact(null);
+  };
+
+  const handleSaveContact = async (payload: UpdateContactDto) => {
+    if (!editingContact) return;
+    setSavingContact(true);
+    setStatusMessage(null);
+    try {
+      await contactsApi.updateContact(editingContact.id, payload);
+      setStatusMessage({
+        type: 'success',
+        text: copy.editDialog.success,
+      });
+      handleCloseEdit();
+      handleRefresh();
+    } catch (err) {
+      console.error('Failed to update contact', err);
+      setStatusMessage({
+        type: 'error',
+        text: copy.editDialog.error,
+      });
+      throw new Error(copy.editDialog.error);
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
   return (
     <DashboardLayout
       title={copy.title}
@@ -341,10 +380,20 @@ export default function ContactsPage() {
               locale={locale}
               showingLabel={showingLabel}
               copy={copy}
+              onEditContact={handleOpenEdit}
             />
           </Stack>
         </Grid>
       </Grid>
+
+      <ContactEditDialog
+        open={isEditDialogOpen}
+        contact={editingContact}
+        onClose={handleCloseEdit}
+        onSave={handleSaveContact}
+        copy={copy.editDialog}
+        saving={savingContact}
+      />
     </DashboardLayout>
   );
 }
