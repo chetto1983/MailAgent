@@ -70,10 +70,15 @@ export default function ContactsPage() {
     }
   }, [authLoading, user, router]);
 
-  const filteredProviders = useMemo(
-    () => providers.filter((provider) => provider.supportsContacts),
-    [providers],
-  );
+  const providerOptions = useMemo(() => {
+    if (providers.length === 0) {
+      return [];
+    }
+
+    const providerIdsWithContacts = new Set(contacts.map((contact) => contact.providerId));
+
+    return providers.filter((provider) => provider.supportsContacts || providerIdsWithContacts.has(provider.id));
+  }, [providers, contacts]);
 
   useEffect(() => {
     if (authLoading || !user) {
@@ -276,7 +281,7 @@ export default function ContactsPage() {
                   <MenuItem value="all">
                     {copy.allProvidersLabel}
                   </MenuItem>
-                  {filteredProviders.map((provider) => (
+                  {providerOptions.map((provider) => (
                     <MenuItem key={provider.id} value={provider.id}>
                       {provider.displayName || provider.email}
                     </MenuItem>
