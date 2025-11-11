@@ -41,6 +41,12 @@ export type CalendarEvent = {
   syncVersion: number;
   createdAt?: string;
   updatedAt?: string;
+  provider?: {
+    id: string;
+    email?: string;
+    providerType?: string;
+    displayName?: string | null;
+  };
 };
 
 export type CreateEventDto = {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import {
   Box,
@@ -10,6 +10,11 @@ import {
   TextField,
   IconButton,
   Tooltip,
+  Paper,
+  Grid,
+  Checkbox,
+  FormControlLabel,
+  Button as MuiButton,
 } from '@mui/material';
 import { Plus, RefreshCw, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/use-auth';
@@ -82,6 +87,50 @@ export default function CalendarPage() {
 
   // Track if we've loaded providers to prevent infinite loops
   const hasProvidersRef = useRef(false);
+  const [visibleCalendars, setVisibleCalendars] = useState<Set<string>>(new Set());
+
+  const makeCalendarKey = useCallback((providerId: string, calendarId?: string | null) => {
+    return `${providerId}:${calendarId ?? 'primary'}`;
+  }, []);
+
+  const calendarGroups = useMemo(() => {
+    const groups = new Map<
+      string,
+      { providerId: string; providerLabel: string; calendars: Array<{ key: string; label: string }> }
+    >();
+
+    events.forEach((event) => {
+      const providerId = event.providerId;
+      const providerLabel =
+        event.provider?.displayName || event.provider?.email || providerId;
+      const calendarId = event.calendarId || 'primary';
+      const calendarLabel = event.calendarId || calendarCopy.allCalendars;
+      const key = makeCalendarKey(providerId, calendarId);
+
+      if (!groups.has(providerId)) {
+        groups.set(providerId, {
+          providerId,
+          providerLabel,
+          calendars: [],
+        });
+      }
+
+      const group = groups.get(providerId)!;
+      if (!group.calendars.some((calendar) => calendar.key === key)) {
+        group.calendars.push({
+          key,
+          label: calendarLabel,
+        });
+      }
+    });
+
+    return Array.from(groups.values());
+  }, [events, makeCalendarKey, calendarCopy.allCalendars]);
+
+  const allCalendarKeys = useMemo(
+    () => calendarGroups.flatMap((group) => group.calendars.map((calendar) => calendar.key)),
+    [calendarGroups],
+  );
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -139,6 +188,53 @@ export default function CalendarPage() {
     void loadEvents();
   }, [loadEvents]);
 
+  const filteredEvents = useMemo(() => {
+    if (visibleCalendars.size === 0) {
+      return events;
+    }
+
+    return events.filter((event) =>
+      visibleCalendars.has(makeCalendarKey(event.providerId, event.calendarId ?? 'primary')),
+    );
+  }, [events, visibleCalendars, makeCalendarKey]);
+
+  const handleToggleCalendarVisibility = useCallback((key: string) => {
+    setVisibleCalendars((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleProviderCalendars = useCallback(
+    (calendarKeys: string[], currentlyAllSelected: boolean) => {
+      setVisibleCalendars((prev) => {
+        const next = new Set(prev);
+        calendarKeys.forEach((key) => {
+          if (currentlyAllSelected) {
+            next.delete(key);
+          } else {
+            next.add(key);
+          }
+        });
+        return next;
+      });
+    },
+    [],
+  );
+
+  const handleShowAllCalendars = useCallback(() => {
+    setVisibleCalendars(new Set(allCalendarKeys));
+  }, [allCalendarKeys]);
+
+  const handleHideAllCalendars = useCallback(() => {
+    setVisibleCalendars(new Set());
+  }, []);
+
   // Load events when providers or view changes
   // Use a ref to track when providers are loaded to prevent infinite loops
   useEffect(() => {
@@ -152,6 +248,29 @@ export default function CalendarPage() {
       loadEvents();
     }
   }, [user, loadEvents]);
+
+  useEffect(() => {
+    setVisibleCalendars((prev) => {
+      if (allCalendarKeys.length === 0) {
+        return prev;
+      }
+
+      if (prev.size === 0) {
+        return new Set(allCalendarKeys);
+      }
+
+      let changed = false;
+      const next = new Set(prev);
+      allCalendarKeys.forEach((key) => {
+        if (!next.has(key)) {
+          next.add(key);
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [allCalendarKeys]);
 
   useEffect(() => {
     if (!user || typeof window === 'undefined') {
@@ -348,6 +467,94 @@ export default function CalendarPage() {
     setIsEditDialogOpen(true);
   };
 
+  const renderCalendarFilters = () => (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 2,
+        borderRadius: 2,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1.5,
+      }}
+    >
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Typography variant="subtitle1">{calendarCopy.title}</Typography>
+        <Stack direction="row" spacing={1}>
+          <MuiButton
+            size="small"
+            variant="text"
+            onClick={handleShowAllCalendars}
+            disabled={allCalendarKeys.length === 0}
+          >
+            {calendarCopy.allCalendars}
+          </MuiButton>
+          <MuiButton
+            size="small"
+            variant="text"
+            onClick={handleHideAllCalendars}
+            disabled={visibleCalendars.size === 0}
+          >
+            {'Hide all'}
+          </MuiButton>
+        </Stack>
+      </Stack>
+
+      {calendarGroups.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          {providersLoading ? calendarCopy.loading : calendarCopy.noProviders}
+        </Typography>
+      ) : (
+        <Stack spacing={1.5}>
+          {calendarGroups.map((group) => {
+            const keys = group.calendars.map((calendar) => calendar.key);
+            const selectedCount = keys.filter((key) => visibleCalendars.has(key)).length;
+            const allSelected = selectedCount === keys.length && keys.length > 0;
+            const partiallySelected = selectedCount > 0 && selectedCount < keys.length;
+
+            return (
+              <Box
+                key={group.providerId}
+                sx={{
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                  pb: 1,
+                }}
+              >
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onChange={() => handleToggleProviderCalendars(keys, allSelected)}
+                    />
+                  }
+                  label={group.providerLabel}
+                />
+                <Stack sx={{ pl: 4 }}>
+                  {group.calendars.map((calendar) => (
+                    <FormControlLabel
+                      key={calendar.key}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={visibleCalendars.has(calendar.key)}
+                          onChange={() => handleToggleCalendarVisibility(calendar.key)}
+                        />
+                      }
+                      label={calendar.label}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            );
+          })}
+        </Stack>
+      )}
+    </Paper>
+  );
+
   if (authLoading || !user) {
     return (
       <Box
@@ -403,66 +610,73 @@ export default function CalendarPage() {
         </Stack>
       }
     >
-      <Box
-        sx={{
-          height: 'calc(100vh - 200px)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-        }}
-      >
-        {providersLoading ? (
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={3}>
+          {renderCalendarFilters()}
+        </Grid>
+        <Grid item xs={12} md={9}>
           <Box
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: 400,
-            }}
-          >
-            <CircularProgress />
-          </Box>
-        ) : providers.length === 0 ? (
-          <Box
-            sx={{
+              height: { xs: 'auto', md: 'calc(100vh - 200px)' },
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: 400,
               gap: 2,
             }}
           >
-            <CalendarIcon size={64} style={{ opacity: 0.3 }} />
-            <Typography variant="h6" color="text.secondary">
-              {calendarCopy.noProviders}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {calendarCopy.noProvidersDescription}
-            </Typography>
+            {providersLoading ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 400,
+                }}
+              >
+                <CircularProgress />
+              </Box>
+            ) : providers.length === 0 ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 400,
+                  gap: 2,
+                }}
+              >
+                <CalendarIcon size={64} style={{ opacity: 0.3 }} />
+                <Typography variant="h6" color="text.secondary">
+                  {calendarCopy.noProviders}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {calendarCopy.noProvidersDescription}
+                </Typography>
+              </Box>
+            ) : loading && events.length === 0 ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 400,
+                }}
+              >
+                <CircularProgress />
+              </Box>
+            ) : (
+              <CalendarView
+                events={filteredEvents}
+                onEventClick={handleEventClick}
+                onDateClick={handleDateClick}
+                onEventDrop={handleEventDrop}
+                onEventResize={handleEventResize}
+                onDatesChange={handleDatesChange}
+              />
+            )}
           </Box>
-        ) : loading && events.length === 0 ? (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: 400,
-            }}
-          >
-            <CircularProgress />
-          </Box>
-        ) : (
-          <CalendarView
-            events={events}
-            onEventClick={handleEventClick}
-            onDateClick={handleDateClick}
-            onEventDrop={handleEventDrop}
-            onEventResize={handleEventResize}
-            onDatesChange={handleDatesChange}
-          />
-        )}
-      </Box>
+        </Grid>
+      </Grid>
 
       {/* FAB for creating new events */}
       <Fab

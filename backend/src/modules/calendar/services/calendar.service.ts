@@ -97,6 +97,16 @@ export class CalendarService {
         orderBy: { startTime: 'asc' },
         skip: offset,
         take: limit,
+        include: {
+          provider: {
+            select: {
+              id: true,
+              email: true,
+              providerType: true,
+              displayName: true,
+            },
+          },
+        },
       }),
       this.prisma.calendarEvent.count({ where }),
     ]);
