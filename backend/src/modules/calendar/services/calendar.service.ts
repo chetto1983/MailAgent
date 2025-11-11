@@ -200,7 +200,7 @@ export class CalendarService {
         recurrence: [],
         status: 'confirmed',
         visibility: 'default',
-        reminders: data.reminders ? (data.reminders as any) : undefined,
+        reminders: data.reminders ? (data.reminders) : undefined,
         lastSyncedAt: new Date(),
       },
     });

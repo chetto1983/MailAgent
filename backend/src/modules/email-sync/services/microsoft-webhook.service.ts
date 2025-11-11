@@ -14,6 +14,8 @@ import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import type { ProviderConfig } from '@prisma/client';
 
+export const MICROSOFT_MAIL_RESOURCE = '/me/mailFolders/inbox/messages';
+
 @Injectable()
 export class MicrosoftWebhookService {
   private readonly logger = new Logger(MicrosoftWebhookService.name);
@@ -141,7 +143,7 @@ export class MicrosoftWebhookService {
       const subscriptionData = {
         changeType: 'created,updated',
         notificationUrl: webhookUrl,
-        resource: '/me/mailFolders/inbox/messages', // Watch inbox messages
+        resource: MICROSOFT_MAIL_RESOURCE, // Watch inbox messages
         expirationDateTime,
         clientState,
       };
@@ -161,7 +163,12 @@ export class MicrosoftWebhookService {
 
       // Save subscription to database
       await this.prisma.webhookSubscription.upsert({
-        where: { providerId },
+        where: {
+          providerId_resourcePath: {
+            providerId,
+            resourcePath: MICROSOFT_MAIL_RESOURCE,
+          },
+        },
         create: {
           providerId,
           providerType: 'microsoft',
@@ -201,7 +208,12 @@ export class MicrosoftWebhookService {
       // Log error in subscription record
       await this.prisma.webhookSubscription
         .update({
-          where: { providerId },
+          where: {
+            providerId_resourcePath: {
+              providerId,
+              resourcePath: MICROSOFT_MAIL_RESOURCE,
+            },
+          },
           data: {
             isActive: false,
             lastError: errorMessage,
@@ -225,6 +237,7 @@ export class MicrosoftWebhookService {
         await this.prisma.webhookSubscription.findMany({
           where: {
             providerType: 'microsoft',
+            resourcePath: MICROSOFT_MAIL_RESOURCE,
             isActive: true,
             expiresAt: {
               lte: new Date(Date.now() + 24 * 60 * 60 * 1000), // Next 24h
@@ -289,7 +302,12 @@ export class MicrosoftWebhookService {
 
       // Update database
       await this.prisma.webhookSubscription.update({
-        where: { providerId },
+        where: {
+          providerId_resourcePath: {
+            providerId,
+            resourcePath: MICROSOFT_MAIL_RESOURCE,
+          },
+        },
         data: {
           expiresAt: new Date(updatedSubscription.expirationDateTime),
           lastRenewedAt: new Date(),
@@ -313,8 +331,11 @@ export class MicrosoftWebhookService {
    */
   async cancelSubscription(providerId: string): Promise<void> {
     try {
-      const subscription = await this.prisma.webhookSubscription.findUnique({
-        where: { providerId },
+      const subscription = await this.prisma.webhookSubscription.findFirst({
+        where: {
+          providerId,
+          resourcePath: MICROSOFT_MAIL_RESOURCE,
+        },
       });
 
       if (!subscription) {
@@ -343,7 +364,12 @@ export class MicrosoftWebhookService {
 
       // Update database
       await this.prisma.webhookSubscription.update({
-        where: { providerId },
+        where: {
+          providerId_resourcePath: {
+            providerId,
+            resourcePath: MICROSOFT_MAIL_RESOURCE,
+          },
+        },
         data: { isActive: false },
       });
 
@@ -365,7 +391,12 @@ export class MicrosoftWebhookService {
   private async updateSubscriptionStats(providerId: string): Promise<void> {
     try {
       await this.prisma.webhookSubscription.update({
-        where: { providerId },
+        where: {
+          providerId_resourcePath: {
+            providerId,
+            resourcePath: MICROSOFT_MAIL_RESOURCE,
+          },
+        },
         data: {
           lastNotificationAt: new Date(),
           notificationCount: { increment: 1 },
@@ -440,7 +471,7 @@ export class MicrosoftWebhookService {
 
   private getAxiosErrorMessage(error: unknown): string {
     if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<any>;
+      const axiosError = error;
       const status = axiosError.response?.status;
       const data =
         typeof axiosError.response?.data === 'string'
@@ -457,16 +488,21 @@ export class MicrosoftWebhookService {
    */
   async getStats(): Promise<Partial<WebhookStats>> {
     const total = await this.prisma.webhookSubscription.count({
-      where: { providerType: 'microsoft' },
+      where: { providerType: 'microsoft', resourcePath: MICROSOFT_MAIL_RESOURCE },
     });
 
     const active = await this.prisma.webhookSubscription.count({
-      where: { providerType: 'microsoft', isActive: true },
+      where: {
+        providerType: 'microsoft',
+        resourcePath: MICROSOFT_MAIL_RESOURCE,
+        isActive: true,
+      },
     });
 
     const expiring = await this.prisma.webhookSubscription.count({
       where: {
         providerType: 'microsoft',
+        resourcePath: MICROSOFT_MAIL_RESOURCE,
         isActive: true,
         expiresAt: {
           lte: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -477,6 +513,7 @@ export class MicrosoftWebhookService {
     const last1h = await this.prisma.webhookSubscription.count({
       where: {
         providerType: 'microsoft',
+        resourcePath: MICROSOFT_MAIL_RESOURCE,
         lastNotificationAt: {
           gte: new Date(Date.now() - 60 * 60 * 1000),
         },
@@ -486,6 +523,7 @@ export class MicrosoftWebhookService {
     const withErrors = await this.prisma.webhookSubscription.count({
       where: {
         providerType: 'microsoft',
+        resourcePath: MICROSOFT_MAIL_RESOURCE,
         errorCount: { gt: 0 },
       },
     });

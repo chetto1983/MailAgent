@@ -1,4 +1,4 @@
-import { GmailWebhookService } from './gmail-webhook.service';
+import { GmailWebhookService, GMAIL_WEBHOOK_RESOURCE } from './gmail-webhook.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { QueueService } from './queue.service';
 import { ConfigService } from '@nestjs/config';
@@ -134,7 +134,12 @@ describe('GmailWebhookService', () => {
       });
 
       expect(prisma.webhookSubscription.update).toHaveBeenCalledWith({
-        where: { providerId: provider.id },
+        where: {
+          providerId_resourcePath: {
+            providerId: provider.id,
+            resourcePath: GMAIL_WEBHOOK_RESOURCE,
+          },
+        },
         data: {
           lastNotificationAt: expect.any(Date),
           notificationCount: { increment: 1 },
@@ -241,12 +246,18 @@ describe('GmailWebhookService', () => {
       const upsertArgs = prisma.webhookSubscription.upsert.mock.calls[0][0];
 
       expect(upsertArgs).toMatchObject({
-        where: { providerId: provider.id },
+        where: {
+          providerId_resourcePath: {
+            providerId: provider.id,
+            resourcePath: GMAIL_WEBHOOK_RESOURCE,
+          },
+        },
       });
       expect(upsertArgs.create).toMatchObject({
         providerId: provider.id,
         providerType: 'google',
         subscriptionId: 'history-abc',
+        resourcePath: GMAIL_WEBHOOK_RESOURCE,
         isActive: true,
         metadata: {
           topicName: 'projects/demo/topics/gmail',

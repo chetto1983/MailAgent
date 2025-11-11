@@ -69,7 +69,8 @@
       "Bash(\"C:\\Program Files\\PostgreSQL\\15\\bin\\psql.exe\" -h localhost -U postgres -d mailagent -c \"CREATE EXTENSION IF NOT EXISTS vector;\")",
       "Bash(timeout 5 sleep:*)",
       "Bash(__NEW_LINE__ pwd)",
-      "Bash(__NEW_LINE__ echo \"Creazione report...\")"
+      "Bash(__NEW_LINE__ echo \"Creazione report...\")",
+      "Bash(timeout 30 bash:*)"
     ],
     "deny": [],
     "ask": []

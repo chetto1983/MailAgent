@@ -492,15 +492,15 @@ model JobQueue {
 // ===== WEBHOOK SUBSCRIPTION MODEL (for real-time sync) =====
 model WebhookSubscription {
   id             String   @id @default(cuid())
-  providerId     String   @unique // One webhook per provider
+  providerId     String   // May have multiple subscriptions per provider
   providerType   String // "google", "microsoft"
 
   // Provider-specific subscription ID
-  subscriptionId String // Gmail historyId, Microsoft subscription ID
+  subscriptionId String // Gmail historyId, Microsoft/Microsoft Calendar subscription ID
 
   // Webhook details
   webhookUrl     String? // For Microsoft Graph
-  resourcePath   String? // Resource being watched
+  resourcePath   String  @default("generic") // Resource being watched (calendar, mailbox, etc.)
 
   // Lifecycle
   isActive       Boolean  @default(true)
@@ -522,6 +522,8 @@ model WebhookSubscription {
   @@index([providerId, isActive])
   @@index([expiresAt]) // For renewal queries
   @@index([providerType])
+  @@index([subscriptionId])
+  @@unique([providerId, resourcePath])
   @@map("webhook_subscriptions")
 }
 

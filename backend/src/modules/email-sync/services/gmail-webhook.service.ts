@@ -14,6 +14,8 @@ import { google, gmail_v1 } from 'googleapis';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 
+export const GMAIL_WEBHOOK_RESOURCE = 'gmail/mailbox';
+
 @Injectable()
 export class GmailWebhookService {
   private readonly logger = new Logger(GmailWebhookService.name);
@@ -151,10 +153,14 @@ export class GmailWebhookService {
   /**
    * Create a Gmail watch subscription for a provider
    */
-  async createSubscription(
-    options: CreateWebhookOptions,
-  ): Promise<void> {
+  async createSubscription(options: CreateWebhookOptions): Promise<void> {
     const { providerId } = options;
+    const subscriptionWhere = {
+      providerId_resourcePath: {
+        providerId,
+        resourcePath: GMAIL_WEBHOOK_RESOURCE,
+      },
+    };
 
     try {
       // Get provider info
@@ -213,11 +219,12 @@ export class GmailWebhookService {
 
       // Save subscription to database
       await this.prisma.webhookSubscription.upsert({
-        where: { providerId },
+        where: subscriptionWhere,
         create: {
           providerId,
           providerType: 'google',
           subscriptionId: watchResponse.historyId,
+          resourcePath: GMAIL_WEBHOOK_RESOURCE,
           isActive: true,
           expiresAt,
           metadata: {
@@ -227,6 +234,7 @@ export class GmailWebhookService {
         },
         update: {
           subscriptionId: watchResponse.historyId,
+          resourcePath: GMAIL_WEBHOOK_RESOURCE,
           isActive: true,
           expiresAt,
           lastRenewedAt: new Date(),
@@ -246,7 +254,7 @@ export class GmailWebhookService {
 
       // Log error in subscription record
       await this.prisma.webhookSubscription.update({
-        where: { providerId },
+        where: subscriptionWhere,
         data: {
           isActive: false,
           lastError: errorMessage,
@@ -268,6 +276,7 @@ export class GmailWebhookService {
       const expiringSubscriptions = await this.prisma.webhookSubscription.findMany({
         where: {
           providerType: 'google',
+          resourcePath: GMAIL_WEBHOOK_RESOURCE,
           isActive: true,
           expiresAt: {
             lte: new Date(Date.now() + 24 * 60 * 60 * 1000), // Next 24h
@@ -329,7 +338,12 @@ export class GmailWebhookService {
 
       // Update database
       await this.prisma.webhookSubscription.update({
-        where: { providerId },
+        where: {
+          providerId_resourcePath: {
+            providerId,
+            resourcePath: GMAIL_WEBHOOK_RESOURCE,
+          },
+        },
         data: { isActive: false },
       });
 
@@ -347,7 +361,12 @@ export class GmailWebhookService {
   private async updateSubscriptionStats(providerId: string): Promise<void> {
     try {
       await this.prisma.webhookSubscription.update({
-        where: { providerId },
+        where: {
+          providerId_resourcePath: {
+            providerId,
+            resourcePath: GMAIL_WEBHOOK_RESOURCE,
+          },
+        },
         data: {
           lastNotificationAt: new Date(),
           notificationCount: { increment: 1 },
@@ -364,16 +383,21 @@ export class GmailWebhookService {
    */
   async getStats(): Promise<Partial<WebhookStats>> {
     const total = await this.prisma.webhookSubscription.count({
-      where: { providerType: 'google' },
+      where: { providerType: 'google', resourcePath: GMAIL_WEBHOOK_RESOURCE },
     });
 
     const active = await this.prisma.webhookSubscription.count({
-      where: { providerType: 'google', isActive: true },
+      where: {
+        providerType: 'google',
+        resourcePath: GMAIL_WEBHOOK_RESOURCE,
+        isActive: true,
+      },
     });
 
     const expiring = await this.prisma.webhookSubscription.count({
       where: {
         providerType: 'google',
+        resourcePath: GMAIL_WEBHOOK_RESOURCE,
         isActive: true,
         expiresAt: {
           lte: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -384,6 +408,7 @@ export class GmailWebhookService {
     const last1h = await this.prisma.webhookSubscription.count({
       where: {
         providerType: 'google',
+        resourcePath: GMAIL_WEBHOOK_RESOURCE,
         lastNotificationAt: {
           gte: new Date(Date.now() - 60 * 60 * 1000),
         },
@@ -393,6 +418,7 @@ export class GmailWebhookService {
     const withErrors = await this.prisma.webhookSubscription.count({
       where: {
         providerType: 'google',
+        resourcePath: GMAIL_WEBHOOK_RESOURCE,
         errorCount: { gt: 0 },
       },
     });

@@ -46,7 +46,7 @@ export class EmailEventsService {
       ),
     );
 
-    return merge(updates$, heartbeat$) as Observable<MessageEvent>;
+    return merge(updates$, heartbeat$);
   }
 
   emitMailboxMutation(tenantId: string, payload: EmailMutationEventPayload): void {

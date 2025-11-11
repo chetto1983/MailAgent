@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { GmailWebhookService } from './gmail-webhook.service';
-import { MicrosoftWebhookService } from './microsoft-webhook.service';
+import { GmailWebhookService, GMAIL_WEBHOOK_RESOURCE } from './gmail-webhook.service';
+import { MicrosoftWebhookService, MICROSOFT_MAIL_RESOURCE } from './microsoft-webhook.service';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -33,9 +33,17 @@ export class WebhookLifecycleService {
         return false;
       }
 
+      const resourcePath = this.getResourcePathForProvider(provider.providerType);
+      if (!resourcePath) {
+        return false;
+      }
+
       // Check if webhook already exists
-      const existing = await this.prisma.webhookSubscription.findUnique({
-        where: { providerId },
+      const existing = await this.prisma.webhookSubscription.findFirst({
+        where: {
+          providerId,
+          resourcePath,
+        },
       });
 
       if (existing) {
@@ -306,8 +314,24 @@ export class WebhookLifecycleService {
    * Remove webhook subscription and cancel upstream watcher for a provider.
    */
   async removeWebhookForProvider(providerId: string): Promise<void> {
-    const subscription = await this.prisma.webhookSubscription.findUnique({
-      where: { providerId },
+    const provider = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+    });
+
+    if (!provider) {
+      return;
+    }
+
+    const resourcePath = this.getResourcePathForProvider(provider.providerType);
+    if (!resourcePath) {
+      return;
+    }
+
+    const subscription = await this.prisma.webhookSubscription.findFirst({
+      where: {
+        providerId,
+        resourcePath,
+      },
     });
 
     if (!subscription) {
@@ -329,7 +353,7 @@ export class WebhookLifecycleService {
 
     try {
       await this.prisma.webhookSubscription.delete({
-        where: { providerId },
+        where: { id: subscription.id },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -337,5 +361,17 @@ export class WebhookLifecycleService {
         `Failed to delete webhook record for provider ${providerId}: ${message}`,
       );
     }
+  }
+
+  private getResourcePathForProvider(providerType: string): string | null {
+    if (providerType === 'google') {
+      return GMAIL_WEBHOOK_RESOURCE;
+    }
+
+    if (providerType === 'microsoft') {
+      return MICROSOFT_MAIL_RESOURCE;
+    }
+
+    return null;
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
-import { google } from 'googleapis';
+import { calendar_v3, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleCalendarSyncService } from './google-calendar-sync.service';
@@ -55,15 +56,23 @@ export class GoogleCalendarWebhookService {
 
       // Get list of calendars to watch
       const calendarList = await calendar.calendarList.list();
-      const calendars = calendarList.data.items || [];
+      const calendars = (calendarList.data.items || []).filter((cal) =>
+        this.isWatchableCalendar(cal),
+      );
 
-      // Setup watch for each calendar (primary calendar for now)
-      for (const cal of calendars.filter((c) => c.primary)) {
+      if (calendars.length === 0) {
+        this.logger.warn(`No watchable calendars found for provider ${providerId}`);
+        return;
+      }
+
+      for (const cal of calendars) {
+        const calendarId = cal.id!;
+        const resourcePath = `/calendar/v3/calendars/${calendarId}/events`;
         const channelId = `calendar-${providerId}-${nanoid()}`;
         const expiration = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
 
         const watchResponse = await calendar.events.watch({
-          calendarId: cal.id!,
+          calendarId,
           requestBody: {
             id: channelId,
             type: 'web_hook',
@@ -74,29 +83,34 @@ export class GoogleCalendarWebhookService {
 
         // Store webhook subscription info
         await this.prisma.webhookSubscription.upsert({
-          where: { providerId },
+          where: {
+            providerId_resourcePath: {
+              providerId,
+              resourcePath,
+            },
+          },
           create: {
             providerId,
             providerType: 'google',
             subscriptionId: channelId,
-            resourcePath: `/calendar/v3/calendars/${cal.id}/events`,
+            resourcePath,
             webhookUrl: this.WEBHOOK_URL,
             isActive: true,
             expiresAt: new Date(expiration),
             metadata: {
               resourceId: watchResponse.data.resourceId,
-              calendarId: cal.id,
+              calendarId,
             },
           },
           update: {
             subscriptionId: channelId,
-            resourcePath: `/calendar/v3/calendars/${cal.id}/events`,
+            resourcePath,
             expiresAt: new Date(expiration),
             isActive: true,
             lastRenewedAt: new Date(),
             metadata: {
               resourceId: watchResponse.data.resourceId,
-              calendarId: cal.id,
+              calendarId,
             },
           },
         });
@@ -112,6 +126,23 @@ export class GoogleCalendarWebhookService {
       );
       throw error;
     }
+  }
+
+  private isWatchableCalendar(cal: calendar_v3.Schema$CalendarListEntry): boolean {
+    if (!cal.id) {
+      return false;
+    }
+
+    if (cal.deleted) {
+      return false;
+    }
+
+    const accessRole = cal.accessRole?.toLowerCase();
+    if (accessRole) {
+      return ['owner', 'writer', 'editor'].includes(accessRole);
+    }
+
+    return !!cal.primary;
   }
 
   /**
@@ -146,6 +177,11 @@ export class GoogleCalendarWebhookService {
         return;
       }
 
+      if (!subscription.resourcePath?.startsWith('/calendar/')) {
+        this.logger.debug(`Ignoring non-calendar subscription ${channelId}`);
+        return;
+      }
+
       // Update subscription stats
       await this.prisma.webhookSubscription.update({
         where: { id: subscription.id },
@@ -175,6 +211,9 @@ export class GoogleCalendarWebhookService {
     const expiring = await this.prisma.webhookSubscription.findMany({
       where: {
         providerType: 'google',
+        resourcePath: {
+          startsWith: '/calendar/',
+        },
         isActive: true,
         expiresAt: {
           lte: oneDayFromNow,
@@ -199,16 +238,35 @@ export class GoogleCalendarWebhookService {
     return renewed;
   }
 
+  @Cron(CronExpression.EVERY_6_HOURS)
+  private async handleScheduledRenewal(): Promise<void> {
+    try {
+      const renewed = await this.renewExpiringSoon();
+      if (renewed > 0) {
+        this.logger.log(`Renewed ${renewed} Google Calendar webhook channels via scheduled job`);
+      }
+    } catch (error) {
+      this.logger.error('Scheduled Google Calendar webhook renewal failed:', error);
+    }
+  }
+
   /**
    * Stop watching a calendar
    */
   async stopWatch(providerId: string): Promise<void> {
     try {
-      const subscription = await this.prisma.webhookSubscription.findUnique({
-        where: { providerId },
+      const subscriptions = await this.prisma.webhookSubscription.findMany({
+        where: {
+          providerId,
+          providerType: 'google',
+          resourcePath: {
+            startsWith: '/calendar/',
+          },
+          isActive: true,
+        },
       });
 
-      if (!subscription || subscription.providerType !== 'google') {
+      if (subscriptions.length === 0) {
         return;
       }
 
@@ -229,26 +287,27 @@ export class GoogleCalendarWebhookService {
       oauth2Client.setCredentials({ access_token: accessToken });
       const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-      const metadata = subscription.metadata as any;
-      const channelId = subscription.subscriptionId;
-      const resourceId = metadata?.resourceId;
+      for (const subscription of subscriptions) {
+        const metadata = subscription.metadata as any;
+        const channelId = subscription.subscriptionId;
+        const resourceId = metadata?.resourceId;
 
-      if (channelId && resourceId) {
-        await calendar.channels.stop({
-          requestBody: {
-            id: channelId,
-            resourceId,
-          },
+        if (channelId && resourceId) {
+          await calendar.channels.stop({
+            requestBody: {
+              id: channelId,
+              resourceId,
+            },
+          });
+        }
+
+        await this.prisma.webhookSubscription.update({
+          where: { id: subscription.id },
+          data: { isActive: false },
         });
       }
 
-      // Mark subscription as inactive
-      await this.prisma.webhookSubscription.update({
-        where: { providerId },
-        data: { isActive: false },
-      });
-
-      this.logger.log(`Stopped Google Calendar watch for provider ${providerId}`);
+      this.logger.log(`Stopped ${subscriptions.length} Google Calendar watch channels for provider ${providerId}`);
     } catch (error) {
       this.logger.error(`Failed to stop Google Calendar watch for ${providerId}:`, error);
     }
@@ -259,12 +318,21 @@ export class GoogleCalendarWebhookService {
    */
   async getStats(): Promise<any> {
     const total = await this.prisma.webhookSubscription.count({
-      where: { providerType: 'google', isActive: true },
+      where: {
+        providerType: 'google',
+        resourcePath: {
+          startsWith: '/calendar/',
+        },
+        isActive: true,
+      },
     });
 
     const recentNotifications = await this.prisma.webhookSubscription.findMany({
       where: {
         providerType: 'google',
+        resourcePath: {
+          startsWith: '/calendar/',
+        },
         isActive: true,
         lastNotificationAt: {
           gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24h

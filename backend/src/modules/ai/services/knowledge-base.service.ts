@@ -136,6 +136,161 @@ export class KnowledgeBaseService {
     };
   }
 
+  /**
+   * Create embeddings for multiple emails in a single batch operation
+   * This is more efficient than calling createEmbeddingForEmail multiple times
+   * @param emailOptions Array of email options to create embeddings for
+   * @returns Array of results indicating success/failure for each email
+   */
+  async createBulkEmbeddingsForEmails(
+    emailOptions: CreateEmailEmbeddingOptions[],
+  ): Promise<Array<{ emailId: string; success: boolean; error?: string }>> {
+    if (!emailOptions || emailOptions.length === 0) {
+      return [];
+    }
+
+    const client = await this.mistralService.createMistralClient();
+    const results: Array<{ emailId: string; success: boolean; error?: string }> = [];
+
+    // Prepare all chunks from all emails
+    const allChunksData: Array<{
+      emailId: string;
+      tenantId: string;
+      subject: string;
+      from: string | null;
+      receivedAt: string | undefined;
+      chunkIndex: number;
+      chunkCount: number;
+      content: string;
+    }> = [];
+
+    // First, compose content and chunk all emails
+    for (const options of emailOptions) {
+      const content = this.composeEmailEmbeddingContent({
+        subject: options.subject,
+        snippet: options.snippet ?? null,
+        bodyText: options.bodyText ?? null,
+        bodyHtml: options.bodyHtml ?? null,
+      });
+
+      if (!content) {
+        this.logger.debug(
+          `Skipping embedding for email ${options.emailId} (tenant ${options.tenantId}): empty content`,
+        );
+        results.push({ emailId: options.emailId, success: false, error: 'Empty content' });
+        continue;
+      }
+
+      // Check if embedding already exists
+      if (
+        options.emailId &&
+        (await this.embeddingsService.hasEmbeddingForEmail(options.tenantId, options.emailId))
+      ) {
+        this.logger.verbose(
+          `Embedding already exists for email ${options.emailId} (tenant ${options.tenantId}), skipping.`,
+        );
+        results.push({ emailId: options.emailId, success: false, error: 'Already exists' });
+        continue;
+      }
+
+      const chunks = KnowledgeBaseService.chunkContentForEmbedding(content);
+      const receivedAtIso =
+        options.receivedAt instanceof Date
+          ? options.receivedAt.toISOString()
+          : options.receivedAt || undefined;
+
+      // Delete existing embeddings for this email
+      await this.deleteEmbeddingsForEmail(options.tenantId, options.emailId);
+
+      // Add chunks to the batch
+      for (const chunk of chunks) {
+        allChunksData.push({
+          emailId: options.emailId,
+          tenantId: options.tenantId,
+          subject: options.subject,
+          from: options.from ?? null,
+          receivedAt: receivedAtIso,
+          chunkIndex: chunk.index,
+          chunkCount: chunks.length,
+          content: chunk.content,
+        });
+      }
+    }
+
+    if (allChunksData.length === 0) {
+      this.logger.debug('No chunks to process in bulk embeddings');
+      return results;
+    }
+
+    try {
+      // Generate embeddings for all chunks in a single bulk operation
+      this.logger.debug(`Generating embeddings for ${allChunksData.length} chunks from ${emailOptions.length} emails`);
+      const allContents = allChunksData.map((c) => c.content);
+      const embeddings = await this.mistralService.generateBulkEmbeddings(allContents, client);
+
+      // Save all embeddings
+      for (let i = 0; i < allChunksData.length; i++) {
+        const chunkData = allChunksData[i];
+        const embedding = embeddings[i];
+
+        try {
+          await this.embeddingsService.saveEmbedding({
+            tenantId: chunkData.tenantId,
+            messageId: `${chunkData.emailId}::chunk-${chunkData.chunkIndex + 1}`,
+            content: chunkData.content,
+            embedding,
+            model: this.mistralService.getEmbeddingModel(),
+            documentName: chunkData.subject,
+            metadata: {
+              source: 'email',
+              emailId: chunkData.emailId,
+              subject: chunkData.subject,
+              from: chunkData.from,
+              receivedAt: chunkData.receivedAt ?? null,
+              chunkIndex: chunkData.chunkIndex,
+              chunkCount: chunkData.chunkCount,
+            },
+          });
+        } catch (saveError) {
+          const message = saveError instanceof Error ? saveError.message : String(saveError);
+          this.logger.warn(
+            `Failed to save embedding for chunk ${chunkData.chunkIndex + 1}/${chunkData.chunkCount} of email ${chunkData.emailId}: ${message}`,
+          );
+        }
+      }
+
+      // Mark all emails as successful
+      const processedEmailIds = new Set(allChunksData.map((c) => c.emailId));
+      for (const emailId of processedEmailIds) {
+        if (!results.find((r) => r.emailId === emailId)) {
+          results.push({ emailId, success: true });
+        }
+      }
+
+      this.logger.log(
+        `Successfully created embeddings for ${processedEmailIds.size} emails with ${allChunksData.length} total chunks`,
+      );
+    } catch (bulkError) {
+      const message = bulkError instanceof Error ? bulkError.message : String(bulkError);
+      this.logger.error(`Bulk embedding generation failed for batch: ${message}`);
+
+      // Fall back to individual processing
+      for (const options of emailOptions) {
+        if (!results.find((r) => r.emailId === options.emailId)) {
+          try {
+            const success = await this.createEmbeddingForEmail(options);
+            results.push({ emailId: options.emailId, success });
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            results.push({ emailId: options.emailId, success: false, error: errorMsg });
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
   async createEmbeddingForEmail(options: CreateEmailEmbeddingOptions): Promise<boolean> {
     const content = this.composeEmailEmbeddingContent({
       subject: options.subject,

@@ -69,9 +69,9 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
       },
       {
         connection,
-        concurrency: 1,
+        concurrency: 3, // Process up to 3 emails concurrently for better throughput
         limiter: {
-          max: 6,
+          max: 10, // Increased to allow more concurrent operations with bulk embeddings
           duration: 1000,
         },
       },

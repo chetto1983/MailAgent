@@ -22,6 +22,14 @@ Complete guide to all documentation files and resources for the MailAgent projec
 | [README.md](README.md) | Full project documentation | Complete reference |
 | [PRIVACY.md](PRIVACY.md) | GDPR and privacy information | Compliance needs |
 
+### Implementation Guides
+
+| Document | Purpose | Time | For Whom |
+|----------|---------|------|----------|
+| [CURRENT_STATUS.md](implementation/CURRENT_STATUS.md) | Current project status & recent changes | 10 min | Developers |
+| [EMBEDDINGS_OPTIMIZATION.md](EMBEDDINGS_OPTIMIZATION.md) | Bulk embeddings implementation guide | 15 min | Backend devs, AI integration |
+| [CALENDAR_WEBHOOK_IMPLEMENTATION.md](implementation/CALENDAR_WEBHOOK_IMPLEMENTATION.md) | Webhook setup for calendar sync | 20 min | Integration developers |
+
 ### OAuth2 Setup (External Services)
 
 | Document | Purpose | Time | For Whom |

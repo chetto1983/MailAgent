@@ -183,7 +183,7 @@ export class GoogleCalendarSyncService {
     let eventsProcessed = 0;
     let newEvents = 0;
     let updatedEvents = 0;
-    let deletedEvents = 0;
+    const deletedEvents = 0;
 
     let pageToken: string | undefined;
 

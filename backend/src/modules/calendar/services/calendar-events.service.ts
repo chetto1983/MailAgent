@@ -48,7 +48,7 @@ export class CalendarEventsService {
       ),
     );
 
-    return merge(updates$, heartbeat$) as Observable<MessageEvent>;
+    return merge(updates$, heartbeat$);
   }
 
   emitCalendarMutation(tenantId: string, payload: CalendarMutationEventPayload): void {

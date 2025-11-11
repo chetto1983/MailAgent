@@ -6,6 +6,8 @@ import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftCalendarSyncService } from './microsoft-calendar-sync.service';
 import { nanoid } from 'nanoid';
 
+export const MICROSOFT_CALENDAR_RESOURCE = '/me/events';
+
 export interface MicrosoftCalendarNotification {
   subscriptionId: string;
   clientState?: string;
@@ -92,12 +94,17 @@ export class MicrosoftCalendarWebhookService {
 
       // Store webhook subscription info
       await this.prisma.webhookSubscription.upsert({
-        where: { providerId },
+        where: {
+          providerId_resourcePath: {
+            providerId,
+            resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+          },
+        },
         create: {
           providerId,
           providerType: 'microsoft',
           subscriptionId,
-          resourcePath: '/me/events',
+          resourcePath: MICROSOFT_CALENDAR_RESOURCE,
           webhookUrl: this.WEBHOOK_URL,
           isActive: true,
           expiresAt: new Date(expirationDateTime),
@@ -108,7 +115,7 @@ export class MicrosoftCalendarWebhookService {
         },
         update: {
           subscriptionId,
-          resourcePath: '/me/events',
+          resourcePath: MICROSOFT_CALENDAR_RESOURCE,
           expiresAt: new Date(expirationDateTime),
           isActive: true,
           lastRenewedAt: new Date(),
@@ -206,6 +213,7 @@ export class MicrosoftCalendarWebhookService {
     const expiring = await this.prisma.webhookSubscription.findMany({
       where: {
         providerType: 'microsoft',
+        resourcePath: MICROSOFT_CALENDAR_RESOURCE,
         isActive: true,
         expiresAt: {
           lte: oneDayFromNow,
@@ -234,8 +242,11 @@ export class MicrosoftCalendarWebhookService {
    * Renew a specific subscription
    */
   private async renewSubscription(providerId: string): Promise<void> {
-    const subscription = await this.prisma.webhookSubscription.findUnique({
-      where: { providerId },
+    const subscription = await this.prisma.webhookSubscription.findFirst({
+      where: {
+        providerId,
+        resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+      },
     });
 
     if (!subscription || subscription.providerType !== 'microsoft') {
@@ -273,7 +284,12 @@ export class MicrosoftCalendarWebhookService {
 
     // Update database
     await this.prisma.webhookSubscription.update({
-      where: { providerId },
+      where: {
+        providerId_resourcePath: {
+          providerId,
+          resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+        },
+      },
       data: {
         expiresAt: new Date(expirationDateTime),
         lastRenewedAt: new Date(),
@@ -288,8 +304,11 @@ export class MicrosoftCalendarWebhookService {
    */
   async deleteSubscription(providerId: string): Promise<void> {
     try {
-      const subscription = await this.prisma.webhookSubscription.findUnique({
-        where: { providerId },
+      const subscription = await this.prisma.webhookSubscription.findFirst({
+        where: {
+          providerId,
+          resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+        },
       });
 
       if (!subscription || subscription.providerType !== 'microsoft') {
@@ -321,7 +340,12 @@ export class MicrosoftCalendarWebhookService {
 
       // Mark subscription as inactive
       await this.prisma.webhookSubscription.update({
-        where: { providerId },
+        where: {
+          providerId_resourcePath: {
+            providerId,
+            resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+          },
+        },
         data: { isActive: false },
       });
 
@@ -339,12 +363,17 @@ export class MicrosoftCalendarWebhookService {
    */
   async getStats(): Promise<any> {
     const total = await this.prisma.webhookSubscription.count({
-      where: { providerType: 'microsoft', isActive: true },
+      where: {
+        providerType: 'microsoft',
+        resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+        isActive: true,
+      },
     });
 
     const recentNotifications = await this.prisma.webhookSubscription.findMany({
       where: {
         providerType: 'microsoft',
+        resourcePath: MICROSOFT_CALENDAR_RESOURCE,
         isActive: true,
         lastNotificationAt: {
           gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24h
