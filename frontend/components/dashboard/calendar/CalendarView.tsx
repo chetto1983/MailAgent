@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin, { DateClickArg, EventDragStopArg, EventResizeDoneArg } from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
+import allLocales from '@fullcalendar/core/locales-all';
 import {
   EventClickArg,
   EventContentArg,
@@ -20,6 +21,7 @@ export interface CalendarViewProps {
   onEventDrop?: (eventId: string, newStart: Date, newEnd: Date) => void;
   onEventResize?: (eventId: string, newStart: Date, newEnd: Date) => void;
   onDatesChange?: (start: Date, end: Date) => void;
+  locale?: string;
 }
 
 /**
@@ -36,6 +38,7 @@ export function CalendarView({
   onEventDrop,
   onEventResize,
   onDatesChange,
+  locale = 'en',
 }: CalendarViewProps) {
   const theme = useTheme();
   const calendarRef = useRef<FullCalendar>(null);
@@ -230,6 +233,8 @@ export function CalendarView({
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
+        locales={allLocales}
+        locale={locale}
         headerToolbar={{
           left: 'prev,next today',
           center: 'title',

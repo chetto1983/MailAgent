@@ -189,6 +189,8 @@ export interface AppTranslations {
       description: string;
       refreshTooltip: string;
       allCalendars: string;
+      clearSelection: string;
+      filterTitle?: string;
       noProviders: string;
       noProvidersDescription: string;
       loading: string;

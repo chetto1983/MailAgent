@@ -30,6 +30,7 @@ import {
 } from '@/lib/api/calendar';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { useTranslations } from '@/lib/hooks/use-translations';
+import { useLocale } from '@/lib/hooks/use-locale';
 
 type ParsedSseMessage = {
   type: string;
@@ -61,6 +62,7 @@ export default function CalendarPage() {
   const { user, isLoading: authLoading } = useAuth();
   const translations = useTranslations();
   const calendarCopy = translations.dashboard.calendar;
+  const locale = useLocale();
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
@@ -496,7 +498,7 @@ export default function CalendarPage() {
             onClick={handleHideAllCalendars}
             disabled={visibleCalendars.size === 0}
           >
-            {'Hide all'}
+            {calendarCopy.clearSelection ?? 'Hide all'}
           </MuiButton>
         </Stack>
       </Stack>
@@ -672,6 +674,7 @@ export default function CalendarPage() {
                 onEventDrop={handleEventDrop}
                 onEventResize={handleEventResize}
                 onDatesChange={handleDatesChange}
+                locale={locale}
               />
             )}
           </Box>
