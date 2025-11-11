@@ -292,6 +292,39 @@ export interface AppTranslations {
       sendError: string;
       draftSaved: string;
     };
+    contacts: {
+      title: string;
+      description: string;
+      searchPlaceholder: string;
+      companyPlaceholder: string;
+      providerFilterLabel: string;
+      allProvidersLabel: string;
+      applyFilters: string;
+      clearFilters: string;
+      refresh: string;
+      sync: string;
+      syncing: string;
+      syncDisabledTooltip: string;
+      list: {
+        emptyTitle: string;
+        emptyDescription: string;
+        loading: string;
+        showing: string;
+        tableHeaders: {
+          name: string;
+          email: string;
+          phone: string;
+          company: string;
+          provider: string;
+          lastSynced: string;
+        };
+      };
+      alerts: {
+        loadError: string;
+        syncSuccess: string;
+        syncError: string;
+      };
+    };
   };
   errors: {
     notFound: {
