@@ -15,6 +15,7 @@ import {
   Checkbox,
   FormControlLabel,
   Button as MuiButton,
+  Divider,
 } from '@mui/material';
 import { Plus, RefreshCw, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/use-auth';
@@ -36,6 +37,25 @@ type ParsedSseMessage = {
   type: string;
   data?: string;
 };
+
+const COLOR_PALETTE = [
+  '#ff8a80',
+  '#ea80fc',
+  '#8c9eff',
+  '#82b1ff',
+  '#80d8ff',
+  '#84ffff',
+  '#a7ffeb',
+  '#c8e6c9',
+  '#dcedc8',
+  '#fff59d',
+  '#ffe082',
+  '#ffcc80',
+  '#ffab91',
+  '#f48fb1',
+  '#ce93d8',
+  '#b39ddb',
+];
 
 const parseSseMessage = (chunk: string): ParsedSseMessage | null => {
   if (!chunk) {
@@ -98,7 +118,11 @@ export default function CalendarPage() {
   const calendarGroups = useMemo(() => {
     const groups = new Map<
       string,
-      { providerId: string; providerLabel: string; calendars: Array<{ key: string; label: string }> }
+      {
+        providerId: string;
+        providerLabel: string;
+        calendars: Array<{ key: string; label: string }>;
+      }
     >();
 
     events.forEach((event) => {
@@ -128,6 +152,20 @@ export default function CalendarPage() {
 
     return Array.from(groups.values());
   }, [events, makeCalendarKey, calendarCopy.allCalendars]);
+
+  const calendarColors = useMemo(() => {
+    const uniqueKeys = Array.from(
+      new Set(
+        events.map((event) => makeCalendarKey(event.providerId, event.calendarId ?? 'primary')),
+      ),
+    ).sort();
+
+    const colors: Record<string, string> = {};
+    uniqueKeys.forEach((key, index) => {
+      colors[key] = COLOR_PALETTE[index % COLOR_PALETTE.length];
+    });
+    return colors;
+  }, [events, makeCalendarKey]);
 
   const allCalendarKeys = useMemo(
     () => calendarGroups.flatMap((group) => group.calendars.map((calendar) => calendar.key)),
@@ -508,8 +546,8 @@ export default function CalendarPage() {
           {providersLoading ? calendarCopy.loading : calendarCopy.noProviders}
         </Typography>
       ) : (
-        <Stack spacing={1.5}>
-          {calendarGroups.map((group) => {
+        <Stack spacing={2}>
+          {calendarGroups.map((group, groupIndex) => {
             const keys = group.calendars.map((calendar) => calendar.key);
             const selectedCount = keys.filter((key) => visibleCalendars.has(key)).length;
             const allSelected = selectedCount === keys.length && keys.length > 0;
@@ -519,12 +557,15 @@ export default function CalendarPage() {
               <Box
                 key={group.providerId}
                 sx={{
-                  borderBottom: '1px solid',
-                  borderColor: 'divider',
-                  pb: 1,
+                  pb: groupIndex === calendarGroups.length - 1 ? 0 : 1.5,
                 }}
               >
                 <FormControlLabel
+                  disableTypography
+                  sx={{
+                    alignItems: 'flex-start',
+                    '& .MuiCheckbox-root': { mt: -0.5 },
+                  }}
                   control={
                     <Checkbox
                       checked={allSelected}
@@ -532,12 +573,21 @@ export default function CalendarPage() {
                       onChange={() => handleToggleProviderCalendars(keys, allSelected)}
                     />
                   }
-                  label={group.providerLabel}
+                  label={
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      {group.providerLabel}
+                    </Typography>
+                  }
                 />
-                <Stack sx={{ pl: 4 }}>
+                <Stack sx={{ pl: 4 }} spacing={0.5}>
                   {group.calendars.map((calendar) => (
                     <FormControlLabel
                       key={calendar.key}
+                      disableTypography
+                      sx={{
+                        alignItems: 'center',
+                        '& .MuiCheckbox-root': { mr: 1 },
+                      }}
                       control={
                         <Checkbox
                           size="small"
@@ -545,10 +595,27 @@ export default function CalendarPage() {
                           onChange={() => handleToggleCalendarVisibility(calendar.key)}
                         />
                       }
-                      label={calendar.label}
+                      label={
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Box
+                            sx={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: '50%',
+                              bgcolor: calendarColors[calendar.key] || 'grey.400',
+                              border: '1px solid',
+                              borderColor: calendarColors[calendar.key]
+                                ? 'transparent'
+                                : 'divider',
+                            }}
+                          />
+                          <Typography variant="body2">{calendar.label}</Typography>
+                        </Stack>
+                      }
                     />
                   ))}
                 </Stack>
+                {groupIndex !== calendarGroups.length - 1 && <Divider sx={{ mt: 1.5 }} />}
               </Box>
             );
           })}
@@ -669,6 +736,7 @@ export default function CalendarPage() {
             ) : (
               <CalendarView
                 events={filteredEvents}
+                calendarColors={calendarColors}
                 onEventClick={handleEventClick}
                 onDateClick={handleDateClick}
                 onEventDrop={handleEventDrop}

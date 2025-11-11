@@ -180,34 +180,80 @@ export class KnowledgeBaseService {
 
       let successfulChunks = 0;
 
-      for (const chunk of chunks) {
-        try {
-          const embedding = await this.mistralService.generateEmbedding(chunk.content, client);
+      try {
+        // Use bulk embeddings for better performance - single API call for all chunks
+        const chunkContents = chunks.map((chunk) => chunk.content);
+        const embeddings = await this.mistralService.generateBulkEmbeddings(chunkContents, client);
 
-          await this.embeddingsService.saveEmbedding({
-            tenantId: options.tenantId,
-            messageId: `${options.emailId}::chunk-${chunk.index + 1}`,
-            content: chunk.content,
-            embedding,
-            model: this.mistralService.getEmbeddingModel(),
-            documentName: options.subject,
-            metadata: {
-              source: 'email',
-              emailId: options.emailId,
-              subject: options.subject,
-              from: options.from ?? null,
-              receivedAt: receivedAtIso ?? null,
-              chunkIndex: chunk.index,
-              chunkCount: chunks.length,
-            },
-          });
+        // Save all embeddings
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          const embedding = embeddings[i];
 
-          successfulChunks += 1;
-        } catch (chunkError) {
-          const message = chunkError instanceof Error ? chunkError.message : String(chunkError);
-          this.logger.warn(
-            `Failed embedding chunk ${chunk.index + 1}/${chunks.length} for email ${options.emailId} (tenant ${options.tenantId}): ${message}`,
-          );
+          try {
+            await this.embeddingsService.saveEmbedding({
+              tenantId: options.tenantId,
+              messageId: `${options.emailId}::chunk-${chunk.index + 1}`,
+              content: chunk.content,
+              embedding,
+              model: this.mistralService.getEmbeddingModel(),
+              documentName: options.subject,
+              metadata: {
+                source: 'email',
+                emailId: options.emailId,
+                subject: options.subject,
+                from: options.from ?? null,
+                receivedAt: receivedAtIso ?? null,
+                chunkIndex: chunk.index,
+                chunkCount: chunks.length,
+              },
+            });
+
+            successfulChunks += 1;
+          } catch (saveError) {
+            const message = saveError instanceof Error ? saveError.message : String(saveError);
+            this.logger.warn(
+              `Failed to save embedding for chunk ${chunk.index + 1}/${chunks.length} of email ${options.emailId} (tenant ${options.tenantId}): ${message}`,
+            );
+          }
+        }
+      } catch (bulkError) {
+        // If bulk operation fails, fall back to individual processing
+        const message = bulkError instanceof Error ? bulkError.message : String(bulkError);
+        this.logger.warn(
+          `Bulk embedding generation failed for email ${options.emailId} (tenant ${options.tenantId}): ${message}. Falling back to individual processing.`,
+        );
+
+        // Fallback: process chunks individually
+        for (const chunk of chunks) {
+          try {
+            const embedding = await this.mistralService.generateEmbedding(chunk.content, client);
+
+            await this.embeddingsService.saveEmbedding({
+              tenantId: options.tenantId,
+              messageId: `${options.emailId}::chunk-${chunk.index + 1}`,
+              content: chunk.content,
+              embedding,
+              model: this.mistralService.getEmbeddingModel(),
+              documentName: options.subject,
+              metadata: {
+                source: 'email',
+                emailId: options.emailId,
+                subject: options.subject,
+                from: options.from ?? null,
+                receivedAt: receivedAtIso ?? null,
+                chunkIndex: chunk.index,
+                chunkCount: chunks.length,
+              },
+            });
+
+            successfulChunks += 1;
+          } catch (chunkError) {
+            const chunkMessage = chunkError instanceof Error ? chunkError.message : String(chunkError);
+            this.logger.warn(
+              `Failed embedding chunk ${chunk.index + 1}/${chunks.length} for email ${options.emailId} (tenant ${options.tenantId}): ${chunkMessage}`,
+            );
+          }
         }
       }
 

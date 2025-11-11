@@ -166,6 +166,101 @@ describe('MistralService', () => {
     });
   });
 
+  describe('generateBulkEmbeddings', () => {
+    it('returns empty array for empty input', async () => {
+      const result = await service.generateBulkEmbeddings([]);
+
+      expect(result).toEqual([]);
+      expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
+    });
+
+    it('generates embeddings for multiple texts in a single call', async () => {
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [
+          { index: 0, embedding: [0.1, 0.2, 0.3] },
+          { index: 1, embedding: [0.4, 0.5, 0.6] },
+          { index: 2, embedding: [0.7, 0.8, 0.9] },
+        ],
+      });
+
+      const result = await service.generateBulkEmbeddings([
+        'first text',
+        'second text',
+        'third text',
+      ]);
+
+      expect(result).toEqual([
+        [0.1, 0.2, 0.3],
+        [0.4, 0.5, 0.6],
+        [0.7, 0.8, 0.9],
+      ]);
+      expect(mockEmbeddingsCreate).toHaveBeenCalledWith({
+        model: 'mistral-embed',
+        inputs: ['first text', 'second text', 'third text'],
+      });
+    });
+
+    it('sorts embeddings by index to ensure correct order', async () => {
+      // Return embeddings in wrong order
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [
+          { index: 2, embedding: [0.7, 0.8, 0.9] },
+          { index: 0, embedding: [0.1, 0.2, 0.3] },
+          { index: 1, embedding: [0.4, 0.5, 0.6] },
+        ],
+      });
+
+      const result = await service.generateBulkEmbeddings([
+        'first text',
+        'second text',
+        'third text',
+      ]);
+
+      // Should be reordered by index
+      expect(result).toEqual([
+        [0.1, 0.2, 0.3],
+        [0.4, 0.5, 0.6],
+        [0.7, 0.8, 0.9],
+      ]);
+    });
+
+    it('throws error when response data is empty', async () => {
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [],
+      });
+
+      await expect(
+        service.generateBulkEmbeddings(['text1', 'text2']),
+      ).rejects.toThrow('Mistral bulk embeddings response did not contain data');
+    });
+
+    it('throws error when embedding count does not match input count', async () => {
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [
+          { index: 0, embedding: [0.1, 0.2, 0.3] },
+          // Missing second embedding
+        ],
+      });
+
+      await expect(
+        service.generateBulkEmbeddings(['text1', 'text2']),
+      ).rejects.toThrow('Expected 2 embeddings but received 1');
+    });
+
+    it('throws error when an embedding is empty or invalid', async () => {
+      mockEmbeddingsCreate.mockResolvedValue({
+        data: [
+          { index: 0, embedding: [0.1, 0.2, 0.3] },
+          { index: 1, embedding: [] }, // Empty embedding
+        ],
+      });
+
+      await expect(
+        service.generateBulkEmbeddings(['text1', 'text2']),
+      ).rejects.toThrow('Embedding at index 1 is empty or invalid');
+    });
+  });
+
   describe('searchSimilarContent', () => {
     it('returns empty array when search fails', async () => {
       embeddingsService.findSimilarContent.mockRejectedValue(new Error('DB error'));

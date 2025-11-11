@@ -12,6 +12,7 @@ import {
   DatesSetArg,
 } from '@fullcalendar/core';
 import { Box, Paper, useTheme, alpha } from '@mui/material';
+import { darken } from '@mui/material/styles';
 import { CalendarEvent } from '@/lib/api/calendar';
 
 export interface CalendarViewProps {
@@ -22,6 +23,7 @@ export interface CalendarViewProps {
   onEventResize?: (eventId: string, newStart: Date, newEnd: Date) => void;
   onDatesChange?: (start: Date, end: Date) => void;
   locale?: string;
+  calendarColors?: Record<string, string>;
 }
 
 /**
@@ -39,24 +41,33 @@ export function CalendarView({
   onEventResize,
   onDatesChange,
   locale = 'en',
+  calendarColors,
 }: CalendarViewProps) {
   const theme = useTheme();
   const calendarRef = useRef<FullCalendar>(null);
+  const getCalendarKey = (event: CalendarEvent) =>
+    `${event.providerId}:${event.calendarId ?? 'primary'}`;
 
   // Convert CalendarEvent to FullCalendar EventInput
-  const calendarEvents: EventInput[] = events.map((event) => ({
-    id: event.id,
-    title: event.title,
-    start: event.startTime,
-    end: event.endTime,
-    allDay: event.isAllDay,
-    backgroundColor: getEventColor(event, theme),
-    borderColor: getEventBorderColor(event, theme),
-    textColor: theme.palette.getContrastText(getEventColor(event, theme)),
-    extendedProps: {
-      ...event,
-    },
-  }));
+  const calendarEvents: EventInput[] = events.map((event) => {
+    const key = getCalendarKey(event);
+    const backgroundColor = getEventColor(event, theme, calendarColors?.[key]);
+    const borderColor = getEventBorderColor(event, theme, calendarColors?.[key]);
+
+    return {
+      id: event.id,
+      title: event.title,
+      start: event.startTime,
+      end: event.endTime,
+      allDay: event.isAllDay,
+      backgroundColor,
+      borderColor,
+      textColor: theme.palette.getContrastText(backgroundColor),
+      extendedProps: {
+        ...event,
+      },
+    };
+  });
 
   // Handle event click
   const handleEventClick = useCallback(
@@ -273,7 +284,11 @@ export function CalendarView({
 /**
  * Get event background color based on status
  */
-function getEventColor(event: CalendarEvent, theme: any): string {
+function getEventColor(event: CalendarEvent, theme: any, customColor?: string): string {
+  if (customColor) {
+    return customColor;
+  }
+
   if (event.isCancelled) {
     return theme.palette.error.main;
   }
@@ -289,7 +304,11 @@ function getEventColor(event: CalendarEvent, theme: any): string {
 /**
  * Get event border color based on status
  */
-function getEventBorderColor(event: CalendarEvent, theme: any): string {
+function getEventBorderColor(event: CalendarEvent, theme: any, customColor?: string): string {
+  if (customColor) {
+    return darken(customColor, 0.2);
+  }
+
   if (event.isCancelled) {
     return theme.palette.error.dark;
   }

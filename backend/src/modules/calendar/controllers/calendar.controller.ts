@@ -93,4 +93,14 @@ export class CalendarController {
     const tenantId = req.user.tenantId;
     await this.calendarService.deleteEvent(tenantId, eventId);
   }
+
+  /**
+   * Trigger manual sync for a provider's calendars
+   * POST /api/calendar/sync/:providerId
+   */
+  @Post('sync/:providerId')
+  async syncProvider(@Req() req: any, @Param('providerId') providerId: string) {
+    const tenantId = req.user.tenantId;
+    return this.calendarService.syncProvider(tenantId, providerId);
+  }
 }

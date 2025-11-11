@@ -275,6 +275,56 @@ export class MistralService {
   }
 
   /**
+   * Generate embeddings for multiple texts in a single bulk operation
+   * This is more efficient than calling generateEmbedding multiple times
+   * @param texts Array of texts to generate embeddings for
+   * @param client Optional Mistral client instance
+   * @returns Array of embeddings in the same order as input texts
+   */
+  async generateBulkEmbeddings(texts: string[], client?: Mistral): Promise<number[][]> {
+    if (!texts || texts.length === 0) {
+      return [];
+    }
+
+    try {
+      const mistralClient = client ?? (await this.createMistralClient());
+      const response = await mistralClient.embeddings.create({
+        model: this.embeddingModel,
+        inputs: texts,
+      });
+
+      if (!response.data || response.data.length === 0) {
+        throw new Error('Mistral bulk embeddings response did not contain data');
+      }
+
+      // Sort by index to ensure correct order
+      const sortedData = response.data.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+      const embeddings = sortedData.map((item, index) => {
+        if (!item.embedding || item.embedding.length === 0) {
+          throw new Error(`Embedding at index ${index} is empty or invalid`);
+        }
+        return item.embedding;
+      });
+
+      if (embeddings.length !== texts.length) {
+        throw new Error(
+          `Expected ${texts.length} embeddings but received ${embeddings.length}`,
+        );
+      }
+
+      this.logger.debug(`Generated ${embeddings.length} embeddings in bulk`);
+      return embeddings;
+    } catch (error) {
+      this.logger.error(
+        'Failed to generate bulk embeddings:',
+        error instanceof Error ? error.message : error,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Get similar embeddings from database for RAG context
    */
   async searchSimilarContent(tenantId: string, embedding: number[], limit: number = 5) {

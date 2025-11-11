@@ -105,6 +105,8 @@ export class GoogleCalendarSyncService {
 
       this.logger.debug(`Found ${calendars.length} calendars for provider ${providerId}`);
 
+      await this.backfillCalendarNames(providerId, calendars);
+
       // Sync events from each calendar
       for (const cal of calendars) {
         if (!cal.id) {
@@ -349,5 +351,32 @@ export class GoogleCalendarSyncService {
     oauth2Client.setCredentials({ access_token: accessToken });
 
     return google.calendar({ version: 'v3', auth: oauth2Client });
+  }
+
+  /**
+   * Ensure existing events have user-friendly calendar names after schema change.
+   * This updates historical rows so the UI stops showing raw calendar IDs.
+   */
+  private async backfillCalendarNames(
+    providerId: string,
+    calendars: calendar_v3.Schema$CalendarListEntry[],
+  ): Promise<void> {
+    const updates = calendars
+      .filter((cal): cal is calendar_v3.Schema$CalendarListEntry & { id: string } => !!cal.id)
+      .map((cal) =>
+        this.prisma.calendarEvent.updateMany({
+          where: {
+            providerId,
+            calendarId: cal.id,
+          },
+          data: {
+            calendarName: cal.summaryOverride || cal.summary || cal.description || cal.id,
+          },
+        }),
+      );
+
+    if (updates.length > 0) {
+      await this.prisma.$transaction(updates);
+    }
   }
 }

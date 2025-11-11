@@ -7,6 +7,8 @@ import { CalendarEvent, ProviderConfig } from '@prisma/client';
 import { CalendarEventsService } from './calendar-events.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
+import { GoogleCalendarSyncService } from './google-calendar-sync.service';
+import { MicrosoftCalendarSyncService } from './microsoft-calendar-sync.service';
 
 export interface CreateEventDto {
   providerId: string;
@@ -56,6 +58,8 @@ export class CalendarService {
     private readonly googleOAuth: GoogleOAuthService,
     private readonly microsoftOAuth: MicrosoftOAuthService,
     private readonly calendarEvents: CalendarEventsService,
+    private readonly googleCalendarSync: GoogleCalendarSyncService,
+    private readonly microsoftCalendarSync: MicrosoftCalendarSyncService,
   ) {}
 
   /**
@@ -601,5 +605,31 @@ export class CalendarService {
         Authorization: `Bearer ${accessToken}`,
       },
     });
+  }
+
+  /**
+   * Manually trigger a sync for a provider's calendars.
+   */
+  async syncProvider(tenantId: string, providerId: string) {
+    const provider = await this.prisma.providerConfig.findFirst({
+      where: {
+        id: providerId,
+        tenantId,
+        supportsCalendar: true,
+      },
+    });
+
+    if (!provider) {
+      throw new NotFoundException('Provider not found or does not belong to this tenant');
+    }
+
+    switch (provider.providerType) {
+      case 'google':
+        return this.googleCalendarSync.syncCalendar(providerId);
+      case 'microsoft':
+        return this.microsoftCalendarSync.syncCalendar(providerId);
+      default:
+        throw new BadRequestException('Calendar sync is not supported for this provider type');
+    }
   }
 }

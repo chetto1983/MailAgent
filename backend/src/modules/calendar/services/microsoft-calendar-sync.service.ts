@@ -148,6 +148,8 @@ export class MicrosoftCalendarSyncService {
       const calendars = calendarsResponse.data.value || [];
       this.logger.debug(`Found ${calendars.length} calendars for provider ${providerId}`);
 
+      await this.backfillCalendarNames(providerId, calendars);
+
       // Sync events from each calendar
       for (const cal of calendars) {
         try {
@@ -382,6 +384,32 @@ export class MicrosoftCalendarSyncService {
         return 'private';
       default:
         return 'default';
+    }
+  }
+
+  /**
+   * Populate calendar names for historical events so the UI displays friendly labels.
+   */
+  private async backfillCalendarNames(
+    providerId: string,
+    calendars: Array<{ id: string; name?: string | null }>,
+  ): Promise<void> {
+    const updates = calendars
+      .filter((cal) => !!cal.id)
+      .map((cal) =>
+        this.prisma.calendarEvent.updateMany({
+          where: {
+            providerId,
+            calendarId: cal.id,
+          },
+          data: {
+            calendarName: cal.name || cal.id,
+          },
+        }),
+      );
+
+    if (updates.length > 0) {
+      await this.prisma.$transaction(updates);
     }
   }
 }
