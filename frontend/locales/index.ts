@@ -324,6 +324,10 @@ export interface AppTranslations {
         loadError: string;
         syncSuccess: string;
         syncError: string;
+        deleteConfirmTitle: string;
+        deleteConfirmDescription: string;
+        deleteSuccess: string;
+        deleteError: string;
       };
       editDialog: {
         title: string;

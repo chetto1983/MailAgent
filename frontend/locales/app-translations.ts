@@ -308,6 +308,10 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
           loadError: 'Unable to load contacts right now. Please try again.',
           syncSuccess: 'Contacts sync completed successfully.',
           syncError: 'Unable to sync contacts. Please try again.',
+          deleteConfirmTitle: 'Delete contact',
+          deleteConfirmDescription: 'Are you sure you want to delete this contact? This action cannot be undone.',
+          deleteSuccess: 'Contact deleted successfully.',
+          deleteError: 'Unable to delete this contact. Please try again.',
         },
         editDialog: {
           title: 'Edit contact',
@@ -737,6 +741,10 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
           loadError: 'Impossibile caricare i contatti. Riprova più tardi.',
           syncSuccess: 'Sincronizzazione contatti completata con successo.',
           syncError: 'Impossibile sincronizzare i contatti. Riprova.',
+          deleteConfirmTitle: 'Elimina contatto',
+          deleteConfirmDescription: 'Sei sicuro di voler eliminare questo contatto? Questa azione non può essere annullata.',
+          deleteSuccess: 'Contatto eliminato con successo.',
+          deleteError: 'Impossibile eliminare questo contatto. Riprova.',
         },
         editDialog: {
           title: 'Modifica contatto',

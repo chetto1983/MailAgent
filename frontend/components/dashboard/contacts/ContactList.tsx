@@ -15,7 +15,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { Pencil, Star } from 'lucide-react';
+import { Pencil, Star, Trash2 } from 'lucide-react';
 import type { Contact } from '@/lib/api/contacts';
 import type { AppTranslations } from '@/locales';
 
@@ -31,6 +31,7 @@ export interface ContactListProps {
   showingLabel?: string;
   copy: AppTranslations['dashboard']['contacts'];
   onEditContact?: (contact: Contact) => void;
+  onDeleteContact?: (contact: Contact) => void;
 }
 
 const EMPTY_VALUE = '—';
@@ -92,6 +93,7 @@ export const ContactList: React.FC<ContactListProps> = ({
   showingLabel,
   copy,
   onEditContact,
+  onDeleteContact,
 }) => {
   const dateFormatter = useMemo(() => {
     try {
@@ -145,7 +147,7 @@ export const ContactList: React.FC<ContactListProps> = ({
                 <TableCell>{copy.list.tableHeaders.company}</TableCell>
                 <TableCell>{copy.list.tableHeaders.provider}</TableCell>
                 <TableCell>{copy.list.tableHeaders.lastSynced}</TableCell>
-                {onEditContact && (
+                {(onEditContact || onDeleteContact) && (
                   <TableCell width={80} align="right">
                     {copy.list.tableHeaders.actions}
                   </TableCell>
@@ -216,15 +218,28 @@ export const ContactList: React.FC<ContactListProps> = ({
                         ? dateFormatter.format(new Date(contact.lastSyncedAt))
                         : EMPTY_VALUE}
                     </TableCell>
-                    {onEditContact && (
+                    {(onEditContact || onDeleteContact) && (
                       <TableCell align="right">
-                        <IconButton
-                          aria-label="edit contact"
-                          size="small"
-                          onClick={() => onEditContact(contact)}
-                        >
-                          <Pencil size={16} />
-                        </IconButton>
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                          {onEditContact && (
+                            <IconButton
+                              aria-label="edit contact"
+                              size="small"
+                              onClick={() => onEditContact(contact)}
+                            >
+                              <Pencil size={16} />
+                            </IconButton>
+                          )}
+                          {onDeleteContact && (
+                            <IconButton
+                              aria-label="delete contact"
+                              size="small"
+                              onClick={() => onDeleteContact(contact)}
+                            >
+                              <Trash2 size={16} />
+                            </IconButton>
+                          )}
+                        </Stack>
                       </TableCell>
                     )}
                   </TableRow>

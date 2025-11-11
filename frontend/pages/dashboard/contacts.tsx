@@ -14,7 +14,11 @@ import {
   Stack,
   TextField,
   Tooltip,
-  //Typography,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Button as MuiButton,
 } from '@mui/material';
 import { RefreshCw, Filter, Users as UsersIcon } from 'lucide-react';
@@ -68,6 +72,8 @@ export default function ContactsPage() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
+  const [deletingContact, setDeletingContact] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -256,6 +262,17 @@ export default function ContactsPage() {
     setEditingContact(null);
   };
 
+  const handleOpenDelete = (contact: Contact) => {
+    setContactToDelete(contact);
+  };
+
+  const handleCloseDelete = () => {
+    if (deletingContact) {
+      return;
+    }
+    setContactToDelete(null);
+  };
+
   const handleSaveContact = async (payload: UpdateContactDto) => {
     if (!editingContact) return;
     setSavingContact(true);
@@ -277,6 +294,31 @@ export default function ContactsPage() {
       throw new Error(copy.editDialog.error);
     } finally {
       setSavingContact(false);
+    }
+  };
+
+  const handleDeleteContact = async () => {
+    if (!contactToDelete) {
+      return;
+    }
+    setDeletingContact(true);
+    setStatusMessage(null);
+    try {
+      await contactsApi.deleteContact(contactToDelete.id);
+      setStatusMessage({
+        type: 'success',
+        text: copy.alerts.deleteSuccess,
+      });
+      setContactToDelete(null);
+      handleRefresh();
+    } catch (err) {
+      console.error('Failed to delete contact', err);
+      setStatusMessage({
+        type: 'error',
+        text: copy.alerts.deleteError,
+      });
+    } finally {
+      setDeletingContact(false);
     }
   };
 
@@ -381,6 +423,7 @@ export default function ContactsPage() {
               showingLabel={showingLabel}
               copy={copy}
               onEditContact={handleOpenEdit}
+              onDeleteContact={handleOpenDelete}
             />
           </Stack>
         </Grid>
@@ -394,6 +437,28 @@ export default function ContactsPage() {
         copy={copy.editDialog}
         saving={savingContact}
       />
+
+      <Dialog open={Boolean(contactToDelete)} onClose={handleCloseDelete}>
+        <DialogTitle>{copy.alerts.deleteConfirmTitle}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            {copy.alerts.deleteConfirmDescription}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <MuiButton onClick={handleCloseDelete} disabled={deletingContact}>
+            {copy.editDialog.cancel}
+          </MuiButton>
+          <MuiButton
+            color="error"
+            variant="contained"
+            onClick={handleDeleteContact}
+            disabled={deletingContact}
+          >
+            {deletingContact ? copy.syncing : copy.alerts.deleteConfirmTitle}
+          </MuiButton>
+        </DialogActions>
+      </Dialog>
     </DashboardLayout>
   );
 }
