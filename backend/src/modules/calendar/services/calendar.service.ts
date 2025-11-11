@@ -3,7 +3,10 @@ import { calendar_v3, google } from 'googleapis';
 import axios from 'axios';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
-import { CalendarEvent } from '@prisma/client';
+import { CalendarEvent, ProviderConfig } from '@prisma/client';
+import { CalendarEventsService } from './calendar-events.service';
+import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
+import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 
 export interface CreateEventDto {
   providerId: string;
@@ -48,6 +51,9 @@ export class CalendarService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
+    private readonly googleOAuth: GoogleOAuthService,
+    private readonly microsoftOAuth: MicrosoftOAuthService,
+    private readonly calendarEvents: CalendarEventsService,
   ) {}
 
   /**
@@ -184,6 +190,14 @@ export class CalendarService {
 
     this.logger.log(`Created calendar event ${event.id} with external ID ${externalId}`);
 
+    this.calendarEvents.emitCalendarMutation(tenantId, {
+      providerId: provider.id,
+      eventId: event.id,
+      externalId: event.externalId,
+      calendarId: event.calendarId ?? undefined,
+      reason: 'event-created',
+    });
+
     return event;
   }
 
@@ -243,6 +257,14 @@ export class CalendarService {
 
     this.logger.log(`Updated calendar event ${eventId}`);
 
+    this.calendarEvents.emitCalendarMutation(tenantId, {
+      providerId: provider.id,
+      eventId: updatedEvent.id,
+      externalId: updatedEvent.externalId,
+      calendarId: updatedEvent.calendarId ?? undefined,
+      reason: 'event-updated',
+    });
+
     return updatedEvent;
   }
 
@@ -276,7 +298,7 @@ export class CalendarService {
     }
 
     // Mark event as deleted in database (soft delete)
-    await this.prisma.calendarEvent.update({
+    const deletedEvent = await this.prisma.calendarEvent.update({
       where: { id: eventId },
       data: {
         isDeleted: true,
@@ -288,17 +310,89 @@ export class CalendarService {
     });
 
     this.logger.log(`Deleted calendar event ${eventId}`);
+
+    this.calendarEvents.emitCalendarMutation(event.tenantId, {
+      providerId: provider.id,
+      eventId: deletedEvent.id,
+      externalId: deletedEvent.externalId,
+      calendarId: deletedEvent.calendarId ?? undefined,
+      reason: 'event-deleted',
+    });
   }
 
   /**
    * Get provider access token (with auto-refresh)
    */
-  private async getProviderAccessToken(provider: any): Promise<string> {
+  private async getProviderAccessToken(provider: ProviderConfig): Promise<string> {
     if (!provider.accessToken || !provider.tokenEncryptionIv) {
       throw new BadRequestException('Provider missing access token');
     }
 
-    return this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
+    let accessToken = this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
+
+    const expiresSoon =
+      !provider.tokenExpiresAt || provider.tokenExpiresAt.getTime() <= Date.now() + 60 * 1000;
+
+    if (!expiresSoon) {
+      return accessToken;
+    }
+
+    if (!provider.refreshToken || !provider.refreshTokenEncryptionIv) {
+      this.logger.warn(
+        `Access token expired for provider ${provider.id} but no refresh token is available`,
+      );
+      return accessToken;
+    }
+
+    const refreshToken = this.crypto.decrypt(
+      provider.refreshToken,
+      provider.refreshTokenEncryptionIv,
+    );
+
+    try {
+      let refreshed:
+        | Awaited<ReturnType<typeof this.googleOAuth.refreshAccessToken>>
+        | Awaited<ReturnType<typeof this.microsoftOAuth.refreshAccessToken>>;
+
+      if (provider.providerType === 'google') {
+        refreshed = await this.googleOAuth.refreshAccessToken(refreshToken);
+      } else if (provider.providerType === 'microsoft') {
+        refreshed = await this.microsoftOAuth.refreshAccessToken(refreshToken);
+      } else {
+        return accessToken;
+      }
+
+      accessToken = refreshed.accessToken;
+
+      const updateData: Record<string, any> = {
+        tokenExpiresAt: refreshed.expiresAt,
+      };
+
+      const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
+      updateData.accessToken = encryptedAccess.encrypted;
+      updateData.tokenEncryptionIv = encryptedAccess.iv;
+
+      const refreshedToken = 'refreshToken' in refreshed ? refreshed.refreshToken : undefined;
+      if (refreshedToken) {
+        const encryptedRefresh = this.crypto.encrypt(refreshedToken);
+        updateData.refreshToken = encryptedRefresh.encrypted;
+        updateData.refreshTokenEncryptionIv = encryptedRefresh.iv;
+      }
+
+      await this.prisma.providerConfig.update({
+        where: { id: provider.id },
+        data: updateData,
+      });
+
+      return accessToken;
+    } catch (error) {
+      this.logger.error(
+        `Failed to refresh calendar access token for provider ${provider.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return accessToken;
+    }
   }
 
   /**

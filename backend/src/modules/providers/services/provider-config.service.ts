@@ -18,6 +18,11 @@ import { QueueService } from '../../email-sync/services/queue.service';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 import { SyncJobData } from '../../email-sync/interfaces/sync-job.interface';
+import { GoogleCalendarSyncService } from '../../calendar/services/google-calendar-sync.service';
+import { MicrosoftCalendarSyncService } from '../../calendar/services/microsoft-calendar-sync.service';
+import { GoogleCalendarWebhookService } from '../../calendar/services/google-calendar-webhook.service';
+import { MicrosoftCalendarWebhookService } from '../../calendar/services/microsoft-calendar-webhook.service';
+import type { ProviderConfig } from '@prisma/client';
 import {
   ConnectGoogleProviderDto,
   ConnectMicrosoftProviderDto,
@@ -43,6 +48,14 @@ export class ProviderConfigService {
     private readonly queueService: QueueService,
     private readonly emailEmbeddingQueue: EmailEmbeddingQueueService,
     private readonly knowledgeBaseService: KnowledgeBaseService,
+    @Inject(forwardRef(() => GoogleCalendarSyncService))
+    private readonly googleCalendarSync: GoogleCalendarSyncService,
+    @Inject(forwardRef(() => MicrosoftCalendarSyncService))
+    private readonly microsoftCalendarSync: MicrosoftCalendarSyncService,
+    @Inject(forwardRef(() => GoogleCalendarWebhookService))
+    private readonly googleCalendarWebhook: GoogleCalendarWebhookService,
+    @Inject(forwardRef(() => MicrosoftCalendarWebhookService))
+    private readonly microsoftCalendarWebhook: MicrosoftCalendarWebhookService,
   ) {}
 
   /**
@@ -614,15 +627,7 @@ export class ProviderConfigService {
   /**
    * Immediately queue a sync job and set up webhooks when supported.
    */
-  private async triggerInitialSync(
-    provider: {
-      id: string;
-      tenantId: string;
-      providerType: string;
-      email: string;
-      lastSyncedAt?: Date | null;
-    },
-  ) {
+  private async triggerInitialSync(provider: ProviderConfig) {
     if (!provider?.id) {
       return;
     }
@@ -655,6 +660,71 @@ export class ProviderConfigService {
           error instanceof Error ? error.message : error
         }`,
       );
+    }
+
+    try {
+      await this.bootstrapCalendarIntegrations(provider);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to bootstrap calendar integrations for provider ${provider.id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    }
+  }
+
+  private async bootstrapCalendarIntegrations(provider: ProviderConfig): Promise<void> {
+    if (!provider.supportsCalendar) {
+      return;
+    }
+
+    if (provider.providerType === 'google') {
+      this.googleCalendarSync
+        .syncCalendar(provider.id)
+        .then(() => this.logger.log(`Completed initial Google Calendar sync for ${provider.email}`))
+        .catch((error) =>
+          this.logger.error(
+            `Failed initial Google Calendar sync for ${provider.id}: ${
+              error instanceof Error ? error.message : error
+            }`,
+          ),
+        );
+
+      try {
+        await this.googleCalendarWebhook.setupWatch(provider.id);
+      } catch (error) {
+        this.logger.error(
+          `Failed to setup Google Calendar webhook for ${provider.id}: ${
+            error instanceof Error ? error.message : error
+          }`,
+        );
+      }
+      return;
+    }
+
+    if (provider.providerType === 'microsoft') {
+      this.microsoftCalendarSync
+        .syncCalendar(provider.id)
+        .then(() =>
+          this.logger.log(`Completed initial Microsoft Calendar sync for ${provider.email}`),
+        )
+        .catch((error) =>
+          this.logger.error(
+            `Failed initial Microsoft Calendar sync for ${provider.id}: ${
+              error instanceof Error ? error.message : error
+            }`,
+          ),
+        );
+
+      try {
+        await this.microsoftCalendarWebhook.setupSubscription(provider.id);
+      } catch (error) {
+        this.logger.error(
+          `Failed to setup Microsoft Calendar webhook for ${provider.id}: ${
+            error instanceof Error ? error.message : error
+          }`,
+        );
+      }
     }
   }
 

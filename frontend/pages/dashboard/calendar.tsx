@@ -26,6 +26,31 @@ import {
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { useTranslations } from '@/lib/hooks/use-translations';
 
+type ParsedSseMessage = {
+  type: string;
+  data?: string;
+};
+
+const parseSseMessage = (chunk: string): ParsedSseMessage | null => {
+  if (!chunk) {
+    return null;
+  }
+
+  const lines = chunk.split(/\r?\n/);
+  let type = 'message';
+  const dataLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      type = line.slice(6).trim();
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trim());
+    }
+  }
+
+  return { type, data: dataLines.join('\n') };
+};
+
 export default function CalendarPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
@@ -110,6 +135,10 @@ export default function CalendarPage() {
     }
   }, [selectedProvider, viewRange.end, viewRange.start]);
 
+  const refreshCalendarData = useCallback(() => {
+    void loadEvents();
+  }, [loadEvents]);
+
   // Load events when providers or view changes
   // Use a ref to track when providers are loaded to prevent infinite loops
   useEffect(() => {
@@ -123,6 +152,97 @@ export default function CalendarPage() {
       loadEvents();
     }
   }, [user, loadEvents]);
+
+  useEffect(() => {
+    if (!user || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!baseUrl) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+    let retryDelay = 2000;
+    let retryHandle: number | null = null;
+    const controller = new AbortController();
+
+    const connect = async () => {
+      if (isCancelled) {
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          return;
+        }
+
+        const response = await fetch(`${baseUrl}/calendar-events/stream`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'text/event-stream',
+          },
+          signal: controller.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`Calendar SSE connection failed with status ${response.status}`);
+        }
+
+        retryDelay = 2000;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (!isCancelled) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+
+          let boundary = buffer.indexOf('\n\n');
+          while (boundary !== -1) {
+            const rawEvent = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            const parsed = parseSseMessage(rawEvent);
+
+            if (parsed?.type === 'calendarUpdate' && parsed.data) {
+              const shouldRefresh = typeof document === 'undefined' || !document.hidden;
+              if (shouldRefresh) {
+                refreshCalendarData();
+              }
+            }
+
+            boundary = buffer.indexOf('\n\n');
+          }
+        }
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        const nextDelay = Math.min(retryDelay * 1.5, 30000);
+        retryHandle = window.setTimeout(() => {
+          retryDelay = nextDelay;
+          connect();
+        }, retryDelay);
+      }
+    };
+
+    connect();
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+      if (retryHandle) {
+        window.clearTimeout(retryHandle);
+      }
+    };
+  }, [user, refreshCalendarData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

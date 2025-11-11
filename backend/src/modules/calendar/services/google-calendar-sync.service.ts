@@ -3,6 +3,7 @@ import { calendar_v3, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
+import { CalendarEventsService } from './calendar-events.service';
 
 export interface GoogleCalendarSyncResult {
   success: boolean;
@@ -22,6 +23,7 @@ export class GoogleCalendarSyncService {
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly googleOAuth: GoogleOAuthService,
+    private readonly calendarEvents: CalendarEventsService,
   ) {}
 
   /**
@@ -135,6 +137,13 @@ export class GoogleCalendarSyncService {
       this.logger.log(
         `Google Calendar sync completed for provider ${providerId}: ${eventsProcessed} events processed, ${newEvents} new, ${updatedEvents} updated, ${deletedEvents} deleted in ${syncDuration}ms`,
       );
+
+      if (newEvents > 0 || updatedEvents > 0 || deletedEvents > 0) {
+        this.calendarEvents.emitCalendarMutation(provider.tenantId, {
+          providerId,
+          reason: 'sync-complete',
+        });
+      }
 
       return {
         success: true,

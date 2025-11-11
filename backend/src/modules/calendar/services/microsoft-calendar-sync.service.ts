@@ -4,6 +4,7 @@ import { URLSearchParams } from 'url';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
+import { CalendarEventsService } from './calendar-events.service';
 
 interface MicrosoftEvent {
   id: string;
@@ -54,6 +55,7 @@ export class MicrosoftCalendarSyncService {
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly microsoftOAuth: MicrosoftOAuthService,
+    private readonly calendarEvents: CalendarEventsService,
   ) {}
 
   /**
@@ -174,6 +176,13 @@ export class MicrosoftCalendarSyncService {
       this.logger.log(
         `Microsoft Calendar sync completed for provider ${providerId}: ${eventsProcessed} events processed, ${newEvents} new, ${updatedEvents} updated, ${deletedEvents} deleted in ${syncDuration}ms`,
       );
+
+      if (newEvents > 0 || updatedEvents > 0 || deletedEvents > 0) {
+        this.calendarEvents.emitCalendarMutation(provider.tenantId, {
+          providerId,
+          reason: 'sync-complete',
+        });
+      }
 
       return {
         success: true,

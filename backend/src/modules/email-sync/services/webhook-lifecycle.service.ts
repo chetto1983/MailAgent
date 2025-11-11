@@ -50,10 +50,12 @@ export class WebhookLifecycleService {
           providerType: 'google',
         });
       } else if (provider.providerType === 'microsoft') {
-        const webhookUrl = this.configService.get<string>(
-          'MICROSOFT_WEBHOOK_URL',
-          'https://your-domain.com/webhooks/microsoft/notifications',
-        );
+        const webhookUrl =
+          this.configService.get<string>('MICROSOFT_EMAIL_WEBHOOK_URL') ??
+          this.configService.get<string>(
+            'MICROSOFT_WEBHOOK_URL',
+            'https://your-domain.com/webhooks/microsoft/notifications',
+          );
 
         await this.microsoftWebhook.createSubscription({
           providerId,
