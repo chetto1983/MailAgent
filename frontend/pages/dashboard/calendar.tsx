@@ -31,7 +31,8 @@ export default function CalendarPage() {
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [providersLoading, setProvidersLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>('all');
 
@@ -41,7 +42,15 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [createDefaultDate, setCreateDefaultDate] = useState<Date | undefined>(undefined);
 
-  const [viewRange, setViewRange] = useState<{ start?: string; end?: string }>({});
+  const [viewRange, setViewRange] = useState<{ start: string; end: string }>(() => {
+    const start = new Date();
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+    end.setMilliseconds(end.getMilliseconds() - 1);
+    return { start: start.toISOString(), end: end.toISOString() };
+  });
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -59,10 +68,13 @@ export default function CalendarPage() {
 
   const loadProviders = async () => {
     try {
+      setProvidersLoading(true);
       const allProviders = await providersApi.getProviders();
       setProviders(allProviders.filter((p: ProviderConfig) => p.supportsCalendar && p.isActive));
     } catch (error) {
       console.error('Failed to load providers:', error);
+    } finally {
+      setProvidersLoading(false);
     }
   };
 
@@ -261,7 +273,7 @@ export default function CalendarPage() {
           gap: 2,
         }}
       >
-        {loading && events.length === 0 ? (
+        {providersLoading ? (
           <Box
             sx={{
               display: 'flex',
@@ -290,6 +302,17 @@ export default function CalendarPage() {
             <Typography variant="body2" color="text.secondary">
               Please configure a calendar provider in the Providers page
             </Typography>
+          </Box>
+        ) : loading && events.length === 0 ? (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 400,
+            }}
+          >
+            <CircularProgress />
           </Box>
         ) : (
           <CalendarView
