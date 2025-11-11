@@ -738,6 +738,21 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
           syncSuccess: 'Sincronizzazione contatti completata con successo.',
           syncError: 'Impossibile sincronizzare i contatti. Riprova.',
         },
+        editDialog: {
+          title: 'Modifica contatto',
+          description: 'Aggiorna le informazioni di base per questo contatto.',
+          firstName: 'Nome',
+          lastName: 'Cognome',
+          displayName: 'Nome visualizzato',
+          email: 'Email principale',
+          phone: 'Telefono principale',
+          company: 'Azienda',
+          jobTitle: 'Titolo professionale',
+          save: 'Salva modifiche',
+          cancel: 'Annulla',
+          success: 'Contatto aggiornato con successo.',
+          error: 'Impossibile aggiornare questo contatto. Riprova.',
+        },
       },
       providers: {
         title: 'Provider e Integrazioni',
@@ -841,5 +856,3 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
     },
   },
 };
-
-
