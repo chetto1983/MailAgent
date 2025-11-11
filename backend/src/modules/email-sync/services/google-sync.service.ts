@@ -269,7 +269,7 @@ export class GoogleSyncService {
   }
 
   /**
-   * Full sync - fetch recent messages (last 100)
+   * Full sync - fetch messages from last 60 days (max 1000)
    */
   private async syncFull(
     gmail: gmail_v1.Gmail,
@@ -281,21 +281,49 @@ export class GoogleSyncService {
     newMessages: number;
     historyId: string;
   }> {
-    this.logger.debug('Full sync - fetching recent messages');
+    this.logger.debug('Full sync - fetching messages from last 60 days');
 
     try {
       // Get profile for historyId
       const profile = await gmail.users.getProfile({ userId: 'me' });
       const historyId = profile.data.historyId!;
 
-      // List recent messages (last 100)
+      // Calculate date 60 days ago in Gmail query format (YYYY/MM/DD)
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      const afterDate = sixtyDaysAgo.toISOString().split('T')[0].replace(/-/g, '/');
+
+      this.logger.debug(`Fetching Gmail messages after ${afterDate}`);
+
+      // List messages from last 60 days (max 1000)
+      // Remove folder restriction to sync all folders (inbox, sent, drafts, etc.)
       const messagesResponse = await gmail.users.messages.list({
         userId: 'me',
-        maxResults: 100,
-        q: 'in:inbox OR in:sent', // Only inbox and sent
+        maxResults: 500, // Gmail API max per request
+        q: `after:${afterDate}`, // All folders from last 60 days
       });
 
-      const messages = messagesResponse.data.messages || [];
+      let messages = messagesResponse.data.messages || [];
+      let pageToken = messagesResponse.data.nextPageToken;
+
+      // Fetch additional pages if needed (up to 1000 total)
+      while (pageToken && messages.length < 1000) {
+        const nextResponse = await gmail.users.messages.list({
+          userId: 'me',
+          maxResults: Math.min(500, 1000 - messages.length),
+          q: `after:${afterDate}`,
+          pageToken,
+        });
+
+        messages = [...messages, ...(nextResponse.data.messages || [])];
+        pageToken = nextResponse.data.nextPageToken;
+
+        if (!pageToken || messages.length >= 1000) {
+          break;
+        }
+      }
+
+      this.logger.debug(`Found ${messages.length} Gmail messages in last 60 days`);
 
       let messagesProcessed = 0;
       let newMessages = 0;

@@ -471,7 +471,7 @@ export class MicrosoftSyncService {
   }
 
   /**
-   * Full sync - fetch recent messages (last 100) and initialize delta sync
+   * Full sync - fetch messages from last 60 days (max 1000)
    */
   private async syncFull(
     accessToken: string,
@@ -483,24 +483,56 @@ export class MicrosoftSyncService {
     newMessages: number;
     latestReceivedDate?: string;
   }> {
-    this.logger.debug('Full sync - fetching recent messages and initializing delta');
+    this.logger.debug('Full sync - fetching messages from last 60 days');
 
     try {
-      // Step 1: Fetch recent messages to process
-      const messagesUrl = `${this.GRAPH_API_BASE}/me/messages?$top=100&$orderby=receivedDateTime desc`;
+      // Calculate date 60 days ago
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      const sinceIso = sixtyDaysAgo.toISOString();
 
-      const messagesResponse = await axios.get(messagesUrl, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+      this.logger.debug(`Fetching Microsoft messages since ${sinceIso}`);
+
+      // Fetch messages from last 60 days with pagination (max 1000)
+      const params = new URLSearchParams({
+        $filter: `receivedDateTime ge ${sinceIso}`,
+        $orderby: 'receivedDateTime desc',
+        $top: '100', // Microsoft Graph API max per request
       });
 
-      const messages: MicrosoftMessage[] = messagesResponse.data.value || [];
+      let messagesUrl: string | undefined = `${this.GRAPH_API_BASE}/me/messages?${params.toString()}`;
+      let allMessages: MicrosoftMessage[] = [];
+      let page = 0;
+      const maxPages = 10; // 10 pages * 100 = max 1000 messages
+
+      // Fetch all pages up to limit
+      while (messagesUrl && page < maxPages) {
+        const messagesResponse: AxiosResponse<MicrosoftDeltaResponse<MicrosoftMessage>> = await axios.get(messagesUrl, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const messages: MicrosoftMessage[] = messagesResponse.data.value || [];
+        allMessages = [...allMessages, ...messages];
+
+        this.logger.debug(`Fetched page ${page + 1}: ${messages.length} messages (total: ${allMessages.length})`);
+
+        // Check for next page
+        messagesUrl = messagesResponse.data['@odata.nextLink'];
+        page++;
+
+        if (allMessages.length >= 1000) {
+          break;
+        }
+      }
+
+      this.logger.debug(`Found ${allMessages.length} Microsoft messages in last 60 days`);
 
       let messagesProcessed = 0;
       let newMessages = 0;
 
-      for (const message of messages) {
+      for (const message of allMessages) {
         const processed = await this.processMessage(
           message.id,
           accessToken,
@@ -513,7 +545,7 @@ export class MicrosoftSyncService {
         }
       }
 
-      const latestReceivedDate = messages.length > 0 ? messages[0].receivedDateTime : undefined;
+      const latestReceivedDate = allMessages.length > 0 ? allMessages[0].receivedDateTime : undefined;
 
       if (latestReceivedDate) {
         this.logger.debug(`Most recent message timestamp: ${latestReceivedDate}`);

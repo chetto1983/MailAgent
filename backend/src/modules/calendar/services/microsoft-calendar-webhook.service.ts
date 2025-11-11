@@ -1,0 +1,358 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { CryptoService } from '../../../common/services/crypto.service';
+import { MicrosoftCalendarSyncService } from './microsoft-calendar-sync.service';
+import { nanoid } from 'nanoid';
+
+export interface MicrosoftCalendarNotification {
+  subscriptionId: string;
+  clientState?: string;
+  changeType: string;
+  resource: string;
+  subscriptionExpirationDateTime: string;
+  resourceData?: {
+    '@odata.type': string;
+    '@odata.id': string;
+    '@odata.etag': string;
+    id: string;
+  };
+}
+
+@Injectable()
+export class MicrosoftCalendarWebhookService {
+  private readonly logger = new Logger(MicrosoftCalendarWebhookService.name);
+  private readonly GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
+  private readonly WEBHOOK_URL: string;
+  private readonly CLIENT_STATE: string;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly crypto: CryptoService,
+    private readonly config: ConfigService,
+    private readonly calendarSync: MicrosoftCalendarSyncService,
+  ) {
+    const backendUrl = this.config.get<string>('BACKEND_URL', 'http://localhost:3000');
+    this.WEBHOOK_URL = `${backendUrl}/webhooks/calendar/microsoft/notifications`;
+    this.CLIENT_STATE = this.config.get<string>('WEBHOOK_CLIENT_STATE', nanoid());
+  }
+
+  /**
+   * Setup Microsoft Calendar webhook subscription
+   */
+  async setupSubscription(providerId: string): Promise<void> {
+    try {
+      const provider = await this.prisma.providerConfig.findUnique({
+        where: { id: providerId },
+      });
+
+      if (!provider || !provider.supportsCalendar || !provider.accessToken) {
+        throw new Error('Provider not found or does not support calendar');
+      }
+
+      const accessToken = this.crypto.decrypt(
+        provider.accessToken,
+        provider.tokenEncryptionIv!,
+      );
+
+      // Calculate expiration (max 4230 minutes = ~3 days for calendar)
+      const expirationDateTime = new Date();
+      expirationDateTime.setDate(expirationDateTime.getDate() + 3);
+
+      // Create subscription for calendar events
+      const subscription = {
+        changeType: 'created,updated,deleted',
+        notificationUrl: this.WEBHOOK_URL,
+        resource: '/me/events',
+        expirationDateTime: expirationDateTime.toISOString(),
+        clientState: this.CLIENT_STATE,
+      };
+
+      const response = await axios.post(
+        `${this.GRAPH_API_BASE}/subscriptions`,
+        subscription,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      const subscriptionId = response.data.id;
+
+      // Store webhook subscription info
+      await this.prisma.webhookSubscription.upsert({
+        where: { providerId },
+        create: {
+          providerId,
+          providerType: 'microsoft',
+          subscriptionId,
+          resourcePath: '/me/events',
+          webhookUrl: this.WEBHOOK_URL,
+          isActive: true,
+          expiresAt: new Date(expirationDateTime),
+          metadata: {
+            clientState: this.CLIENT_STATE,
+            changeType: 'created,updated,deleted',
+          },
+        },
+        update: {
+          subscriptionId,
+          resourcePath: '/me/events',
+          expiresAt: new Date(expirationDateTime),
+          isActive: true,
+          lastRenewedAt: new Date(),
+          metadata: {
+            clientState: this.CLIENT_STATE,
+            changeType: 'created,updated,deleted',
+          },
+        },
+      });
+
+      this.logger.log(
+        `Setup Microsoft Calendar subscription for provider ${providerId}, subscription ${subscriptionId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to setup Microsoft Calendar subscription for provider ${providerId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Handle Microsoft Calendar notifications
+   */
+  async handleNotifications(
+    notifications: MicrosoftCalendarNotification[],
+  ): Promise<void> {
+    for (const notification of notifications) {
+      try {
+        await this.handleSingleNotification(notification);
+      } catch (error) {
+        this.logger.error(
+          `Error handling Microsoft Calendar notification ${notification.subscriptionId}:`,
+          error,
+        );
+      }
+    }
+  }
+
+  /**
+   * Handle a single notification
+   */
+  private async handleSingleNotification(
+    notification: MicrosoftCalendarNotification,
+  ): Promise<void> {
+    // Verify client state
+    if (notification.clientState !== this.CLIENT_STATE) {
+      this.logger.warn('Microsoft Calendar notification with invalid client state');
+      return;
+    }
+
+    const subscriptionId = notification.subscriptionId;
+
+    // Find provider by subscription ID
+    const subscription = await this.prisma.webhookSubscription.findFirst({
+      where: {
+        subscriptionId,
+        providerType: 'microsoft',
+        isActive: true,
+      },
+    });
+
+    if (!subscription) {
+      this.logger.warn(
+        `No active subscription found for Microsoft Calendar subscription ${subscriptionId}`,
+      );
+      return;
+    }
+
+    // Update subscription stats
+    await this.prisma.webhookSubscription.update({
+      where: { id: subscription.id },
+      data: {
+        lastNotificationAt: new Date(),
+        notificationCount: { increment: 1 },
+      },
+    });
+
+    this.logger.log(
+      `Microsoft Calendar notification: subscription=${subscriptionId}, changeType=${notification.changeType}`,
+    );
+
+    // Trigger calendar sync for this provider
+    await this.calendarSync.syncCalendar(subscription.providerId);
+  }
+
+  /**
+   * Renew subscriptions that are about to expire
+   */
+  async renewExpiringSoon(): Promise<number> {
+    const oneDayFromNow = new Date();
+    oneDayFromNow.setDate(oneDayFromNow.getDate() + 1);
+
+    const expiring = await this.prisma.webhookSubscription.findMany({
+      where: {
+        providerType: 'microsoft',
+        isActive: true,
+        expiresAt: {
+          lte: oneDayFromNow,
+        },
+      },
+    });
+
+    let renewed = 0;
+
+    for (const subscription of expiring) {
+      try {
+        await this.renewSubscription(subscription.providerId);
+        renewed++;
+      } catch (error) {
+        this.logger.error(
+          `Failed to renew Microsoft Calendar subscription for ${subscription.providerId}:`,
+          error,
+        );
+      }
+    }
+
+    return renewed;
+  }
+
+  /**
+   * Renew a specific subscription
+   */
+  private async renewSubscription(providerId: string): Promise<void> {
+    const subscription = await this.prisma.webhookSubscription.findUnique({
+      where: { providerId },
+    });
+
+    if (!subscription || subscription.providerType !== 'microsoft') {
+      return;
+    }
+
+    const provider = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+    });
+
+    if (!provider || !provider.accessToken) {
+      return;
+    }
+
+    const accessToken = this.crypto.decrypt(
+      provider.accessToken,
+      provider.tokenEncryptionIv!,
+    );
+
+    // Calculate new expiration
+    const expirationDateTime = new Date();
+    expirationDateTime.setDate(expirationDateTime.getDate() + 3);
+
+    // Update subscription
+    await axios.patch(
+      `${this.GRAPH_API_BASE}/subscriptions/${subscription.subscriptionId}`,
+      { expirationDateTime: expirationDateTime.toISOString() },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+
+    // Update database
+    await this.prisma.webhookSubscription.update({
+      where: { providerId },
+      data: {
+        expiresAt: new Date(expirationDateTime),
+        lastRenewedAt: new Date(),
+      },
+    });
+
+    this.logger.log(`Renewed Microsoft Calendar subscription for provider ${providerId}`);
+  }
+
+  /**
+   * Delete a subscription
+   */
+  async deleteSubscription(providerId: string): Promise<void> {
+    try {
+      const subscription = await this.prisma.webhookSubscription.findUnique({
+        where: { providerId },
+      });
+
+      if (!subscription || subscription.providerType !== 'microsoft') {
+        return;
+      }
+
+      const provider = await this.prisma.providerConfig.findUnique({
+        where: { id: providerId },
+      });
+
+      if (!provider || !provider.accessToken) {
+        return;
+      }
+
+      const accessToken = this.crypto.decrypt(
+        provider.accessToken,
+        provider.tokenEncryptionIv!,
+      );
+
+      // Delete subscription from Microsoft
+      await axios.delete(
+        `${this.GRAPH_API_BASE}/subscriptions/${subscription.subscriptionId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      // Mark subscription as inactive
+      await this.prisma.webhookSubscription.update({
+        where: { providerId },
+        data: { isActive: false },
+      });
+
+      this.logger.log(`Deleted Microsoft Calendar subscription for provider ${providerId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete Microsoft Calendar subscription for ${providerId}:`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * Get webhook statistics
+   */
+  async getStats(): Promise<any> {
+    const total = await this.prisma.webhookSubscription.count({
+      where: { providerType: 'microsoft', isActive: true },
+    });
+
+    const recentNotifications = await this.prisma.webhookSubscription.findMany({
+      where: {
+        providerType: 'microsoft',
+        isActive: true,
+        lastNotificationAt: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24h
+        },
+      },
+      select: {
+        providerId: true,
+        notificationCount: true,
+        lastNotificationAt: true,
+      },
+    });
+
+    return {
+      activeSubscriptions: total,
+      recentNotifications: recentNotifications.length,
+      lastNotifications: recentNotifications,
+    };
+  }
+}

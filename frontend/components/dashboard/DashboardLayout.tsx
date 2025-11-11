@@ -31,6 +31,7 @@ import {
   User,
   Moon,
   Sun,
+  Calendar,
 } from 'lucide-react';
 import { useTheme as useNextTheme } from 'next-themes';
 
@@ -38,6 +39,7 @@ const drawerWidth = 260;
 
 const navItems = [
   { path: '/dashboard/email', label: 'Inbox', icon: Mail },
+  { path: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
   { path: '/dashboard/providers', label: 'Providers', icon: ServerCog },
   { path: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];

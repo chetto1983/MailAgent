@@ -28,6 +28,7 @@ model Tenant {
   embeddings      Embedding[]
   auditLogs       AuditLog[]
   chatSessions    ChatSession[]
+  calendarEvents  CalendarEvent[]
 
   @@map("tenants")
 }
@@ -172,8 +173,9 @@ model ProviderConfig {
   lastActivityCheck     DateTime? // Last time activity rate was calculated
 
   // Relations
-  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  emails Email[]
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  emails        Email[]
+  calendarEvents CalendarEvent[]
 
   @@unique([tenantId, email, providerType])
   @@index([tenantId, isDefault])
@@ -380,6 +382,68 @@ model Embedding {
 
   @@index([tenantId])
   @@map("embeddings")
+}
+
+// ===== CALENDAR EVENT MODEL (Synced calendar events from providers) =====
+model CalendarEvent {
+  id         String @id @default(cuid())
+  tenantId   String
+  providerId String
+
+  // External IDs for sync tracking
+  externalId String // Google event ID, Microsoft event ID
+  calendarId String? // Which calendar this event belongs to
+
+  // Event metadata
+  iCalUID    String? // RFC 5545 UID (for cross-provider sync)
+
+  // Event details
+  title       String // Event title/summary
+  description String? // Event description/body
+  location    String? // Event location
+
+  // Attendees
+  organizer  String? // Organizer email
+  attendees  Json? // Array of attendees with status
+
+  // Time and recurrence
+  startTime    DateTime // Event start time
+  endTime      DateTime // Event end time
+  isAllDay     Boolean  @default(false)
+  timeZone     String   @default("UTC")
+  recurrence   String[] @default([]) // RRULE strings
+  recurringEventId String? // ID of parent recurring event
+
+  // Status and flags
+  status       String  @default("confirmed") // confirmed, tentative, cancelled
+  visibility   String  @default("default") // default, public, private, confidential
+  isDeleted    Boolean @default(false)
+  isCancelled  Boolean @default(false)
+
+  // Reminders
+  reminders    Json? // Reminder settings
+
+  // Dates
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Metadata
+  metadata     Json? // Provider-specific metadata
+  htmlLink     String? // Link to event in provider's UI
+
+  // Sync tracking
+  lastSyncedAt DateTime @default(now())
+  syncVersion  Int      @default(1) // Increment on each update for conflict resolution
+
+  // Relations
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, externalId]) // Prevent duplicates
+  @@index([tenantId, startTime]) // List events by date
+  @@index([tenantId, calendarId, startTime]) // List events in a calendar
+  @@index([iCalUID]) // Cross-provider sync
+  @@map("calendar_events")
 }
 
 // ===== AUDIT LOG MODEL =====

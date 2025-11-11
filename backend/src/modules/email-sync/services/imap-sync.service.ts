@@ -322,7 +322,7 @@ export class ImapSyncService {
   }
 
   /**
-   * Full sync - fetch recent messages (last 100)
+   * Full sync - fetch messages from last 60 days (max 1000)
    */
   private async syncFull(
     client: ImapFlow,
@@ -334,49 +334,107 @@ export class ImapSyncService {
     newMessages: number;
     maxUid: number;
   }> {
-    this.logger.debug('Full sync - fetching recent messages');
+    this.logger.debug('Full sync - fetching messages from last 60 days');
 
     const lock = await client.getMailboxLock('INBOX');
 
     try {
-      // Get mailbox status
-      const mailboxStatus = await client.status('INBOX', { messages: true });
-      const totalMessages = mailboxStatus.messages || 0;
+      // Calculate date 60 days ago
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      const sinceDate = sixtyDaysAgo.toISOString().split('T')[0].replace(/-/g, '-');
 
-      if (totalMessages === 0) {
-        return {
-          messagesProcessed: 0,
-          newMessages: 0,
-          maxUid: 0,
-        };
-      }
-
-      // Fetch last 100 messages (or all if less than 100)
-      const limit = Math.min(100, totalMessages);
-      const startSeq = Math.max(1, totalMessages - limit + 1);
-      const endSeq = totalMessages;
+      this.logger.debug(`Fetching IMAP messages since ${sinceDate}`);
 
       let messagesProcessed = 0;
       let newMessages = 0;
       let maxUid = 0;
+      let fetchedCount = 0;
+      const maxMessages = 1000;
 
-      for await (const message of client.fetch(`${startSeq}:${endSeq}`, {
-        uid: true,
-        envelope: true,
-        bodyStructure: true,
-        flags: true,
-      })) {
-        const processed = await this.processMessage(
-          message,
-          client,
-          providerId,
-          tenantId,
-        );
-        if (processed) {
-          messagesProcessed++;
-          newMessages++;
+      // Use IMAP SEARCH to find messages since the date
+      try {
+        const searchResults = await client.search({ since: sixtyDaysAgo }, { uid: true });
+
+        if (!searchResults || searchResults.length === 0) {
+          this.logger.debug('No messages found in the last 60 days');
+          return {
+            messagesProcessed: 0,
+            newMessages: 0,
+            maxUid: 0,
+          };
         }
-        maxUid = Math.max(maxUid, message.uid);
+
+        // Sort UIDs in ascending order and limit to max 1000
+        const uidsToFetch = searchResults.sort((a, b) => a - b).slice(-maxMessages);
+
+        this.logger.debug(`Found ${searchResults.length} messages in last 60 days, fetching last ${uidsToFetch.length}`);
+
+        // Fetch messages in batches to avoid timeout
+        const batchSize = 50;
+        for (let i = 0; i < uidsToFetch.length; i += batchSize) {
+          const batch = uidsToFetch.slice(i, Math.min(i + batchSize, uidsToFetch.length));
+          const range = batch.join(',');
+
+          for await (const message of client.fetch(range, {
+            uid: true,
+            envelope: true,
+            bodyStructure: true,
+            flags: true,
+          }, { uid: true })) {
+            const processed = await this.processMessage(
+              message,
+              client,
+              providerId,
+              tenantId,
+            );
+            if (processed) {
+              messagesProcessed++;
+              newMessages++;
+            }
+            maxUid = Math.max(maxUid, message.uid);
+            fetchedCount++;
+          }
+        }
+
+        this.logger.debug(`Processed ${messagesProcessed} messages from last 60 days`);
+      } catch (searchError) {
+        // Fallback to fetching last 1000 messages if SEARCH fails
+        this.logger.warn(`IMAP SEARCH failed, falling back to sequence-based fetch: ${searchError instanceof Error ? searchError.message : String(searchError)}`);
+
+        const mailboxStatus = await client.status('INBOX', { messages: true });
+        const totalMessages = mailboxStatus.messages || 0;
+
+        if (totalMessages === 0) {
+          return {
+            messagesProcessed: 0,
+            newMessages: 0,
+            maxUid: 0,
+          };
+        }
+
+        const limit = Math.min(maxMessages, totalMessages);
+        const startSeq = Math.max(1, totalMessages - limit + 1);
+        const endSeq = totalMessages;
+
+        for await (const message of client.fetch(`${startSeq}:${endSeq}`, {
+          uid: true,
+          envelope: true,
+          bodyStructure: true,
+          flags: true,
+        })) {
+          const processed = await this.processMessage(
+            message,
+            client,
+            providerId,
+            tenantId,
+          );
+          if (processed) {
+            messagesProcessed++;
+            newMessages++;
+          }
+          maxUid = Math.max(maxUid, message.uid);
+        }
       }
 
       return {
