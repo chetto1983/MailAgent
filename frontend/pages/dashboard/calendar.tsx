@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import {
   Box,
@@ -41,8 +41,7 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [createDefaultDate, setCreateDefaultDate] = useState<Date | undefined>(undefined);
 
-  const [viewStart, setViewStart] = useState<Date>(new Date());
-  const [viewEnd, setViewEnd] = useState<Date>(new Date());
+  const [viewRange, setViewRange] = useState<{ start?: string; end?: string }>({});
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -58,13 +57,6 @@ export default function CalendarPage() {
     }
   }, [user]);
 
-  // Load events when providers or view changes
-  useEffect(() => {
-    if (user && providers.length > 0) {
-      loadEvents();
-    }
-  }, [user, providers, selectedProvider, viewStart, viewEnd]);
-
   const loadProviders = async () => {
     try {
       const allProviders = await providersApi.getProviders();
@@ -74,13 +66,17 @@ export default function CalendarPage() {
     }
   };
 
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
+    if (!viewRange.start || !viewRange.end) {
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await calendarApi.listEvents({
         providerId: selectedProvider !== 'all' ? selectedProvider : undefined,
-        startTime: viewStart.toISOString(),
-        endTime: viewEnd.toISOString(),
+        startTime: viewRange.start,
+        endTime: viewRange.end,
         limit: 1000,
       });
       setEvents(response.data.events);
@@ -89,7 +85,14 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedProvider, viewRange.end, viewRange.start]);
+
+  // Load events when providers or view changes
+  useEffect(() => {
+    if (user && providers.length > 0) {
+      loadEvents();
+    }
+  }, [user, providers, loadEvents]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -179,10 +182,16 @@ export default function CalendarPage() {
     }
   };
 
-  const handleDatesChange = (start: Date, end: Date) => {
-    setViewStart(start);
-    setViewEnd(end);
-  };
+  const handleDatesChange = useCallback((start: Date, end: Date) => {
+    setViewRange((prev) => {
+      const nextStart = start.toISOString();
+      const nextEnd = end.toISOString();
+      if (prev.start === nextStart && prev.end === nextEnd) {
+        return prev;
+      }
+      return { start: nextStart, end: nextEnd };
+    });
+  }, []);
 
   const handleEditFromDetail = (event: CalendarEvent) => {
     setSelectedEvent(event);
