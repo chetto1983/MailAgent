@@ -41,8 +41,14 @@ export class HtmlContentExtractor {
         const cleaned = this.cleanExtractedText(article.textContent);
 
         if (cleaned && cleaned.length > 0) {
+          // Calculate total text in HTML (without tags) for more meaningful comparison
+          const rawTextLength = this.fallbackStripHtml(html).length;
+          const retentionPercent = rawTextLength > 0
+            ? Math.round((cleaned.length / rawTextLength) * 100)
+            : 0;
+
           this.logger.debug(
-            `Readability extracted ${cleaned.length} chars from ${html.length} chars HTML (${Math.round((cleaned.length / html.length) * 100)}% efficiency)`
+            `Readability extracted ${cleaned.length} chars from ${rawTextLength} chars total text (${retentionPercent}% retained, HTML was ${html.length} chars)`
           );
           return cleaned;
         }

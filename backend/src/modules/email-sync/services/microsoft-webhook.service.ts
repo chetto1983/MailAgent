@@ -9,7 +9,10 @@ import {
   WebhookStats,
 } from '../interfaces/webhook.interface';
 import { SyncJobData } from '../interfaces/sync-job.interface';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+import { CryptoService } from '../../../common/services/crypto.service';
+import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
+import type { ProviderConfig } from '@prisma/client';
 
 @Injectable()
 export class MicrosoftWebhookService {
@@ -23,6 +26,8 @@ export class MicrosoftWebhookService {
     private prisma: PrismaService,
     private queueService: QueueService,
     private configService: ConfigService,
+    private cryptoService: CryptoService,
+    private microsoftOAuthService: MicrosoftOAuthService,
   ) {}
 
   /**
@@ -122,10 +127,7 @@ export class MicrosoftWebhookService {
         throw new Error('Invalid Microsoft provider');
       }
 
-      // Ensure token is valid (you may need to implement token refresh)
-      if (!provider.accessToken) {
-        throw new Error('No access token available');
-      }
+      const accessToken = await this.getFreshAccessToken(provider);
 
       // Generate a unique client state for validation
       const clientState = this.generateClientState(providerId);
@@ -149,7 +151,7 @@ export class MicrosoftWebhookService {
         subscriptionData,
         {
           headers: {
-            Authorization: `Bearer ${provider.accessToken}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         },
@@ -191,7 +193,7 @@ export class MicrosoftWebhookService {
         `Created Microsoft Graph subscription for ${provider.email}, expires at ${subscription.expirationDateTime}`,
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = this.getAxiosErrorMessage(error);
       this.logger.error(
         `Error creating Microsoft subscription: ${errorMessage}`,
       );
@@ -260,9 +262,11 @@ export class MicrosoftWebhookService {
         where: { id: providerId },
       });
 
-      if (!provider || !provider.accessToken) {
-        throw new Error('Invalid provider or missing token');
+      if (!provider || provider.providerType !== 'microsoft') {
+        throw new Error('Invalid provider');
       }
+
+      const accessToken = await this.getFreshAccessToken(provider);
 
       // Calculate new expiration
       const expirationDateTime = new Date(
@@ -275,7 +279,7 @@ export class MicrosoftWebhookService {
         { expirationDateTime },
         {
           headers: {
-            Authorization: `Bearer ${provider.accessToken}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         },
@@ -296,7 +300,7 @@ export class MicrosoftWebhookService {
         `Renewed Microsoft subscription ${subscriptionId}, new expiration: ${updatedSubscription.expirationDateTime}`,
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = this.getAxiosErrorMessage(error);
       this.logger.error(
         `Error renewing subscription ${subscriptionId}: ${errorMessage}`,
       );
@@ -321,16 +325,18 @@ export class MicrosoftWebhookService {
         where: { id: providerId },
       });
 
-      if (!provider || !provider.accessToken) {
+      if (!provider || provider.providerType !== 'microsoft') {
         throw new Error('Invalid provider or missing token');
       }
+
+      const accessToken = await this.getFreshAccessToken(provider);
 
       // Delete subscription via Microsoft Graph API
       await axios.delete(
         `${this.GRAPH_API_URL}/subscriptions/${subscription.subscriptionId}`,
         {
           headers: {
-            Authorization: `Bearer ${provider.accessToken}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         },
       );
@@ -345,7 +351,7 @@ export class MicrosoftWebhookService {
         `Cancelled Microsoft subscription for provider ${providerId}`,
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = this.getAxiosErrorMessage(error);
       this.logger.error(
         `Error cancelling Microsoft subscription: ${errorMessage}`,
       );
@@ -376,6 +382,74 @@ export class MicrosoftWebhookService {
   private generateClientState(providerId: string): string {
     const randomString = Math.random().toString(36).substring(2, 15);
     return `${providerId}-${randomString}`;
+  }
+
+  /**
+   * Ensure we have a decrypted, non-expired Microsoft access token
+   */
+  private async getFreshAccessToken(provider: ProviderConfig): Promise<string> {
+    if (!provider.accessToken || !provider.tokenEncryptionIv) {
+      throw new Error('Provider has no stored access token');
+    }
+
+    let accessToken = this.cryptoService.decrypt(
+      provider.accessToken,
+      provider.tokenEncryptionIv,
+    );
+
+    const expiresSoon =
+      !provider.tokenExpiresAt ||
+      provider.tokenExpiresAt.getTime() <= Date.now() + 60 * 1000;
+
+    if (!expiresSoon) {
+      return accessToken;
+    }
+
+    if (!provider.refreshToken || !provider.refreshTokenEncryptionIv) {
+      throw new Error('Access token expired and no refresh token is available');
+    }
+
+    const refreshToken = this.cryptoService.decrypt(
+      provider.refreshToken,
+      provider.refreshTokenEncryptionIv,
+    );
+
+    const refreshed = await this.microsoftOAuthService.refreshAccessToken(refreshToken);
+    accessToken = refreshed.accessToken;
+
+    const encryptedAccess = this.cryptoService.encrypt(refreshed.accessToken);
+    const updateData: Record<string, any> = {
+      accessToken: encryptedAccess.encrypted,
+      tokenEncryptionIv: encryptedAccess.iv,
+      tokenExpiresAt: refreshed.expiresAt,
+    };
+
+    if (refreshed.refreshToken) {
+      const encryptedRefresh = this.cryptoService.encrypt(refreshed.refreshToken);
+      updateData.refreshToken = encryptedRefresh.encrypted;
+      updateData.refreshTokenEncryptionIv = encryptedRefresh.iv;
+    }
+
+    await this.prisma.providerConfig.update({
+      where: { id: provider.id },
+      data: updateData,
+    });
+
+    return accessToken;
+  }
+
+  private getAxiosErrorMessage(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError<any>;
+      const status = axiosError.response?.status;
+      const data =
+        typeof axiosError.response?.data === 'string'
+          ? axiosError.response.data
+          : JSON.stringify(axiosError.response?.data);
+      return status ? `HTTP ${status}: ${data}` : axiosError.message;
+    }
+
+    return error instanceof Error ? error.message : String(error);
   }
 
   /**
