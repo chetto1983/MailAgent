@@ -79,6 +79,7 @@ export class EmailsService {
           id: true,
           externalId: true,
           threadId: true,
+          providerId: true,
           from: true,
           to: true,
           subject: true,
@@ -384,6 +385,7 @@ export class EmailsService {
       take: limit,
       select: {
         id: true,
+        providerId: true,
         from: true,
         subject: true,
         snippet: true,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import {
   Box,
@@ -24,10 +24,13 @@ import {
   type UpdateEventDto,
 } from '@/lib/api/calendar';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 export default function CalendarPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const translations = useTranslations();
+  const calendarCopy = translations.dashboard.calendar;
 
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
@@ -52,6 +55,9 @@ export default function CalendarPage() {
     return { start: start.toISOString(), end: end.toISOString() };
   });
 
+  // Track if we've loaded providers to prevent infinite loops
+  const hasProvidersRef = useRef(false);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
@@ -59,14 +65,8 @@ export default function CalendarPage() {
     }
   }, [user, authLoading, router]);
 
-  // Load providers
-  useEffect(() => {
-    if (user) {
-      loadProviders();
-    }
-  }, [user]);
-
-  const loadProviders = async () => {
+  // Load providers - memoized to prevent unnecessary re-creations
+  const loadProviders = useCallback(async () => {
     try {
       setProvidersLoading(true);
       const allProviders = await providersApi.getProviders();
@@ -76,7 +76,14 @@ export default function CalendarPage() {
     } finally {
       setProvidersLoading(false);
     }
-  };
+  }, []);
+
+  // Load providers
+  useEffect(() => {
+    if (user) {
+      loadProviders();
+    }
+  }, [user, loadProviders]);
 
   const loadEvents = useCallback(async () => {
     if (!viewRange.start || !viewRange.end) {
@@ -91,20 +98,31 @@ export default function CalendarPage() {
         endTime: viewRange.end,
         limit: 1000,
       });
-      setEvents(response.data.events);
+      // Only update if the component is still mounted and the response is valid
+      if (response?.data?.events) {
+        setEvents(response.data.events);
+      }
     } catch (error) {
       console.error('Failed to load events:', error);
+      // Don't clear events on error to prevent flickering
     } finally {
       setLoading(false);
     }
   }, [selectedProvider, viewRange.end, viewRange.start]);
 
   // Load events when providers or view changes
+  // Use a ref to track when providers are loaded to prevent infinite loops
   useEffect(() => {
-    if (user && providers.length > 0) {
+    if (providers.length > 0) {
+      hasProvidersRef.current = true;
+    }
+  }, [providers.length]);
+
+  useEffect(() => {
+    if (user && hasProvidersRef.current) {
       loadEvents();
     }
-  }, [user, providers, loadEvents]);
+  }, [user, loadEvents]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -228,8 +246,8 @@ export default function CalendarPage() {
 
   return (
     <DashboardLayout
-      title="Calendar"
-      description="Manage your calendar events"
+      title={calendarCopy.title}
+      description={calendarCopy.description}
       actions={
         <Stack direction="row" spacing={1} alignItems="center">
           {providers.length > 0 && (
@@ -240,7 +258,7 @@ export default function CalendarPage() {
               size="small"
               sx={{ minWidth: 200 }}
             >
-              <MenuItem value="all">All Calendars</MenuItem>
+              <MenuItem value="all">{calendarCopy.allCalendars}</MenuItem>
               {providers.map((provider) => (
                 <MenuItem key={provider.id} value={provider.id}>
                   {provider.email}
@@ -248,7 +266,7 @@ export default function CalendarPage() {
               ))}
             </TextField>
           )}
-          <Tooltip title="Refresh calendars">
+          <Tooltip title={calendarCopy.refreshTooltip}>
             <IconButton
               onClick={handleRefresh}
               disabled={refreshing}
@@ -297,10 +315,10 @@ export default function CalendarPage() {
           >
             <CalendarIcon size={64} style={{ opacity: 0.3 }} />
             <Typography variant="h6" color="text.secondary">
-              No calendar providers configured
+              {calendarCopy.noProviders}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Please configure a calendar provider in the Providers page
+              {calendarCopy.noProvidersDescription}
             </Typography>
           </Box>
         ) : loading && events.length === 0 ? (
@@ -329,7 +347,7 @@ export default function CalendarPage() {
       {/* FAB for creating new events */}
       <Fab
         color="primary"
-        aria-label="add event"
+        aria-label={calendarCopy.createEvent}
         onClick={() => {
           setCreateDefaultDate(undefined);
           setIsCreateDialogOpen(true);
