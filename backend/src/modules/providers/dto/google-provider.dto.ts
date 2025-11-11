@@ -30,12 +30,12 @@ export class ConnectGoogleProviderDto {
 
   @ApiProperty({
     description: 'Enable contacts sync',
-    example: false,
-    default: false,
+    example: true,
+    default: true,
   })
   @IsBoolean()
   @IsOptional()
-  supportsContacts?: boolean = false;
+  supportsContacts?: boolean = true;
 
   @ApiProperty({
     description: 'Set as default provider',
