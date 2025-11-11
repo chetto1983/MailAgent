@@ -12,6 +12,7 @@ import { ProvidersModule } from './modules/providers/providers.module';
 import { EmailSyncModule } from './modules/email-sync/email-sync.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { ContactsModule } from './modules/contacts/contacts.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
     EmailSyncModule,
     ComplianceModule,
     CalendarModule,
+    ContactsModule,
   ],
 })
 export class AppModule {}

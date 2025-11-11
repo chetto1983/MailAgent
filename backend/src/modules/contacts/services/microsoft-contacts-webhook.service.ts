@@ -3,12 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
-import { MicrosoftCalendarSyncService } from './microsoft-calendar-sync.service';
+import { MicrosoftContactsSyncService } from './microsoft-contacts-sync.service';
 import { nanoid } from 'nanoid';
 
-export const MICROSOFT_CALENDAR_RESOURCE = '/me/events';
+export const MICROSOFT_CONTACTS_RESOURCE = '/me/contacts';
 
-export interface MicrosoftCalendarNotification {
+export interface MicrosoftContactsNotification {
   subscriptionId: string;
   clientState?: string;
   changeType: string;
@@ -23,8 +23,8 @@ export interface MicrosoftCalendarNotification {
 }
 
 @Injectable()
-export class MicrosoftCalendarWebhookService {
-  private readonly logger = new Logger(MicrosoftCalendarWebhookService.name);
+export class MicrosoftContactsWebhookService {
+  private readonly logger = new Logger(MicrosoftContactsWebhookService.name);
   private readonly GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
   private readonly WEBHOOK_URL: string;
   private readonly CLIENT_STATE: string;
@@ -33,23 +33,23 @@ export class MicrosoftCalendarWebhookService {
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly config: ConfigService,
-    private readonly calendarSync: MicrosoftCalendarSyncService,
+    private readonly contactsSync: MicrosoftContactsSyncService,
   ) {
     const configuredWebhookUrl =
-      this.config.get<string>('MICROSOFT_CALENDAR_WEBHOOK_URL') ??
+      this.config.get<string>('MICROSOFT_CONTACTS_WEBHOOK_URL') ??
       this.config.get<string>('MICROSOFT_WEBHOOK_URL');
 
     if (configuredWebhookUrl) {
       this.WEBHOOK_URL = configuredWebhookUrl;
     } else {
       const backendUrl = this.config.get<string>('BACKEND_URL', 'http://localhost:3000');
-      this.WEBHOOK_URL = `${backendUrl}/webhooks/calendar/microsoft/notifications`;
+      this.WEBHOOK_URL = `${backendUrl}/webhooks/contacts/microsoft/notifications`;
     }
     this.CLIENT_STATE = this.config.get<string>('WEBHOOK_CLIENT_STATE', nanoid());
   }
 
   /**
-   * Setup Microsoft Calendar webhook subscription
+   * Setup Microsoft Contacts webhook subscription
    */
   async setupSubscription(providerId: string): Promise<void> {
     try {
@@ -57,8 +57,8 @@ export class MicrosoftCalendarWebhookService {
         where: { id: providerId },
       });
 
-      if (!provider || !provider.supportsCalendar || !provider.accessToken) {
-        throw new Error('Provider not found or does not support calendar');
+      if (!provider || !provider.supportsContacts || !provider.accessToken) {
+        throw new Error('Provider not found or does not support contacts');
       }
 
       const accessToken = this.crypto.decrypt(
@@ -66,15 +66,15 @@ export class MicrosoftCalendarWebhookService {
         provider.tokenEncryptionIv!,
       );
 
-      // Calculate expiration (max 4230 minutes = ~3 days for calendar)
+      // Calculate expiration (max 4230 minutes = ~3 days)
       const expirationDateTime = new Date();
       expirationDateTime.setDate(expirationDateTime.getDate() + 3);
 
-      // Create subscription for calendar events
+      // Create subscription for contacts
       const subscription = {
         changeType: 'created,updated,deleted',
         notificationUrl: this.WEBHOOK_URL,
-        resource: '/me/events',
+        resource: '/me/contacts',
         expirationDateTime: expirationDateTime.toISOString(),
         clientState: this.CLIENT_STATE,
       };
@@ -97,14 +97,14 @@ export class MicrosoftCalendarWebhookService {
         where: {
           providerId_resourcePath: {
             providerId,
-            resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+            resourcePath: MICROSOFT_CONTACTS_RESOURCE,
           },
         },
         create: {
           providerId,
           providerType: 'microsoft',
           subscriptionId,
-          resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+          resourcePath: MICROSOFT_CONTACTS_RESOURCE,
           webhookUrl: this.WEBHOOK_URL,
           isActive: true,
           expiresAt: new Date(expirationDateTime),
@@ -115,7 +115,7 @@ export class MicrosoftCalendarWebhookService {
         },
         update: {
           subscriptionId,
-          resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+          resourcePath: MICROSOFT_CONTACTS_RESOURCE,
           expiresAt: new Date(expirationDateTime),
           isActive: true,
           lastRenewedAt: new Date(),
@@ -127,11 +127,11 @@ export class MicrosoftCalendarWebhookService {
       });
 
       this.logger.log(
-        `Setup Microsoft Calendar subscription for provider ${providerId}, subscription ${subscriptionId}`,
+        `Setup Microsoft Contacts subscription for provider ${providerId}, subscription ${subscriptionId}`,
       );
     } catch (error) {
       this.logger.error(
-        `Failed to setup Microsoft Calendar subscription for provider ${providerId}:`,
+        `Failed to setup Microsoft Contacts subscription for provider ${providerId}:`,
         error,
       );
       throw error;
@@ -139,17 +139,17 @@ export class MicrosoftCalendarWebhookService {
   }
 
   /**
-   * Handle Microsoft Calendar notifications
+   * Handle Microsoft Contacts notifications
    */
   async handleNotifications(
-    notifications: MicrosoftCalendarNotification[],
+    notifications: MicrosoftContactsNotification[],
   ): Promise<void> {
     for (const notification of notifications) {
       try {
         await this.handleSingleNotification(notification);
       } catch (error) {
         this.logger.error(
-          `Error handling Microsoft Calendar notification ${notification.subscriptionId}:`,
+          `Error handling Microsoft Contacts notification ${notification.subscriptionId}:`,
           error,
         );
       }
@@ -160,11 +160,11 @@ export class MicrosoftCalendarWebhookService {
    * Handle a single notification
    */
   private async handleSingleNotification(
-    notification: MicrosoftCalendarNotification,
+    notification: MicrosoftContactsNotification,
   ): Promise<void> {
     // Verify client state
     if (notification.clientState !== this.CLIENT_STATE) {
-      this.logger.warn('Microsoft Calendar notification with invalid client state');
+      this.logger.warn('Microsoft Contacts notification with invalid client state');
       return;
     }
 
@@ -181,7 +181,7 @@ export class MicrosoftCalendarWebhookService {
 
     if (!subscription) {
       this.logger.warn(
-        `No active subscription found for Microsoft Calendar subscription ${subscriptionId}`,
+        `No active subscription found for Microsoft Contacts subscription ${subscriptionId}`,
       );
       return;
     }
@@ -196,11 +196,11 @@ export class MicrosoftCalendarWebhookService {
     });
 
     this.logger.log(
-      `Microsoft Calendar notification: subscription=${subscriptionId}, changeType=${notification.changeType}`,
+      `Microsoft Contacts notification: subscription=${subscriptionId}, changeType=${notification.changeType}`,
     );
 
-    // Trigger calendar sync for this provider
-    await this.calendarSync.syncCalendar(subscription.providerId);
+    // Trigger contacts sync for this provider
+    await this.contactsSync.syncContacts(subscription.providerId);
   }
 
   /**
@@ -213,7 +213,7 @@ export class MicrosoftCalendarWebhookService {
     const expiring = await this.prisma.webhookSubscription.findMany({
       where: {
         providerType: 'microsoft',
-        resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+        resourcePath: MICROSOFT_CONTACTS_RESOURCE,
         isActive: true,
         expiresAt: {
           lte: oneDayFromNow,
@@ -231,7 +231,7 @@ export class MicrosoftCalendarWebhookService {
         }
       } catch (error) {
         this.logger.error(
-          `Failed to renew Microsoft Calendar subscription for ${subscription.providerId}:`,
+          `Failed to renew Microsoft Contacts subscription for ${subscription.providerId}:`,
           error,
         );
       }
@@ -247,7 +247,7 @@ export class MicrosoftCalendarWebhookService {
     const subscription = await this.prisma.webhookSubscription.findFirst({
       where: {
         providerId,
-        resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+        resourcePath: MICROSOFT_CONTACTS_RESOURCE,
       },
     });
 
@@ -289,7 +289,7 @@ export class MicrosoftCalendarWebhookService {
       where: {
         providerId_resourcePath: {
           providerId,
-          resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+          resourcePath: MICROSOFT_CONTACTS_RESOURCE,
         },
       },
       data: {
@@ -298,7 +298,7 @@ export class MicrosoftCalendarWebhookService {
       },
     });
 
-    this.logger.log(`Renewed Microsoft Calendar subscription for provider ${providerId}`);
+    this.logger.log(`Renewed Microsoft Contacts subscription for provider ${providerId}`);
     return true;
   }
 
@@ -310,7 +310,7 @@ export class MicrosoftCalendarWebhookService {
       const subscription = await this.prisma.webhookSubscription.findFirst({
         where: {
           providerId,
-          resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+          resourcePath: MICROSOFT_CONTACTS_RESOURCE,
         },
       });
 
@@ -346,16 +346,16 @@ export class MicrosoftCalendarWebhookService {
         where: {
           providerId_resourcePath: {
             providerId,
-            resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+            resourcePath: MICROSOFT_CONTACTS_RESOURCE,
           },
         },
         data: { isActive: false },
       });
 
-      this.logger.log(`Deleted Microsoft Calendar subscription for provider ${providerId}`);
+      this.logger.log(`Deleted Microsoft Contacts subscription for provider ${providerId}`);
     } catch (error) {
       this.logger.error(
-        `Failed to delete Microsoft Calendar subscription for ${providerId}:`,
+        `Failed to delete Microsoft Contacts subscription for ${providerId}:`,
         error,
       );
     }
@@ -368,7 +368,7 @@ export class MicrosoftCalendarWebhookService {
     const total = await this.prisma.webhookSubscription.count({
       where: {
         providerType: 'microsoft',
-        resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+        resourcePath: MICROSOFT_CONTACTS_RESOURCE,
         isActive: true,
       },
     });
@@ -376,7 +376,7 @@ export class MicrosoftCalendarWebhookService {
     const recentNotifications = await this.prisma.webhookSubscription.findMany({
       where: {
         providerType: 'microsoft',
-        resourcePath: MICROSOFT_CALENDAR_RESOURCE,
+        resourcePath: MICROSOFT_CONTACTS_RESOURCE,
         isActive: true,
         lastNotificationAt: {
           gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24h

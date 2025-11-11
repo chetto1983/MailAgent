@@ -29,6 +29,7 @@ Complete guide to all documentation files and resources for the MailAgent projec
 | [CURRENT_STATUS.md](implementation/CURRENT_STATUS.md) | Current project status & recent changes | 10 min | Developers |
 | [EMBEDDINGS_OPTIMIZATION.md](EMBEDDINGS_OPTIMIZATION.md) | Bulk embeddings implementation guide | 15 min | Backend devs, AI integration |
 | [CALENDAR_WEBHOOK_IMPLEMENTATION.md](implementation/CALENDAR_WEBHOOK_IMPLEMENTATION.md) | Webhook setup for calendar sync | 20 min | Integration developers |
+| [CONTACTS_IMPLEMENTATION.md](implementation/CONTACTS_IMPLEMENTATION.md) | Bidirectional contacts sync with webhooks | 20 min | Integration developers |
 
 ### OAuth2 Setup (External Services)
 

@@ -80,10 +80,10 @@ describe('GoogleCalendarWebhookService', () => {
     }).compile();
 
     service = module.get<GoogleCalendarWebhookService>(GoogleCalendarWebhookService);
-    prisma = module.get(PrismaService) as jest.Mocked<PrismaService>;
-    crypto = module.get(CryptoService) as jest.Mocked<CryptoService>;
-    config = module.get(ConfigService) as jest.Mocked<ConfigService>;
-    calendarSync = module.get(GoogleCalendarSyncService) as jest.Mocked<GoogleCalendarSyncService>;
+    prisma = module.get(PrismaService);
+    crypto = module.get(CryptoService);
+    config = module.get(ConfigService);
+    calendarSync = module.get(GoogleCalendarSyncService);
 
     // Clear all mocks
     jest.clearAllMocks();

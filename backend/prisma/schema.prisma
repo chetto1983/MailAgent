@@ -29,6 +29,7 @@ model Tenant {
   auditLogs       AuditLog[]
   chatSessions    ChatSession[]
   calendarEvents  CalendarEvent[]
+  contacts        Contact[]
 
   @@map("tenants")
 }
@@ -173,9 +174,10 @@ model ProviderConfig {
   lastActivityCheck     DateTime? // Last time activity rate was calculated
 
   // Relations
-  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  emails        Email[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  emails         Email[]
   calendarEvents CalendarEvent[]
+  contacts       Contact[]
 
   @@unique([tenantId, email, providerType])
   @@index([tenantId, isDefault])
@@ -242,10 +244,10 @@ model Email {
   crossProviderLinkId String? // Link to cross-provider group
 
   // Relations
-  tenant              Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  provider            ProviderConfig           @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  attachments         EmailAttachment[]
-  crossProviderLink   EmailCrossProviderLink?  @relation(fields: [crossProviderLinkId], references: [id], onDelete: SetNull)
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider          ProviderConfig          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  attachments       EmailAttachment[]
+  crossProviderLink EmailCrossProviderLink? @relation(fields: [crossProviderLinkId], references: [id], onDelete: SetNull)
 
   @@unique([providerId, externalId]) // Prevent duplicates
   @@unique([tenantId, messageId])
@@ -297,21 +299,21 @@ model EmailCrossProviderLink {
   conflictStrategy String @default("LAST_WRITE_WINS") // "LAST_WRITE_WINS", "UNION", "INTERSECTION", "PRIORITY_BASED"
 
   // Merged state across all providers (computed from provider states)
-  mergedIsRead     Boolean   @default(false)
-  mergedIsStarred  Boolean   @default(false)
-  mergedFolder     String    @default("INBOX")
-  mergedLabels     String[]  @default([])
+  mergedIsRead    Boolean  @default(false)
+  mergedIsStarred Boolean  @default(false)
+  mergedFolder    String   @default("INBOX")
+  mergedLabels    String[] @default([])
 
   // Tracking
-  providerCount    Int       @default(0) // How many providers have this email
-  lastSyncedAt     DateTime  @default(now())
-  lastConflictAt   DateTime? // Last time a conflict was detected
+  providerCount  Int       @default(0) // How many providers have this email
+  lastSyncedAt   DateTime  @default(now())
+  lastConflictAt DateTime? // Last time a conflict was detected
 
   // Conflict metadata (JSON with details about last conflict)
-  lastConflict     Json?
+  lastConflict Json?
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   emails Email[] // All emails linked to this group
@@ -391,12 +393,12 @@ model CalendarEvent {
   providerId String
 
   // External IDs for sync tracking
-  externalId String // Google event ID, Microsoft event ID
-  calendarId String? // Which calendar this event belongs to
+  externalId   String // Google event ID, Microsoft event ID
+  calendarId   String? // Which calendar this event belongs to
   calendarName String? // Friendly calendar name
 
   // Event metadata
-  iCalUID    String? // RFC 5545 UID (for cross-provider sync)
+  iCalUID String? // RFC 5545 UID (for cross-provider sync)
 
   // Event details
   title       String // Event title/summary
@@ -404,33 +406,33 @@ model CalendarEvent {
   location    String? // Event location
 
   // Attendees
-  organizer  String? // Organizer email
-  attendees  Json? // Array of attendees with status
+  organizer String? // Organizer email
+  attendees Json? // Array of attendees with status
 
   // Time and recurrence
-  startTime    DateTime // Event start time
-  endTime      DateTime // Event end time
-  isAllDay     Boolean  @default(false)
-  timeZone     String   @default("UTC")
-  recurrence   String[] @default([]) // RRULE strings
+  startTime        DateTime // Event start time
+  endTime          DateTime // Event end time
+  isAllDay         Boolean  @default(false)
+  timeZone         String   @default("UTC")
+  recurrence       String[] @default([]) // RRULE strings
   recurringEventId String? // ID of parent recurring event
 
   // Status and flags
-  status       String  @default("confirmed") // confirmed, tentative, cancelled
-  visibility   String  @default("default") // default, public, private, confidential
-  isDeleted    Boolean @default(false)
-  isCancelled  Boolean @default(false)
+  status      String  @default("confirmed") // confirmed, tentative, cancelled
+  visibility  String  @default("default") // default, public, private, confidential
+  isDeleted   Boolean @default(false)
+  isCancelled Boolean @default(false)
 
   // Reminders
-  reminders    Json? // Reminder settings
+  reminders Json? // Reminder settings
 
   // Dates
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Metadata
-  metadata     Json? // Provider-specific metadata
-  htmlLink     String? // Link to event in provider's UI
+  metadata Json? // Provider-specific metadata
+  htmlLink String? // Link to event in provider's UI
 
   // Sync tracking
   lastSyncedAt DateTime @default(now())
@@ -445,6 +447,82 @@ model CalendarEvent {
   @@index([tenantId, calendarId, startTime]) // List events in a calendar
   @@index([iCalUID]) // Cross-provider sync
   @@map("calendar_events")
+}
+
+// ===== CONTACT MODEL (Synced contacts from providers) =====
+model Contact {
+  id         String @id @default(cuid())
+  tenantId   String
+  providerId String
+
+  // External IDs for sync tracking
+  externalId   String // Google People API resourceName, Microsoft contact ID
+  contactGroup String? // Contact group/label
+
+  // Basic information
+  firstName   String?
+  lastName    String?
+  middleName  String?
+  displayName String? // Full name
+  nickname    String?
+  prefix      String? // Mr., Mrs., Dr., etc.
+  suffix      String? // Jr., Sr., III, etc.
+
+  // Email addresses
+  emails Json? // Array of {value: string, type: string, primary: boolean}
+
+  // Phone numbers
+  phoneNumbers Json? // Array of {value: string, type: string, primary: boolean}
+
+  // Physical addresses
+  addresses Json? // Array of {street, city, state, postalCode, country, type}
+
+  // Organization
+  company    String?
+  jobTitle   String?
+  department String?
+
+  // Dates
+  birthday    DateTime? // Birthday
+  anniversary DateTime? // Anniversary
+
+  // Social and web
+  websites       Json? // Array of {url: string, type: string}
+  socialProfiles Json? // Array of {platform: string, username: string, url: string}
+
+  // Additional info
+  notes     String? // Notes about contact
+  photoUrl  String? // Profile photo URL
+  photoEtag String? // Photo ETag for caching
+
+  // Status and flags
+  isDeleted  Boolean @default(false)
+  isStarred  Boolean @default(false) // Favorite/starred
+  isFavorite Boolean @default(false)
+
+  // Dates
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Metadata
+  metadata     Json? // Provider-specific metadata
+  vCardVersion String? @default("4.0") // vCard version for compatibility
+
+  // Sync tracking
+  lastSyncedAt DateTime @default(now())
+  syncVersion  Int      @default(1) // Increment on each update for conflict resolution
+  eTag         String? // Entity tag for optimistic concurrency
+
+  // Relations
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, externalId]) // Prevent duplicates
+  @@index([tenantId, lastName, firstName]) // Search by name
+  @@index([tenantId, displayName]) // Search by display name
+  @@index([tenantId, company]) // Search by company
+  @@index([contactGroup]) // Filter by group
+  @@map("contacts")
 }
 
 // ===== AUDIT LOG MODEL =====
@@ -491,24 +569,24 @@ model JobQueue {
 
 // ===== WEBHOOK SUBSCRIPTION MODEL (for real-time sync) =====
 model WebhookSubscription {
-  id             String   @id @default(cuid())
-  providerId     String   // May have multiple subscriptions per provider
-  providerType   String // "google", "microsoft"
+  id           String @id @default(cuid())
+  providerId   String // May have multiple subscriptions per provider
+  providerType String // "google", "microsoft"
 
   // Provider-specific subscription ID
   subscriptionId String // Gmail historyId, Microsoft/Microsoft Calendar subscription ID
 
   // Webhook details
-  webhookUrl     String? // For Microsoft Graph
-  resourcePath   String  @default("generic") // Resource being watched (calendar, mailbox, etc.)
+  webhookUrl   String? // For Microsoft Graph
+  resourcePath String  @default("generic") // Resource being watched (calendar, mailbox, etc.)
 
   // Lifecycle
-  isActive       Boolean  @default(true)
-  expiresAt      DateTime // When subscription expires
-  lastRenewedAt  DateTime @default(now())
+  isActive      Boolean  @default(true)
+  expiresAt     DateTime // When subscription expires
+  lastRenewedAt DateTime @default(now())
 
   // Metadata
-  metadata       Json? // Provider-specific data (topic name, etc.)
+  metadata Json? // Provider-specific data (topic name, etc.)
 
   // Tracking
   lastNotificationAt DateTime?
@@ -516,14 +594,14 @@ model WebhookSubscription {
   errorCount         Int       @default(0)
   lastError          String?
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@unique([providerId, resourcePath])
   @@index([providerId, isActive])
   @@index([expiresAt]) // For renewal queries
   @@index([providerType])
   @@index([subscriptionId])
-  @@unique([providerId, resourcePath])
   @@map("webhook_subscriptions")
 }
 

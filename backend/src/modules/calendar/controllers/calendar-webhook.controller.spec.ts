@@ -30,8 +30,8 @@ describe('CalendarWebhookController', () => {
     }).compile();
 
     controller = module.get<CalendarWebhookController>(CalendarWebhookController);
-    googleWebhook = module.get(GoogleCalendarWebhookService) as jest.Mocked<GoogleCalendarWebhookService>;
-    microsoftWebhook = module.get(MicrosoftCalendarWebhookService) as jest.Mocked<MicrosoftCalendarWebhookService>;
+    googleWebhook = module.get(GoogleCalendarWebhookService);
+    microsoftWebhook = module.get(MicrosoftCalendarWebhookService);
 
     // Clear all mocks
     jest.clearAllMocks();

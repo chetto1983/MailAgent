@@ -210,7 +210,7 @@ export class EmailFetchService {
 
       return {
         bodyText: parsed.text,
-        bodyHtml: parsed.html,
+        bodyHtml: typeof parsed.html === 'string' ? parsed.html : undefined,
         headers,
       };
     } finally {

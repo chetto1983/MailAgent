@@ -85,6 +85,21 @@
 - **Files:** `backend/src/modules/calendar/{services/*-webhook.service.ts,controllers/calendar-webhook.controller.ts}`
 - **Documentation:** Complete implementation guide in `docs/implementation/CALENDAR_WEBHOOK_IMPLEMENTATION.md`
 
+### 12. Contacts Bidirectional Sync Implementation (2025-11-11)
+
+- **Google Contacts:** Full integration with Google People API (read/write contacts)
+- **Microsoft Contacts:** Full integration with Microsoft Graph Contacts API (read/write contacts)
+- **Bidirectional Sync:** Create, update, delete contacts synchronized with external providers
+- **Google Webhook:** Intelligent polling system with sync tokens (People API doesn't support push notifications)
+- **Microsoft Webhook:** Real-time push notifications via Graph API subscriptions
+- **Database Schema:** Complete `Contact` model with support for emails, phones, addresses, social profiles
+- **CRUD API:** Full REST API for contact management with search and filtering
+- **Controllers:** Separate controllers for CRUD operations and webhook handling
+- **Services:** Dedicated sync services for Google and Microsoft, plus webhook services
+- **Files:** `backend/src/modules/contacts/{services/*,controllers/*,contacts.module.ts}`
+- **Migration:** Database migration `20251111170000_add_contacts_table`
+- **Documentation:** Complete implementation guide in `docs/implementation/CONTACTS_IMPLEMENTATION.md`
+
 ---
 
 ## 🚀 How to Run Locally (RECOMMENDED)
