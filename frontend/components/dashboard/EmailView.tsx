@@ -114,6 +114,7 @@ export function EmailView({
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <base target="_blank" />
         <style>
           body {
             margin: 0;
@@ -129,7 +130,22 @@ export function EmailView({
           table {
             width: 100% !important;
           }
+          a {
+            color: #1a73e8;
+          }
         </style>
+        <script>
+          document.addEventListener('DOMContentLoaded', function () {
+            const links = document.querySelectorAll('a[href]');
+            links.forEach(function (link) {
+              link.setAttribute('target', '_blank');
+              const rel = (link.getAttribute('rel') || '').split(/\s+/).filter(Boolean);
+              if (!rel.includes('noopener')) rel.push('noopener');
+              if (!rel.includes('noreferrer')) rel.push('noreferrer');
+              link.setAttribute('rel', rel.join(' '));
+            });
+          });
+        </script>
       </head>
       <body>${selectedEmail.bodyHtml}</body>
     </html>`;
