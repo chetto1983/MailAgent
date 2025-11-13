@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../api-client';
+import { apiClient } from '../api-client';
 
 export interface Folder {
   id: string;
@@ -47,17 +47,13 @@ export interface ProviderFoldersResponse {
  * Get all folders for current user
  */
 export async function getFolders(token: string): Promise<FoldersResponse> {
-  const response = await fetch(`${API_BASE_URL}/folders`, {
+  const response = await apiClient.get('/folders', {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch folders');
-  }
-
-  return response.json();
+  return response.data;
 }
 
 /**
@@ -67,20 +63,13 @@ export async function getFoldersByProvider(
   token: string,
   providerId: string,
 ): Promise<ProviderFoldersResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/folders/provider/${providerId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  const response = await apiClient.get(`/folders/provider/${providerId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
     },
-  );
+  });
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch folders for provider');
-  }
-
-  return response.json();
+  return response.data;
 }
 
 /**
@@ -90,18 +79,13 @@ export async function syncFolders(
   token: string,
   providerId: string,
 ): Promise<{ success: boolean; foldersCount: number; folders: Folder[] }> {
-  const response = await fetch(`${API_BASE_URL}/folders/sync/${providerId}`, {
-    method: 'POST',
+  const response = await apiClient.post(`/folders/sync/${providerId}`, null, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to sync folders');
-  }
-
-  return response.json();
+  return response.data;
 }
 
 /**
@@ -117,18 +101,13 @@ export async function syncAllFolders(token: string): Promise<{
     error?: string;
   }>;
 }> {
-  const response = await fetch(`${API_BASE_URL}/folders/sync-all`, {
-    method: 'POST',
+  const response = await apiClient.post('/folders/sync-all', null, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to sync all folders');
-  }
-
-  return response.json();
+  return response.data;
 }
 
 /**
@@ -138,19 +117,11 @@ export async function updateFolderCounts(
   token: string,
   providerId: string,
 ): Promise<{ success: boolean; message: string }> {
-  const response = await fetch(
-    `${API_BASE_URL}/folders/update-counts/${providerId}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  const response = await apiClient.post(`/folders/update-counts/${providerId}`, null, {
+    headers: {
+      Authorization: `Bearer ${token}`,
     },
-  );
+  });
 
-  if (!response.ok) {
-    throw new Error('Failed to update folder counts');
-  }
-
-  return response.json();
+  return response.data;
 }

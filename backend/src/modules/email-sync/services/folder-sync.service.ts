@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ImapService } from '../../providers/services/imap.service';
 import { CryptoService } from '../../../common/services/crypto.service';
+import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { Folder } from '@prisma/client';
 import axios from 'axios';
 import { google } from 'googleapis';
@@ -24,6 +25,7 @@ export class FolderSyncService {
     private readonly prisma: PrismaService,
     private readonly imapService: ImapService,
     private readonly crypto: CryptoService,
+    private readonly googleOAuth: GoogleOAuthService,
   ) {}
 
   /**
@@ -354,9 +356,49 @@ export class FolderSyncService {
         throw new Error('Provider not found or missing access token');
       }
 
-      const accessToken = this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
+      // Get access token and refresh if needed
+      let accessToken = this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
 
-      const gmail = google.gmail({ version: 'v1', auth: accessToken });
+      const needsRefresh =
+        !provider.tokenExpiresAt ||
+        provider.tokenExpiresAt.getTime() <= Date.now() + 60 * 1000;
+
+      if (needsRefresh && provider.refreshToken && provider.refreshTokenEncryptionIv) {
+        try {
+          this.logger.log(`Refreshing expired access token for provider ${providerId}`);
+          const refreshToken = this.crypto.decrypt(
+            provider.refreshToken,
+            provider.refreshTokenEncryptionIv,
+          );
+
+          const refreshed = await this.googleOAuth.refreshAccessToken(refreshToken);
+          accessToken = refreshed.accessToken;
+
+          const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
+
+          await this.prisma.providerConfig.update({
+            where: { id: provider.id },
+            data: {
+              accessToken: encryptedAccess.encrypted,
+              tokenEncryptionIv: encryptedAccess.iv,
+              tokenExpiresAt: refreshed.expiresAt,
+            },
+          });
+
+          this.logger.log(`Successfully refreshed access token for provider ${providerId}`);
+        } catch (error) {
+          this.logger.error(
+            `Failed to refresh Google access token for provider ${provider.id}: ${error instanceof Error ? error.message : error}`,
+          );
+          throw new Error('Failed to refresh access token. Please reconnect your Google account.');
+        }
+      }
+
+      // Create OAuth2 client with access token
+      const oauth2Client = new google.auth.OAuth2();
+      oauth2Client.setCredentials({ access_token: accessToken });
+
+      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
       const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
       const labels = labelsResponse.data.labels || [];
 
