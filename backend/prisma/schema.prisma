@@ -25,6 +25,7 @@ model Tenant {
   messages        Message[]
   providerConfigs ProviderConfig[]
   emails          Email[]
+  folders         Folder[]
   embeddings      Embedding[]
   auditLogs       AuditLog[]
   chatSessions    ChatSession[]
@@ -176,6 +177,7 @@ model ProviderConfig {
   // Relations
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   emails         Email[]
+  folders        Folder[]
   calendarEvents CalendarEvent[]
   contacts       Contact[]
 
@@ -257,6 +259,57 @@ model Email {
   @@index([sentAt]) // Sort by date
   @@index([crossProviderLinkId]) // Cross-provider lookups
   @@map("emails")
+}
+
+// ===== FOLDER MODEL (Email folders/mailboxes from providers) =====
+model Folder {
+  id         String @id @default(cuid())
+  tenantId   String
+  providerId String
+
+  // Folder identification
+  name String // Display name (e.g., "Inbox", "Sent Items", "Work")
+  path String // Full path (e.g., "INBOX", "INBOX/Work", "[Gmail]/Sent Mail")
+
+  // Folder hierarchy
+  delimiter    String  @default("/") // Folder delimiter (/, ., etc.)
+  parentId     String? // Parent folder ID for hierarchy
+  level        Int     @default(0) // Nesting level (0 = root)
+  isSelectable Boolean @default(true) // Can emails be stored here?
+
+  // Special folder types (RFC 6154)
+  specialUse String? // INBOX, SENT, DRAFTS, TRASH, SPAM, JUNK, ARCHIVE, FLAGGED, ALL
+
+  // Folder metadata
+  attributes String[] @default([]) // IMAP attributes (\Noselect, \HasChildren, etc.)
+
+  // Counters (cached, updated during sync)
+  totalCount   Int @default(0) // Total emails in folder
+  unreadCount  Int @default(0) // Unread emails
+  recentCount  Int @default(0) // Recent emails (IMAP)
+  unseenCount  Int @default(0) // Unseen emails (IMAP)
+
+  // Sync metadata
+  uidValidity  String? // IMAP UIDVALIDITY
+  uidNext      Int?    @default(0) // IMAP UIDNEXT
+  lastSyncedAt DateTime?
+
+  // Dates
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  parent   Folder?        @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[]       @relation("FolderHierarchy")
+
+  @@unique([providerId, path]) // One folder per path per provider
+  @@index([tenantId, providerId])
+  @@index([tenantId, specialUse]) // Quick lookup of special folders
+  @@index([providerId, parentId]) // Hierarchy queries
+  @@index([lastSyncedAt]) // Sync queries
+  @@map("folders")
 }
 
 // ===== EMAIL ATTACHMENT MODEL =====

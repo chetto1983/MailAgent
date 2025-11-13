@@ -11,6 +11,7 @@ import { SyncSchedulerService } from './services/sync-scheduler.service';
 import { GoogleSyncService } from './services/google-sync.service';
 import { MicrosoftSyncService } from './services/microsoft-sync.service';
 import { ImapSyncService } from './services/imap-sync.service';
+import { FolderSyncService } from './services/folder-sync.service';
 import { EmailEmbeddingCleanupService } from './services/email-embedding-cleanup.service';
 import { EmailEventsService } from './services/email-events.service';
 
@@ -56,6 +57,7 @@ import { EmailEventsController } from './controllers/email-events.controller';
     GoogleSyncService,
     MicrosoftSyncService,
     ImapSyncService,
+    FolderSyncService,
     EmailEmbeddingCleanupService,
 
     // Webhook services (Strategy 2: Real-time)
@@ -75,6 +77,7 @@ import { EmailEventsController } from './controllers/email-events.controller';
   exports: [
     QueueService,
     SyncSchedulerService,
+    FolderSyncService,
     GmailWebhookService,
     MicrosoftWebhookService,
     WebhookLifecycleService,

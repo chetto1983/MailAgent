@@ -839,6 +839,128 @@ export class MicrosoftSyncService {
     }
   }
 
+  /**
+   * Sync Microsoft mail folders
+   */
+  async syncMicrosoftFolders(tenantId: string, providerId: string): Promise<void> {
+    this.logger.log(`Starting Microsoft folder sync for provider ${providerId}`);
+
+    try {
+      // Get provider config
+      const provider = await this.prisma.providerConfig.findUnique({
+        where: { id: providerId },
+      });
+
+      if (!provider || !provider.accessToken || !provider.tokenEncryptionIv) {
+        throw new Error('Provider not found or missing access token');
+      }
+
+      // Decrypt access token
+      const accessToken = this.crypto.decrypt(
+        provider.accessToken,
+        provider.tokenEncryptionIv,
+      );
+
+      // Fetch folders from Microsoft Graph
+      const url = `${this.GRAPH_API_BASE}/me/mailFolders`;
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const folders = response.data.value || [];
+      this.logger.log(`Found ${folders.length} Microsoft folders for provider ${providerId}`);
+
+      // Get existing folders
+      const existingFolders = await (this.prisma as any).folder.findMany({
+        where: { providerId, tenantId },
+      });
+
+      const existingPaths = new Set(existingFolders.map((f: any) => f.path as string));
+      const newPaths = new Set(folders.map((f: any) => f.id as string));
+
+      // Delete folders that no longer exist
+      const deletedPaths = Array.from(existingPaths).filter(
+        (path) => !newPaths.has(path),
+      );
+
+      if (deletedPaths.length > 0) {
+        this.logger.log(`Deleting ${deletedPaths.length} removed Microsoft folders`);
+        await (this.prisma as any).folder.deleteMany({
+          where: {
+            providerId,
+            path: { in: deletedPaths },
+          },
+        });
+      }
+
+      // Sync each folder
+      for (const folder of folders) {
+        if (!folder.id || !folder.displayName) continue;
+
+        // Determine special use based on well-known folder names
+        const specialUse = this.determineMicrosoftFolderType(folder.displayName);
+
+        await (this.prisma as any).folder.upsert({
+          where: {
+            providerId_path: {
+              providerId,
+              path: folder.id,
+            },
+          },
+          create: {
+            tenantId,
+            providerId,
+            path: folder.id,
+            name: folder.displayName,
+            delimiter: '/',
+            specialUse,
+            isSelectable: true,
+            totalCount: folder.totalItemCount || 0,
+            unreadCount: folder.unreadItemCount || 0,
+            level: folder.parentFolderId ? 1 : 0,
+          },
+          update: {
+            name: folder.displayName,
+            specialUse,
+            totalCount: folder.totalItemCount || 0,
+            unreadCount: folder.unreadItemCount || 0,
+            lastSyncedAt: new Date(),
+          },
+        });
+      }
+
+      this.logger.log(`Synced ${folders.length} Microsoft folders for provider ${providerId}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(
+        `Error syncing Microsoft folders for provider ${providerId}: ${errorMessage}`,
+        errorStack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Determine folder type from Microsoft folder name
+   */
+  private determineMicrosoftFolderType(folderName: string): string | undefined {
+    const lowerName = folderName.toLowerCase();
+
+    // Well-known Microsoft folder names
+    if (lowerName === 'inbox') return 'INBOX';
+    if (lowerName === 'sent items' || lowerName === 'sentitems') return 'SENT';
+    if (lowerName === 'drafts') return 'DRAFTS';
+    if (lowerName === 'deleted items' || lowerName === 'deleteditems' || lowerName === 'trash') return 'TRASH';
+    if (lowerName === 'junk email' || lowerName === 'junk' || lowerName === 'spam') return 'JUNK';
+    if (lowerName === 'archive') return 'ARCHIVE';
+    if (lowerName === 'outbox') return undefined; // Outbox is temporary
+
+    return undefined;
+  }
+
   private notifyMailboxChange(
     tenantId: string,
     providerId: string,

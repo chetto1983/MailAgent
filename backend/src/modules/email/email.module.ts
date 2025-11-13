@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { EmailService } from './services/email.service';
 import { EmailsService } from './services/emails.service';
 import { EmailFetchService } from './services/email-fetch.service';
@@ -10,9 +10,16 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { AiModule } from '../ai/ai.module';
 import { EmailsController } from './controllers/emails.controller';
+import { FoldersController } from './controllers/folders.controller';
+import { EmailSyncModule } from '../email-sync/email-sync.module';
 
 @Module({
-  imports: [PrismaModule, ProvidersModule, AiModule],
+  imports: [
+    PrismaModule,
+    ProvidersModule,
+    AiModule,
+    forwardRef(() => EmailSyncModule),
+  ],
   providers: [
     EmailService,
     EmailsService,
@@ -22,7 +29,7 @@ import { EmailsController } from './controllers/emails.controller';
     EmailSyncBackService,
     EmailCleanupService,
   ],
-  controllers: [EmailsController],
+  controllers: [EmailsController, FoldersController],
   exports: [
     EmailService,
     EmailsService,

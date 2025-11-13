@@ -872,6 +872,140 @@ export class GoogleSyncService {
     });
   }
 
+  /**
+   * Sync Gmail labels as folders
+   */
+  async syncGmailFolders(tenantId: string, providerId: string): Promise<void> {
+    this.logger.log(`Starting Gmail folder (labels) sync for provider ${providerId}`);
+
+    try {
+      // Get provider config
+      const provider = await this.prisma.providerConfig.findUnique({
+        where: { id: providerId },
+      });
+
+      if (!provider || !provider.accessToken || !provider.tokenEncryptionIv) {
+        throw new Error('Provider not found or missing access token');
+      }
+
+      // Decrypt access token
+      const accessToken = this.crypto.decrypt(
+        provider.accessToken,
+        provider.tokenEncryptionIv,
+      );
+
+      // Create Gmail client
+      const gmail = this.createGmailClient(accessToken);
+
+      // List all labels
+      const labelsResponse = await gmail.users.labels.list({
+        userId: 'me',
+      });
+
+      const labels = labelsResponse.data.labels || [];
+      this.logger.log(`Found ${labels.length} Gmail labels for provider ${providerId}`);
+
+      // Get existing folders
+      const existingFolders = await (this.prisma as any).folder.findMany({
+        where: { providerId, tenantId },
+      });
+
+      const existingPaths = new Set<string>(existingFolders.map((f: any) => f.path as string));
+      const newPaths = new Set<string>(labels.map((l) => l.id).filter((id): id is string => !!id));
+
+      // Delete folders that no longer exist
+      const deletedPaths: string[] = [];
+      existingPaths.forEach((path) => {
+        if (!newPaths.has(path)) {
+          deletedPaths.push(path);
+        }
+      });
+
+      if (deletedPaths.length > 0) {
+        this.logger.log(`Deleting ${deletedPaths.length} removed Gmail labels`);
+        await (this.prisma as any).folder.deleteMany({
+          where: {
+            providerId,
+            path: { in: deletedPaths },
+          },
+        });
+      }
+
+      // Sync each label as a folder
+      for (const label of labels) {
+        if (!label.id || !label.name) continue;
+
+        // Determine special use
+        const specialUse = this.determineFolderTypeFromLabelId(label.id);
+
+        // Determine if selectable
+        const isSelectable = label.type !== 'system' || specialUse !== undefined;
+
+        await (this.prisma as any).folder.upsert({
+          where: {
+            providerId_path: {
+              providerId,
+              path: label.id,
+            },
+          },
+          create: {
+            tenantId,
+            providerId,
+            path: label.id,
+            name: label.name,
+            delimiter: '/',
+            specialUse,
+            isSelectable,
+            totalCount: label.messagesTotal || 0,
+            unreadCount: label.messagesUnread || 0,
+            level: 0,
+          },
+          update: {
+            name: label.name,
+            specialUse,
+            isSelectable,
+            totalCount: label.messagesTotal || 0,
+            unreadCount: label.messagesUnread || 0,
+            lastSyncedAt: new Date(),
+          },
+        });
+      }
+
+      this.logger.log(`Synced ${labels.length} Gmail labels as folders for provider ${providerId}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(
+        `Error syncing Gmail folders for provider ${providerId}: ${errorMessage}`,
+        errorStack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Determine folder type from Gmail label ID
+   */
+  private determineFolderTypeFromLabelId(labelId: string): string | undefined {
+    const labelMap: Record<string, string | undefined> = {
+      'INBOX': 'INBOX',
+      'SENT': 'SENT',
+      'DRAFT': 'DRAFTS',
+      'TRASH': 'TRASH',
+      'SPAM': 'JUNK',
+      'STARRED': 'FLAGGED',
+      'IMPORTANT': 'IMPORTANT',
+      'UNREAD': undefined, // Not a folder, it's a filter
+      'CATEGORY_PERSONAL': undefined,
+      'CATEGORY_SOCIAL': undefined,
+      'CATEGORY_PROMOTIONS': undefined,
+      'CATEGORY_UPDATES': undefined,
+      'CATEGORY_FORUMS': undefined,
+    };
+
+    return labelMap[labelId];
+  }
+
   private notifyMailboxChange(
     tenantId: string,
     providerId: string,
