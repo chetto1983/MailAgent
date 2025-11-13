@@ -46,13 +46,8 @@ export interface ProviderFoldersResponse {
 /**
  * Get all folders for current user
  */
-export async function getFolders(token: string): Promise<FoldersResponse> {
-  const response = await apiClient.get('/folders', {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+export async function getFolders(): Promise<FoldersResponse> {
+  const response = await apiClient.get('/folders');
   return response.data;
 }
 
@@ -60,15 +55,9 @@ export async function getFolders(token: string): Promise<FoldersResponse> {
  * Get folders for a specific provider
  */
 export async function getFoldersByProvider(
-  token: string,
   providerId: string,
 ): Promise<ProviderFoldersResponse> {
-  const response = await apiClient.get(`/folders/provider/${providerId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const response = await apiClient.get(`/folders/provider/${providerId}`);
   return response.data;
 }
 
@@ -76,22 +65,16 @@ export async function getFoldersByProvider(
  * Sync folders for a specific provider
  */
 export async function syncFolders(
-  token: string,
   providerId: string,
 ): Promise<{ success: boolean; foldersCount: number; folders: Folder[] }> {
-  const response = await apiClient.post(`/folders/sync/${providerId}`, null, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const response = await apiClient.post(`/folders/sync/${providerId}`);
   return response.data;
 }
 
 /**
  * Sync folders for all providers
  */
-export async function syncAllFolders(token: string): Promise<{
+export async function syncAllFolders(): Promise<{
   success: boolean;
   results: Array<{
     providerId: string;
@@ -101,12 +84,7 @@ export async function syncAllFolders(token: string): Promise<{
     error?: string;
   }>;
 }> {
-  const response = await apiClient.post('/folders/sync-all', null, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const response = await apiClient.post('/folders/sync-all');
   return response.data;
 }
 
@@ -114,14 +92,8 @@ export async function syncAllFolders(token: string): Promise<{
  * Update folder counts for a provider
  */
 export async function updateFolderCounts(
-  token: string,
   providerId: string,
 ): Promise<{ success: boolean; message: string }> {
-  const response = await apiClient.post(`/folders/update-counts/${providerId}`, null, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
+  const response = await apiClient.post(`/folders/update-counts/${providerId}`);
   return response.data;
 }

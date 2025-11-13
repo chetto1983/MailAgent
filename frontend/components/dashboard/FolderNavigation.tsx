@@ -86,7 +86,7 @@ export function FolderNavigation({
     setError(null);
 
     try {
-      const response = await getFolders(token);
+      const response = await getFolders();
 
       // Use a map to store folders, allows for easy updating and aggregation.
       // Initialize with default folders to ensure they are always present.
@@ -161,7 +161,7 @@ export function FolderNavigation({
     setError(null);
 
     try {
-      await syncAllFolders(token);
+      await syncAllFolders();
       // Reload folders after sync
       await loadFolders();
     } catch (err) {
