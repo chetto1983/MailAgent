@@ -3,6 +3,8 @@ import { useAuthStore } from '@/stores/auth-store';
 
 const apiBaseURL = process.env.NEXT_PUBLIC_API_URL;
 
+export const API_BASE_URL = apiBaseURL;
+
 if (!apiBaseURL) {
   throw new Error('NEXT_PUBLIC_API_URL is not configured. Please set it in the frontend environment.');
 }
