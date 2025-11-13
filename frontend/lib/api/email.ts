@@ -123,6 +123,8 @@ export type EmailStats = {
 export type EmailUpdateData = {
   isRead?: boolean;
   isStarred?: boolean;
+  isDeleted?: boolean;
+  isArchived?: boolean;
   folder?: string;
 };
 
