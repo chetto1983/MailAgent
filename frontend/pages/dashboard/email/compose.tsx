@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
 import {
   Box,
   Paper,
@@ -19,8 +18,6 @@ import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { emailApi } from '@/lib/api/email';
 import { useTranslations } from '@/lib/hooks/use-translations';
-
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
 
 type ComposeMode = 'new' | 'reply' | 'forward';
 
@@ -57,18 +54,7 @@ function EmailComposeInner() {
   const [sending, setSending] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const quillModules = useMemo(
-    () => ({
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-        ['bold', 'italic', 'underline', 'strike'],
-        [{ list: 'ordered' }, { list: 'bullet' }],
-        ['link'],
-        ['clean'],
-      ],
-    }),
-    [],
-  );
+  const editorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const loadProviders = async () => {
@@ -130,8 +116,15 @@ function EmailComposeInner() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleBodyChange = (value: string) => {
-    setForm((prev) => ({ ...prev, bodyHtml: value }));
+  const handleEditorInput = () => {
+    const html = editorRef.current?.innerHTML ?? '';
+    setForm((prev) => ({ ...prev, bodyHtml: html }));
+  };
+
+  const applyFormat = (command: string, value?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(command, false, value);
+    handleEditorInput();
   };
 
   const fileToBase64 = (file: File) =>
@@ -173,6 +166,12 @@ function EmailComposeInner() {
   const handleRemoveAttachment = (id: string) => {
     setAttachments((prev) => prev.filter((att) => att.id !== id));
   };
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== form.bodyHtml) {
+      editorRef.current.innerHTML = form.bodyHtml || '';
+    }
+  }, [form.bodyHtml]);
 
   const handleSend = async () => {
     if (!providerId) {
@@ -296,11 +295,53 @@ function EmailComposeInner() {
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
             {composerCopy.bodyLabel}
           </Typography>
-          <ReactQuill
-            value={form.bodyHtml}
-            onChange={handleBodyChange}
-            modules={quillModules}
-            readOnly={sending}
+          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+            <Button size="small" variant="outlined" onClick={() => applyFormat('bold')}>
+              B
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => applyFormat('italic')}>
+              I
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => applyFormat('underline')}>
+              U
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => applyFormat('insertOrderedList')}>
+              1.
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => applyFormat('insertUnorderedList')}>
+              •
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => {
+                const url = window.prompt('Enter URL');
+                if (url) {
+                  applyFormat('createLink', url);
+                }
+              }}
+            >
+              Link
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => applyFormat('removeFormat')}>
+              Clear
+            </Button>
+          </Stack>
+          <Box
+            ref={editorRef}
+            contentEditable={!sending}
+            suppressContentEditableWarning
+            onInput={handleEditorInput}
+            dangerouslySetInnerHTML={{ __html: form.bodyHtml }}
+            sx={{
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+              minHeight: 200,
+              p: 2,
+              bgcolor: 'background.paper',
+              outline: 'none',
+            }}
           />
         </Box>
 

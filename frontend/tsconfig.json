@@ -22,10 +22,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "typeRoots": [
-      "./types",
-      "./node_modules/@types"
-    ],
     "paths": {
       "@/*": [
         "./*"
@@ -50,9 +46,6 @@
       ],
       "@/types/*": [
         "./types/*"
-      ],
-      "react-quill": [
-        "./types/react-quill"
       ]
     },
     "allowJs": true,

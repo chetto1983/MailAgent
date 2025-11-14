@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box,
-  Grid,
   Typography,
   Avatar,
   Button,
@@ -160,124 +159,85 @@ export function PmSyncDashboard() {
       </Box>
 
       {/* Quick Stats */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <DashboardCard>
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 3,
+          mb: 3,
+          gridTemplateColumns: {
+            xs: '1fr',
+            sm: 'repeat(2, minmax(0, 1fr))',
+            md: 'repeat(4, minmax(0, 1fr))',
+          },
+        }}
+      >
+        {[
+          {
+            value: stats.unreadEmails,
+            label: 'Unread Emails',
+            icon: <Mail size={24} color="white" />,
+            color: 'primary.main',
+          },
+          {
+            value: stats.todayEvents,
+            label: "Today's Events",
+            icon: <Calendar size={24} color="white" />,
+            color: 'success.main',
+          },
+          {
+            value: stats.pendingTasks,
+            label: 'Pending Tasks',
+            icon: <CheckSquare size={24} color="white" />,
+            color: 'warning.main',
+          },
+          {
+            value: stats.totalContacts,
+            label: 'Contacts',
+            icon: <Users size={24} color="white" />,
+            color: 'info.main',
+          },
+        ].map((stat) => (
+          <DashboardCard key={stat.label}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box
                 sx={{
                   width: 48,
                   height: 48,
                   borderRadius: 2,
-                  bgcolor: 'primary.main',
+                  bgcolor: stat.color,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Mail size={24} color="white" />
+                {stat.icon}
               </Box>
               <Box>
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  {stats.unreadEmails}
+                  {stat.value}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Unread Emails
+                  {stat.label}
                 </Typography>
               </Box>
             </Box>
           </DashboardCard>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <DashboardCard>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 2,
-                  bgcolor: 'success.main',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Calendar size={24} color="white" />
-              </Box>
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  {stats.todayEvents}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Today&apos;s Events
-                </Typography>
-              </Box>
-            </Box>
-          </DashboardCard>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <DashboardCard>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 2,
-                  bgcolor: 'warning.main',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <CheckSquare size={24} color="white" />
-              </Box>
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  {stats.pendingTasks}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Pending Tasks
-                </Typography>
-              </Box>
-            </Box>
-          </DashboardCard>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <DashboardCard>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 2,
-                  bgcolor: 'info.main',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Users size={24} color="white" />
-              </Box>
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  {stats.totalContacts}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total Contacts
-                </Typography>
-              </Box>
-            </Box>
-          </DashboardCard>
-        </Grid>
-      </Grid>
+        ))}
+      </Box>
 
       {/* Main Content Grid */}
-      <Grid container spacing={3}>
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 3,
+          gridTemplateColumns: {
+            xs: '1fr',
+            md: '2fr 1fr',
+          },
+        }}
+      >
         {/* Left Column */}
-        <Grid item xs={12} md={8}>
+        <Box>
           {/* Upcoming Events */}
           <DashboardCard
             title="Upcoming Events"
@@ -443,10 +403,10 @@ export function PmSyncDashboard() {
               </Button>
             </Box>
           </DashboardCard>
-        </Grid>
+        </Box>
 
         {/* Right Column */}
-        <Grid item xs={12} md={4}>
+        <Box>
           {/* AI Insights */}
           <DashboardCard
             title="AI Insights"
@@ -577,8 +537,9 @@ export function PmSyncDashboard() {
               </Button>
             </Box>
           </DashboardCard>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </Box>
   );
 }
+

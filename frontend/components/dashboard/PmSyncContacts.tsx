@@ -15,7 +15,7 @@ import {
   Divider,
   Tabs,
   Tab,
-  Grid,
+  Stack,
   Card,
   CardContent,
   CircularProgress,
@@ -408,42 +408,34 @@ export function PmSyncContacts() {
               </Box>
             </Box>
 
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  startIcon={<Mail size={18} />}
-                  disabled={!selectedContactEmail}
-                  onClick={() =>
-                    selectedContactEmail &&
-                    router.push(`/dashboard/email/compose?to=${selectedContactEmail}`)
-                  }
-                >
-                  Email
-                </Button>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  startIcon={<Calendar size={18} />}
-                  onClick={() => router.push(`/dashboard/calendar?contact=${selectedContact.id}`)}
-                >
-                  Schedule
-                </Button>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Button fullWidth variant="outlined" startIcon={<MessageSquare size={18} />}>
-                  Add Note
-                </Button>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Button fullWidth variant="outlined" startIcon={<Sparkles size={18} />}>
-                  AI Insights
-                </Button>
-              </Grid>
-            </Grid>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <Button
+                fullWidth
+                variant="contained"
+                startIcon={<Mail size={18} />}
+                disabled={!selectedContactEmail}
+                onClick={() =>
+                  selectedContactEmail &&
+                  router.push(`/dashboard/email/compose?to=${selectedContactEmail}`)
+                }
+              >
+                Email
+              </Button>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<Calendar size={18} />}
+                onClick={() => router.push(`/dashboard/calendar?contact=${selectedContact.id}`)}
+              >
+                Schedule
+              </Button>
+              <Button fullWidth variant="outlined" startIcon={<MessageSquare size={18} />}>
+                Add Note
+              </Button>
+              <Button fullWidth variant="outlined" startIcon={<Sparkles size={18} />}>
+                AI Insights
+              </Button>
+            </Stack>
           </Box>
 
           {/* Tabs */}
@@ -461,87 +453,86 @@ export function PmSyncContacts() {
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                 Contact Information
               </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 2,
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(2, minmax(0, 1fr))',
+                  },
+                }}
+              >
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Mail size={18} color="#0B7EFF" />
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Email
+                      </Typography>
+                    </Box>
+                    <Typography variant="body1">
+                      {selectedContactEmail || 'Not available'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+
+                {selectedContactPhone && (
                   <Card variant="outlined">
                     <CardContent>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <Mail size={18} color="#0B7EFF" />
+                        <Phone size={18} color="#00C853" />
                         <Typography variant="subtitle2" color="text.secondary">
-                          Email
+                          Phone
                         </Typography>
                       </Box>
-                      <Typography variant="body1">
-                        {selectedContactEmail || 'Not available'}
-                      </Typography>
+                      <Typography variant="body1">{selectedContactPhone}</Typography>
                     </CardContent>
                   </Card>
-                </Grid>
-
-                {selectedContactPhone && (
-                  <Grid item xs={12} sm={6}>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <Phone size={18} color="#00C853" />
-                          <Typography variant="subtitle2" color="text.secondary">
-                            Phone
-                          </Typography>
-                        </Box>
-                        <Typography variant="body1">{selectedContactPhone}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
                 )}
 
                 {selectedContact.company && (
-                  <Grid item xs={12} sm={6}>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <Building size={18} color="#FF9800" />
-                          <Typography variant="subtitle2" color="text.secondary">
-                            Company
-                          </Typography>
-                        </Box>
-                        <Typography variant="body1">{selectedContact.company}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                )}
-
-                {selectedContactLocation && (
-                  <Grid item xs={12} sm={6}>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <MapPin size={18} color="#9C27B0" />
-                          <Typography variant="subtitle2" color="text.secondary">
-                            Location
-                          </Typography>
-                        </Box>
-                        <Typography variant="body1">{selectedContactLocation}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                )}
-
-                <Grid item xs={12}>
                   <Card variant="outlined">
                     <CardContent>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <Clock size={18} color="#757575" />
+                        <Building size={18} color="#FF9800" />
                         <Typography variant="subtitle2" color="text.secondary">
-                          Last Interaction
+                          Company
                         </Typography>
                       </Box>
-                      <Typography variant="body1">
-                        {formatDate(selectedContactInteractionDate)}
-                      </Typography>
+                      <Typography variant="body1">{selectedContact.company}</Typography>
                     </CardContent>
                   </Card>
-                </Grid>
-              </Grid>
+                )}
+
+                {selectedContactLocation && (
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <MapPin size={18} color="#9C27B0" />
+                        <Typography variant="subtitle2" color="text.secondary">
+                          Location
+                        </Typography>
+                      </Box>
+                      <Typography variant="body1">{selectedContactLocation}</Typography>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <Card variant="outlined" sx={{ gridColumn: '1 / -1' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Clock size={18} color="#757575" />
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Last Interaction
+                      </Typography>
+                    </Box>
+                    <Typography variant="body1">
+                      {formatDate(selectedContactInteractionDate)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Box>
 
               {selectedContact.notes && (
                 <Box sx={{ mt: 3 }}>

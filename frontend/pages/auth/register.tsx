@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Box, Container, Grid, Stack, Typography } from '@mui/material';
+import { Box, Container, Stack, Typography } from '@mui/material';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -88,28 +88,26 @@ export default function RegisterPage() {
             )}
 
             <Stack component="form" spacing={3} onSubmit={handleSubmit}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Input
-                    type="text"
-                    name="firstName"
-                    label={copy.form.firstNameLabel}
-                    placeholder="Alex"
-                    value={formData.firstName}
-                    onChange={handleChange}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Input
-                    type="text"
-                    name="lastName"
-                    label={copy.form.lastNameLabel}
-                    placeholder="Rossi"
-                    value={formData.lastName}
-                    onChange={handleChange}
-                  />
-                </Grid>
-              </Grid>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <Input
+                  type="text"
+                  name="firstName"
+                  label={copy.form.firstNameLabel}
+                  placeholder="Alex"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  sx={{ flex: 1 }}
+                />
+                <Input
+                  type="text"
+                  name="lastName"
+                  label={copy.form.lastNameLabel}
+                  placeholder="Rossi"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
 
               <Input
                 type="email"

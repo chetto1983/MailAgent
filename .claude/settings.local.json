@@ -70,7 +70,9 @@
       "Bash(timeout 5 sleep:*)",
       "Bash(__NEW_LINE__ pwd)",
       "Bash(__NEW_LINE__ echo \"Creazione report...\")",
-      "Bash(timeout 30 bash:*)"
+      "Bash(timeout 30 bash:*)",
+      "Bash(if exist node_modules rmdir /s /q node_modules)",
+      "Bash(if exist package-lock.json del package-lock.json)"
     ],
     "deny": [],
     "ask": []

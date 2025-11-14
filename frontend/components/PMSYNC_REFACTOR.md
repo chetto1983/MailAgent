@@ -489,6 +489,9 @@ DELETE /providers/:id       - Remove provider
 NEXT_PUBLIC_API_URL=http://localhost:3000/api
 ```
 
+### Tailwind 4 Configuration
+- `styles/globals.css` now begins with `@config '../tailwind.config.ts';` so Tailwind 4 picks up the custom color tokens (e.g., `border`, `background`) defined in the config. Without this directive utilities such as `border-border` or `bg-background` are unknown and the production build fails.
+
 ### Build Commands
 ```bash
 # Development

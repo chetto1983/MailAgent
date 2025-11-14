@@ -8,7 +8,7 @@ import {
   Container,
   Box,
   Typography,
-  Grid,
+  Grid as MuiGrid,
   Paper,
   Stack,
   Chip,
@@ -17,6 +17,8 @@ import {
 } from '@mui/material';
 import { useTheme as useNextTheme } from 'next-themes';
 import { ArrowRight, Play, CheckCircle, Moon, Sun } from 'lucide-react';
+
+const Grid = MuiGrid as unknown as React.ComponentType<any>;
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useTranslations } from '@/lib/hooks/use-translations';
