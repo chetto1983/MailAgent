@@ -125,6 +125,8 @@ frontend/
   - Full HTML rendering
   - Attachment previews
   - Quick actions (Reply, Forward, Archive, Delete)
+- **Stabilized loading**: folder sidebar waits for provider data so `/dashboard/email` no longer flickers on first render
+- **Aggregated folders**: “All inbox” and “Starred” global folders span every connected provider
 - **Responsive**: Hides detail panel on mobile/tablet
 
 **API Integration**:
@@ -143,12 +145,14 @@ frontend/
 - Prefills provider, subject, and recipients via query params (`replyTo`, `forwardFrom`, `to`)
 - Sends through `emailApi.sendEmail`, `emailApi.replyToEmail`, and `emailApi.forwardEmail`
 - Localized labels and body input align with `dashboard.composer` copy
+- Rich-text composer (React Quill) with formatting toolbar and file attachments (base64 payloads)
 
 ### 4. **Calendar** - Full View Switching
 **Features**:
 - **FullCalendar integration** with `dayGridMonth`, `timeGridWeek`, and `timeGridDay` views
 - **Quick event creation**: Sidebar input ties directly into `calendarApi.createEvent`
-- **Calendar categories**: Work, Personal, Team Project (color-coded)
+- **Calendar categories**: auto-generated per connected provider with color-coded toggles
+- **Locale-aware**: FullCalendar locale switches to `en-GB` or `it` based on user preference
 - **Event creation dialog**: Full-featured event form
 - **AI suggestions**: Smart scheduling conflict resolution
 - **Toggle calendars**: Show/hide calendar categories

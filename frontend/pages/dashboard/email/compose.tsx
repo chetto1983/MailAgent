@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import {
+  Box,
   Paper,
   Typography,
   TextField,
@@ -9,14 +11,26 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Chip,
 } from '@mui/material';
+import { Paperclip, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { emailApi } from '@/lib/api/email';
 import { useTranslations } from '@/lib/hooks/use-translations';
 
+const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
+
 type ComposeMode = 'new' | 'reply' | 'forward';
+
+type AttachmentDraft = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  base64: string;
+};
 
 const parseRecipients = (value: string) =>
   value
@@ -37,10 +51,24 @@ function EmailComposeInner() {
     cc: '',
     bcc: '',
     subject: '',
-    body: '',
+    bodyHtml: '',
   });
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [sending, setSending] = useState(false);
+  const [attachments, setAttachments] = useState<AttachmentDraft[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const quillModules = useMemo(
+    () => ({
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link'],
+        ['clean'],
+      ],
+    }),
+    [],
+  );
 
   useEffect(() => {
     const loadProviders = async () => {
@@ -71,13 +99,10 @@ function EmailComposeInner() {
             nextMode === 'reply'
               ? prev.subject || `Re: ${email.subject}`
               : prev.subject || `Fwd: ${email.subject}`,
-          to:
-            nextMode === 'reply'
-              ? email.from
-              : prev.to,
-          body:
-            prev.body ||
-            `\n\n----\n${email.from}\n${email.bodyText || email.snippet || ''}`,
+          to: nextMode === 'reply' ? email.from : prev.to,
+          bodyHtml:
+            prev.bodyHtml ||
+            `<br /><br />----<br />${email.from}<br />${email.bodyHtml || email.bodyText || email.snippet || ''}`,
         }));
       } catch (error) {
         console.error('Failed to load reference email:', error);
@@ -105,6 +130,50 @@ function EmailComposeInner() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleBodyChange = (value: string) => {
+    setForm((prev) => ({ ...prev, bodyHtml: value }));
+  };
+
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        resolve(base64);
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const handleAttachmentChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    if (files.length === 0) return;
+    try {
+      const items = await Promise.all(
+        files.map(async (file) => ({
+          id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          name: file.name,
+          size: file.size,
+          type: file.type || 'application/octet-stream',
+          base64: await fileToBase64(file),
+        })),
+      );
+      setAttachments((prev) => [...prev, ...items]);
+    } catch (error) {
+      console.error('Failed to read attachment:', error);
+      alert('Unable to read one of the attachments. Please try again.');
+    } finally {
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((att) => att.id !== id));
+  };
+
   const handleSend = async () => {
     if (!providerId) {
       alert(composerCopy.selectProvider);
@@ -119,13 +188,23 @@ function EmailComposeInner() {
 
     try {
       setSending(true);
+      const plainText = form.bodyHtml
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .trim();
+
       const basePayload = {
         to: toRecipients,
         cc: parseRecipients(form.cc),
         bcc: parseRecipients(form.bcc),
         subject: form.subject,
-        bodyHtml: form.body.replace(/\n/g, '<br />'),
-        bodyText: form.body,
+        bodyHtml: form.bodyHtml,
+        bodyText: plainText,
+        attachments: attachments.map((item) => ({
+          filename: item.name,
+          contentType: item.type || 'application/octet-stream',
+          contentBase64: item.base64,
+        })),
       };
 
       if (mode === 'reply' && typeof replyTo === 'string') {
@@ -139,6 +218,7 @@ function EmailComposeInner() {
         });
       }
 
+      setAttachments([]);
       router.push('/dashboard/email');
     } catch (error) {
       console.error('Failed to send email:', error);
@@ -212,15 +292,52 @@ function EmailComposeInner() {
           disabled={sending}
         />
 
-        <TextField
-          label={composerCopy.bodyLabel}
-          value={form.body}
-          onChange={(event) => handleFieldChange('body', event.target.value)}
-          fullWidth
-          multiline
-          minRows={8}
-          disabled={sending}
+        <Box>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            {composerCopy.bodyLabel}
+          </Typography>
+          <ReactQuill
+            value={form.bodyHtml}
+            onChange={handleBodyChange}
+            modules={quillModules}
+            readOnly={sending}
+          />
+        </Box>
+
+        <input
+          type="file"
+          multiple
+          hidden
+          ref={fileInputRef}
+          onChange={handleAttachmentChange}
         />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+          <Button
+            variant="outlined"
+            startIcon={<Paperclip size={18} />}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
+          >
+            {composerCopy.attachFiles}
+          </Button>
+          {attachments.length > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              {attachments.length} attachment{attachments.length > 1 ? 's' : ''}
+            </Typography>
+          )}
+        </Stack>
+        {attachments.length > 0 && (
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            {attachments.map((attachment) => (
+              <Chip
+                key={attachment.id}
+                label={`${attachment.name} (${Math.round(attachment.size / 1024)} KB)`}
+                onDelete={() => handleRemoveAttachment(attachment.id)}
+                deleteIcon={<Trash2 size={16} />}
+              />
+            ))}
+          </Stack>
+        )}
 
         <Stack direction="row" spacing={2} justifyContent="flex-end">
           <Button variant="outlined" onClick={() => router.back()} disabled={sending}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -34,8 +34,12 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import type { EventInput, DateSelectArg, EventClickArg } from '@fullcalendar/core';
+import enGbLocale from '@fullcalendar/core/locales/en-gb';
+import itLocale from '@fullcalendar/core/locales/it';
+import { useRouter } from 'next/router';
 import { calendarApi, type CalendarEvent, type CreateEventDto } from '@/lib/api/calendar';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
+import { resolveLocale } from '@/locales';
 
 interface CalendarCategory {
   id: string;
@@ -45,6 +49,7 @@ interface CalendarCategory {
 }
 
 export function PmSyncCalendar() {
+  const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
   const [currentMonth, setCurrentMonth] = useState('');
   const [currentYear, setCurrentYear] = useState('');
@@ -56,6 +61,11 @@ export function PmSyncCalendar() {
 
   const categoryPalette = ['#9C27B0', '#00C853', '#FF9800', '#0B7EFF', '#E91E63', '#3F51B5'];
   const [categories, setCategories] = useState<CalendarCategory[]>([]);
+  const localeKey = resolveLocale(
+    router.locale ?? (typeof navigator !== 'undefined' ? navigator.language : 'en'),
+  );
+  const calendarLocale = localeKey === 'it' ? 'it' : 'en-gb';
+  const calendarLocales = useMemo(() => [enGbLocale, itLocale], []);
 
   const [quickEventText, setQuickEventText] = useState('');
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
@@ -496,6 +506,8 @@ export function PmSyncCalendar() {
               minute: '2-digit',
               meridiem: false,
             }}
+            locales={calendarLocales}
+            locale={calendarLocale}
           />
         </Box>
       </Box>

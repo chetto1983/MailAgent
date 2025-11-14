@@ -195,6 +195,8 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         searchPlaceholder: 'Search threads, senders, or labels',
         noProviders: 'Connect a mail provider to send and receive email.',
         selectEmail: 'Select a conversation to start collaborating.',
+        allAccountsLabel: 'All accounts',
+        starredFolderLabel: 'Starred',
         bulkBar: {
           selected: '{count} selected',
           markUnread: 'Mark unread',
@@ -696,6 +698,8 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         searchPlaceholder: 'Cerca conversazioni, mittenti o etichette',
         noProviders: 'Collega un provider per inviare e ricevere email.',
         selectEmail: 'Seleziona una conversazione per iniziare a collaborare.',
+        allAccountsLabel: 'Tutti gli account',
+        starredFolderLabel: 'Speciali',
         bulkBar: {
           selected: '{count} elementi',
           markUnread: 'Segna come non letto',
@@ -1000,3 +1004,5 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
     },
   },
 };
+
+

@@ -41,7 +41,7 @@ import {
   Folder as FolderIcon,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
-import { emailApi, type Email } from '@/lib/api/email';
+import { emailApi, type Email, type EmailListParams } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
@@ -55,6 +55,8 @@ interface FolderItem {
   providerId?: string;
   providerEmail?: string;
   filterFolder?: string;
+  queryOverrides?: Partial<EmailListParams>;
+  aggregate?: boolean;
 }
 
 export function PmSyncMailbox() {
@@ -63,40 +65,81 @@ export function PmSyncMailbox() {
   const [loading, setLoading] = useState(true);
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
-const [foldersLoading, setFoldersLoading] = useState(false);
-const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-const activeFolder = useMemo(
-  () => (selectedFolderId ? remoteFolders.find((folder) => folder.id === selectedFolderId) ?? null : null),
-  [remoteFolders, selectedFolderId],
-);
+  const aggregatorFolders = useMemo<FolderItem[]>(
+    () => [
+      {
+        id: 'all:inbox',
+        label: t.dashboard.folders.inbox,
+        icon: <Inbox size={20} />,
+        aggregate: true,
+        queryOverrides: { folder: 'INBOX' },
+      },
+      {
+        id: 'all:starred',
+        label: t.dashboard.email.starredFolderLabel || t.dashboard.folders.starred,
+        icon: <Star size={20} />,
+        color: '#FFB300',
+        aggregate: true,
+        queryOverrides: { isStarred: true },
+      },
+    ],
+    [t],
+  );
+  const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const combinedFolders = useMemo(
+    () => [...aggregatorFolders, ...remoteFolders],
+    [aggregatorFolders, remoteFolders],
+  );
+  const activeFolder = useMemo(
+    () => combinedFolders.find((folder) => folder.id === selectedFolderId) || combinedFolders[0] || null,
+    [combinedFolders, selectedFolderId],
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [_providers, setProviders] = useState<ProviderConfig[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const foldersByProvider = useMemo(() => {
-    const groups = new Map<
+    const groups: Array<{
+      providerId: string;
+      providerEmail: string;
+      folders: FolderItem[];
+    }> = [];
+
+    if (aggregatorFolders.length) {
+      groups.push({
+        providerId: 'all',
+        providerEmail: t.dashboard.email.allAccountsLabel || 'All accounts',
+        folders: aggregatorFolders,
+      });
+    }
+
+    const providerMap = new Map<
       string,
       { providerId: string; providerEmail: string; folders: FolderItem[] }
     >();
 
     remoteFolders.forEach((folder) => {
       if (!folder.providerId) return;
-      if (!groups.has(folder.providerId)) {
-        groups.set(folder.providerId, {
+      if (!providerMap.has(folder.providerId)) {
+        providerMap.set(folder.providerId, {
           providerId: folder.providerId,
           providerEmail: folder.providerEmail || t.dashboard.email.noProviders,
           folders: [],
         });
       }
-
-      groups.get(folder.providerId)!.folders.push(folder);
+      providerMap.get(folder.providerId)!.folders.push(folder);
     });
 
-    return Array.from(groups.values()).sort((a, b) =>
-      a.providerEmail.localeCompare(b.providerEmail),
+    groups.push(
+      ...Array.from(providerMap.values()).sort((a, b) =>
+        a.providerEmail.localeCompare(b.providerEmail),
+      ),
     );
-  }, [remoteFolders, t.dashboard.email.noProviders]);
+
+    return groups;
+  }, [aggregatorFolders, remoteFolders, t.dashboard.email.allAccountsLabel, t.dashboard.email.noProviders]);
   const sanitizedBody = useMemo(() => {
     if (!selectedEmail) {
       return '';
@@ -140,14 +183,19 @@ const activeFolder = useMemo(
           (folderResponse.foldersByProvider && folderResponse.foldersByProvider[provider.id]) || [];
 
         providerFolders.forEach((folder) => {
+          const folderKey = folder.path || folder.name;
           dynamicFolders.push({
             id: `${provider.id}:${folder.id}`,
             label: folder.name,
             icon: getIconForFolder(folder.specialUse),
             providerId: provider.id,
             providerEmail: provider.email,
-            filterFolder: folder.name,
+            filterFolder: folderKey,
             count: folder.unreadCount ?? folder.unseenCount ?? folder.recentCount ?? folder.totalCount,
+            queryOverrides: {
+              providerId: provider.id,
+              folder: folderKey,
+            },
           });
         });
       });
@@ -159,7 +207,7 @@ const activeFolder = useMemo(
         : false;
 
       if (!stillExists) {
-        setSelectedFolderId(dynamicFolders[0]?.id ?? null);
+        setSelectedFolderId(dynamicFolders[0]?.id ?? aggregatorFolders[0]?.id ?? null);
       }
     } catch (error) {
       console.error('Failed to load folders:', error);
@@ -179,8 +227,7 @@ const activeFolder = useMemo(
       setProviders(providersRes || []);
 
       const emailsRes = await emailApi.listEmails({
-        folder: activeFolder.filterFolder,
-        providerId: activeFolder.providerId,
+        ...activeFolder.queryOverrides,
         search: searchQuery || undefined,
         limit: 50,
       });
@@ -199,6 +246,12 @@ const activeFolder = useMemo(
   useEffect(() => {
     loadFolderMetadata();
   }, [loadFolderMetadata]);
+
+  useEffect(() => {
+    if (!selectedFolderId && combinedFolders.length) {
+      setSelectedFolderId(combinedFolders[0].id);
+    }
+  }, [combinedFolders, selectedFolderId]);
 
   useEffect(() => {
     if (activeFolder) {

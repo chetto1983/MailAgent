@@ -126,6 +126,8 @@ export interface AppTranslations {
       searchPlaceholder: string;
       noProviders: string;
       selectEmail: string;
+      allAccountsLabel: string;
+      starredFolderLabel: string;
       bulkBar: {
         selected: string;
         markUnread: string;
