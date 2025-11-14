@@ -112,8 +112,8 @@ frontend/
 
 ### 3. **Mailbox** - Professional Email Interface
 **Features**:
-- **3-column layout**: Folders sidebar | Email list | Email detail panel
-- **Folder navigation**: Inbox, Sent, Starred, Archive, Trash
+- **3-column layout**: provider-grouped folders sidebar | Email list | Email detail panel
+- **Folder navigation**: auto-synced per provider (Google, Microsoft, IMAP) with unread counts
 - **Smart search**: Real-time email search
 - **Bulk actions**: Select all, batch delete, mark read/unread
 - **Email list** with:
@@ -121,7 +121,7 @@ frontend/
   - Attachment indicators
   - Star/unstar quick action
   - Read/unread visual states
-- **Email detail** view with:
+- **Email detail** view with sanitized HTML rendering, attachment chips, and quick actions
   - Full HTML rendering
   - Attachment previews
   - Quick actions (Reply, Forward, Archive, Delete)
@@ -138,10 +138,16 @@ frontend/
 **Components**:
 - `PmSyncMailbox`: Complete mailbox implementation
 
-### 4. **Calendar** - Monthly Grid View
+**Compose Workflow**:
+- Dedicated `/dashboard/email/compose` page handles new messages, replies, and forwards
+- Prefills provider, subject, and recipients via query params (`replyTo`, `forwardFrom`, `to`)
+- Sends through `emailApi.sendEmail`, `emailApi.replyToEmail`, and `emailApi.forwardEmail`
+- Localized labels and body input align with `dashboard.composer` copy
+
+### 4. **Calendar** - Full View Switching
 **Features**:
-- **FullCalendar integration** (dayGridMonth view)
-- **Quick event creation**: Text input with natural language parsing (planned)
+- **FullCalendar integration** with `dayGridMonth`, `timeGridWeek`, and `timeGridDay` views
+- **Quick event creation**: Sidebar input ties directly into `calendarApi.createEvent`
 - **Calendar categories**: Work, Personal, Team Project (color-coded)
 - **Event creation dialog**: Full-featured event form
 - **AI suggestions**: Smart scheduling conflict resolution
@@ -150,9 +156,10 @@ frontend/
 - **View modes**: Day, Week, Month (toggle buttons)
 
 **API Integration**:
-- `GET /calendar-events/stream` - SSE for real-time events
-- `POST /calendar-events` - Create event (planned)
-- `PATCH /calendar-events/:id` - Update (planned)
+- `GET /calendar/events` - List events per provider
+- `POST /calendar/events` - Create events from quick input and dialog
+- `PATCH /calendar/events/:id` - Update events
+- `DELETE /calendar/events/:id` - Remove events
 
 **Components**:
 - `PmSyncCalendar`: Calendar with sidebar and FullCalendar
@@ -204,7 +211,7 @@ frontend/
 
 ### 7. **Settings** - Comprehensive Configuration
 **Features**:
-- **Sidebar navigation**: General, AI Agent, Tenant, Account, Notifications
+- **Sidebar navigation**: General, AI Agent, Mail Accounts, Account, Notifications
 - **General Settings**:
   - Theme selection (Light/Dark/System)
   - Language picker (English, Italiano, Español, Français, Deutsch)
@@ -214,19 +221,18 @@ frontend/
   - Enable/disable Smart Replies
   - Email Summarization
   - Smart Scheduling
+- **Mail Accounts**:
+  - Read-only list of connected providers with capability badges and last-sync status
+  - Shortcut to `/dashboard/providers`
 - **Account Settings**:
-  - Profile information (name, email, phone)
+  - Read-only profile information (name, email, role)
   - Danger zone (delete account)
-- **Tenant Settings**:
-  - Organization name and domain
 - **Notification Settings**:
   - Granular notification controls
 
 **API Integration**:
 - `GET /users/me` - Current user
-- `PATCH /users/me` - Update profile
-- `GET /tenants/:id` - Tenant info
-- `PATCH /tenants/:id` - Update tenant
+- `GET /providers` - Connected mail accounts
 
 **Components**:
 - `PmSyncSettings`: Multi-section settings interface

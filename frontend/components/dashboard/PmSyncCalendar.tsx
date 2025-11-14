@@ -54,11 +54,8 @@ export function PmSyncCalendar() {
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [selectedProvider, _setSelectedProvider] = useState<string | undefined>();
 
-  const [categories, setCategories] = useState<CalendarCategory[]>([
-    { id: 'work', name: 'Work', color: '#9C27B0', enabled: true },
-    { id: 'personal', name: 'Personal', color: '#00C853', enabled: true },
-    { id: 'team', name: 'Team Project', color: '#FF9800', enabled: true },
-  ]);
+  const categoryPalette = ['#9C27B0', '#00C853', '#FF9800', '#0B7EFF', '#E91E63', '#3F51B5'];
+  const [categories, setCategories] = useState<CalendarCategory[]>([]);
 
   const [quickEventText, setQuickEventText] = useState('');
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
@@ -81,7 +78,7 @@ export function PmSyncCalendar() {
 
   // Convert backend CalendarEvent to FullCalendar EventInput
   const convertToFullCalendarEvent = (event: CalendarEvent): EventInput => {
-    const category = categories.find((c) => c.name.toLowerCase() === event.calendarName?.toLowerCase());
+    const category = categories.find((c) => c.id === event.providerId);
     return {
       id: event.id,
       title: event.title,
@@ -92,7 +89,7 @@ export function PmSyncCalendar() {
       extendedProps: {
         description: event.description,
         location: event.location,
-        calendar: event.calendarName || 'work',
+        calendar: category?.name || event.calendarName || 'calendar',
         providerId: event.providerId,
       },
     };
@@ -141,6 +138,18 @@ export function PmSyncCalendar() {
   useEffect(() => {
     updateCalendarHeader();
   }, [updateCalendarHeader]);
+
+  useEffect(() => {
+    setCategories((prev) => {
+      const map = new Map(prev.map((cat) => [cat.id, cat]));
+      return providers.map((provider, index) => ({
+        id: provider.id,
+        name: provider.email,
+        color: map.get(provider.id)?.color || categoryPalette[index % categoryPalette.length],
+        enabled: map.get(provider.id)?.enabled ?? true,
+      }));
+    });
+  }, [providers]);
 
   useEffect(() => {
     if (!calendarRef.current) return;
@@ -284,8 +293,8 @@ export function PmSyncCalendar() {
   };
 
   const filteredEvents = events.filter((event) => {
-    const calendar = event.extendedProps?.calendar;
-    const category = categories.find((c) => c.id === calendar);
+    const providerId = event.extendedProps?.providerId as string | undefined;
+    const category = categories.find((c) => c.id === providerId);
     return category?.enabled !== false;
   });
 

@@ -63,15 +63,13 @@ export function PmSyncMailbox() {
   const [loading, setLoading] = useState(true);
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-  const baseFolders: FolderItem[] = [];
-  const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
-  const [foldersLoading, setFoldersLoading] = useState(false);
-  const [selectedFolderId, setSelectedFolderId] = useState('INBOX');
-  const allFolders = useMemo(() => [...remoteFolders], [remoteFolders]);
-  const activeFolder = useMemo(
-    () => allFolders.find((folder) => folder.id === selectedFolderId) || allFolders[0],
-    [allFolders, selectedFolderId],
-  );
+const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
+const [foldersLoading, setFoldersLoading] = useState(false);
+const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+const activeFolder = useMemo(
+  () => (selectedFolderId ? remoteFolders.find((folder) => folder.id === selectedFolderId) ?? null : null),
+  [remoteFolders, selectedFolderId],
+);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [_providers, setProviders] = useState<ProviderConfig[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -144,7 +142,7 @@ export function PmSyncMailbox() {
         providerFolders.forEach((folder) => {
           dynamicFolders.push({
             id: `${provider.id}:${folder.id}`,
-            label: `${folder.name}${provider.email ? ` (${provider.email})` : ''}`,
+            label: folder.name,
             icon: getIconForFolder(folder.specialUse),
             providerId: provider.id,
             providerEmail: provider.email,
@@ -156,39 +154,38 @@ export function PmSyncMailbox() {
 
       setRemoteFolders(dynamicFolders);
 
-      const folderExists =
-        baseFolders.some((folder) => folder.id === selectedFolderId) ||
-        dynamicFolders.some((folder) => folder.id === selectedFolderId);
+      const stillExists = selectedFolderId
+        ? dynamicFolders.some((folder) => folder.id === selectedFolderId)
+        : false;
 
-      if (!folderExists) {
-        const fallbackId = dynamicFolders[0]?.id ?? baseFolders[0]?.id ?? 'INBOX';
-        setSelectedFolderId(fallbackId);
+      if (!stillExists) {
+        setSelectedFolderId(dynamicFolders[0]?.id ?? null);
       }
     } catch (error) {
       console.error('Failed to load folders:', error);
     } finally {
       setFoldersLoading(false);
     }
-  }, [baseFolders, selectedFolderId]);
+  }, [selectedFolderId]);
 
   const loadData = useCallback(async () => {
+    if (!activeFolder) {
+      return;
+    }
     try {
       setLoading(true);
 
-      // Load providers
       const providersRes = await providersApi.getProviders();
       setProviders(providersRes || []);
 
-      // Load emails
       const emailsRes = await emailApi.listEmails({
-        folder: activeFolder?.filterFolder,
-        providerId: activeFolder?.providerId,
+        folder: activeFolder.filterFolder,
+        providerId: activeFolder.providerId,
         search: searchQuery || undefined,
         limit: 50,
       });
       setEmails(emailsRes.data.emails || []);
 
-      // Select first email if none selected
       if (!selectedEmail && emailsRes.data.emails?.[0]) {
         setSelectedEmail(emailsRes.data.emails[0]);
       }
@@ -197,19 +194,23 @@ export function PmSyncMailbox() {
     } finally {
       setLoading(false);
     }
-  }, [activeFolder?.filterFolder, activeFolder?.providerId, searchQuery, selectedEmail]);
+  }, [activeFolder, searchQuery, selectedEmail]);
 
   useEffect(() => {
     loadFolderMetadata();
   }, [loadFolderMetadata]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (activeFolder) {
+      loadData();
+    }
+  }, [activeFolder, loadData]);
 
   const handleRefresh = () => {
     loadFolderMetadata();
-    loadData();
+    if (activeFolder) {
+      loadData();
+    }
   };
 
   const handleEmailClick = (email: Email) => {
