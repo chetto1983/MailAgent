@@ -13,7 +13,6 @@ import {
   Button,
   IconButton,
   Divider,
-  Chip,
   Tabs,
   Tab,
   Grid,
@@ -21,6 +20,14 @@ import {
   CardContent,
   CircularProgress,
   Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Search,
@@ -37,21 +44,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
-import { apiClient } from '@/lib/api-client';
-
-interface Contact {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  company?: string;
-  position?: string;
-  location?: string;
-  tags?: string[];
-  notes?: string;
-  lastInteraction?: Date;
-  avatar?: string;
-}
+import { contactsApi, type Contact } from '@/lib/api/contacts';
+import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -67,6 +61,32 @@ function TabPanel({ children, value, index }: TabPanelProps) {
   );
 }
 
+type ContactFormState = {
+  displayName: string;
+  company: string;
+  jobTitle: string;
+  email: string;
+  notes: string;
+  providerId?: string;
+};
+
+const getContactName = (contact: Contact) => {
+  if (contact.displayName) return contact.displayName;
+  const parts = [contact.firstName, contact.lastName].filter(Boolean);
+  if (parts.length) return parts.join(' ');
+  return contact.emails?.[0]?.value || 'Unnamed contact';
+};
+
+const getPrimaryEmail = (contact?: Contact | null) =>
+  contact?.emails?.find((email) => email.primary)?.value ||
+  contact?.emails?.[0]?.value ||
+  '';
+
+const getPrimaryPhone = (contact?: Contact | null) =>
+  contact?.phoneNumbers?.find((phone) => phone.primary)?.value ||
+  contact?.phoneNumbers?.[0]?.value ||
+  '';
+
 export function PmSyncContacts() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -74,17 +94,38 @@ export function PmSyncContacts() {
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [tabValue, setTabValue] = useState(0);
+  const [providers, setProviders] = useState<ProviderConfig[]>([]);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [contactDialogMode, setContactDialogMode] = useState<'create' | 'edit'>('create');
+  const [contactForm, setContactForm] = useState<ContactFormState>({
+    displayName: '',
+    company: '',
+    jobTitle: '',
+    email: '',
+    notes: '',
+    providerId: undefined,
+  });
+  const [actionLoading, setActionLoading] = useState(false);
 
   const loadContacts = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/contacts', {
-        params: { search: searchQuery || undefined, limit: 100 },
+      const response = await contactsApi.listContacts({
+        search: searchQuery || undefined,
+        limit: 100,
       });
-      const contactsData = response.data.contacts || [];
+      const contactsData = response.contacts || [];
       setContacts(contactsData);
 
-      if (!selectedContact && contactsData[0]) {
+      if (contactsData.length === 0) {
+        setSelectedContact(null);
+        return;
+      }
+
+      if (selectedContact) {
+        const updatedSelection = contactsData.find((contact) => contact.id === selectedContact.id);
+        setSelectedContact(updatedSelection || contactsData[0]);
+      } else {
         setSelectedContact(contactsData[0]);
       }
     } catch (error) {
@@ -92,11 +133,116 @@ export function PmSyncContacts() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedContact]);
+  }, [searchQuery, selectedContact?.id]);
 
   useEffect(() => {
     loadContacts();
   }, [loadContacts]);
+
+  const loadProviders = useCallback(async () => {
+    try {
+      const providerData = await providersApi.getProviders();
+      setProviders(providerData || []);
+      setContactForm((prev) => ({
+        ...prev,
+        providerId: prev.providerId || providerData?.[0]?.id,
+      }));
+    } catch (error) {
+      console.error('Failed to load providers:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProviders();
+  }, [loadProviders]);
+
+  const openCreateContactDialog = () => {
+    setContactDialogMode('create');
+    setContactForm({
+      displayName: '',
+      company: '',
+      jobTitle: '',
+      email: '',
+      notes: '',
+      providerId: providers[0]?.id,
+    });
+    setContactDialogOpen(true);
+  };
+
+  const openEditContactDialog = () => {
+    if (!selectedContact) return;
+    setContactDialogMode('edit');
+    setContactForm({
+      displayName: getContactName(selectedContact),
+      company: selectedContact.company || '',
+      jobTitle: selectedContact.jobTitle || '',
+      email: getPrimaryEmail(selectedContact),
+      notes: selectedContact.notes || '',
+      providerId: selectedContact.providerId,
+    });
+    setContactDialogOpen(true);
+  };
+
+  const handleContactFormChange = (field: keyof ContactFormState, value: string) => {
+    setContactForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmitContact = async () => {
+    if (!contactForm.providerId) {
+      alert('Please select a provider');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      if (contactDialogMode === 'create') {
+        await contactsApi.createContact({
+          providerId: contactForm.providerId,
+          displayName: contactForm.displayName || undefined,
+          company: contactForm.company || undefined,
+          jobTitle: contactForm.jobTitle || undefined,
+          notes: contactForm.notes || undefined,
+          emails: contactForm.email
+            ? [{ value: contactForm.email, primary: true }]
+            : undefined,
+        });
+      } else if (selectedContact) {
+        await contactsApi.updateContact(selectedContact.id, {
+          displayName: contactForm.displayName || undefined,
+          company: contactForm.company || undefined,
+          jobTitle: contactForm.jobTitle || undefined,
+          notes: contactForm.notes || undefined,
+          emails: contactForm.email
+            ? [{ value: contactForm.email, primary: true }]
+            : undefined,
+        });
+      }
+
+      await loadContacts();
+      setContactDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to save contact:', error);
+      alert('Failed to save contact. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteContact = async () => {
+    if (!selectedContact) return;
+    if (!confirm('Are you sure you want to delete this contact?')) return;
+
+    try {
+      setActionLoading(true);
+      await contactsApi.deleteContact(selectedContact.id);
+      await loadContacts();
+    } catch (error) {
+      console.error('Failed to delete contact:', error);
+      alert('Failed to delete contact. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleContactClick = (contact: Contact) => {
     setSelectedContact(contact);
@@ -115,6 +261,23 @@ export function PmSyncContacts() {
     if (diffDays < 7) return `${diffDays} days ago`;
     return d.toLocaleDateString();
   };
+
+  const selectedContactName = selectedContact ? getContactName(selectedContact) : '';
+  const selectedContactEmail = getPrimaryEmail(selectedContact);
+  const selectedContactPhone = getPrimaryPhone(selectedContact);
+  const selectedContactLocation =
+    selectedContact?.addresses && selectedContact.addresses.length > 0
+      ? [
+          selectedContact.addresses[0].city,
+          selectedContact.addresses[0].state,
+          selectedContact.addresses[0].country,
+        ]
+          .filter(Boolean)
+          .join(', ')
+      : '';
+  const selectedContactInteractionDate = selectedContact?.updatedAt
+    ? new Date(selectedContact.updatedAt)
+    : undefined;
 
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', overflow: 'hidden' }}>
@@ -139,7 +302,7 @@ export function PmSyncContacts() {
               variant="contained"
               size="small"
               startIcon={<Plus size={18} />}
-              onClick={() => router.push('/dashboard/contacts/new')}
+              onClick={openCreateContactDialog}
             >
               New
             </Button>
@@ -183,31 +346,19 @@ export function PmSyncContacts() {
                 >
                   <ListItemAvatar>
                     <Avatar sx={{ bgcolor: 'primary.main' }}>
-                      {contact.name?.[0]?.toUpperCase() || 'U'}
+                      {getContactName(contact)?.[0]?.toUpperCase() || 'U'}
                     </Avatar>
                   </ListItemAvatar>
-                  <ListItemText
-                    primary={contact.name}
-                    secondary={
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          {contact.company || contact.email}
-                        </Typography>
-                        {contact.tags && contact.tags.length > 0 && (
-                          <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-                            {contact.tags.slice(0, 2).map((tag) => (
-                              <Chip
-                                key={tag}
-                                label={tag}
-                                size="small"
-                                sx={{ height: 18, fontSize: '0.65rem' }}
-                              />
-                            ))}
-                          </Box>
-                        )}
-                      </Box>
-                    }
-                  />
+                <ListItemText
+                  primary={getContactName(contact)}
+                  secondary={
+                    contact.company || getPrimaryEmail(contact) ? (
+                      <Typography variant="caption" color="text.secondary">
+                        {contact.company || getPrimaryEmail(contact)}
+                      </Typography>
+                    ) : null
+                  }
+                />
                 </ListItemButton>
                 <Divider />
               </React.Fragment>
@@ -230,34 +381,27 @@ export function PmSyncContacts() {
           <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
               <Avatar sx={{ width: 72, height: 72, bgcolor: 'primary.main', fontSize: '2rem' }}>
-                {selectedContact.name?.[0]?.toUpperCase() || 'U'}
+                {selectedContactName?.[0]?.toUpperCase() || 'U'}
               </Avatar>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  {selectedContact.name}
+                  {selectedContactName}
                 </Typography>
-                {selectedContact.position && (
+                {(selectedContact.jobTitle || selectedContact.company) && (
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                    {selectedContact.position}
+                    {selectedContact.jobTitle}
                     {selectedContact.company && ` at ${selectedContact.company}`}
                   </Typography>
-                )}
-                {selectedContact.tags && selectedContact.tags.length > 0 && (
-                  <Box sx={{ display: 'flex', gap: 0.5, mt: 1 }}>
-                    {selectedContact.tags.map((tag) => (
-                      <Chip key={tag} label={tag} size="small" color="primary" />
-                    ))}
-                  </Box>
                 )}
               </Box>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Tooltip title="Edit">
-                  <IconButton size="small">
+                  <IconButton size="small" onClick={openEditContactDialog}>
                     <Edit size={18} />
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Delete">
-                  <IconButton size="small">
+                  <IconButton size="small" onClick={handleDeleteContact} disabled={actionLoading}>
                     <Trash2 size={18} />
                   </IconButton>
                 </Tooltip>
@@ -270,7 +414,11 @@ export function PmSyncContacts() {
                   fullWidth
                   variant="contained"
                   startIcon={<Mail size={18} />}
-                  onClick={() => router.push(`/dashboard/email/compose?to=${selectedContact.email}`)}
+                  disabled={!selectedContactEmail}
+                  onClick={() =>
+                    selectedContactEmail &&
+                    router.push(`/dashboard/email/compose?to=${selectedContactEmail}`)
+                  }
                 >
                   Email
                 </Button>
@@ -323,12 +471,14 @@ export function PmSyncContacts() {
                           Email
                         </Typography>
                       </Box>
-                      <Typography variant="body1">{selectedContact.email}</Typography>
+                      <Typography variant="body1">
+                        {selectedContactEmail || 'Not available'}
+                      </Typography>
                     </CardContent>
                   </Card>
                 </Grid>
 
-                {selectedContact.phone && (
+                {selectedContactPhone && (
                   <Grid item xs={12} sm={6}>
                     <Card variant="outlined">
                       <CardContent>
@@ -338,7 +488,7 @@ export function PmSyncContacts() {
                             Phone
                           </Typography>
                         </Box>
-                        <Typography variant="body1">{selectedContact.phone}</Typography>
+                        <Typography variant="body1">{selectedContactPhone}</Typography>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -360,7 +510,7 @@ export function PmSyncContacts() {
                   </Grid>
                 )}
 
-                {selectedContact.location && (
+                {selectedContactLocation && (
                   <Grid item xs={12} sm={6}>
                     <Card variant="outlined">
                       <CardContent>
@@ -370,7 +520,7 @@ export function PmSyncContacts() {
                             Location
                           </Typography>
                         </Box>
-                        <Typography variant="body1">{selectedContact.location}</Typography>
+                        <Typography variant="body1">{selectedContactLocation}</Typography>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -386,7 +536,7 @@ export function PmSyncContacts() {
                         </Typography>
                       </Box>
                       <Typography variant="body1">
-                        {formatDate(selectedContact.lastInteraction)}
+                        {formatDate(selectedContactInteractionDate)}
                       </Typography>
                     </CardContent>
                   </Card>
@@ -451,6 +601,84 @@ export function PmSyncContacts() {
           </Typography>
         </Box>
       )}
+
+      <Dialog
+        open={contactDialogOpen}
+        onClose={() => setContactDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {contactDialogMode === 'create' ? 'New Contact' : 'Edit Contact'}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <FormControl fullWidth disabled={contactDialogMode === 'edit'}>
+              <InputLabel>Provider</InputLabel>
+              <Select
+                label="Provider"
+                value={contactForm.providerId || ''}
+                onChange={(event) =>
+                  handleContactFormChange('providerId', String(event.target.value))
+                }
+              >
+                {providers.map((provider) => (
+                  <MenuItem key={provider.id} value={provider.id}>
+                    {provider.email}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <TextField
+              label="Name"
+              value={contactForm.displayName}
+              onChange={(event) => handleContactFormChange('displayName', event.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              label="Email"
+              value={contactForm.email}
+              onChange={(event) => handleContactFormChange('email', event.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              label="Company"
+              value={contactForm.company}
+              onChange={(event) => handleContactFormChange('company', event.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              label="Job Title"
+              value={contactForm.jobTitle}
+              onChange={(event) => handleContactFormChange('jobTitle', event.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              label="Notes"
+              value={contactForm.notes}
+              onChange={(event) => handleContactFormChange('notes', event.target.value)}
+              fullWidth
+              multiline
+              minRows={3}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setContactDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmitContact}
+            disabled={actionLoading || (contactDialogMode === 'create' && !contactForm.providerId)}
+          >
+            {contactDialogMode === 'create' ? 'Create Contact' : 'Save Changes'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

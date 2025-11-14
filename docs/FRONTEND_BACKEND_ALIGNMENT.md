@@ -1,0 +1,37 @@
+# Frontend vs Backend Alignment
+
+This document summarizes how the new PM Sync frontend pages interact with the NestJS backend and highlights the areas that still need wiring (mail, domains, folders, settings, calendars, contacts).
+
+## Environment and Domains
+
+- The frontend `apiClient` (`frontend/lib/api-client.ts:4-22`) reads `NEXT_PUBLIC_API_URL` and adds the required `ngrok-skip-browser-warning` header. When the frontend calls the ngrok HTTPS URL defined in `docker-compose.dev.yml:47-52`, browsers will throw `ERR_CERT_AUTHORITY_INVALID` unless nginx trusts the ngrok CA or you access the HTTP variant (for local development set `NEXT_PUBLIC_API_URL=http://localhost:3000`).
+- To avoid CORS/auth mismatches, ensure the `NEXT_PUBLIC_API_URL` matches the backend `APP_URL`/`API_PUBLIC_URL` and that both reference the same domain (ngrok or localhost). Repro steps are documented in `docs/VERCEL_OAUTH_FINAL_STEPS.md:198-208`.
+
+## Feature Matrix
+
+| Area | Frontend usage | Backend support | Gaps / Notes |
+| ---- | -------------- | --------------- | ------------ |
+| **Authentication** | Pages under `frontend/pages/auth/*.tsx` call `POST /auth/login`, `POST /auth/verify-otp`, etc., through `useAuthStore`. | `backend/src/modules/auth/controllers/*.ts` provide matching endpoints. | No functional gaps noted. Ensure `NEXT_PUBLIC_API_URL` is set, otherwise login throws at `frontend/lib/api-client.ts:9`. |
+| **Email list / threads** | `PmSyncMailbox` (`frontend/components/dashboard/PmSyncMailbox.tsx`) calls `emailApi.listEmails`, `emailApi.updateEmail`, `emailApi.replyToEmail`, etc. | `EmailsController` (`backend/src/modules/email/controllers/emails.controller.ts`) exposes identical routes; Prisma models back them up. | Folder chips are hard-coded (`frontend/components/dashboard/PmSyncMailbox.tsx:67-74`) and ignore real folder metadata coming from `/folders`. Labels and categories trigger a TODO alert only (`frontend/components/dashboard/PmSyncMailbox.tsx:678`). |
+| **Email attachments** | `emailApi.downloadAttachment` expects a `downloadUrl` to open new tabs. | `EmailsService.getAttachmentDownloadUrl` currently returns `{ downloadUrl: null, message: 'Direct file download not yet implemented' }` (`backend/src/modules/email/services/emails.service.ts:566-581`). | Users will keep seeing the alert path; storage integration is still needed. |
+| **Email folders & sync** | `frontend/lib/api/folders.ts` is implemented but never imported; the UI shows static folders. | `FoldersController` plus `FolderSyncService` (`backend/src/modules/email/controllers/folders.controller.ts`) handle `/folders`, `/folders/sync`, `/folders/sync-all`, `/folders/update-counts`. | Wire `PmSyncMailbox` (and any sidebar) to `getFolders()` so counts and provider-specific folders match the backend. |
+| **Email sync monitoring** | `emailApi.syncProvider` / `emailApi.getSyncStatus` route to `/email-sync/...`; no dedicated UI entry points yet. | `EmailSyncController` (`backend/src/modules/email-sync/email-sync.controller.ts`) implements these endpoints. | Consider exposing sync status in providers or dashboard widgets. |
+| **Calendar** | `PmSyncCalendar` (`frontend/components/dashboard/PmSyncCalendar.tsx`) uses `calendarApi.listEvents`, `calendarApi.createEvent`, etc. | `CalendarController` (`backend/src/modules/calendar/controllers/calendar.controller.ts`) exposes the same routes. | The UI filters by fake categories, not by backend calendars; map providers/calendars to toggle buttons for accuracy. |
+| **Contacts** | `PmSyncContacts` fetches `/contacts` directly through `apiClient` (should be switched to `contactsApi` for consistency). | `ContactsController` (`backend/src/modules/contacts/controllers/contacts.controller.ts`) supports list/get/create/update/delete and manual sync. | Editing/deleting buttons in the UI are placeholders; wiring them to `contactsApi.updateContact` / `deleteContact` is still pending. |
+| **Providers / OAuth** | `providersApi` (consumed in `frontend/pages/dashboard/providers.tsx`) handles connect/delete flows. | `ProvidersController` + Google/Microsoft services (`backend/src/modules/providers/*`) match the API surface. | Works end-to-end, but make sure callback query parsing covers `state` to validate CSRF tokens. |
+| **Calendar & contact webhooks** | No frontend configuration exposed. | Backend exposes webhook controllers/services (`backend/src/modules/calendar/controllers/calendar-webhook.controller.ts`, `backend/src/modules/contacts/controllers/contacts-webhook.controller.ts`). | Surface webhook/renewal status in settings if desired. |
+| **Settings / domains / tenant info** | `PmSyncSettings` renders static text fields and switches (`frontend/components/dashboard/PmSyncSettings.tsx:41-344`) with default values such as the domain field at line 341. | Backend has tenant CRUD under `backend/src/modules/tenants/controllers/tenants.controller.ts`. | There is no frontend call to `/tenants`; saving buttons currently do nothing. Decide whether to expose tenant profile edits here or hide the fields. |
+| **Tasks** | `PmSyncTasks` is a local-state mock list (`frontend/components/dashboard/PmSyncTasks.tsx:24-112`) with no API calls. | No backend task module exists (`rg -n \"task\" backend/src` returns empty). | Either remove the menu item or implement a task service plus endpoints. |
+| **AI** | `aiApi` maps to `/ai/*` endpoints, and the sidebar includes a “Smart Insights” link (`frontend/components/layout/PmSyncSidebar.tsx:226`). | `backend/src/modules/ai/controllers/*.ts` implement chat/agent endpoints. | There is no `/dashboard/ai` page, so clicking that link results in 404. Build a page under `frontend/pages/dashboard/ai.tsx` and reuse `aiApi`. |
+
+## Recommended Alignment Steps
+
+1. **Resolve domain/certificate mismatch**: When using ngrok for the backend, either trust the certificate locally or point `NEXT_PUBLIC_API_URL` to `http://localhost:3000` while using `ngrok` only for webhook callbacks. This removes the `ERR_CERT_AUTHORITY_INVALID` seen in the console.
+2. **Wire dynamic folder data**: Replace the static folder array in `PmSyncMailbox` (`frontend/components/dashboard/PmSyncMailbox.tsx:67-74`) with calls to `getFolders()` so folder counts stay in sync with `FolderSyncService`.
+3. **Implement label management**: The frontend already surfaces the button; add endpoints in the backend (e.g., `/emails/:id/labels`) or hide the menu item until ready.
+4. **Expose attachment downloads**: Update `EmailsService.getAttachmentDownloadUrl` (`backend/src/modules/email/services/emails.service.ts:566-581`) to return signed URLs (S3, Blob storage, etc.) so the frontend download flow works.
+5. **Connect contacts & calendar actions**: Hook the edit/delete buttons in `PmSyncContacts` and quick-create dialog in `PmSyncCalendar` to the existing endpoints, ensuring provider IDs and calendars are passed correctly.
+6. **Settings & tenant domain**: If organization/domain editing is required, connect the UI to `/tenants/:id` with role-based access; otherwise label those sections as read-only to avoid confusion.
+7. **Tasks & AI navigation**: Either build backend support for tasks or hide that route. Additionally, create the missing `/dashboard/ai` page so sidebar links stop breaking navigation.
+
+By following this checklist the frontend will reflect the real capabilities of the NestJS backend, and any unsupported UI elements will either be implemented or clearly gated.

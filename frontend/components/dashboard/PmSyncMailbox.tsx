@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   List,
@@ -27,7 +27,6 @@ import {
   Archive,
   Trash2,
   Star,
-  Tag,
   Mail,
   MailOpen,
   RefreshCw,
@@ -38,18 +37,23 @@ import {
   Forward,
   Paperclip,
   Calendar,
+  Folder as FolderIcon,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { emailApi, type Email } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
+import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface FolderItem {
   id: string;
-  name: string;
+  label: string;
   icon: React.ReactNode;
   count?: number;
   color?: string;
+  providerId?: string;
+  providerEmail?: string;
+  filterFolder?: string;
 }
 
 export function PmSyncMailbox() {
@@ -58,19 +62,88 @@ export function PmSyncMailbox() {
   const [loading, setLoading] = useState(true);
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-  const [selectedFolder, setSelectedFolder] = useState('INBOX');
+  const baseFolders = useMemo<FolderItem[]>(
+    () => [
+      { id: 'INBOX', label: t.dashboard.folders.inbox, icon: <Inbox size={20} />, filterFolder: 'INBOX' },
+      { id: 'SENT', label: t.dashboard.folders.sent, icon: <Send size={20} />, filterFolder: 'SENT' },
+      { id: 'STARRED', label: t.dashboard.folders.starred, icon: <Star size={20} />, color: '#FFB300', filterFolder: 'STARRED' },
+      { id: 'ARCHIVE', label: t.dashboard.folders.all, icon: <Archive size={20} />, filterFolder: 'ARCHIVE' },
+      { id: 'TRASH', label: t.dashboard.folders.trash, icon: <Trash2 size={20} />, filterFolder: 'TRASH' },
+    ],
+    [t],
+  );
+  const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [selectedFolderId, setSelectedFolderId] = useState('INBOX');
+  const allFolders = useMemo(() => [...baseFolders, ...remoteFolders], [baseFolders, remoteFolders]);
+  const activeFolder = useMemo(
+    () => allFolders.find((folder) => folder.id === selectedFolderId) || allFolders[0],
+    [allFolders, selectedFolderId],
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [_providers, setProviders] = useState<ProviderConfig[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-  const folders: FolderItem[] = [
-    { id: 'INBOX', name: t.dashboard.folders.inbox, icon: <Inbox size={20} />, count: 12 },
-    { id: 'SENT', name: t.dashboard.folders.sent, icon: <Send size={20} /> },
-    { id: 'STARRED', name: t.dashboard.folders.starred, icon: <Star size={20} />, color: '#FFB300' },
-    { id: 'ARCHIVE', name: t.dashboard.folders.all, icon: <Archive size={20} /> },
-    { id: 'TRASH', name: t.dashboard.folders.trash, icon: <Trash2 size={20} /> },
-  ];
+  const getIconForFolder = (specialUse?: string | null) => {
+    if (!specialUse) return <FolderIcon size={20} />;
+    const normalized = specialUse.replace('\\', '').toLowerCase();
+    switch (normalized) {
+      case 'inbox':
+        return <Inbox size={20} />;
+      case 'sent':
+        return <Send size={20} />;
+      case 'trash':
+        return <Trash2 size={20} />;
+      case 'archive':
+      case 'all':
+        return <Archive size={20} />;
+      case 'starred':
+        return <Star size={20} />;
+      default:
+        return <FolderIcon size={20} />;
+    }
+  };
+
+  const loadFolderMetadata = useCallback(async () => {
+    try {
+      setFoldersLoading(true);
+      const folderResponse = await getFolders();
+      const dynamicFolders: FolderItem[] = [];
+
+      folderResponse.providers.forEach((provider) => {
+        const providerFolders: ProviderFolder[] =
+          (folderResponse.foldersByProvider && folderResponse.foldersByProvider[provider.id]) || [];
+
+        providerFolders.forEach((folder) => {
+          dynamicFolders.push({
+            id: `${provider.id}:${folder.id}`,
+            label: `${folder.name}${provider.email ? ` (${provider.email})` : ''}`,
+            icon: getIconForFolder(folder.specialUse),
+            providerId: provider.id,
+            providerEmail: provider.email,
+            filterFolder: folder.name,
+            count: folder.unreadCount ?? folder.unseenCount ?? folder.recentCount ?? folder.totalCount,
+          });
+        });
+      });
+
+      setRemoteFolders(dynamicFolders);
+
+      const folderExists =
+        baseFolders.some((folder) => folder.id === selectedFolderId) ||
+        dynamicFolders.some((folder) => folder.id === selectedFolderId);
+
+      if (!folderExists) {
+        const fallbackId = dynamicFolders[0]?.id ?? baseFolders[0]?.id ?? 'INBOX';
+        setSelectedFolderId(fallbackId);
+      }
+    } catch (error) {
+      console.error('Failed to load folders:', error);
+    } finally {
+      setFoldersLoading(false);
+    }
+  }, [baseFolders, selectedFolderId]);
 
   const loadData = useCallback(async () => {
     try {
@@ -82,7 +155,8 @@ export function PmSyncMailbox() {
 
       // Load emails
       const emailsRes = await emailApi.listEmails({
-        folder: selectedFolder,
+        folder: activeFolder?.filterFolder,
+        providerId: activeFolder?.providerId,
         search: searchQuery || undefined,
         limit: 50,
       });
@@ -97,13 +171,18 @@ export function PmSyncMailbox() {
     } finally {
       setLoading(false);
     }
-  }, [selectedFolder, searchQuery, selectedEmail]);
+  }, [activeFolder?.filterFolder, activeFolder?.providerId, searchQuery, selectedEmail]);
+
+  useEffect(() => {
+    loadFolderMetadata();
+  }, [loadFolderMetadata]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   const handleRefresh = () => {
+    loadFolderMetadata();
     loadData();
   };
 
@@ -239,11 +318,16 @@ export function PmSyncMailbox() {
         </Box>
 
         <List sx={{ px: 1, flex: 1 }}>
-          {folders.map((folder) => (
+          {foldersLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+              <CircularProgress size={18} />
+            </Box>
+          )}
+          {allFolders.map((folder) => (
             <ListItemButton
               key={folder.id}
-              selected={selectedFolder === folder.id}
-              onClick={() => setSelectedFolder(folder.id)}
+              selected={activeFolder?.id === folder.id}
+              onClick={() => setSelectedFolderId(folder.id)}
               sx={{ borderRadius: 2, mb: 0.5 }}
             >
               <ListItemIcon
@@ -255,11 +339,13 @@ export function PmSyncMailbox() {
                 {folder.icon}
               </ListItemIcon>
               <ListItemText
-                primary={folder.name}
+                primary={folder.label}
+                secondary={folder.providerEmail}
                 primaryTypographyProps={{
                   fontSize: '0.875rem',
-                  fontWeight: selectedFolder === folder.id ? 600 : 500,
+                  fontWeight: activeFolder?.id === folder.id ? 600 : 500,
                 }}
+                secondaryTypographyProps={{ fontSize: '0.7rem' }}
               />
               {folder.count && folder.count > 0 && (
                 <Chip
@@ -272,32 +358,9 @@ export function PmSyncMailbox() {
                   }}
                 />
               )}
-            </ListItemButton>
-          ))}
+              </ListItemButton>
+            ))}
 
-          <Divider sx={{ my: 2 }} />
-
-          <Typography variant="caption" color="text.secondary" sx={{ px: 2, mb: 1 }}>
-            Labels
-          </Typography>
-          <ListItemButton sx={{ borderRadius: 2 }}>
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              <Tag size={18} />
-            </ListItemIcon>
-            <ListItemText
-              primary="Work"
-              primaryTypographyProps={{ fontSize: '0.875rem' }}
-            />
-          </ListItemButton>
-          <ListItemButton sx={{ borderRadius: 2 }}>
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              <Tag size={18} />
-            </ListItemIcon>
-            <ListItemText
-              primary="Personal"
-              primaryTypographyProps={{ fontSize: '0.875rem' }}
-            />
-          </ListItemButton>
         </List>
 
         <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
@@ -670,18 +733,6 @@ export function PmSyncMailbox() {
             <Calendar size={18} />
           </ListItemIcon>
           <ListItemText>Add to calendar</ListItemText>
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setAnchorEl(null);
-            // TODO: Implement label dialog when label management is added to backend
-            alert('Label management will be available soon');
-          }}
-        >
-          <ListItemIcon>
-            <Tag size={18} />
-          </ListItemIcon>
-          <ListItemText>Add label</ListItemText>
         </MenuItem>
       </Menu>
     </Box>

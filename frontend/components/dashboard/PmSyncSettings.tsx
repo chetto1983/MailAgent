@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -31,6 +31,8 @@ import {
   Clock,
   Sparkles,
 } from 'lucide-react';
+import { useAuth } from '@/lib/hooks/use-auth';
+import { apiClient } from '@/lib/api-client';
 
 type SettingsSection =
   | 'general'
@@ -39,12 +41,23 @@ type SettingsSection =
   | 'account'
   | 'notifications';
 
+interface TenantFormState {
+  name: string;
+  description: string;
+  slug: string;
+}
+
 export function PmSyncSettings() {
+  const { user } = useAuth();
   const [selectedSection, setSelectedSection] = useState<SettingsSection>('general');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('dark');
   const [language, setLanguage] = useState('en-US');
   const [timezone, setTimezone] = useState('GMT-08:00');
   const [emailNotifications, setEmailNotifications] = useState(true);
+  const [tenantForm, setTenantForm] = useState<TenantFormState | null>(null);
+  const [tenantLoading, setTenantLoading] = useState(false);
+  const [tenantSaving, setTenantSaving] = useState(false);
+  const [tenantMessage, setTenantMessage] = useState<string | null>(null);
 
   const sections = [
     { id: 'general', label: 'General', icon: <Settings size={20} /> },
@@ -53,6 +66,56 @@ export function PmSyncSettings() {
     { id: 'account', label: 'Account', icon: <User size={20} /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell size={20} /> },
   ];
+
+  useEffect(() => {
+    if (!user?.tenantId) {
+      setTenantForm(null);
+      return;
+    }
+
+    const fetchTenant = async () => {
+      try {
+        setTenantLoading(true);
+        const response = await apiClient.get(`/tenants/${user.tenantId}`);
+        const data = response.data;
+        setTenantForm({
+          name: data.name,
+          description: data.description || '',
+          slug: data.slug,
+        });
+      } catch (error) {
+        console.error('Failed to load tenant info:', error);
+      } finally {
+        setTenantLoading(false);
+      }
+    };
+
+    fetchTenant();
+  }, [user]);
+
+  const handleTenantFieldChange = (field: keyof TenantFormState, value: string) => {
+    setTenantForm((prev) => (prev ? { ...prev, [field]: value } : prev));
+  };
+
+  const handleTenantSave = async () => {
+    if (!tenantForm || !user?.tenantId) return;
+    try {
+      setTenantSaving(true);
+      setTenantMessage(null);
+      await apiClient.put(`/tenants/${user.tenantId}`, {
+        name: tenantForm.name,
+        description: tenantForm.description || undefined,
+      });
+      setTenantMessage('Organization settings updated successfully.');
+    } catch (error) {
+      console.error('Failed to update tenant:', error);
+      setTenantMessage('Failed to update organization settings. Please try again.');
+    } finally {
+      setTenantSaving(false);
+    }
+  };
+
+  const accountName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || '';
 
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', overflow: 'hidden' }}>
@@ -295,14 +358,14 @@ export function PmSyncSettings() {
                 </Typography>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <TextField label="Full Name" defaultValue="Alex Johnson" fullWidth />
-                  <TextField label="Email" defaultValue="alex@example.com" fullWidth />
-                  <TextField label="Phone" defaultValue="+1 234 567 8900" fullWidth />
+                  <TextField label="Full Name" value={accountName} fullWidth disabled />
+                  <TextField label="Email" value={user?.email ?? ''} fullWidth disabled />
+                  <TextField label="Role" value={user?.role ?? ''} fullWidth disabled />
                 </Box>
 
-                <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-                  <Button variant="contained">Save Changes</Button>
-                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                  Account details are managed centrally. Contact your administrator to request changes.
+                </Typography>
               </CardContent>
             </Card>
 
@@ -330,6 +393,12 @@ export function PmSyncSettings() {
               Manage organization settings
             </Typography>
 
+            {tenantLoading && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Loading tenant information...
+              </Typography>
+            )}
+
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
@@ -337,12 +406,45 @@ export function PmSyncSettings() {
                 </Typography>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <TextField label="Organization Name" defaultValue="Acme Corp" fullWidth />
-                  <TextField label="Domain" defaultValue="acme.com" fullWidth />
+                  <TextField
+                    label="Organization Name"
+                    value={tenantForm?.name ?? ''}
+                    disabled={tenantLoading}
+                    onChange={(event) => handleTenantFieldChange('name', event.target.value)}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Domain Slug"
+                    value={tenantForm?.slug ?? ''}
+                    disabled
+                    helperText="Slug is assigned during provisioning and cannot be changed from the UI."
+                    fullWidth
+                  />
+                  <TextField
+                    label="Description"
+                    value={tenantForm?.description ?? ''}
+                    disabled={tenantLoading}
+                    onChange={(event) => handleTenantFieldChange('description', event.target.value)}
+                    fullWidth
+                    multiline
+                    minRows={2}
+                  />
                 </Box>
 
+                {tenantMessage && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                    {tenantMessage}
+                  </Typography>
+                )}
+
                 <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-                  <Button variant="contained">Save Changes</Button>
+                  <Button
+                    variant="contained"
+                    onClick={handleTenantSave}
+                    disabled={tenantLoading || tenantSaving || !tenantForm}
+                  >
+                    {tenantSaving ? 'Saving...' : 'Save Changes'}
+                  </Button>
                 </Box>
               </CardContent>
             </Card>

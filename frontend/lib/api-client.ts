@@ -1,12 +1,16 @@
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth-store';
 
-const apiBaseURL = process.env.NEXT_PUBLIC_API_URL;
+const apiBaseURL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : undefined);
 
 export const API_BASE_URL = apiBaseURL;
 
 if (!apiBaseURL) {
-  throw new Error('NEXT_PUBLIC_API_URL is not configured. Please set it in the frontend environment.');
+  throw new Error(
+    'NEXT_PUBLIC_API_URL is not configured. Set it in the environment or rely on the default http://localhost:3000 for development.',
+  );
 }
 
 export const apiClient = axios.create({

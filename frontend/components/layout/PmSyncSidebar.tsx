@@ -19,7 +19,6 @@ import {
   Mail,
   Calendar,
   Users,
-  CheckSquare,
   Settings,
   Sparkles,
   ChevronLeft,
@@ -77,11 +76,6 @@ export function PmSyncSidebar({
       label: 'Contacts',
       icon: <Users size={20} />,
       href: '/dashboard/contacts',
-    },
-    {
-      label: 'Tasks',
-      icon: <CheckSquare size={20} />,
-      href: '/dashboard/tasks',
     },
   ];
 

@@ -228,20 +228,37 @@ export function PmSyncCalendar() {
     }
   };
 
-  const handleQuickEvent = () => {
-    if (quickEventText.trim()) {
-      // Parse quick event text (simple implementation)
-      setEvents([
-        ...events,
-        {
-          id: String(Date.now()),
-          title: quickEventText,
-          start: new Date(),
-          backgroundColor: '#0B7EFF',
-          extendedProps: { calendar: 'work' },
-        },
-      ]);
+  const handleQuickEvent = async () => {
+    if (!quickEventText.trim()) return;
+
+    const provider = selectedProvider
+      ? providers.find((p) => p.id === selectedProvider)
+      : providers.find((p) => p.supportsCalendar);
+
+    if (!provider) {
+      alert('No calendar provider available. Please connect a provider first.');
+      return;
+    }
+
+    try {
+      const start = new Date();
+      const end = new Date(start.getTime() + 30 * 60 * 1000);
+
+      await calendarApi.createEvent({
+        providerId: provider.id,
+        title: quickEventText.trim(),
+        description: '',
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        isAllDay: false,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+
       setQuickEventText('');
+      await loadData();
+    } catch (error) {
+      console.error('Failed to create quick event:', error);
+      alert('Failed to create quick event. Please try again.');
     }
   };
 
