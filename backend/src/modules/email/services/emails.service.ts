@@ -8,6 +8,7 @@ export interface EmailListFilters {
   folder?: string;
   isRead?: boolean;
   isStarred?: boolean;
+  hasAttachments?: boolean;
   search?: string;
   from?: string;
   startDate?: Date;
@@ -55,6 +56,9 @@ export class EmailsService {
       ...(!filters.folder || filters.folder !== 'TRASH' ? { isDeleted: false } : {}),
       ...(filters.isRead !== undefined && { isRead: filters.isRead }),
       ...(filters.isStarred !== undefined && { isStarred: filters.isStarred }),
+      ...(filters.hasAttachments
+        ? { attachments: { some: {} } }
+        : undefined),
       ...(filters.from && { from: { contains: filters.from, mode: 'insensitive' } }),
       ...(filters.search && {
         OR: [
@@ -91,6 +95,15 @@ export class EmailsService {
           sentAt: true,
           receivedAt: true,
           size: true,
+          attachments: {
+            select: {
+              id: true,
+              filename: true,
+              size: true,
+              mimeType: true,
+              isInline: true,
+            },
+          },
           provider: {
             select: {
               id: true,
@@ -516,5 +529,56 @@ export class EmailsService {
     }
 
     return emails;
+  }
+
+  /**
+   * Get attachment download URL or file data
+   */
+  async getAttachmentDownloadUrl(
+    emailId: string,
+    attachmentId: string,
+    tenantId: string,
+  ) {
+    // Verify email belongs to tenant
+    const email = await this.prisma.email.findFirst({
+      where: {
+        id: emailId,
+        tenantId,
+        isDeleted: false,
+      },
+      include: {
+        attachments: {
+          where: {
+            id: attachmentId,
+          },
+        },
+      },
+    });
+
+    if (!email) {
+      throw new NotFoundException('Email not found');
+    }
+
+    const attachment = email.attachments[0];
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    // For now, return attachment metadata
+    // In production, you would:
+    // 1. Generate a signed URL from cloud storage (S3, GCS, etc.)
+    // 2. Or stream the file directly from storage
+    // 3. Or return base64 encoded content if stored in DB
+
+    return {
+      id: attachment.id,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+      size: attachment.size,
+      // TODO: Implement actual file streaming or signed URL generation
+      // For now, return a placeholder message
+      downloadUrl: null,
+      message: 'Direct file download not yet implemented. Please implement file storage integration.',
+    };
   }
 }

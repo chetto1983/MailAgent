@@ -83,6 +83,7 @@ export type EmailListFilters = {
   folder?: string;
   isRead?: boolean;
   isStarred?: boolean;
+  hasAttachments?: boolean;
   search?: string;
   from?: string;
   startDate?: string;
@@ -96,6 +97,7 @@ export type EmailListParams = {
   folder?: string;
   isRead?: boolean;
   isStarred?: boolean;
+  hasAttachments?: boolean;
   search?: string;
   from?: string;
   startDate?: string;
@@ -171,6 +173,9 @@ export const emailApi = {
     if (params?.folder) queryParams.append('folder', params.folder);
     if (params?.isRead !== undefined) queryParams.append('isRead', params.isRead.toString());
     if (params?.isStarred !== undefined) queryParams.append('isStarred', params.isStarred.toString());
+    if (params?.hasAttachments !== undefined) {
+      queryParams.append('hasAttachments', params.hasAttachments.toString());
+    }
     if (params?.search) queryParams.append('search', params.search);
     if (params?.from) queryParams.append('from', params.from);
     if (params?.startDate) queryParams.append('startDate', params.startDate);
@@ -342,5 +347,20 @@ export const emailApi = {
       `/emails/${emailId}/forward`,
       payload
     );
+  },
+
+  /**
+   * Download email attachment
+   * GET /emails/:emailId/attachments/:attachmentId/download
+   */
+  downloadAttachment(emailId: string, attachmentId: string) {
+    return apiClient.get<{
+      id: string;
+      filename: string;
+      mimeType: string;
+      size: number;
+      downloadUrl: string | null;
+      message?: string;
+    }>(`/emails/${emailId}/attachments/${attachmentId}/download`);
   },
 };

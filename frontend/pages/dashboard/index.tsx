@@ -2,22 +2,20 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
+import { PmSyncDashboard } from '@/components/dashboard/PmSyncDashboard';
 
 /**
- * Dashboard Index - Redirects to Email Page
+ * Dashboard Index - Main Dashboard Page
  *
- * This page serves as the main dashboard entry point and automatically
- * redirects authenticated users to the email management page.
+ * This page serves as the main dashboard showing overview of emails, events, contacts, and AI insights.
  */
 export default function DashboardIndex() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && user) {
-      // Redirect to email page
-      router.replace('/dashboard/email');
-    } else if (!isLoading && !user) {
+    if (!isLoading && !user) {
       // Redirect to login if not authenticated
       router.push('/auth/login');
     }
@@ -46,25 +44,14 @@ export default function DashboardIndex() {
     );
   }
 
+  if (!user) {
+    return null;
+  }
+
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        minHeight: '100vh',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'background.default',
-      }}
-    >
-      <Box sx={{ textAlign: 'center' }}>
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-          <CircularProgress size={40} />
-        </Box>
-        <Typography variant="body1" color="text.primary">
-          Redirecting to email...
-        </Typography>
-      </Box>
-    </Box>
+    <PmSyncLayout>
+      <PmSyncDashboard />
+    </PmSyncLayout>
   );
 }
 

@@ -60,6 +60,7 @@ export class EmailsController {
     @Query('folder') folder?: string,
     @Query('isRead') isRead?: string,
     @Query('isStarred') isStarred?: string,
+    @Query('hasAttachments') hasAttachments?: string,
     @Query('search') search?: string,
     @Query('from') from?: string,
     @Query('startDate') startDate?: string,
@@ -71,6 +72,7 @@ export class EmailsController {
     if (folder) filters.folder = folder;
     if (isRead !== undefined) filters.isRead = isRead === 'true';
     if (isStarred !== undefined) filters.isStarred = isStarred === 'true';
+    if (hasAttachments !== undefined) filters.hasAttachments = hasAttachments === 'true';
     if (search) filters.search = search;
     if (from) filters.from = from;
     if (startDate) filters.startDate = new Date(startDate);
@@ -276,5 +278,18 @@ export class EmailsController {
   @Post('retention/run')
   async runRetentionPolicy(@Body() data?: { retentionDays?: number }) {
     return this.retentionService.runManualRetention(data?.retentionDays);
+  }
+
+  /**
+   * GET /emails/:emailId/attachments/:attachmentId/download - Download attachment
+   */
+  @Get(':emailId/attachments/:attachmentId/download')
+  async downloadAttachment(
+    @Req() req: any,
+    @Param('emailId') emailId: string,
+    @Param('attachmentId') attachmentId: string,
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.getAttachmentDownloadUrl(emailId, attachmentId, tenantId);
   }
 }
