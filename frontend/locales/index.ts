@@ -256,6 +256,69 @@ export interface AppTranslations {
       deleteAccount: string;
       deleting: string;
       deleteConfirm: string;
+      sections: {
+        general: string;
+        ai: string;
+        accounts: string;
+        account: string;
+        notifications: string;
+      };
+      generalPanel: {
+        title: string;
+        description: string;
+        appearanceTitle: string;
+        themeLabel: string;
+        themeHint: string;
+        languageTitle: string;
+        languageLabel: string;
+        languageHint: string;
+        timezoneLabel: string;
+        notificationsTitle: string;
+        notificationsDescription: string;
+        reset: string;
+        save: string;
+      };
+      mailAccountsPanel: {
+        title: string;
+        description: string;
+        empty: string;
+        manage: string;
+        defaultBadge: string;
+        emailBadge: string;
+        calendarBadge: string;
+        contactsBadge: string;
+        lastSyncPrefix: string;
+        neverSynced: string;
+        providerTypes: Record<string, string>;
+      };
+      aiPanel: {
+        title: string;
+        description: string;
+        smartReplies: string;
+        smartRepliesDescription: string;
+        summarization: string;
+        summarizationDescription: string;
+        scheduling: string;
+        schedulingDescription: string;
+        save: string;
+      };
+      accountPanel: {
+        title: string;
+        description: string;
+        profileInformation: string;
+        fullName: string;
+        email: string;
+        role: string;
+        readOnlyNotice: string;
+        dangerTitle: string;
+        dangerDescription: string;
+        deleteCta: string;
+      };
+      notificationsPanel: {
+        title: string;
+        description: string;
+        emailToggle: string;
+      };
     };
     folders: {
       all: string;
@@ -274,6 +337,7 @@ export interface AppTranslations {
       cc: string;
       bcc: string;
       subject: string;
+      bodyLabel: string;
       attachFiles: string;
       removeAttachment: string;
       formatting: string;

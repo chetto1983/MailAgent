@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import type { EventInput, DateSelectArg, EventClickArg } from '@fullcalendar/core';
 import { calendarApi, type CalendarEvent, type CreateEventDto } from '@/lib/api/calendar';
@@ -140,6 +141,18 @@ export function PmSyncCalendar() {
   useEffect(() => {
     updateCalendarHeader();
   }, [updateCalendarHeader]);
+
+  useEffect(() => {
+    if (!calendarRef.current) return;
+    const calendarApi = calendarRef.current.getApi();
+    const viewName =
+      viewType === 'day'
+        ? 'timeGridDay'
+        : viewType === 'week'
+        ? 'timeGridWeek'
+        : 'dayGridMonth';
+    calendarApi.changeView(viewName);
+  }, [viewType]);
 
   useEffect(() => {
     loadData();
@@ -457,7 +470,7 @@ export function PmSyncCalendar() {
           )}
           <FullCalendar
             ref={calendarRef}
-            plugins={[dayGridPlugin, interactionPlugin]}
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             headerToolbar={false}
             editable={true}

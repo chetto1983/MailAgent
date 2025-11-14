@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Paper,
@@ -20,99 +20,86 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   TextField,
+  Chip,
+  Stack,
+  CircularProgress,
 } from '@mui/material';
 import {
   Settings,
   User,
   Bell,
-  Building,
+  Mail,
   Moon,
   Globe,
   Clock,
   Sparkles,
 } from 'lucide-react';
+import { useRouter } from 'next/router';
+import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { useAuth } from '@/lib/hooks/use-auth';
-import { apiClient } from '@/lib/api-client';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 type SettingsSection =
   | 'general'
   | 'ai'
-  | 'tenant'
+  | 'accounts'
   | 'account'
   | 'notifications';
 
-interface TenantFormState {
-  name: string;
-  description: string;
-  slug: string;
-}
-
 export function PmSyncSettings() {
+  const router = useRouter();
   const { user } = useAuth();
+  const t = useTranslations();
+  const settingsCopy = useMemo(() => t.dashboard.settings, [t]);
   const [selectedSection, setSelectedSection] = useState<SettingsSection>('general');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('dark');
   const [language, setLanguage] = useState('en-US');
   const [timezone, setTimezone] = useState('GMT-08:00');
   const [emailNotifications, setEmailNotifications] = useState(true);
-  const [tenantForm, setTenantForm] = useState<TenantFormState | null>(null);
-  const [tenantLoading, setTenantLoading] = useState(false);
-  const [tenantSaving, setTenantSaving] = useState(false);
-  const [tenantMessage, setTenantMessage] = useState<string | null>(null);
+  const [providers, setProviders] = useState<ProviderConfig[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
 
-  const sections = [
-    { id: 'general', label: 'General', icon: <Settings size={20} /> },
-    { id: 'ai', label: 'AI Agent', icon: <Sparkles size={20} /> },
-    { id: 'tenant', label: 'Tenant Settings', icon: <Building size={20} /> },
-    { id: 'account', label: 'Account', icon: <User size={20} /> },
-    { id: 'notifications', label: 'Notifications', icon: <Bell size={20} /> },
-  ];
+  const sections = useMemo(
+    () => [
+      { id: 'general', label: settingsCopy.sections.general, icon: <Settings size={20} /> },
+      { id: 'ai', label: settingsCopy.sections.ai, icon: <Sparkles size={20} /> },
+      { id: 'accounts', label: settingsCopy.sections.accounts, icon: <Mail size={20} /> },
+      { id: 'account', label: settingsCopy.sections.account, icon: <User size={20} /> },
+      { id: 'notifications', label: settingsCopy.sections.notifications, icon: <Bell size={20} /> },
+    ],
+    [settingsCopy.sections],
+  );
 
   useEffect(() => {
-    if (!user?.tenantId) {
-      setTenantForm(null);
-      return;
-    }
-
-    const fetchTenant = async () => {
+    const fetchProviders = async () => {
       try {
-        setTenantLoading(true);
-        const response = await apiClient.get(`/tenants/${user.tenantId}`);
-        const data = response.data;
-        setTenantForm({
-          name: data.name,
-          description: data.description || '',
-          slug: data.slug,
-        });
+        setAccountsLoading(true);
+        const response = await providersApi.getProviders();
+        setProviders(response || []);
       } catch (error) {
-        console.error('Failed to load tenant info:', error);
+        console.error('Failed to load providers:', error);
       } finally {
-        setTenantLoading(false);
+        setAccountsLoading(false);
       }
     };
 
-    fetchTenant();
-  }, [user]);
+    fetchProviders();
+  }, []);
 
-  const handleTenantFieldChange = (field: keyof TenantFormState, value: string) => {
-    setTenantForm((prev) => (prev ? { ...prev, [field]: value } : prev));
-  };
+  const generalCopy = settingsCopy.generalPanel;
+  const aiCopy = settingsCopy.aiPanel;
+  const mailAccountsCopy = settingsCopy.mailAccountsPanel;
+  const accountCopy = settingsCopy.accountPanel;
+  const notificationsCopy = settingsCopy.notificationsPanel;
 
-  const handleTenantSave = async () => {
-    if (!tenantForm || !user?.tenantId) return;
-    try {
-      setTenantSaving(true);
-      setTenantMessage(null);
-      await apiClient.put(`/tenants/${user.tenantId}`, {
-        name: tenantForm.name,
-        description: tenantForm.description || undefined,
-      });
-      setTenantMessage('Organization settings updated successfully.');
-    } catch (error) {
-      console.error('Failed to update tenant:', error);
-      setTenantMessage('Failed to update organization settings. Please try again.');
-    } finally {
-      setTenantSaving(false);
+  const formatProviderType = (type: ProviderConfig['providerType']) =>
+    mailAccountsCopy.providerTypes[type] || type;
+
+  const formatLastSynced = (value?: string | null) => {
+    if (!value) {
+      return mailAccountsCopy.neverSynced;
     }
+    return new Date(value).toLocaleString();
   };
 
   const accountName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || '';
@@ -173,23 +160,23 @@ export function PmSyncSettings() {
         {selectedSection === 'general' && (
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-              General Settings
+              {generalCopy.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-              Configure your application&apos;s appearance, language, and notifications.
+              {generalCopy.description}
             </Typography>
 
             {/* Appearance */}
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Appearance
+                  {generalCopy.appearanceTitle}
                 </Typography>
 
                 <Box sx={{ mb: 3 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                     <Moon size={18} />
-                    <Typography variant="subtitle2">Theme</Typography>
+                    <Typography variant="subtitle2">{generalCopy.themeLabel}</Typography>
                   </Box>
                   <ToggleButtonGroup
                     value={theme}
@@ -202,7 +189,7 @@ export function PmSyncSettings() {
                     <ToggleButton value="system">System</ToggleButton>
                   </ToggleButtonGroup>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    Choose &lsquo;System&rsquo; to automatically match your operating system&apos;s light or dark mode settings.
+                    {generalCopy.themeHint}
                   </Typography>
                 </Box>
               </CardContent>
@@ -212,16 +199,16 @@ export function PmSyncSettings() {
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Language & Region
+                  {generalCopy.languageTitle}
                 </Typography>
 
                 <Box sx={{ mb: 3 }}>
                   <FormControl fullWidth>
-                    <InputLabel>Language</InputLabel>
+                    <InputLabel>{generalCopy.languageLabel}</InputLabel>
                     <Select
                       value={language}
                       onChange={(e) => setLanguage(e.target.value)}
-                      label="Language"
+                      label={generalCopy.languageLabel}
                       startAdornment={
                         <Box sx={{ mr: 1, display: 'flex' }}>
                           <Globe size={18} />
@@ -236,17 +223,17 @@ export function PmSyncSettings() {
                     </Select>
                   </FormControl>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    This setting changes the language of the PmSync interface. It does not affect the language of your emails or calendar events.
+                    {generalCopy.languageHint}
                   </Typography>
                 </Box>
 
                 <Box>
                   <FormControl fullWidth>
-                    <InputLabel>Timezone</InputLabel>
+                    <InputLabel>{generalCopy.timezoneLabel}</InputLabel>
                     <Select
                       value={timezone}
                       onChange={(e) => setTimezone(e.target.value)}
-                      label="Timezone"
+                      label={generalCopy.timezoneLabel}
                       startAdornment={
                         <Box sx={{ mr: 1, display: 'flex' }}>
                           <Clock size={18} />
@@ -268,7 +255,7 @@ export function PmSyncSettings() {
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Notifications
+                  {generalCopy.notificationsTitle}
                 </Typography>
 
                 <FormControlLabel
@@ -278,15 +265,96 @@ export function PmSyncSettings() {
                       onChange={(e) => setEmailNotifications(e.target.checked)}
                     />
                   }
-                  label="Email Notifications"
+                  label={generalCopy.notificationsTitle}
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
-                  Fine-tune how you receive alerts. Push notifications require you to have the PmSync app installed and permissions enabled on your device.
+                  {generalCopy.notificationsDescription}
                 </Typography>
 
                 <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                  <Button variant="outlined">Reset</Button>
-                  <Button variant="contained">Save Changes</Button>
+                  <Button variant="outlined">{generalCopy.reset}</Button>
+                  <Button variant="contained">{generalCopy.save}</Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+
+        {/* Mail Accounts */}
+        {selectedSection === 'accounts' && (
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
+              {mailAccountsCopy.title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+              {mailAccountsCopy.description}
+            </Typography>
+
+            <Card>
+              <CardContent>
+                {accountsLoading ? (
+                  <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
+                    <CircularProgress size={28} />
+                  </Box>
+                ) : providers.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    {mailAccountsCopy.empty}
+                  </Typography>
+                ) : (
+                  <Stack spacing={2}>
+                    {providers.map((provider) => (
+                      <Paper
+                        key={provider.id}
+                        variant="outlined"
+                        sx={{ p: 2, borderRadius: 2 }}
+                      >
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          justifyContent="space-between"
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          spacing={1}
+                        >
+                          <Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                              {provider.email}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {formatProviderType(provider.providerType)}
+                            </Typography>
+                          </Box>
+                          <Stack direction="row" spacing={1}>
+                            {provider.isDefault && (
+                              <Chip
+                                label={mailAccountsCopy.defaultBadge}
+                                size="small"
+                                color="primary"
+                              />
+                            )}
+                          </Stack>
+                        </Stack>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+                          {provider.supportsEmail && (
+                            <Chip label={mailAccountsCopy.emailBadge} size="small" />
+                          )}
+                          {provider.supportsCalendar && (
+                            <Chip label={mailAccountsCopy.calendarBadge} size="small" />
+                          )}
+                          {provider.supportsContacts && (
+                            <Chip label={mailAccountsCopy.contactsBadge} size="small" />
+                          )}
+                        </Stack>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                          {mailAccountsCopy.lastSyncPrefix} {formatLastSynced(provider.lastSyncedAt)}
+                        </Typography>
+                      </Paper>
+                    ))}
+                  </Stack>
+                )}
+
+                <Box sx={{ mt: 3 }}>
+                  <Button variant="outlined" onClick={() => router.push('/dashboard/providers')}>
+                    {mailAccountsCopy.manage}
+                  </Button>
                 </Box>
               </CardContent>
             </Card>
@@ -297,44 +365,44 @@ export function PmSyncSettings() {
         {selectedSection === 'ai' && (
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-              AI Agent Settings
+              {aiCopy.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-              Configure your AI assistant preferences
+              {aiCopy.description}
             </Typography>
 
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  AI Features
+                  {aiCopy.title}
                 </Typography>
 
                 <FormControlLabel
                   control={<Switch defaultChecked />}
-                  label="Enable Smart Replies"
+                  label={aiCopy.smartReplies}
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4, mb: 2 }}>
-                  AI-generated quick reply suggestions for your emails
+                  {aiCopy.smartRepliesDescription}
                 </Typography>
 
                 <FormControlLabel
                   control={<Switch defaultChecked />}
-                  label="Email Summarization"
+                  label={aiCopy.summarization}
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4, mb: 2 }}>
-                  Automatic summaries of long email threads
+                  {aiCopy.summarizationDescription}
                 </Typography>
 
                 <FormControlLabel
                   control={<Switch defaultChecked />}
-                  label="Smart Scheduling"
+                  label={aiCopy.scheduling}
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4 }}>
-                  AI-powered meeting time suggestions
+                  {aiCopy.schedulingDescription}
                 </Typography>
 
                 <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-                  <Button variant="contained">Save Changes</Button>
+                  <Button variant="contained">{aiCopy.save}</Button>
                 </Box>
               </CardContent>
             </Card>
@@ -345,26 +413,26 @@ export function PmSyncSettings() {
         {selectedSection === 'account' && (
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-              Account Settings
+              {accountCopy.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-              Manage your account information
+              {accountCopy.description}
             </Typography>
 
             <Card sx={{ mb: 3 }}>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Profile Information
+                  {accountCopy.profileInformation}
                 </Typography>
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <TextField label="Full Name" value={accountName} fullWidth disabled />
-                  <TextField label="Email" value={user?.email ?? ''} fullWidth disabled />
-                  <TextField label="Role" value={user?.role ?? ''} fullWidth disabled />
+                  <TextField label={accountCopy.fullName} value={accountName} fullWidth disabled />
+                  <TextField label={accountCopy.email} value={user?.email ?? ''} fullWidth disabled />
+                  <TextField label={accountCopy.role} value={user?.role ?? ''} fullWidth disabled />
                 </Box>
 
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                  Account details are managed centrally. Contact your administrator to request changes.
+                  {accountCopy.readOnlyNotice}
                 </Typography>
               </CardContent>
             </Card>
@@ -372,80 +440,12 @@ export function PmSyncSettings() {
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, color: 'error.main' }}>
-                  Danger Zone
+                  {accountCopy.dangerTitle}
                 </Typography>
 
                 <Button variant="outlined" color="error">
-                  Delete Account
+                  {accountCopy.deleteCta}
                 </Button>
-              </CardContent>
-            </Card>
-          </Box>
-        )}
-
-        {/* Tenant Settings */}
-        {selectedSection === 'tenant' && (
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-              Tenant Settings
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-              Manage organization settings
-            </Typography>
-
-            {tenantLoading && (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Loading tenant information...
-              </Typography>
-            )}
-
-            <Card>
-              <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Organization Information
-                </Typography>
-
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <TextField
-                    label="Organization Name"
-                    value={tenantForm?.name ?? ''}
-                    disabled={tenantLoading}
-                    onChange={(event) => handleTenantFieldChange('name', event.target.value)}
-                    fullWidth
-                  />
-                  <TextField
-                    label="Domain Slug"
-                    value={tenantForm?.slug ?? ''}
-                    disabled
-                    helperText="Slug is assigned during provisioning and cannot be changed from the UI."
-                    fullWidth
-                  />
-                  <TextField
-                    label="Description"
-                    value={tenantForm?.description ?? ''}
-                    disabled={tenantLoading}
-                    onChange={(event) => handleTenantFieldChange('description', event.target.value)}
-                    fullWidth
-                    multiline
-                    minRows={2}
-                  />
-                </Box>
-
-                {tenantMessage && (
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                    {tenantMessage}
-                  </Typography>
-                )}
-
-                <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-                  <Button
-                    variant="contained"
-                    onClick={handleTenantSave}
-                    disabled={tenantLoading || tenantSaving || !tenantForm}
-                  >
-                    {tenantSaving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </Box>
               </CardContent>
             </Card>
           </Box>
@@ -455,16 +455,16 @@ export function PmSyncSettings() {
         {selectedSection === 'notifications' && (
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
-              Notification Settings
+              {notificationsCopy.title}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-              Control when and how you receive notifications
+              {notificationsCopy.description}
             </Typography>
 
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  Email Notifications
+                  {notificationsCopy.emailToggle}
                 </Typography>
 
                 <FormControlLabel control={<Switch defaultChecked />} label="New Emails" />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import {
   Box,
   List,
@@ -62,20 +63,11 @@ export function PmSyncMailbox() {
   const [loading, setLoading] = useState(true);
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-  const baseFolders = useMemo<FolderItem[]>(
-    () => [
-      { id: 'INBOX', label: t.dashboard.folders.inbox, icon: <Inbox size={20} />, filterFolder: 'INBOX' },
-      { id: 'SENT', label: t.dashboard.folders.sent, icon: <Send size={20} />, filterFolder: 'SENT' },
-      { id: 'STARRED', label: t.dashboard.folders.starred, icon: <Star size={20} />, color: '#FFB300', filterFolder: 'STARRED' },
-      { id: 'ARCHIVE', label: t.dashboard.folders.all, icon: <Archive size={20} />, filterFolder: 'ARCHIVE' },
-      { id: 'TRASH', label: t.dashboard.folders.trash, icon: <Trash2 size={20} />, filterFolder: 'TRASH' },
-    ],
-    [t],
-  );
+  const baseFolders: FolderItem[] = [];
   const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
   const [foldersLoading, setFoldersLoading] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState('INBOX');
-  const allFolders = useMemo(() => [...baseFolders, ...remoteFolders], [baseFolders, remoteFolders]);
+  const allFolders = useMemo(() => [...remoteFolders], [remoteFolders]);
   const activeFolder = useMemo(
     () => allFolders.find((folder) => folder.id === selectedFolderId) || allFolders[0],
     [allFolders, selectedFolderId],
@@ -84,6 +76,40 @@ export function PmSyncMailbox() {
   const [_providers, setProviders] = useState<ProviderConfig[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const foldersByProvider = useMemo(() => {
+    const groups = new Map<
+      string,
+      { providerId: string; providerEmail: string; folders: FolderItem[] }
+    >();
+
+    remoteFolders.forEach((folder) => {
+      if (!folder.providerId) return;
+      if (!groups.has(folder.providerId)) {
+        groups.set(folder.providerId, {
+          providerId: folder.providerId,
+          providerEmail: folder.providerEmail || t.dashboard.email.noProviders,
+          folders: [],
+        });
+      }
+
+      groups.get(folder.providerId)!.folders.push(folder);
+    });
+
+    return Array.from(groups.values()).sort((a, b) =>
+      a.providerEmail.localeCompare(b.providerEmail),
+    );
+  }, [remoteFolders, t.dashboard.email.noProviders]);
+  const sanitizedBody = useMemo(() => {
+    if (!selectedEmail) {
+      return '';
+    }
+    const rawBody =
+      selectedEmail.bodyHtml ||
+      selectedEmail.bodyText?.replace(/\n/g, '<br />') ||
+      selectedEmail.snippet ||
+      '';
+    return DOMPurify.sanitize(rawBody);
+  }, [selectedEmail]);
 
   const getIconForFolder = (specialUse?: string | null) => {
     if (!specialUse) return <FolderIcon size={20} />;
@@ -318,49 +344,64 @@ export function PmSyncMailbox() {
         </Box>
 
         <List sx={{ px: 1, flex: 1 }}>
-          {foldersLoading && (
+          {foldersLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
               <CircularProgress size={18} />
             </Box>
+          ) : foldersByProvider.length === 0 ? (
+            <Box sx={{ px: 2, py: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                {t.dashboard.email.noProviders}
+              </Typography>
+            </Box>
+          ) : (
+            foldersByProvider.map((group) => (
+              <Box key={group.providerId} sx={{ mb: 2 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ px: 2, mb: 1, display: 'block', fontWeight: 600, textTransform: 'uppercase' }}
+                >
+                  {group.providerEmail}
+                </Typography>
+                {group.folders.map((folder) => (
+                  <ListItemButton
+                    key={folder.id}
+                    selected={activeFolder?.id === folder.id}
+                    onClick={() => setSelectedFolderId(folder.id)}
+                    sx={{ borderRadius: 2, mb: 0.5 }}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        minWidth: 36,
+                        color: folder.color || 'inherit',
+                      }}
+                    >
+                      {folder.icon}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={folder.label}
+                      primaryTypographyProps={{
+                        fontSize: '0.875rem',
+                        fontWeight: activeFolder?.id === folder.id ? 600 : 500,
+                      }}
+                    />
+                    {folder.count && folder.count > 0 && (
+                      <Chip
+                        label={folder.count}
+                        size="small"
+                        sx={{
+                          height: 20,
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                        }}
+                      />
+                    )}
+                  </ListItemButton>
+                ))}
+              </Box>
+            ))
           )}
-          {allFolders.map((folder) => (
-            <ListItemButton
-              key={folder.id}
-              selected={activeFolder?.id === folder.id}
-              onClick={() => setSelectedFolderId(folder.id)}
-              sx={{ borderRadius: 2, mb: 0.5 }}
-            >
-              <ListItemIcon
-                sx={{
-                  minWidth: 36,
-                  color: folder.color || 'inherit',
-                }}
-              >
-                {folder.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={folder.label}
-                secondary={folder.providerEmail}
-                primaryTypographyProps={{
-                  fontSize: '0.875rem',
-                  fontWeight: activeFolder?.id === folder.id ? 600 : 500,
-                }}
-                secondaryTypographyProps={{ fontSize: '0.7rem' }}
-              />
-              {folder.count && folder.count > 0 && (
-                <Chip
-                  label={folder.count}
-                  size="small"
-                  sx={{
-                    height: 20,
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                  }}
-                />
-              )}
-              </ListItemButton>
-            ))}
-
         </List>
 
         <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
@@ -633,10 +674,7 @@ export function PmSyncMailbox() {
 
             <Divider sx={{ mb: 3 }} />
 
-            <Box
-              sx={{ mb: 3 }}
-              dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml || selectedEmail.bodyText || selectedEmail.snippet || '' }}
-            />
+            <Box sx={{ mb: 3 }} dangerouslySetInnerHTML={{ __html: sanitizedBody }} />
 
             {hasAttachments(selectedEmail) && selectedEmail.attachments && (
               <Box>
