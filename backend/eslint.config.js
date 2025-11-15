@@ -36,7 +36,7 @@ module.exports = tseslint.config(
   },
   eslintConfigPrettier,
   {
-    files: ['**/*.spec.ts', '**/*.test.ts'],
+    files: ['**/*.spec.ts', '**/*.test.ts', 'test/**/*.ts'],
     languageOptions: {
       parserOptions: {
         project: './tsconfig.test.json',
@@ -52,6 +52,10 @@ module.exports = tseslint.config(
         afterEach: 'readonly',
         jest: 'readonly',
       },
+    },
+    rules: {
+      '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/no-namespace': 'off',
     },
   }
 );

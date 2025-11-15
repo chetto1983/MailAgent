@@ -537,7 +537,13 @@ describe('AuthService', () => {
       prismaService.user.update.mockResolvedValue({ ...mockUser, lastLogin: new Date() });
 
       // Execute
-      await service.verifyOtpCode('test@example.com', '123456', 'test@example.com');
+      await service.verifyOtpCode(
+        'test@example.com',
+        '123456',
+        'test@example.com',
+        '127.0.0.1',
+        'JestTest',
+      );
 
       // Assert
       expect(prismaService.session.create).toHaveBeenCalledWith({
@@ -547,7 +553,7 @@ describe('AuthService', () => {
           token: 'mock-jwt-token',
           expiresAt: expect.any(Date),
           ipAddress: '127.0.0.1',
-          userAgent: 'unknown',
+          userAgent: 'JestTest',
         },
       });
 

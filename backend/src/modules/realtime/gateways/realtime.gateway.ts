@@ -9,7 +9,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards, OnModuleInit } from '@nestjs/common';
+import { Logger, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -119,7 +119,7 @@ export class RealtimeGateway
 
       // Aggiungi il socket alla room del tenant per isolamento
       const tenantRoom = `tenant:${decoded.tenantId}`;
-      client.join(tenantRoom);
+      await client.join(tenantRoom);
 
       this.logger.log(
         `Client connected: ${client.id} | User: ${user.email} | Tenant: ${decoded.tenantId}`,
@@ -153,7 +153,7 @@ export class RealtimeGateway
    * Permette ai client di fare ping per verificare la connessione
    */
   @SubscribeMessage('ping')
-  handlePing(@ConnectedSocket() client: AuthenticatedSocket) {
+  handlePing(@ConnectedSocket() _client: AuthenticatedSocket) {
     return {
       event: 'pong',
       data: { timestamp: new Date().toISOString() },
@@ -164,13 +164,13 @@ export class RealtimeGateway
    * Permette ai client di unirsi a stanze aggiuntive (es. email threads)
    */
   @SubscribeMessage('join_room')
-  handleJoinRoom(
+  async handleJoinRoom(
     @MessageBody() data: { room: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
     // Assicurati che la room inizi con il tenantId per sicurezza
     const room = `tenant:${client.tenantId}:${data.room}`;
-    client.join(room);
+    await client.join(room);
     this.logger.debug(`Client ${client.id} joined room: ${room}`);
     return { event: 'joined_room', data: { room } };
   }
@@ -179,12 +179,12 @@ export class RealtimeGateway
    * Permette ai client di lasciare stanze
    */
   @SubscribeMessage('leave_room')
-  handleLeaveRoom(
+  async handleLeaveRoom(
     @MessageBody() data: { room: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
     const room = `tenant:${client.tenantId}:${data.room}`;
-    client.leave(room);
+    await client.leave(room);
     this.logger.debug(`Client ${client.id} left room: ${room}`);
     return { event: 'left_room', data: { room } };
   }

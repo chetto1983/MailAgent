@@ -14,8 +14,12 @@ Le seguenti variabili sono state configurate nel file `backend/.env`:
 FRONTEND_URL=https://mail-agent-indol.vercel.app
 GOOGLE_REDIRECT_URI=https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
 MICROSOFT_REDIRECT_URI=https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
-CORS_ALLOWED_ORIGINS=https://mail-agent-indol.vercel.app,...
+CORS_ALLOWED_ORIGINS=https://mail-agent-indol.vercel.app,
 ```
+
+> ℹ️ **Nota:** mantieni le variabili `GOOGLE_REDIRECT_URI` e `MICROSOFT_REDIRECT_URI` senza il parametro `provider`.
+> Il backend aggiunge automaticamente `&provider=google|microsoft` quando genera l'URL di autorizzazione e quando gestisce i callback.
+> Per questo motivo è necessario registrare su Google/Microsoft gli URL completi che includono `&provider=...`.
 
 ---
 
@@ -32,11 +36,11 @@ CORS_ALLOWED_ORIGINS=https://mail-agent-indol.vercel.app,...
 3. Nella sezione **Authorized redirect URIs**, aggiungi ENTRAMBI questi URI:
 
 ```
-https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts?provider=google
+https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts&provider=google
 https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
 ```
 
-**Nota:** Devi aggiungere entrambi! Il primo (con `?provider=google`) è quello che userà il backend, il secondo è un fallback.
+**Nota:** Devi aggiungere entrambi! Il primo (con `&provider=google`) è quello che userà il backend, il secondo è un fallback.
 
 4. **Salva**
 
@@ -44,13 +48,13 @@ https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
 
 ```
 Authorized redirect URIs:
-  ✅ https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts?provider=google (NUOVO - richiesto!)
+  ✅ https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts&provider=google (NUOVO - richiesto!)
   ✅ https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
-  ✅ http://localhost:3001/dashboard/settings?section=accounts?provider=google (mantieni per test locale)
+  ✅ http://localhost:3001/dashboard/settings?section=accounts&provider=google (mantieni per test locale)
   ✅ http://localhost:3001/dashboard/settings?section=accounts (mantieni per test locale)
 ```
 
-**IMPORTANTE:** Il parametro `?provider=google` è necessario per far sapere al frontend quale provider sta connettendo!
+**IMPORTANTE:** Il parametro `&provider=google` è necessario per far sapere al frontend quale provider sta connettendo!
 
 ---
 
@@ -66,11 +70,11 @@ Authorized redirect URIs:
 4. Nella sezione **Redirect URIs**, aggiungi ENTRAMBI questi URI:
 
 ```
-https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts?provider=microsoft
+https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts&provider=microsoft
 https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
 ```
 
-**Nota:** Devi aggiungere entrambi! Il primo (con `?provider=microsoft`) è quello che userà il backend, il secondo è un fallback.
+**Nota:** Devi aggiungere entrambi! Il primo (con `&provider=microsoft`) è quello che userà il backend, il secondo è un fallback.
 
 5. **Salva**
 
@@ -78,13 +82,13 @@ https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
 
 ```
 Redirect URIs:
-  ✅ https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts?provider=microsoft (NUOVO - richiesto!)
+  ✅ https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts&provider=microsoft (NUOVO - richiesto!)
   ✅ https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
-  ✅ http://localhost:3001/dashboard/settings?section=accounts?provider=microsoft (mantieni per test locale)
+  ✅ http://localhost:3001/dashboard/settings?section=accounts&provider=microsoft (mantieni per test locale)
   ✅ http://localhost:3001/dashboard/settings?section=accounts (mantieni per test locale)
 ```
 
-**IMPORTANTE:** Il parametro `?provider=microsoft` è necessario per far sapere al frontend quale provider sta connettendo!
+**IMPORTANTE:** Il parametro `&provider=microsoft` è necessario per far sapere al frontend quale provider sta connettendo!
 
 ---
 
@@ -144,8 +148,8 @@ docker-compose restart backend
 
 **Soluzione:**
 1. Aggiungi il redirect URI con il parametro provider:
-   - **Google:** `https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts?provider=google`
-   - **Microsoft:** `https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts?provider=microsoft`
+   - **Google:** `https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts&provider=google`
+   - **Microsoft:** `https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts&provider=microsoft`
 2. Riavvia il backend (già fatto ✅)
 3. Riprova la connessione
 
@@ -156,7 +160,7 @@ docker-compose restart backend
 **Soluzione:**
 1. Verifica di aver salvato **esattamente**:
    ```
-   https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts?provider=google
+   https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts&provider=google
    https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
    ```
    (Nota: NO trailing slash `/` alla fine!)
@@ -172,7 +176,7 @@ docker-compose restart backend
 2. Authentication → Web → Redirect URIs
 3. Aggiungi entrambi:
    ```
-   https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts?provider=microsoft
+   https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts&provider=microsoft
    https://mail-agent-indol.vercel.app/dashboard/settings?section=accounts
    ```
 4. Salva e riprova

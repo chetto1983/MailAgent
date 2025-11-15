@@ -239,7 +239,7 @@ describe('GmailWebhookService', () => {
         userId: 'me',
         requestBody: {
           topicName: 'projects/demo/topics/gmail',
-          labelIds: ['INBOX'],
+          labelFilterAction: 'include',
         },
       });
 

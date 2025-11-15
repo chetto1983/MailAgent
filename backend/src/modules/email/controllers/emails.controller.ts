@@ -15,6 +15,8 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { EmailsService, EmailListFilters } from '../services/emails.service';
 import { EmailRetentionService } from '../services/email-retention.service';
@@ -318,9 +320,6 @@ export class EmailsController {
     // Handle different storage types
     if (attachment.storageType === 'local' && attachment.storagePath) {
       // Stream file from local filesystem
-      const fs = require('fs');
-      const path = require('path');
-
       // Security: Ensure path is absolute and exists
       const absolutePath = path.isAbsolute(attachment.storagePath)
         ? attachment.storagePath
