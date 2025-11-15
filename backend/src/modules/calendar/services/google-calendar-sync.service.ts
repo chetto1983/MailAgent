@@ -3,7 +3,6 @@ import { calendar_v3, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
-import { CalendarEventsService } from './calendar-events.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 export interface GoogleCalendarSyncResult {
@@ -24,7 +23,6 @@ export class GoogleCalendarSyncService {
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly googleOAuth: GoogleOAuthService,
-    private readonly calendarEvents: CalendarEventsService,
     private readonly realtimeEvents: RealtimeEventsService,
   ) {}
 
@@ -144,13 +142,7 @@ export class GoogleCalendarSyncService {
       );
 
       if (newEvents > 0 || updatedEvents > 0 || deletedEvents > 0) {
-        this.calendarEvents.emitCalendarMutation(provider.tenantId, {
-          providerId,
-          reason: 'sync-complete',
-        });
-
         // WebSocket events
-        const reason = 'sync-complete';
         this.realtimeEvents.emitSyncStatus(provider.tenantId, {
           providerId,
           status: 'completed',

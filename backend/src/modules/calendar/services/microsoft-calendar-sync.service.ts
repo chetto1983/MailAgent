@@ -4,7 +4,6 @@ import { URLSearchParams } from 'url';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
-import { CalendarEventsService } from './calendar-events.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 interface MicrosoftEvent {
@@ -56,7 +55,6 @@ export class MicrosoftCalendarSyncService {
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly microsoftOAuth: MicrosoftOAuthService,
-    private readonly calendarEvents: CalendarEventsService,
     private readonly realtimeEvents: RealtimeEventsService,
   ) {}
 
@@ -183,13 +181,7 @@ export class MicrosoftCalendarSyncService {
       );
 
       if (newEvents > 0 || updatedEvents > 0 || deletedEvents > 0) {
-        this.calendarEvents.emitCalendarMutation(provider.tenantId, {
-          providerId,
-          reason: 'sync-complete',
-        });
-
         // WebSocket events
-        const reason = 'sync-complete';
         this.realtimeEvents.emitSyncStatus(provider.tenantId, {
           providerId,
           status: 'completed',

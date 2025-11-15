@@ -4,8 +4,8 @@ import axios from 'axios';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { CalendarEvent, ProviderConfig } from '@prisma/client';
-import { CalendarEventsService } from './calendar-events.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import { GoogleCalendarSyncService } from './google-calendar-sync.service';
 import { MicrosoftCalendarSyncService } from './microsoft-calendar-sync.service';
@@ -57,7 +57,7 @@ export class CalendarService {
     private readonly crypto: CryptoService,
     private readonly googleOAuth: GoogleOAuthService,
     private readonly microsoftOAuth: MicrosoftOAuthService,
-    private readonly calendarEvents: CalendarEventsService,
+    private readonly realtimeEvents: RealtimeEventsService,
     private readonly googleCalendarSync: GoogleCalendarSyncService,
     private readonly microsoftCalendarSync: MicrosoftCalendarSyncService,
   ) {}
@@ -207,11 +207,12 @@ export class CalendarService {
 
     this.logger.log(`Created calendar event ${event.id} with external ID ${externalId}`);
 
-    this.calendarEvents.emitCalendarMutation(tenantId, {
+    // Emit WebSocket event
+    this.realtimeEvents.emitCalendarEventNew(tenantId, {
       providerId: provider.id,
       eventId: event.id,
       externalId: event.externalId,
-      calendarId: event.calendarId ?? undefined,
+      calendarId: event.calendarId || 'primary',
       reason: 'event-created',
     });
 
@@ -277,11 +278,12 @@ export class CalendarService {
 
     this.logger.log(`Updated calendar event ${eventId}`);
 
-    this.calendarEvents.emitCalendarMutation(tenantId, {
+    // Emit WebSocket event
+    this.realtimeEvents.emitCalendarEventUpdate(tenantId, {
       providerId: provider.id,
       eventId: updatedEvent.id,
       externalId: updatedEvent.externalId,
-      calendarId: updatedEvent.calendarId ?? undefined,
+      calendarId: updatedEvent.calendarId || 'primary',
       reason: 'event-updated',
     });
 
@@ -331,11 +333,12 @@ export class CalendarService {
 
     this.logger.log(`Deleted calendar event ${eventId}`);
 
-    this.calendarEvents.emitCalendarMutation(event.tenantId, {
+    // Emit WebSocket event
+    this.realtimeEvents.emitCalendarEventDelete(event.tenantId, {
       providerId: provider.id,
       eventId: deletedEvent.id,
       externalId: deletedEvent.externalId,
-      calendarId: deletedEvent.calendarId ?? undefined,
+      calendarId: deletedEvent.calendarId || 'primary',
       reason: 'event-deleted',
     });
   }

@@ -14,7 +14,6 @@ import { MicrosoftSyncService } from './services/microsoft-sync.service';
 import { ImapSyncService } from './services/imap-sync.service';
 import { FolderSyncService } from './services/folder-sync.service';
 import { EmailEmbeddingCleanupService } from './services/email-embedding-cleanup.service';
-import { EmailEventsService } from './services/email-events.service';
 
 // Webhook Services (Strategy 2: Real-time Sync)
 import { GmailWebhookService } from './services/gmail-webhook.service';
@@ -32,7 +31,6 @@ import { SyncWorker } from './workers/sync.worker';
 // Controllers
 import { EmailSyncController } from './email-sync.controller';
 import { WebhookController } from './controllers/webhook.controller';
-import { EmailEventsController } from './controllers/email-events.controller';
 
 @Module({
   imports: [
@@ -46,7 +44,6 @@ import { EmailEventsController } from './controllers/email-events.controller';
   controllers: [
     EmailSyncController,
     WebhookController, // Real-time webhook endpoint
-    EmailEventsController,
   ],
   providers: [
     // Queue management
@@ -71,7 +68,6 @@ import { EmailEventsController } from './controllers/email-events.controller';
     CrossProviderDedupService,
     CrossProviderConflictService,
     CrossProviderSyncService,
-    EmailEventsService,
 
     // Workers
     SyncWorker,
@@ -84,7 +80,6 @@ import { EmailEventsController } from './controllers/email-events.controller';
     MicrosoftWebhookService,
     WebhookLifecycleService,
     CrossProviderSyncService,
-    EmailEventsService,
   ],
 })
 export class EmailSyncModule {}

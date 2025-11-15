@@ -3,8 +3,13 @@ import { google, people_v1 } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
-import { ContactEventsService, ContactRealtimeReason } from './contact-events.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
+
+export type ContactRealtimeReason =
+  | 'contact-created'
+  | 'contact-updated'
+  | 'contact-deleted'
+  | 'sync-complete';
 
 export interface GoogleContactsSyncResult {
   success: boolean;
@@ -24,7 +29,6 @@ export class GoogleContactsSyncService {
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly googleOAuth: GoogleOAuthService,
-    private contactEvents: ContactEventsService,
     private realtimeEvents: RealtimeEventsService,
   ) {}
 
@@ -383,13 +387,6 @@ export class GoogleContactsSyncService {
     payload?: { contactId?: string; externalId?: string },
   ): void {
     try {
-      // Emit SSE event
-      this.contactEvents.emitContactMutation(tenantId, {
-        providerId,
-        reason,
-        ...payload,
-      });
-
       // Emit WebSocket event
       switch (reason) {
         case 'contact-created':

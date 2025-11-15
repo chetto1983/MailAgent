@@ -3,8 +3,13 @@ import axios from 'axios';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
-import { ContactEventsService, ContactRealtimeReason } from './contact-events.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
+
+export type ContactRealtimeReason =
+  | 'contact-created'
+  | 'contact-updated'
+  | 'contact-deleted'
+  | 'sync-complete';
 
 export interface MicrosoftContactsSyncResult {
   success: boolean;
@@ -25,7 +30,6 @@ export class MicrosoftContactsSyncService {
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly microsoftOAuth: MicrosoftOAuthService,
-    private contactEvents: ContactEventsService,
     private realtimeEvents: RealtimeEventsService,
   ) {}
 
@@ -391,13 +395,6 @@ export class MicrosoftContactsSyncService {
     payload?: { contactId?: string; externalId?: string },
   ): void {
     try {
-      // Emit SSE event
-      this.contactEvents.emitContactMutation(tenantId, {
-        providerId,
-        reason,
-        ...payload,
-      });
-
       // Emit WebSocket event
       switch (reason) {
         case 'contact-created':

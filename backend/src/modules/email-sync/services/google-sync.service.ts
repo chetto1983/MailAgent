@@ -7,11 +7,13 @@ import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
-import {
-  EmailEventsService,
-  EmailRealtimeReason,
-} from './email-events.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
+
+export type EmailRealtimeReason =
+  | 'message-processed'
+  | 'message-deleted'
+  | 'labels-updated'
+  | 'sync-complete';
 
 @Injectable()
 export class GoogleSyncService {
@@ -24,7 +26,6 @@ export class GoogleSyncService {
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
     private knowledgeBaseService: KnowledgeBaseService,
-    private emailEvents: EmailEventsService,
     private realtimeEvents: RealtimeEventsService,
   ) {}
 
@@ -1015,14 +1016,7 @@ export class GoogleSyncService {
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
     try {
-      // Emit SSE event (legacy)
-      this.emailEvents.emitMailboxMutation(tenantId, {
-        providerId,
-        reason,
-        ...payload,
-      });
-
-      // Emit WebSocket event (nuovo sistema realtime)
+      // Emit WebSocket event
       const eventPayload = {
         providerId,
         reason,

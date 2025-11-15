@@ -138,4 +138,11 @@ function OAuthCallbackPage() {
 // Skip auth guard for this page
 (OAuthCallbackPage as any).skipAuthGuard = true;
 
+// Force SSR instead of SSG to avoid NextRouter mount errors
+export async function getServerSideProps() {
+  return {
+    props: {},
+  };
+}
+
 export default OAuthCallbackPage;

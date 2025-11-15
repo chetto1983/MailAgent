@@ -6,11 +6,13 @@ import { CryptoService } from '../../../common/services/crypto.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
-import {
-  EmailEventsService,
-  EmailRealtimeReason,
-} from './email-events.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
+
+export type EmailRealtimeReason =
+  | 'message-processed'
+  | 'message-deleted'
+  | 'labels-updated'
+  | 'sync-complete';
 
 const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
 const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -24,7 +26,6 @@ export class ImapSyncService {
     private crypto: CryptoService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
-    private emailEvents: EmailEventsService,
     private realtimeEvents: RealtimeEventsService,
   ) {}
 
@@ -706,15 +707,7 @@ export class ImapSyncService {
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
     try {
-      // Emit SSE event (legacy)
-      this.emailEvents.emitMailboxMutation(tenantId, {
-        providerId,
-        reason,
-        ...payload,
-        timestamp: new Date().toISOString(),
-      });
-
-      // Emit WebSocket event (nuovo sistema realtime)
+      // Emit WebSocket event
       const eventPayload = {
         providerId,
         reason,

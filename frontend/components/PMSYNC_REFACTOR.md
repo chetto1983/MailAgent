@@ -104,7 +104,7 @@ frontend/
 - `GET /emails` - Priority inbox (starred)
 - `GET /emails/stats` - Unread count
 - `GET /contacts` - Recent contacts
-- `GET /calendar-events/stream` - SSE for events (planned)
+- WebSocket `/realtime` - Real-time events (emails, calendar, contacts)
 
 **Components**:
 - `DashboardCard`: Reusable card with header/actions
@@ -416,7 +416,12 @@ POST   /contacts/sync/:providerId - Manual sync
 
 ### Calendar
 ```
-SSE    /calendar-events/stream - Stream calendar events
+GET    /calendar/events        - List calendar events
+GET    /calendar/events/:id    - Get calendar event
+POST   /calendar/events        - Create calendar event
+PATCH  /calendar/events/:id    - Update calendar event
+DELETE /calendar/events/:id    - Delete calendar event
+POST   /calendar/sync/:providerId - Manual sync
 ```
 
 ### AI
@@ -537,8 +542,8 @@ npm run lint
 
 ## 🔮 Future Enhancements
 
-### Phase 2 (Planned)
-1. **Real-time updates** via WebSocket/SSE
+### Phase 2 (Completed ✅ / Planned)
+1. ✅ **Real-time updates** via WebSocket
 2. **Drag & drop** for tasks and emails
 3. **Keyboard shortcuts** (j/k navigation, c for compose, etc.)
 4. **Advanced search** with filters and operators
