@@ -56,7 +56,7 @@ Cerca e abilita queste API:
 # Google OAuth
 GOOGLE_CLIENT_ID=123456789-xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
-GOOGLE_REDIRECT_URI=http://localhost:3001/dashboard/settings?section=accounts
+GOOGLE_REDIRECT_URI=http://localhost:3000/auth/gmail/callback
 ```
 
 ### Passo 5: Test Users (Solo per External)
@@ -145,7 +145,7 @@ Vai su **Overview** e copia:
 MICROSOFT_CLIENT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
 MICROSOFT_CLIENT_SECRET=xxxxxxxxxxxxx
 MICROSOFT_TENANT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
-MICROSOFT_REDIRECT_URI=http://localhost:3001/dashboard/settings?section=accounts
+MICROSOFT_REDIRECT_URI=http://localhost:3000/auth/microsoft/callback
 ```
 
 ---
@@ -170,13 +170,13 @@ JWT_EXPIRES_IN=7d
 # Google OAuth
 GOOGLE_CLIENT_ID=123456789-xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
-GOOGLE_REDIRECT_URI=http://localhost:3001/dashboard/settings?section=accounts
+GOOGLE_REDIRECT_URI=http://localhost:3000/auth/gmail/callback
 
 # Microsoft OAuth
 MICROSOFT_CLIENT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
 MICROSOFT_CLIENT_SECRET=xxxxxxxxxxxxx
 MICROSOFT_TENANT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
-MICROSOFT_REDIRECT_URI=http://localhost:3001/dashboard/settings?section=accounts
+MICROSOFT_REDIRECT_URI=http://localhost:3000/auth/microsoft/callback
 
 # Encryption (per token storage)
 ENCRYPTION_KEY=your-32-character-encryption-key!!

@@ -47,17 +47,10 @@ export class MicrosoftOAuthService {
     // Generate random state for CSRF protection
     const state = this.generateRandomState();
 
-    const { redirectUri } = this.config.oauth.microsoft;
-
-    // Add provider query parameter to redirect URI so frontend knows which provider is connecting
-    const redirectUriWithProvider = redirectUri.includes('?')
-      ? `${redirectUri}&provider=microsoft`
-      : `${redirectUri}?provider=microsoft`;
-
     const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?` +
       `client_id=${this.config.oauth.microsoft.clientId}&` +
       `response_type=code&` +
-      `redirect_uri=${encodeURIComponent(redirectUriWithProvider)}&` +
+      `redirect_uri=${encodeURIComponent(this.config.oauth.microsoft.redirectUri)}&` +
       `response_mode=query&` +
       `scope=${encodeURIComponent(requestedScopes.join(' '))}&` +
       `state=${state}&` +
@@ -76,22 +69,15 @@ export class MicrosoftOAuthService {
     email: string;
   }> {
     try {
-      const { redirectUri } = this.config.oauth.microsoft;
-
-      // Must use same redirect URI as in authorization request (with provider parameter)
-      const redirectUriWithProvider = redirectUri.includes('?')
-        ? `${redirectUri}&provider=microsoft`
-        : `${redirectUri}?provider=microsoft`;
-
       this.logger.log(`Exchanging authorization code for tokens...`);
-      this.logger.debug(`Redirect URI: ${redirectUriWithProvider}`);
+      this.logger.debug(`Redirect URI: ${this.config.oauth.microsoft.redirectUri}`);
       this.logger.debug(`Code length: ${authorizationCode.length}`);
       this.logger.debug(`Code starts with: ${authorizationCode.substring(0, 20)}...`);
 
       const tokenRequest = {
         code: authorizationCode,
         scopes: this.defaultScopes,
-        redirectUri: redirectUriWithProvider,
+        redirectUri: this.config.oauth.microsoft.redirectUri,
       };
 
       this.logger.log(`Calling MSAL acquireTokenByCode...`);

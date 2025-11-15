@@ -39,15 +39,8 @@ export class GoogleOAuthService {
     // Generate random state for CSRF protection
     const state = this.generateRandomState();
 
-    // Add provider query parameter to redirect URI so frontend knows which provider is connecting
-    const { redirectUri } = this.config.oauth.gmail;
-    const redirectUriWithProvider = redirectUri.includes('?')
-      ? `${redirectUri}&provider=google`
-      : `${redirectUri}?provider=google`;
-
-    // Create temporary OAuth2Client with modified redirect URI
-    const { clientId, clientSecret } = this.config.oauth.gmail;
-    const tempClient = new OAuth2Client(clientId, clientSecret, redirectUriWithProvider);
+    const { redirectUri, clientId, clientSecret } = this.config.oauth.gmail;
+    const tempClient = new OAuth2Client(clientId, clientSecret, redirectUri);
 
     const authUrl = tempClient.generateAuthUrl({
       access_type: 'offline', // Request refresh token
@@ -69,14 +62,8 @@ export class GoogleOAuthService {
     email: string;
   }> {
     try {
-      // Must use same redirect URI as in authorization request (with provider parameter)
       const { redirectUri, clientId, clientSecret } = this.config.oauth.gmail;
-      const redirectUriWithProvider = redirectUri.includes('?')
-        ? `${redirectUri}&provider=google`
-        : `${redirectUri}?provider=google`;
-
-      // Create temporary OAuth2Client with modified redirect URI
-      const tempClient = new OAuth2Client(clientId, clientSecret, redirectUriWithProvider);
+      const tempClient = new OAuth2Client(clientId, clientSecret, redirectUri);
 
       // Exchange code for tokens
       const { tokens } = await tempClient.getToken(authorizationCode);
