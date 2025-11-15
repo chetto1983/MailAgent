@@ -101,6 +101,7 @@ export class MicrosoftContactsWebhookService {
           },
         },
         create: {
+          tenantId: provider.tenantId,
           providerId,
           providerType: 'microsoft',
           subscriptionId,

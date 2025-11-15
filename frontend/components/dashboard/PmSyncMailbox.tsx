@@ -163,7 +163,7 @@ export function PmSyncMailbox() {
     return rawHtml;
   }, [selectedEmail]);
 
-  const getIconForFolder = (specialUse?: string | null) => {
+  const getIconForFolder = useCallback((specialUse?: string | null) => {
     if (!specialUse) return <FolderIcon size={20} />;
     const normalized = specialUse.replace('\\', '').toLowerCase();
     switch (normalized) {
@@ -181,7 +181,7 @@ export function PmSyncMailbox() {
       default:
         return <FolderIcon size={20} />;
     }
-  };
+  }, []);
 
   const loadFolderMetadata = useCallback(async () => {
     console.log('Loading folder metadata...');
@@ -244,7 +244,7 @@ export function PmSyncMailbox() {
     } finally {
       setFoldersLoading(false);
     }
-  }, [selectedFolderId]);
+  }, [selectedFolderId, aggregatorFolders, getIconForFolder]);
 
   const loadData = useCallback(async () => {
     if (!activeFolder) {
@@ -324,7 +324,7 @@ export function PmSyncMailbox() {
 
   const isRowLoaded = useCallback(
     (index: number) => !hasNextPage || index < emails.length,
-    [emails.length, hasNextPage],
+    [emails, hasNextPage],
   );
 
   const onRowsRendered = useInfiniteLoader({
@@ -381,7 +381,7 @@ export function PmSyncMailbox() {
     }
   };
 
-  const handleEmailClick = async (email: Email) => {
+  const handleEmailClick = useCallback(async (email: Email) => {
     // Fetch full email with bodyHtml
     try {
       const fullEmail = await emailApi.getEmail(email.id);
@@ -399,17 +399,17 @@ export function PmSyncMailbox() {
       // Fallback to list email if fetch fails
       setSelectedEmail(email);
     }
-  };
+  }, []);
 
-  const handleToggleStar = async (emailId: string, isStarred: boolean) => {
+  const handleToggleStar = useCallback(async (emailId: string, isStarred: boolean) => {
     await emailApi.updateEmail(emailId, { isStarred: !isStarred });
     setEmails((prev) =>
       prev.map((e) => (e.id === emailId ? { ...e, isStarred: !isStarred } : e))
     );
-    if (selectedEmail?.id === emailId) {
-      setSelectedEmail({ ...selectedEmail, isStarred: !isStarred });
-    }
-  };
+    setSelectedEmail((prev) =>
+      prev?.id === emailId ? { ...prev, isStarred: !isStarred } : prev
+    );
+  }, []);
 
   const handleDelete = async (emailId: string) => {
     await emailApi.deleteEmail(emailId);
@@ -456,7 +456,7 @@ export function PmSyncMailbox() {
     }
   };
 
-  const handleToggleSelect = (emailId: string) => {
+  const handleToggleSelect = useCallback((emailId: string) => {
     const newSelected = new Set(selectedIds);
     if (newSelected.has(emailId)) {
       newSelected.delete(emailId);
@@ -464,20 +464,20 @@ export function PmSyncMailbox() {
       newSelected.add(emailId);
     }
     setSelectedIds(newSelected);
-  };
+  }, [selectedIds]);
 
   // Helper: Parse email "from" field
-  const parseEmailFrom = (fromString: string) => {
+  const parseEmailFrom = useCallback((fromString: string) => {
     // Format: "Name <email@example.com>" or just "email@example.com"
     const match = fromString.match(/^(.+?)\s*<(.+?)>$/);
     if (match) {
       return { name: match[1].trim(), email: match[2].trim() };
     }
     return { name: fromString, email: fromString };
-  };
+  }, []);
 
   // Helper: Get provider icon based on provider type
-  const getProviderIcon = (providerId?: string) => {
+  const getProviderIcon = useCallback((providerId?: string) => {
     if (!providerId) return '📬';
 
     const provider = _providers.find(p => p.id === providerId);
@@ -492,15 +492,15 @@ export function PmSyncMailbox() {
       default:
         return '📬';
     }
-  };
+  }, [_providers]);
 
   // Helper: Check if has attachments
-  const hasAttachments = (email: Email) => {
+  const hasAttachments = useCallback((email: Email) => {
     return (email.attachments?.length || 0) > 0;
-  };
+  }, []);
 
   // Helper: Format date
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     const d = new Date(date);
     const now = new Date();
@@ -514,7 +514,7 @@ export function PmSyncMailbox() {
     } else {
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
-  };
+  }, []);
 
   const renderRow = useCallback(
     ({ index, style, ariaAttributes }: RowComponentProps) => {
@@ -634,15 +634,15 @@ export function PmSyncMailbox() {
     },
     [
       emails,
-      selectedEmail,
+      selectedEmail?.id,
       handleEmailClick,
       selectedIds,
       handleToggleSelect,
       getProviderIcon,
+      handleToggleStar,
       parseEmailFrom,
       formatDate,
       hasAttachments,
-      handleToggleStar,
     ],
   );
 

@@ -93,23 +93,26 @@ export function PmSyncCalendar() {
   }, []);
 
   // Convert backend CalendarEvent to FullCalendar EventInput
-  const convertToFullCalendarEvent = (event: CalendarEvent): EventInput => {
-    const category = categories.find((c) => c.id === event.providerId);
-    return {
-      id: event.id,
-      title: event.title,
-      start: event.startTime,
-      end: event.endTime,
-      allDay: event.isAllDay,
-      backgroundColor: category?.color || '#0B7EFF',
-      extendedProps: {
-        description: event.description,
-        location: event.location,
-        calendar: category?.name || event.calendarName || 'calendar',
-        providerId: event.providerId,
-      },
-    };
-  };
+  const convertToFullCalendarEvent = useCallback(
+    (event: CalendarEvent): EventInput => {
+      const category = categories.find((c) => c.id === event.providerId);
+      return {
+        id: event.id,
+        title: event.title,
+        start: event.startTime,
+        end: event.endTime,
+        allDay: event.isAllDay,
+        backgroundColor: category?.color || '#0B7EFF',
+        extendedProps: {
+          description: event.description,
+          location: event.location,
+          calendar: category?.name || event.calendarName || 'calendar',
+          providerId: event.providerId,
+        },
+      };
+    },
+    [categories]
+  );
 
   // Load providers and events
   const loadData = useCallback(async () => {
@@ -156,7 +159,7 @@ export function PmSyncCalendar() {
     } finally {
       setLoading(false);
     }
-  }, [selectedProvider]);
+  }, [selectedProvider, convertToFullCalendarEvent]);
 
   useEffect(() => {
     updateCalendarHeader();

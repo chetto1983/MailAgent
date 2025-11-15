@@ -101,6 +101,7 @@ export class MicrosoftCalendarWebhookService {
           },
         },
         create: {
+          tenantId: provider.tenantId,
           providerId,
           providerType: 'microsoft',
           subscriptionId,

@@ -221,6 +221,7 @@ export class GmailWebhookService {
       await this.prisma.webhookSubscription.upsert({
         where: subscriptionWhere,
         create: {
+          tenantId: provider.tenantId,
           providerId,
           providerType: 'google',
           subscriptionId: watchResponse.historyId,

@@ -216,14 +216,7 @@ export function PmSyncSettings() {
         cleanupQuery();
       }
     })();
-  }, [
-    router.isReady,
-    router.query.code,
-    router.query.error,
-    router.query.provider,
-    router.pathname,
-    handleOAuthCallback,
-  ]);
+  }, [router, handleOAuthCallback]);
 
   const generalCopy = settingsCopy.generalPanel;
   const aiCopy = settingsCopy.aiPanel;

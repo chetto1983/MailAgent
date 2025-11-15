@@ -48,6 +48,7 @@ export class GoogleContactsWebhookService {
           },
         },
         create: {
+          tenantId: provider.tenantId,
           providerId,
           providerType: 'google',
           subscriptionId: `contacts-${providerId}`, // Pseudo subscription ID

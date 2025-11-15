@@ -90,6 +90,7 @@ export class GoogleCalendarWebhookService {
             },
           },
           create: {
+            tenantId: provider.tenantId,
             providerId,
             providerType: 'google',
             subscriptionId: channelId,

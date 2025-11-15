@@ -133,7 +133,7 @@ export function PmSyncContacts() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedContact?.id]);
+  }, [searchQuery, selectedContact]);
 
   useEffect(() => {
     loadContacts();

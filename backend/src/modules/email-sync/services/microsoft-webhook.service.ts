@@ -170,6 +170,7 @@ export class MicrosoftWebhookService {
           },
         },
         create: {
+          tenantId: provider.tenantId,
           providerId,
           providerType: 'microsoft',
           subscriptionId: subscription.id,

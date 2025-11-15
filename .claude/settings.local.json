@@ -11,7 +11,12 @@
       "Bash(find:*)",
       "Bash(npx tsc:*)",
       "Bash(timeout 120 npm run build)",
-      "Bash(npx prisma migrate:*)"
+      "Bash(npx prisma migrate:*)",
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"siamo in sviluppo possiamo fare tutto\" npx prisma migrate reset:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git -C d:MailAgent diff --stat frontend/components/dashboard/PmSync*.tsx)",
+      "Bash(npm run lint:*)",
+      "Bash(npx prisma generate:*)"
     ],
     "deny": [],
     "ask": []
