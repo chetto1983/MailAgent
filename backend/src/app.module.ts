@@ -15,6 +15,7 @@ import { EmailSyncModule } from './modules/email-sync/email-sync.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ContactsModule } from './modules/contacts/contacts.module';
     ComplianceModule,
     CalendarModule,
     ContactsModule,
+    RealtimeModule, // WebSocket Gateway per eventi realtime multi-tenant
   ],
   providers: [
     // Apply throttler globally to all routes

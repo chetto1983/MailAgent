@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { CalendarEventsService } from './calendar-events.service';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 export interface GoogleCalendarSyncResult {
   success: boolean;
@@ -24,6 +25,7 @@ export class GoogleCalendarSyncService {
     private readonly crypto: CryptoService,
     private readonly googleOAuth: GoogleOAuthService,
     private readonly calendarEvents: CalendarEventsService,
+    private readonly realtimeEvents: RealtimeEventsService,
   ) {}
 
   /**
@@ -145,6 +147,13 @@ export class GoogleCalendarSyncService {
         this.calendarEvents.emitCalendarMutation(provider.tenantId, {
           providerId,
           reason: 'sync-complete',
+        });
+
+        // WebSocket events
+        const reason = 'sync-complete';
+        this.realtimeEvents.emitSyncStatus(provider.tenantId, {
+          providerId,
+          status: 'completed',
         });
       }
 

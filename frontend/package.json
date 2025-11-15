@@ -40,6 +40,7 @@
     "react-window": "^2.2.3",
     "react-window-infinite-loader": "^2.0.0",
     "remark-gfm": "^4.0.1",
+    "socket.io-client": "^4.8.1",
     "tailwindcss": "^4.1.17",
     "web-vitals": "^5.1.0",
     "zustand": "^5.0.8"

@@ -3,6 +3,8 @@ import { google, people_v1 } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
+import { ContactEventsService, ContactRealtimeReason } from './contact-events.service';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 export interface GoogleContactsSyncResult {
   success: boolean;
@@ -22,6 +24,8 @@ export class GoogleContactsSyncService {
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly googleOAuth: GoogleOAuthService,
+    private contactEvents: ContactEventsService,
+    private realtimeEvents: RealtimeEventsService,
   ) {}
 
   /**
@@ -130,7 +134,16 @@ export class GoogleContactsSyncService {
       : null;
 
     // Upsert contact
-    await this.prisma.contact.upsert({
+    const existingContact = await this.prisma.contact.findFirst({
+      where: {
+        AND: [
+          { providerId: provider.id },
+          { externalId },
+        ],
+      },
+    });
+
+    const upsertedContact = await this.prisma.contact.upsert({
       where: {
         providerId_externalId: {
           providerId: provider.id,
@@ -179,6 +192,19 @@ export class GoogleContactsSyncService {
         isDeleted: false,
       },
     });
+
+    // Emit events for contact creation or update
+    if (!existingContact) {
+      this.notifyContactChange(provider.tenantId, provider.id, 'contact-created', {
+        contactId: upsertedContact.id,
+        externalId,
+      });
+    } else {
+      this.notifyContactChange(provider.tenantId, provider.id, 'contact-updated', {
+        contactId: upsertedContact.id,
+        externalId,
+      });
+    }
   }
 
   /**
@@ -345,5 +371,58 @@ export class GoogleContactsSyncService {
     oauth2Client.setCredentials({ access_token: accessToken });
 
     return google.people({ version: 'v1', auth: oauth2Client });
+  }
+
+  /**
+   * Notify contact change via SSE and WebSocket
+   */
+  private notifyContactChange(
+    tenantId: string,
+    providerId: string,
+    reason: ContactRealtimeReason,
+    payload?: { contactId?: string; externalId?: string },
+  ): void {
+    try {
+      // Emit SSE event
+      this.contactEvents.emitContactMutation(tenantId, {
+        providerId,
+        reason,
+        ...payload,
+      });
+
+      // Emit WebSocket event
+      switch (reason) {
+        case 'contact-created':
+          this.realtimeEvents.emitContactNew(tenantId, {
+            providerId,
+            reason: 'contact-created',
+            ...payload,
+          });
+          break;
+        case 'contact-updated':
+          this.realtimeEvents.emitContactUpdate(tenantId, {
+            providerId,
+            reason: 'contact-updated',
+            ...payload,
+          });
+          break;
+        case 'contact-deleted':
+          this.realtimeEvents.emitContactDelete(tenantId, {
+            providerId,
+            reason: 'contact-deleted',
+            ...payload,
+          });
+          break;
+        case 'sync-complete':
+          this.realtimeEvents.emitSyncStatus(tenantId, {
+            providerId,
+            status: 'completed',
+          });
+          break;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Failed to emit contact event for ${tenantId}: ${message}`);
+    }
   }
 }

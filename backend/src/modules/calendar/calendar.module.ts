@@ -10,11 +10,13 @@ import { MicrosoftCalendarWebhookService } from './services/microsoft-calendar-w
 import { CalendarEventsService } from './services/calendar-events.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 @Module({
   imports: [
     PrismaModule,
     forwardRef(() => ProvidersModule),
+    RealtimeModule, // WebSocket events
   ],
   controllers: [
     CalendarController,

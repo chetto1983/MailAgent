@@ -10,6 +10,7 @@ import {
   EmailEventsService,
   EmailRealtimeReason,
 } from './email-events.service';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
 const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -24,6 +25,7 @@ export class ImapSyncService {
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
     private emailEvents: EmailEventsService,
+    private realtimeEvents: RealtimeEventsService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -704,12 +706,40 @@ export class ImapSyncService {
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
     try {
+      // Emit SSE event (legacy)
       this.emailEvents.emitMailboxMutation(tenantId, {
         providerId,
         reason,
         ...payload,
         timestamp: new Date().toISOString(),
       });
+
+      // Emit WebSocket event (nuovo sistema realtime)
+      const eventPayload = {
+        providerId,
+        reason,
+        ...payload,
+      };
+
+      switch (reason) {
+        case 'message-processed':
+          this.realtimeEvents.emitEmailNew(tenantId, eventPayload);
+          break;
+        case 'labels-updated':
+          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
+          break;
+        case 'message-deleted':
+          this.realtimeEvents.emitEmailDelete(tenantId, eventPayload);
+          break;
+        case 'sync-complete':
+          this.realtimeEvents.emitSyncStatus(tenantId, {
+            providerId,
+            status: 'completed',
+          });
+          break;
+        default:
+          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.debug(`Failed to emit IMAP mailbox event: ${message}`);

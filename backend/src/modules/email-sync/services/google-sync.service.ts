@@ -11,6 +11,7 @@ import {
   EmailEventsService,
   EmailRealtimeReason,
 } from './email-events.service';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 @Injectable()
 export class GoogleSyncService {
@@ -24,6 +25,7 @@ export class GoogleSyncService {
     private embeddingsService: EmbeddingsService,
     private knowledgeBaseService: KnowledgeBaseService,
     private emailEvents: EmailEventsService,
+    private realtimeEvents: RealtimeEventsService,
   ) {}
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -1013,11 +1015,39 @@ export class GoogleSyncService {
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
     try {
+      // Emit SSE event (legacy)
       this.emailEvents.emitMailboxMutation(tenantId, {
         providerId,
         reason,
         ...payload,
       });
+
+      // Emit WebSocket event (nuovo sistema realtime)
+      const eventPayload = {
+        providerId,
+        reason,
+        ...payload,
+      };
+
+      switch (reason) {
+        case 'message-processed':
+          this.realtimeEvents.emitEmailNew(tenantId, eventPayload);
+          break;
+        case 'labels-updated':
+          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
+          break;
+        case 'message-deleted':
+          this.realtimeEvents.emitEmailDelete(tenantId, eventPayload);
+          break;
+        case 'sync-complete':
+          this.realtimeEvents.emitSyncStatus(tenantId, {
+            providerId,
+            status: 'completed',
+          });
+          break;
+        default:
+          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.debug(`Failed to emit mailbox event for ${tenantId}: ${message}`);

@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { AiModule } from '../ai/ai.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 // Services
 import { QueueService } from './services/queue.service';
@@ -40,6 +41,7 @@ import { EmailEventsController } from './controllers/email-events.controller';
     PrismaModule,
     forwardRef(() => ProvidersModule), // For OAuth services and crypto
     AiModule,
+    RealtimeModule, // WebSocket events
   ],
   controllers: [
     EmailSyncController,

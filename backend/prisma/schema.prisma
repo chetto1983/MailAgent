@@ -21,16 +21,17 @@ model Tenant {
   deletedAt   DateTime?
 
   // Relations
-  users           User[]
-  messages        Message[]
-  providerConfigs ProviderConfig[]
-  emails          Email[]
-  folders         Folder[]
-  embeddings      Embedding[]
-  auditLogs       AuditLog[]
-  chatSessions    ChatSession[]
-  calendarEvents  CalendarEvent[]
-  contacts        Contact[]
+  users                User[]
+  messages             Message[]
+  providerConfigs      ProviderConfig[]
+  emails               Email[]
+  folders              Folder[]
+  embeddings           Embedding[]
+  auditLogs            AuditLog[]
+  chatSessions         ChatSession[]
+  calendarEvents       CalendarEvent[]
+  contacts             Contact[]
+  webhookSubscriptions WebhookSubscription[]
 
   @@map("tenants")
 }
@@ -175,11 +176,12 @@ model ProviderConfig {
   lastActivityCheck     DateTime? // Last time activity rate was calculated
 
   // Relations
-  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  emails         Email[]
-  folders        Folder[]
-  calendarEvents CalendarEvent[]
-  contacts       Contact[]
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  emails               Email[]
+  folders              Folder[]
+  calendarEvents       CalendarEvent[]
+  contacts             Contact[]
+  webhookSubscriptions WebhookSubscription[]
 
   @@unique([tenantId, email, providerType])
   @@index([tenantId, isDefault])
@@ -623,6 +625,7 @@ model JobQueue {
 // ===== WEBHOOK SUBSCRIPTION MODEL (for real-time sync) =====
 model WebhookSubscription {
   id           String @id @default(cuid())
+  tenantId     String // Multi-tenant isolation
   providerId   String // May have multiple subscriptions per provider
   providerType String // "google", "microsoft"
 
@@ -650,7 +653,13 @@ model WebhookSubscription {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
   @@unique([providerId, resourcePath])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
   @@index([providerId, isActive])
   @@index([expiresAt]) // For renewal queries
   @@index([providerType])
