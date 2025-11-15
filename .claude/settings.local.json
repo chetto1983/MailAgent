@@ -16,7 +16,11 @@
       "Bash(npx eslint:*)",
       "Bash(git -C d:MailAgent diff --stat frontend/components/dashboard/PmSync*.tsx)",
       "Bash(npm run lint:*)",
-      "Bash(npx prisma generate:*)"
+      "Bash(npx prisma generate:*)",
+      "Bash(node check-db.js:*)",
+      "Bash(node check-embeddings.js:*)",
+      "Bash(node test-delete-embeddings.js:*)",
+      "Bash(node check-full-cleanup.js:*)"
     ],
     "deny": [],
     "ask": []

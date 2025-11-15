@@ -39,7 +39,8 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         useAuthStore.getState().logout();
-        window.location.href = '/auth/login';
+        // Don't redirect here - let the RouteGuard in _app.tsx handle it
+        // This preserves the 'next' parameter for OAuth callbacks
       }
     }
     return Promise.reject(error);

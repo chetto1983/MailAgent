@@ -13,6 +13,24 @@ import { getConfiguration } from '../../../config/configuration';
 export class OAuthCallbackController {
   private config = getConfiguration();
 
+  private getFrontendUrl(): string {
+    const envFrontend = process.env.FRONTEND_URL;
+
+    if (envFrontend) {
+      return envFrontend;
+    }
+
+    const nonApiOrigin = this.config.api.corsOrigins.find(
+      (origin) =>
+        origin &&
+        !origin.includes(this.config.api.host) &&
+        !origin.includes(`${this.config.api.port}`) &&
+        !origin.includes('localhost:3000'),
+    );
+
+    return nonApiOrigin || 'http://localhost:3001';
+  }
+
   @Get('gmail/callback')
   @ApiOperation({ summary: 'OAuth2 callback for Google (Gmail)' })
   @ApiQuery({ name: 'code', required: true, description: 'Authorization code from Google' })
@@ -24,9 +42,7 @@ export class OAuthCallbackController {
     @Query('error') error: string,
     @Res() res: Response,
   ) {
-    const frontendUrl = this.config.api.corsOrigins.find((origin) =>
-      origin.includes('localhost:3001'),
-    ) || 'http://localhost:3001';
+    const frontendUrl = this.getFrontendUrl();
 
     // If there was an error during OAuth flow
     if (error) {
@@ -42,10 +58,10 @@ export class OAuthCallbackController {
       );
     }
 
-    // Redirect to frontend with the authorization code
-    // Frontend will then call the /providers/google/connect endpoint
+    // Redirect to frontend OAuth callback page
+    // This page will handle the connection and then redirect to settings
     return res.redirect(
-      `${frontendUrl}/dashboard/settings?section=accounts&code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || '')}&provider=google`,
+      `${frontendUrl}/auth/oauth-callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || '')}&provider=google`,
     );
   }
 
@@ -61,9 +77,7 @@ export class OAuthCallbackController {
     @Query('error_description') errorDescription: string,
     @Res() res: Response,
   ) {
-    const frontendUrl = this.config.api.corsOrigins.find((origin) =>
-      origin.includes('localhost:3001'),
-    ) || 'http://localhost:3001';
+    const frontendUrl = this.getFrontendUrl();
 
     // If there was an error during OAuth flow
     if (error) {
@@ -80,10 +94,10 @@ export class OAuthCallbackController {
       );
     }
 
-    // Redirect to frontend with the authorization code
-    // Frontend will then call the /providers/microsoft/connect endpoint
+    // Redirect to frontend OAuth callback page
+    // This page will handle the connection and then redirect to settings
     return res.redirect(
-      `${frontendUrl}/dashboard/settings?section=accounts&code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || '')}&provider=microsoft`,
+      `${frontendUrl}/auth/oauth-callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || '')}&provider=microsoft`,
     );
   }
 }

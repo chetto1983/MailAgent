@@ -147,76 +147,41 @@ export function PmSyncSettings() {
     loadProviders();
   }, [loadProviders]);
 
-  const handleOAuthCallback = useCallback(
-    async (authorizationCode: string, providerType: string) => {
-      try {
-        setProviderError('');
-        setProviderSuccess('');
-        setProvidersLoading(true);
-
-        if (providerType === 'google') {
-          await providersApi.connectGoogle({
-            authorizationCode,
-            supportsCalendar: true,
-          });
-        } else if (providerType === 'microsoft') {
-          await providersApi.connectMicrosoft({
-            authorizationCode,
-            supportsCalendar: true,
-          });
-        } else {
-          setProviderError('Unsupported provider type');
-          return;
-        }
-
-        setProviderSuccess('Provider connected successfully!');
-        await loadProviders();
-      } catch (error) {
-        const err = error as { response?: { data?: { message?: string } } };
-        setProviderError(
-          err.response?.data?.message || `Failed to connect ${providerType} account`,
-        );
-      } finally {
-        setProvidersLoading(false);
-      }
-    },
-    [loadProviders],
-  );
-
+  // Handle success/error messages from OAuth callback page
   useEffect(() => {
     if (!router.isReady) {
       return;
     }
 
-    const { code, provider, error } = router.query;
-    if (!code && !error) {
-      return;
-    }
+    const { success, error } = router.query;
 
-    setSelectedSection('accounts');
+    if (success) {
+      setSelectedSection('accounts');
+      setProviderSuccess('Provider connected successfully!');
+      setProviderError('');
+      loadProviders();
 
-    const cleanupQuery = () => {
+      // Clean up query params
       router.replace(
         { pathname: router.pathname, query: { section: 'accounts' } },
         undefined,
         { shallow: true },
       );
-    };
+    }
 
-    (async () => {
-      if (error && typeof error === 'string') {
-        setProviderError(`OAuth error: ${error}`);
-        setProviderSuccess('');
-        cleanupQuery();
-        return;
-      }
+    if (error && typeof error === 'string') {
+      setSelectedSection('accounts');
+      setProviderError(error);
+      setProviderSuccess('');
 
-      if (typeof code === 'string' && typeof provider === 'string') {
-        await handleOAuthCallback(code, provider);
-        cleanupQuery();
-      }
-    })();
-  }, [router, handleOAuthCallback]);
+      // Clean up query params
+      router.replace(
+        { pathname: router.pathname, query: { section: 'accounts' } },
+        undefined,
+        { shallow: true },
+      );
+    }
+  }, [router, loadProviders]);
 
   const generalCopy = settingsCopy.generalPanel;
   const aiCopy = settingsCopy.aiPanel;

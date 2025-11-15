@@ -22,6 +22,8 @@ import { GoogleCalendarSyncService } from '../../calendar/services/google-calend
 import { MicrosoftCalendarSyncService } from '../../calendar/services/microsoft-calendar-sync.service';
 import { GoogleCalendarWebhookService } from '../../calendar/services/google-calendar-webhook.service';
 import { MicrosoftCalendarWebhookService } from '../../calendar/services/microsoft-calendar-webhook.service';
+import { FolderSyncService } from '../../email-sync/services/folder-sync.service';
+import { ContactsService } from '../../contacts/services/contacts.service';
 import type { ProviderConfig } from '@prisma/client';
 import {
   ConnectGoogleProviderDto,
@@ -56,6 +58,8 @@ export class ProviderConfigService {
     private readonly googleCalendarWebhook: GoogleCalendarWebhookService,
     @Inject(forwardRef(() => MicrosoftCalendarWebhookService))
     private readonly microsoftCalendarWebhook: MicrosoftCalendarWebhookService,
+    private readonly folderSync: FolderSyncService,
+    private readonly contactsService: ContactsService,
   ) {}
 
   /**
@@ -626,16 +630,52 @@ export class ProviderConfigService {
 
   /**
    * Immediately queue a sync job and set up webhooks when supported.
+   * Order of operations: Folders → Contacts → Emails → Embeddings
    */
   private async triggerInitialSync(provider: ProviderConfig) {
     if (!provider?.id) {
       return;
     }
 
+    // STEP 1: Sync folders/labels first
+    this.logger.log(`[Initial Sync] Step 1/4: Syncing folders for provider ${provider.email}`);
+    try {
+      await this.folderSync.syncProviderFolders(provider.tenantId, provider.id);
+      this.logger.log(`✅ [Initial Sync] Folders synced successfully for ${provider.email}`);
+    } catch (error) {
+      this.logger.error(
+        `❌ [Initial Sync] Failed to sync folders for provider ${provider.id}: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+      // Continue even if folder sync fails
+    }
+
+    // STEP 2: Sync contacts (if supported)
+    if (provider.supportsContacts) {
+      this.logger.log(`[Initial Sync] Step 2/4: Syncing contacts for provider ${provider.email}`);
+      try {
+        const contactsCount = await this.contactsService.syncContacts(provider.id);
+        this.logger.log(`✅ [Initial Sync] ${contactsCount} contacts synced successfully for ${provider.email}`);
+      } catch (error) {
+        this.logger.error(
+          `❌ [Initial Sync] Failed to sync contacts for provider ${provider.id}: ${
+            error instanceof Error ? error.message : error
+          }`,
+        );
+        // Continue even if contact sync fails
+      }
+    } else {
+      this.logger.log(`[Initial Sync] Step 2/4: Skipping contacts (not supported by provider)`);
+    }
+
+    // STEP 3: Sync emails
+    this.logger.log(`[Initial Sync] Step 3/4: Syncing emails for provider ${provider.email}`);
     let queuedViaScheduler = false;
     try {
       await this.syncScheduler.syncProviderNow(provider.id, 'high');
       queuedViaScheduler = true;
+      this.logger.log(`✅ [Initial Sync] Email sync queued successfully for ${provider.email}`);
     } catch (error) {
       this.logger.error(
         `Failed to queue initial sync via scheduler for provider ${provider.id}: ${
@@ -648,6 +688,10 @@ export class ProviderConfigService {
       await this.enqueueFallbackSyncJob(provider);
     }
 
+    // STEP 4: Embeddings will be queued automatically as emails are processed
+    this.logger.log(`[Initial Sync] Step 4/4: Embeddings will be queued as emails are processed`);
+
+    // Setup webhooks for real-time updates (Google/Microsoft only)
     if (!['google', 'microsoft'].includes(provider.providerType)) {
       return;
     }
