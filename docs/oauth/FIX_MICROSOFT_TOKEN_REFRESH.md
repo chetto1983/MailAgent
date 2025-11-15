@@ -113,7 +113,7 @@ curl -H "Authorization: Bearer YOUR_JWT" \
 Il token attuale è corrotto e non può essere fixato. **Riconnetti il provider**:
 
 #### Via Frontend:
-1. Apri [http://localhost:3001/dashboard/providers](http://localhost:3001/dashboard/providers)
+1. Apri [http://localhost:3001/dashboard/settings?section=accounts](http://localhost:3001/dashboard/settings?section=accounts)
 2. Trova "Microsoft" provider (chetto983@hotmail.it)
 3. Click su **"Disconnect"** o **"Remove"**
 4. Click su **"Connect Microsoft"**

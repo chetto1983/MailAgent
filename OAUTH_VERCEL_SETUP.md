@@ -4,7 +4,7 @@
 
 - **Frontend:** `https://your-app.vercel.app` (Vercel)
 - **Backend:** `http://localhost:3000` (Locale per test) o URL pubblico
-- **OAuth Redirect:** `https://your-app.vercel.app/dashboard/providers`
+- **OAuth Redirect:** `https://your-app.vercel.app/dashboard/settings?section=accounts`
 
 ---
 
@@ -25,8 +25,8 @@
 3. **Authorized redirect URIs** → Aggiungi:
 
 ```
-https://your-app.vercel.app/dashboard/providers
-http://localhost:3001/dashboard/providers  (mantieni per test locale)
+https://your-app.vercel.app/dashboard/settings?section=accounts
+http://localhost:3001/dashboard/settings?section=accounts  (mantieni per test locale)
 ```
 
 4. **Salva**
@@ -37,7 +37,7 @@ http://localhost:3001/dashboard/providers  (mantieni per test locale)
 # Google OAuth
 GOOGLE_CLIENT_ID=123456789-xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
-GOOGLE_REDIRECT_URI=https://your-app.vercel.app/dashboard/providers
+GOOGLE_REDIRECT_URI=https://your-app.vercel.app/dashboard/settings?section=accounts
 
 # Frontend URL
 FRONTEND_URL=https://your-app.vercel.app
@@ -59,8 +59,8 @@ FRONTEND_URL=https://your-app.vercel.app
 4. **Redirect URIs** → Aggiungi:
 
 ```
-https://your-app.vercel.app/dashboard/providers
-http://localhost:3001/dashboard/providers  (mantieni per test locale)
+https://your-app.vercel.app/dashboard/settings?section=accounts
+http://localhost:3001/dashboard/settings?section=accounts  (mantieni per test locale)
 ```
 
 5. **Salva**
@@ -72,7 +72,7 @@ http://localhost:3001/dashboard/providers  (mantieni per test locale)
 MICROSOFT_CLIENT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
 MICROSOFT_CLIENT_SECRET=xxxxxxxxxxxxx
 MICROSOFT_TENANT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
-MICROSOFT_REDIRECT_URI=https://your-app.vercel.app/dashboard/providers
+MICROSOFT_REDIRECT_URI=https://your-app.vercel.app/dashboard/settings?section=accounts
 ```
 
 ---
@@ -156,7 +156,7 @@ Poi usa URL pubblico come `NEXT_PUBLIC_API_URL`.
 2. Login con le tue credenziali
 3. Click **"Connect Google"** o **"Connect Microsoft"**
 4. Autorizza l'app
-5. Verrai reindirizzato a `/dashboard/providers?code=xxx`
+5. Verrai reindirizzato a `/dashboard/settings?section=accounts?code=xxx`
 6. Frontend chiamerà backend per completare la connessione
 
 ---
@@ -167,22 +167,22 @@ Poi usa URL pubblico come `NEXT_PUBLIC_API_URL`.
 
 ```bash
 # Deve contenere:
-https://your-app.vercel.app/dashboard/providers ✅
+https://your-app.vercel.app/dashboard/settings?section=accounts ✅
 ```
 
 ### Check 2: Microsoft Redirect URIs
 
 ```bash
 # Deve contenere:
-https://your-app.vercel.app/dashboard/providers ✅
+https://your-app.vercel.app/dashboard/settings?section=accounts ✅
 ```
 
 ### Check 3: Backend `.env`
 
 ```env
 FRONTEND_URL=https://your-app.vercel.app
-GOOGLE_REDIRECT_URI=https://your-app.vercel.app/dashboard/providers
-MICROSOFT_REDIRECT_URI=https://your-app.vercel.app/dashboard/providers
+GOOGLE_REDIRECT_URI=https://your-app.vercel.app/dashboard/settings?section=accounts
+MICROSOFT_REDIRECT_URI=https://your-app.vercel.app/dashboard/settings?section=accounts
 ```
 
 ### Check 4: CORS Backend
@@ -255,13 +255,13 @@ JWT_EXPIRES_IN=7d
 # Google OAuth (VERCEL)
 GOOGLE_CLIENT_ID=123456789-xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
-GOOGLE_REDIRECT_URI=https://your-app.vercel.app/dashboard/providers
+GOOGLE_REDIRECT_URI=https://your-app.vercel.app/dashboard/settings?section=accounts
 
 # Microsoft OAuth (VERCEL)
 MICROSOFT_CLIENT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
 MICROSOFT_CLIENT_SECRET=xxxxxxxxxxxxx
 MICROSOFT_TENANT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
-MICROSOFT_REDIRECT_URI=https://your-app.vercel.app/dashboard/providers
+MICROSOFT_REDIRECT_URI=https://your-app.vercel.app/dashboard/settings?section=accounts
 
 # URLs
 FRONTEND_URL=https://your-app.vercel.app

@@ -31,21 +31,21 @@ export class OAuthCallbackController {
     // If there was an error during OAuth flow
     if (error) {
       return res.redirect(
-        `${frontendUrl}/dashboard/providers?error=${encodeURIComponent(error)}&provider=google`,
+        `${frontendUrl}/dashboard/settings?section=accounts&error=${encodeURIComponent(error)}&provider=google`,
       );
     }
 
     // If no code was provided
     if (!code) {
       return res.redirect(
-        `${frontendUrl}/dashboard/providers?error=no_code&provider=google`,
+        `${frontendUrl}/dashboard/settings?section=accounts&error=no_code&provider=google`,
       );
     }
 
     // Redirect to frontend with the authorization code
     // Frontend will then call the /providers/google/connect endpoint
     return res.redirect(
-      `${frontendUrl}/dashboard/providers?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || '')}&provider=google`,
+      `${frontendUrl}/dashboard/settings?section=accounts&code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || '')}&provider=google`,
     );
   }
 
@@ -69,21 +69,21 @@ export class OAuthCallbackController {
     if (error) {
       const errorMsg = errorDescription || error;
       return res.redirect(
-        `${frontendUrl}/dashboard/providers?error=${encodeURIComponent(errorMsg)}&provider=microsoft`,
+        `${frontendUrl}/dashboard/settings?section=accounts&error=${encodeURIComponent(errorMsg)}&provider=microsoft`,
       );
     }
 
     // If no code was provided
     if (!code) {
       return res.redirect(
-        `${frontendUrl}/dashboard/providers?error=no_code&provider=microsoft`,
+        `${frontendUrl}/dashboard/settings?section=accounts&error=no_code&provider=microsoft`,
       );
     }
 
     // Redirect to frontend with the authorization code
     // Frontend will then call the /providers/microsoft/connect endpoint
     return res.redirect(
-      `${frontendUrl}/dashboard/providers?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || '')}&provider=microsoft`,
+      `${frontendUrl}/dashboard/settings?section=accounts&code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || '')}&provider=microsoft`,
     );
   }
 }

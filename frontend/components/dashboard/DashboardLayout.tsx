@@ -25,16 +25,15 @@ import {
   Menu as MenuIcon,
   Mail,
   Sparkles,
-  ServerCog,
   Settings,
   LogOut,
-  User,
   Moon,
   Sun,
   Calendar,
   Users,
 } from 'lucide-react';
 import { useTheme as useNextTheme } from 'next-themes';
+import { useAuth } from '@/lib/hooks/use-auth';
 
 const drawerWidth = 260;
 
@@ -42,7 +41,6 @@ const navItems = [
   { path: '/dashboard/email', label: 'Inbox', icon: Mail },
   { path: '/dashboard/contacts', label: 'Contacts', icon: Users },
   { path: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
-  { path: '/dashboard/providers', label: 'Providers', icon: ServerCog },
   { path: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -75,8 +73,15 @@ export function MaterialDashboardLayout({
   const router = useRouter();
   const muiTheme = useTheme();
   const { theme, setTheme } = useNextTheme();
+  const { user } = useAuth();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  // Get user display name
+  const userName = user?.firstName || user?.email?.split('@')[0] || 'User';
+  const userInitials = user?.firstName
+    ? user.firstName.charAt(0).toUpperCase()
+    : user?.email?.charAt(0).toUpperCase() || 'U';
 
   const handleDrawerToggle = () => {
     setMobileDrawerOpen(!mobileDrawerOpen);
@@ -292,9 +297,11 @@ export function MaterialDashboardLayout({
                 height: 32,
                 bgcolor: 'secondary.main',
                 color: 'secondary.contrastText',
+                fontSize: '0.875rem',
+                fontWeight: 600,
               }}
             >
-              <User size={18} />
+              {userInitials}
             </Avatar>
           </IconButton>
 
@@ -314,6 +321,17 @@ export function MaterialDashboardLayout({
             }}
             sx={{ mt: 1 }}
           >
+            <Box sx={{ px: 2, py: 1.5, minWidth: 200 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                {userName}
+              </Typography>
+              {user?.email && (
+                <Typography variant="caption" color="text.secondary">
+                  {user.email}
+                </Typography>
+              )}
+            </Box>
+            <Divider />
             <MenuItem onClick={() => handleNavigation('/dashboard/settings')}>
               <ListItemIcon>
                 <Settings size={18} />

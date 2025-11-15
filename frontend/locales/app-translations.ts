@@ -405,7 +405,7 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         mailAccountsPanel: {
           title: 'Mail Accounts',
           description: 'Review the accounts powering your inbox, calendar, and contacts sync.',
-          empty: 'No accounts connected yet. Visit the Providers page to add one.',
+          empty: 'No accounts connected yet. Use the actions below to add one.',
           manage: 'Manage providers',
           defaultBadge: 'Default',
           emailBadge: 'Email',
@@ -908,7 +908,7 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         mailAccountsPanel: {
           title: 'Account email',
           description: 'Riepilogo degli account che alimentano posta, calendario e contatti.',
-          empty: 'Nessun account collegato. Visita la pagina Provider per aggiungerne uno.',
+          empty: 'Nessun account collegato. Usa i pulsanti qui sotto per aggiungerne uno.',
           manage: 'Gestisci provider',
           defaultBadge: 'Predefinito',
           emailBadge: 'Email',

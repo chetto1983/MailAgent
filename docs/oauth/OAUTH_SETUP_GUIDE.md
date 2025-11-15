@@ -75,7 +75,7 @@ npm run start:dev
 
 ## 8. Testa la connessione
 
-1. Vai su http://localhost:3001/dashboard/providers
+1. Vai su http://localhost:3001/dashboard/settings?section=accounts
 2. Click "Connect Google Account"
 3. Accedi con l'account Gmail che hai aggiunto come Test User
 4. Autorizza l'accesso

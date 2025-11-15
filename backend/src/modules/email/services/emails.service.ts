@@ -51,9 +51,9 @@ export class EmailsService {
     const where: Prisma.EmailWhereInput = {
       tenantId,
       ...(providerId && { providerId }),
-      ...(filters.folder && { folder: filters.folder }),
+      ...(filters.folder && { folder: { equals: filters.folder, mode: 'insensitive' } }),
       // Only show deleted emails if we're viewing the TRASH folder
-      ...(!filters.folder || filters.folder !== 'TRASH' ? { isDeleted: false } : {}),
+      ...(!filters.folder || filters.folder.toUpperCase() !== 'TRASH' ? { isDeleted: false } : {}),
       ...(filters.isRead !== undefined && { isRead: filters.isRead }),
       ...(filters.isStarred !== undefined && { isStarred: filters.isStarred }),
       ...(filters.hasAttachments
@@ -564,21 +564,17 @@ export class EmailsService {
       throw new NotFoundException('Attachment not found');
     }
 
-    // For now, return attachment metadata
-    // In production, you would:
-    // 1. Generate a signed URL from cloud storage (S3, GCS, etc.)
-    // 2. Or stream the file directly from storage
-    // 3. Or return base64 encoded content if stored in DB
-
+    // Return attachment with storage information
+    // The controller should handle actual file streaming based on storageType
     return {
       id: attachment.id,
       filename: attachment.filename,
       mimeType: attachment.mimeType,
       size: attachment.size,
-      // TODO: Implement actual file streaming or signed URL generation
-      // For now, return a placeholder message
-      downloadUrl: null,
-      message: 'Direct file download not yet implemented. Please implement file storage integration.',
+      storageType: attachment.storageType,
+      storagePath: attachment.storagePath,
+      isInline: attachment.isInline,
+      contentId: attachment.contentId,
     };
   }
 }

@@ -41,9 +41,21 @@ function MaterialThemeWrapper({ children }: { children: React.ReactNode }) {
 function RouteGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
-  const requiresAuth = router.pathname.startsWith('/dashboard');
+  const [requiresAuth, setRequiresAuth] = React.useState(false);
+
+  // Determine if route requires auth only on client side
+  React.useEffect(() => {
+    if (router.pathname) {
+      setRequiresAuth(router.pathname.startsWith('/dashboard'));
+    }
+  }, [router.pathname]);
 
   React.useEffect(() => {
+    // Skip auth check during SSR
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     if (!requiresAuth) {
       return;
     }
@@ -60,6 +72,11 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
       });
     }
   }, [requiresAuth, isAuthenticated, isLoading, router]);
+
+  // Don't block rendering during SSR
+  if (typeof window === 'undefined') {
+    return <>{children}</>;
+  }
 
   if (requiresAuth && (!isAuthenticated || isLoading)) {
     return (
@@ -87,14 +104,21 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function App({ Component, pageProps }: AppProps) {
+export default function App({ Component, pageProps }: AppProps & { Component: any }) {
+  // Skip RouteGuard for error pages and pages with skipAuthGuard flag
+  const skipAuth = Component.skipAuthGuard || false;
+
   return (
     <NextThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <MaterialThemeWrapper>
         <AuthProvider>
-          <RouteGuard>
+          {skipAuth ? (
             <Component {...pageProps} />
-          </RouteGuard>
+          ) : (
+            <RouteGuard>
+              <Component {...pageProps} />
+            </RouteGuard>
+          )}
         </AuthProvider>
       </MaterialThemeWrapper>
     </NextThemeProvider>

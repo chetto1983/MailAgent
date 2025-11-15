@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 import {
   Box,
   Paper,
@@ -55,6 +56,15 @@ function EmailComposeInner() {
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
+
+  // Sanitize HTML to prevent XSS attacks
+  const sanitizedBodyHtml = useMemo(() => {
+    return DOMPurify.sanitize(form.bodyHtml, {
+      ALLOWED_TAGS: ['p', 'br', 'b', 'i', 'u', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre'],
+      ALLOWED_ATTR: ['href', 'target', 'style', 'class'],
+      ALLOW_DATA_ATTR: false,
+    });
+  }, [form.bodyHtml]);
 
   useEffect(() => {
     const loadProviders = async () => {
@@ -266,21 +276,25 @@ function EmailComposeInner() {
           disabled={sending}
         />
 
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <TextField
-            label={composerCopy.cc}
-            value={form.cc}
-            onChange={(event) => handleFieldChange('cc', event.target.value)}
-            fullWidth
-            disabled={sending}
-          />
-          <TextField
-            label={composerCopy.bcc}
-            value={form.bcc}
-            onChange={(event) => handleFieldChange('bcc', event.target.value)}
-            fullWidth
-            disabled={sending}
-          />
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+          <Box sx={{ flex: 1 }}>
+            <TextField
+              label={composerCopy.cc}
+              value={form.cc}
+              onChange={(event) => handleFieldChange('cc', event.target.value)}
+              fullWidth
+              disabled={sending}
+            />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <TextField
+              label={composerCopy.bcc}
+              value={form.bcc}
+              onChange={(event) => handleFieldChange('bcc', event.target.value)}
+              fullWidth
+              disabled={sending}
+            />
+          </Box>
         </Stack>
 
         <TextField
@@ -332,7 +346,7 @@ function EmailComposeInner() {
             contentEditable={!sending}
             suppressContentEditableWarning
             onInput={handleEditorInput}
-            dangerouslySetInnerHTML={{ __html: form.bodyHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizedBodyHtml }}
             sx={{
               border: 1,
               borderColor: 'divider',
@@ -399,4 +413,9 @@ export default function EmailComposePage() {
       <EmailComposeInner />
     </PmSyncLayout>
   );
+}
+
+// Force SSR to avoid build-time router issues
+export async function getServerSideProps() {
+  return { props: {} };
 }

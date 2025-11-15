@@ -87,7 +87,7 @@ async connectGoogleProvider(tenantId, userId, dto) {
 
 ### 3. Frontend: Rimozione Prompt Manuale
 
-**File modificato**: `frontend/pages/dashboard/providers.tsx`
+**File modificato**: `frontend/pages/dashboard/settings?section=accounts.tsx`
 
 **Codice rimosso**:
 ```typescript
@@ -221,14 +221,14 @@ async exchangeCodeForTokens(authorizationCode: string) {
 ### Test Case 1: Nuova Connessione Google
 
 **Steps**:
-1. Vai a http://localhost:3001/dashboard/providers
+1. Vai a http://localhost:3001/dashboard/settings?section=accounts
 2. Click "Connect Google Account"
 3. Fai login con Google
 4. Google redirect a localhost:3001?code=XXX&provider=google
 
 **Expected**:
 - ✅ NO popup che chiede email
-- ✅ Redirect automatico a /dashboard/providers
+- ✅ Redirect automatico a /dashboard/settings?section=accounts
 - ✅ Messaggio "Successfully connected google account!"
 - ✅ Provider salvato in database con email corretta
 
@@ -244,14 +244,14 @@ LIMIT 1;
 ### Test Case 2: Nuova Connessione Microsoft
 
 **Steps**:
-1. Vai a http://localhost:3001/dashboard/providers
+1. Vai a http://localhost:3001/dashboard/settings?section=accounts
 2. Click "Connect Microsoft Account"
 3. Fai login con Microsoft
 4. Microsoft redirect a localhost:3001?code=XXX&provider=microsoft
 
 **Expected**:
 - ✅ NO popup che chiede email
-- ✅ Redirect automatico a /dashboard/providers
+- ✅ Redirect automatico a /dashboard/settings?section=accounts
 - ✅ Messaggio "Successfully connected microsoft account!"
 - ✅ Provider salvato in database con email corretta
 
@@ -321,7 +321,7 @@ Il backend continua a:
 
 ### Frontend (2 file)
 
-4. **`frontend/pages/dashboard/providers.tsx`**
+4. **`frontend/pages/dashboard/settings?section=accounts.tsx`**
    - Rimosso: `prompt()` per chiedere email
    - Rimosso: Validazione email non presente
    - Semplificato: `handleOAuthCallback()`

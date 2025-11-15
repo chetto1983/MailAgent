@@ -673,6 +673,60 @@ export class MicrosoftSyncService {
   }
 
   /**
+   * Determine folder name from Microsoft folder ID
+   */
+  private async determineFolderFromParentId(
+    parentFolderId: string | undefined,
+    providerId: string,
+    isDraft: boolean,
+  ): Promise<string> {
+    // Default fallback
+    if (!parentFolderId) {
+      return isDraft ? 'DRAFTS' : 'INBOX';
+    }
+
+    try {
+      // Lookup folder in database
+      const folder = await this.prisma.folder.findFirst({
+        where: {
+          providerId,
+          path: parentFolderId,
+        },
+        select: {
+          specialUse: true,
+          name: true,
+        },
+      });
+
+      if (!folder) {
+        return isDraft ? 'DRAFTS' : 'INBOX';
+      }
+
+      // Use specialUse if available (already normalized to INBOX, SENT, TRASH, etc.)
+      if (folder.specialUse) {
+        return folder.specialUse.replace('\\', '').toUpperCase();
+      }
+
+      // Normalize Italian folder names to standard names
+      const normalized = folder.name.toLowerCase().trim();
+      if (normalized === 'posta in arrivo' || normalized === 'inbox') return 'INBOX';
+      if (normalized === 'posta inviata' || normalized === 'sent' || normalized === 'inviata') return 'SENT';
+      if (normalized === 'posta eliminata' || normalized === 'trash' || normalized === 'cestino' || normalized === 'eliminata') return 'TRASH';
+      if (normalized === 'bozze' || normalized === 'draft' || normalized === 'drafts') return 'DRAFTS';
+      if (normalized === 'posta indesiderata' || normalized === 'spam' || normalized === 'junk') return 'SPAM';
+      if (normalized === 'archive' || normalized === 'archivia' || normalized === 'archivio') return 'ARCHIVE';
+      if (normalized === 'posta in uscita' || normalized === 'outbox') return 'OUTBOX';
+
+      // Return original name if no mapping found
+      return folder.name.toUpperCase();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to determine folder from parentId ${parentFolderId}: ${errorMessage}`);
+      return isDraft ? 'DRAFTS' : 'INBOX';
+    }
+  }
+
+  /**
    * Process a single Microsoft message
    */
   private async processMessage(
@@ -708,8 +762,12 @@ export class MicrosoftSyncService {
       const sentAt = message.sentDateTime ? new Date(message.sentDateTime) : new Date();
       const receivedAt = message.receivedDateTime ? new Date(message.receivedDateTime) : new Date();
 
-      // Extract folder from parentFolderId (simplified - would need folder lookup for actual name)
-      const folder = message.isDraft ? 'DRAFTS' : 'INBOX';
+      // Extract folder from parentFolderId using database lookup
+      const folder = await this.determineFolderFromParentId(
+        message.parentFolderId,
+        providerId,
+        message.isDraft || false,
+      );
 
       // Categories as labels
       const labels = message.categories || [];

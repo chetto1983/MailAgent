@@ -62,8 +62,10 @@ function AiAssistantView() {
   }, [selectedSession, handleSelectSession]);
 
   useEffect(() => {
+    // Only load sessions once on mount
     loadSessions();
-  }, [loadSessions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCreateSession = async () => {
     try {
@@ -249,4 +251,9 @@ export default function AiAssistantPage() {
       <AiAssistantView />
     </PmSyncLayout>
   );
+}
+
+// Force SSR to avoid build-time errors with useRouter
+export async function getServerSideProps() {
+  return { props: {} };
 }

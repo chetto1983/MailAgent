@@ -28,6 +28,7 @@ import {
 import { DashboardCard } from './DashboardCard';
 import { useRouter } from 'next/router';
 import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/lib/hooks/use-auth';
 
 interface Email {
   id: string;
@@ -68,6 +69,7 @@ interface Stats {
 
 export function PmSyncDashboard() {
   const router = useRouter();
+  const { user } = useAuth();
   const [_loading, setLoading] = useState(true);
   const [emails, setEmails] = useState<Email[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -95,21 +97,40 @@ export function PmSyncDashboard() {
 
       // Load stats
       const statsResponse = await apiClient.get('/emails/stats');
-      setStats({
-        unreadEmails: statsResponse.data.unread || 0,
-        todayEvents: 0,
-        pendingTasks: 0,
-        totalContacts: 0,
-      });
 
-      // Load contacts (recent)
+      // Load contacts count
       const contactsResponse = await apiClient.get('/contacts', {
         params: { limit: 5 },
       });
       setContacts(contactsResponse.data.contacts || []);
 
-      // TODO: Load events from calendar API
-      setEvents([]);
+      // Load calendar events for today
+      let todayEventsCount = 0;
+      try {
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+        const eventsResponse = await apiClient.get('/calendar/events', {
+          params: {
+            startTime: startOfDay.toISOString(),
+            endTime: endOfDay.toISOString(),
+          },
+        });
+        const todayEvents = eventsResponse.data.events || [];
+        setEvents(todayEvents);
+        todayEventsCount = todayEvents.length;
+      } catch (error) {
+        console.error('Failed to load calendar events:', error);
+        setEvents([]);
+      }
+
+      setStats({
+        unreadEmails: statsResponse.data.unread || 0,
+        todayEvents: todayEventsCount,
+        pendingTasks: 0, // TODO: Implement tasks API
+        totalContacts: contactsResponse.data.total || contactsResponse.data.contacts?.length || 0,
+      });
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -148,22 +169,22 @@ export function PmSyncDashboard() {
 
   return (
     <Box>
-      {/* Header Section */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-          {getGreeting()}, Alex
+      {/* Header Section - More compact */}
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 0 }}>
+          {getGreeting()}, {user?.firstName || user?.email?.split('@')[0] || 'User'}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="caption" color="text.secondary">
           Here&apos;s what&apos;s happening today
         </Typography>
       </Box>
 
-      {/* Quick Stats */}
+      {/* Quick Stats - More compact */}
       <Box
         sx={{
           display: 'grid',
-          gap: 3,
-          mb: 3,
+          gap: 2,
+          mb: 2,
           gridTemplateColumns: {
             xs: '1fr',
             sm: 'repeat(2, minmax(0, 1fr))',
@@ -198,25 +219,25 @@ export function PmSyncDashboard() {
           },
         ].map((stat) => (
           <DashboardCard key={stat.label}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box
                 sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 2,
+                  width: 40,
+                  height: 40,
+                  borderRadius: 1.5,
                   bgcolor: stat.color,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                {stat.icon}
+                {React.cloneElement(stat.icon, { size: 20 })}
               </Box>
               <Box>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   {stat.value}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="caption" color="text.secondary">
                   {stat.label}
                 </Typography>
               </Box>
@@ -225,11 +246,11 @@ export function PmSyncDashboard() {
         ))}
       </Box>
 
-      {/* Main Content Grid */}
+      {/* Main Content Grid - More compact */}
       <Box
         sx={{
           display: 'grid',
-          gap: 3,
+          gap: 2,
           gridTemplateColumns: {
             xs: '1fr',
             md: '2fr 1fr',
@@ -242,13 +263,13 @@ export function PmSyncDashboard() {
           <DashboardCard
             title="Upcoming Events"
             subtitle="Your schedule for today"
-            sx={{ mb: 3 }}
+            sx={{ mb: 2 }}
           >
             {events.length === 0 ? (
               <Box
                 sx={{
                   textAlign: 'center',
-                  py: 4,
+                  py: 2,
                 }}
               >
                 <Calendar size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
@@ -312,7 +333,7 @@ export function PmSyncDashboard() {
           {/* Priority Inbox */}
           <DashboardCard title="Priority Inbox" subtitle="Starred and important emails">
             {emails.length === 0 ? (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Box sx={{ textAlign: 'center', py: 2 }}>
                 <Star size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
                 <Typography variant="body2" color="text.secondary">
                   No starred emails
@@ -411,7 +432,7 @@ export function PmSyncDashboard() {
           <DashboardCard
             title="AI Insights"
             subtitle="Smart suggestions for you"
-            sx={{ mb: 3 }}
+            sx={{ mb: 2 }}
           >
             <Box
               sx={{
@@ -429,7 +450,9 @@ export function PmSyncDashboard() {
                 </Typography>
               </Box>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                You have 3 emails that can be quickly replied to with AI-generated responses.
+                {stats.unreadEmails > 0
+                  ? `You have ${stats.unreadEmails} unread email${stats.unreadEmails > 1 ? 's' : ''} that can be managed with AI assistance.`
+                  : 'All caught up! AI will assist you when new emails arrive.'}
               </Typography>
               <Button
                 variant="contained"
@@ -448,25 +471,29 @@ export function PmSyncDashboard() {
               </Button>
             </Box>
 
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Email Response Rate
-              </Typography>
-              <LinearProgress
-                variant="determinate"
-                value={85}
-                sx={{
-                  height: 8,
-                  borderRadius: 4,
-                  mb: 0.5,
-                }}
-              />
-              <Typography variant="caption" color="text.secondary">
-                85% - Excellent!
-              </Typography>
-            </Box>
+            {stats.unreadEmails > 0 && (
+              <>
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Inbox Status
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.max(0, 100 - (stats.unreadEmails / (stats.unreadEmails + 10)) * 100)}
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      mb: 0.5,
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {stats.unreadEmails} unread - Keep going!
+                  </Typography>
+                </Box>
 
-            <Divider sx={{ my: 2 }} />
+                <Divider sx={{ my: 2 }} />
+              </>
+            )}
 
             <Box>
               <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>

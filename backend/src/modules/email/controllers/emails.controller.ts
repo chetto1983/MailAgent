@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,6 +12,7 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -68,6 +70,26 @@ export class EmailsController {
   ) {
     const tenantId = req.user.tenantId;
 
+    // Validate and sanitize pagination parameters
+    const parsedPage = page ? parseInt(page) : 1;
+    const parsedLimit = limit ? parseInt(limit) : 50;
+
+    // Security: Enforce maximum limit to prevent DOS attacks
+    const MAX_LIMIT = 1000;
+    const MIN_PAGE = 1;
+
+    if (parsedPage < MIN_PAGE) {
+      throw new BadRequestException(`Page must be at least ${MIN_PAGE}`);
+    }
+
+    if (parsedLimit < 1) {
+      throw new BadRequestException('Limit must be at least 1');
+    }
+
+    if (parsedLimit > MAX_LIMIT) {
+      throw new BadRequestException(`Limit cannot exceed ${MAX_LIMIT}`);
+    }
+
     const filters: EmailListFilters = {};
     if (folder) filters.folder = folder;
     if (isRead !== undefined) filters.isRead = isRead === 'true';
@@ -81,8 +103,8 @@ export class EmailsController {
     return this.emailsService.listEmails({
       tenantId,
       providerId,
-      page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 50,
+      page: parsedPage,
+      limit: parsedLimit,
       filters,
     });
   }
@@ -286,10 +308,44 @@ export class EmailsController {
   @Get(':emailId/attachments/:attachmentId/download')
   async downloadAttachment(
     @Req() req: any,
+    @Res() res: any,
     @Param('emailId') emailId: string,
     @Param('attachmentId') attachmentId: string,
   ) {
     const tenantId = req.user.tenantId;
-    return this.emailsService.getAttachmentDownloadUrl(emailId, attachmentId, tenantId);
+    const attachment = await this.emailsService.getAttachmentDownloadUrl(emailId, attachmentId, tenantId);
+
+    // Handle different storage types
+    if (attachment.storageType === 'local' && attachment.storagePath) {
+      // Stream file from local filesystem
+      const fs = require('fs');
+      const path = require('path');
+
+      // Security: Ensure path is absolute and exists
+      const absolutePath = path.isAbsolute(attachment.storagePath)
+        ? attachment.storagePath
+        : path.join(process.cwd(), attachment.storagePath);
+
+      if (!fs.existsSync(absolutePath)) {
+        return res.status(404).json({ message: 'File not found on disk' });
+      }
+
+      res.set({
+        'Content-Type': attachment.mimeType,
+        'Content-Disposition': `attachment; filename="${attachment.filename}"`,
+        'Content-Length': attachment.size,
+      });
+
+      const fileStream = fs.createReadStream(absolutePath);
+      fileStream.pipe(res);
+    } else if (attachment.storageType === 's3' || attachment.storageType === 'azure') {
+      // Cloud storage - would need to generate signed URL
+      return res.status(501).json({
+        message: 'Cloud storage download not yet implemented',
+        storageType: attachment.storageType,
+      });
+    } else {
+      return res.status(400).json({ message: 'Invalid storage configuration' });
+    }
   }
 }

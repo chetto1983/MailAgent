@@ -183,9 +183,10 @@ export class GoogleCalendarSyncService {
     let eventsProcessed = 0;
     let newEvents = 0;
     let updatedEvents = 0;
-    const deletedEvents = 0;
+    let deletedEvents = 0;
 
     let pageToken: string | undefined;
+    const allGoogleEventIds = new Set<string>();
 
     do {
       const eventsResponse = await calendar.events.list({
@@ -204,6 +205,9 @@ export class GoogleCalendarSyncService {
         if (!event.id) {
           continue;
         }
+
+        // Collect event ID for deleted events check
+        allGoogleEventIds.add(event.id);
 
         try {
           const result = await this.processCalendarEvent(
@@ -230,7 +234,35 @@ export class GoogleCalendarSyncService {
       pageToken = eventsResponse.data.nextPageToken || undefined;
     } while (pageToken);
 
-    // TODO: Handle deleted events (compare with database)
+    // Handle deleted events: mark events in DB that are no longer in Google Calendar as deleted
+    try {
+      const dbEvents = await this.prisma.calendarEvent.findMany({
+        where: {
+          providerId,
+          calendarId,
+          isDeleted: false,
+        },
+        select: {
+          id: true,
+          externalId: true,
+        },
+      });
+
+      // Mark events as deleted if they're not in Google's response
+      for (const dbEvent of dbEvents) {
+        if (!allGoogleEventIds.has(dbEvent.externalId)) {
+          await this.prisma.calendarEvent.update({
+            where: { id: dbEvent.id },
+            data: { isDeleted: true },
+          });
+          deletedEvents++;
+        }
+      }
+    } catch (deleteError) {
+      this.logger.warn(
+        `Failed to process deleted events: ${deleteError instanceof Error ? deleteError.message : String(deleteError)}`,
+      );
+    }
 
     return {
       eventsProcessed,

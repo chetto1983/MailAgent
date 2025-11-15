@@ -359,7 +359,7 @@ Response: 204 No Content
 
 1. **Naviga alla pagina Providers**
    - Dal dashboard, click su "Providers"
-   - Oppure vai a `/dashboard/providers`
+   - Oppure vai a `/dashboard/settings?section=accounts`
 
 2. **Collega un provider**
    - Tab "Add Provider"

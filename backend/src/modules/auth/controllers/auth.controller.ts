@@ -5,14 +5,17 @@ import {
   Get,
   UseGuards,
   Request,
+  Req,
   BadRequestException,
   GoneException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from '../services/auth.service';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthenticatedRequest } from '../../../common/types/request.types';
 import { RegisterDto } from '../dtos/register.dto';
+import { Request as ExpressRequest } from 'express';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -31,8 +34,10 @@ export class AuthController {
   /**
    * Send OTP code via email
    * POST /auth/send-otp
+   * Rate limited: 5 requests per 60 seconds to prevent OTP spam
    */
   @Post('send-otp')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async sendOtp(@Body() body: { email: string; tenantSlug?: string }) {
     if (!body.email) {
       throw new BadRequestException('Email is required');
@@ -43,32 +48,48 @@ export class AuthController {
   /**
    * Verify OTP code
    * POST /auth/verify-otp
+   * Rate limited: 10 attempts per 60 seconds to prevent brute force
    */
   @Post('verify-otp')
-  async verifyOtp(@Body() body: { email: string; code: string; tenantSlug?: string }) {
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async verifyOtp(
+    @Body() body: { email: string; code: string; tenantSlug?: string },
+    @Req() req: ExpressRequest,
+  ) {
     if (!body.email || !body.code) {
       throw new BadRequestException('Email and code are required');
     }
-    return this.authService.verifyOtpCode(body.email, body.code, body.tenantSlug);
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    return this.authService.verifyOtpCode(body.email, body.code, body.tenantSlug, ipAddress, userAgent);
   }
 
   /**
    * Login user with email and password
    * POST /auth/login
+   * Rate limited: 10 attempts per 60 seconds to prevent credential stuffing
    */
   @Post('login')
-  async login(@Body() body: { email: string; password: string; tenantSlug?: string }) {
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async login(
+    @Body() body: { email: string; password: string; tenantSlug?: string },
+    @Req() req: ExpressRequest,
+  ) {
     if (!body.email || !body.password) {
       throw new BadRequestException('Email and password are required');
     }
-    return this.authService.login(body.email, body.password, body.tenantSlug);
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    return this.authService.login(body.email, body.password, body.tenantSlug, ipAddress, userAgent);
   }
 
   /**
    * Request password reset
    * POST /auth/forgot-password
+   * Rate limited: 3 requests per 60 seconds to prevent email bombing
    */
   @Post('forgot-password')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   async forgotPassword(@Body() body: { email: string; tenantSlug?: string }) {
     if (!body.email) {
       throw new BadRequestException('Email is required');

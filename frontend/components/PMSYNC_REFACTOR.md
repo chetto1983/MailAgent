@@ -227,7 +227,7 @@ frontend/
   - Smart Scheduling
 - **Mail Accounts**:
   - Read-only list of connected providers with capability badges and last-sync status
-  - Shortcut to `/dashboard/providers`
+  - Shortcut to `/dashboard/settings?section=accounts`
 - **Account Settings**:
   - Read-only profile information (name, email, role)
   - Danger zone (delete account)

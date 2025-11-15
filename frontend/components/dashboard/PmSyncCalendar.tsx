@@ -48,6 +48,9 @@ interface CalendarCategory {
   enabled: boolean;
 }
 
+// Color palette for calendar categories - defined outside component to avoid re-creation
+const CATEGORY_PALETTE = ['#9C27B0', '#00C853', '#FF9800', '#0B7EFF', '#E91E63', '#3F51B5'];
+
 export function PmSyncCalendar() {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
@@ -59,11 +62,14 @@ export function PmSyncCalendar() {
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [selectedProvider, _setSelectedProvider] = useState<string | undefined>();
 
-  const categoryPalette = ['#9C27B0', '#00C853', '#FF9800', '#0B7EFF', '#E91E63', '#3F51B5'];
   const [categories, setCategories] = useState<CalendarCategory[]>([]);
-  const localeKey = resolveLocale(
-    router.locale ?? (typeof navigator !== 'undefined' ? navigator.language : 'en'),
-  );
+
+  // Use useMemo to avoid accessing router during SSR
+  const localeKey = useMemo(() => {
+    const locale = router.locale ?? (typeof navigator !== 'undefined' ? navigator.language : 'en');
+    return resolveLocale(locale);
+  }, [router.locale]);
+
   const calendarLocale = localeKey === 'it' ? 'it' : 'en-gb';
   const calendarLocales = useMemo(() => [enGbLocale, itLocale], []);
 
@@ -110,9 +116,15 @@ export function PmSyncCalendar() {
     try {
       setLoading(true);
 
-      // Load providers
-      const providersRes = await providersApi.getProviders();
-      setProviders(providersRes || []);
+      // Load providers (non-blocking - continue even if fails)
+      try {
+        const providersRes = await providersApi.getProviders();
+        setProviders(providersRes || []);
+      } catch (providerError) {
+        console.warn('Failed to load providers for calendar:', providerError);
+        // Continue without providers - calendar can still work
+        setProviders([]);
+      }
 
       // Get date range from calendar (current view)
       let startTime: Date;
@@ -130,9 +142,9 @@ export function PmSyncCalendar() {
         endTime = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       }
 
-      // Load events
+      // Load events - if no provider selected, load from all providers
       const eventsRes = await calendarApi.listEvents({
-        providerId: selectedProvider,
+        ...(selectedProvider && { providerId: selectedProvider }),
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
       });
@@ -140,10 +152,11 @@ export function PmSyncCalendar() {
       setEvents((eventsRes.data.events || []).map(convertToFullCalendarEvent));
     } catch (error) {
       console.error('Failed to load calendar data:', error);
+      setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedProvider, categories]);
+  }, [selectedProvider]);
 
   useEffect(() => {
     updateCalendarHeader();
@@ -155,7 +168,7 @@ export function PmSyncCalendar() {
       return providers.map((provider, index) => ({
         id: provider.id,
         name: provider.email,
-        color: map.get(provider.id)?.color || categoryPalette[index % categoryPalette.length],
+        color: map.get(provider.id)?.color || CATEGORY_PALETTE[index % CATEGORY_PALETTE.length],
         enabled: map.get(provider.id)?.enabled ?? true,
       }));
     });
@@ -173,9 +186,11 @@ export function PmSyncCalendar() {
     calendarApi.changeView(viewName);
   }, [viewType]);
 
+  // Load data only when selectedProvider changes or on mount
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProvider]);
 
   const handlePrevMonth = () => {
     if (calendarRef.current) {
@@ -379,50 +394,56 @@ export function PmSyncCalendar() {
           ))}
         </List>
 
-        {/* AI Assistant */}
-        <Box
-          sx={{
-            mt: 'auto',
-            p: 2,
-            borderRadius: 2,
-            bgcolor: 'primary.main',
-            color: 'white',
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <Sparkles size={20} />
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              AI Suggestions
+        {/* AI Assistant - Only show if there are events */}
+        {events.length > 5 && (
+          <Box
+            sx={{
+              mt: 'auto',
+              p: 2,
+              borderRadius: 2,
+              bgcolor: 'primary.main',
+              color: 'white',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Sparkles size={20} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                AI Insights
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ fontSize: '0.75rem', mb: 1.5, opacity: 0.9 }}>
+              You have {events.length} events scheduled. Would you like AI to optimize your calendar?
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                size="small"
+                variant="contained"
+                sx={{
+                  bgcolor: 'white',
+                  color: 'primary.main',
+                  '&:hover': { bgcolor: 'grey.100' },
+                }}
+                onClick={() => router.push('/dashboard/ai')}
+              >
+                Open AI Assistant
+              </Button>
+            </Box>
+          </Box>
+        )}
+        {events.length === 0 && !loading && (
+          <Box
+            sx={{
+              mt: 'auto',
+              p: 2,
+              borderRadius: 2,
+              bgcolor: 'action.hover',
+            }}
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+              No events scheduled. Click on the calendar to create your first event!
             </Typography>
           </Box>
-          <Typography variant="body2" sx={{ fontSize: '0.75rem', mb: 1.5, opacity: 0.9 }}>
-            There&apos;s a conflict with &lsquo;Project Alpha Review&rsquo;. Suggest moving to 3 PM?
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              size="small"
-              variant="contained"
-              sx={{
-                bgcolor: 'white',
-                color: 'primary.main',
-                '&:hover': { bgcolor: 'grey.100' },
-              }}
-            >
-              Accept 3 PM
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              sx={{
-                borderColor: 'white',
-                color: 'white',
-                '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' },
-              }}
-            >
-              Decline
-            </Button>
-          </Box>
-        </Box>
+        )}
       </Paper>
 
       {/* Calendar Main */}

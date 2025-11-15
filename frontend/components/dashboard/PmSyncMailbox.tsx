@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import DOMPurify from 'dompurify';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { List as VirtualizedList } from 'react-window';
+import type { RowComponentProps } from 'react-window';
+import { useInfiniteLoader } from 'react-window-infinite-loader';
 import {
   Box,
-  List,
+  List as MuiList,
   ListItemButton,
   ListItemIcon,
   ListItemText,
@@ -21,6 +23,9 @@ import {
   MenuItem,
   Tooltip,
   CircularProgress,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   Inbox,
@@ -39,6 +44,7 @@ import {
   Paperclip,
   Calendar,
   Folder as FolderIcon,
+  ChevronDown,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { emailApi, type Email, type EmailListParams } from '@/lib/api/email';
@@ -100,6 +106,11 @@ export function PmSyncMailbox() {
   const [_providers, setProviders] = useState<ProviderConfig[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set(['all']));
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const currentPageRef = useRef(1);
   const foldersByProvider = useMemo(() => {
     const groups: Array<{
       providerId: string;
@@ -140,16 +151,16 @@ export function PmSyncMailbox() {
 
     return groups;
   }, [aggregatorFolders, remoteFolders, t.dashboard.email.allAccountsLabel, t.dashboard.email.noProviders]);
-  const sanitizedBody = useMemo(() => {
+  const emailBody = useMemo(() => {
     if (!selectedEmail) {
       return '';
     }
-    const rawBody =
+    const rawHtml =
       selectedEmail.bodyHtml ||
       selectedEmail.bodyText?.replace(/\n/g, '<br />') ||
       selectedEmail.snippet ||
       '';
-    return DOMPurify.sanitize(rawBody);
+    return rawHtml;
   }, [selectedEmail]);
 
   const getIconForFolder = (specialUse?: string | null) => {
@@ -173,28 +184,47 @@ export function PmSyncMailbox() {
   };
 
   const loadFolderMetadata = useCallback(async () => {
+    console.log('Loading folder metadata...');
     try {
       setFoldersLoading(true);
       const folderResponse = await getFolders();
+      console.log('Folders loaded:', folderResponse.providers.length, 'providers');
       const dynamicFolders: FolderItem[] = [];
+
+      // Map localized folder names to standard folder names
+      const normalizeFolderName = (name: string, specialUse?: string | null): string => {
+        if (specialUse) return specialUse;
+
+        const normalized = name.toLowerCase().trim();
+        // Italian mappings
+        if (normalized === 'posta in arrivo' || normalized === 'inbox') return 'INBOX';
+        if (normalized === 'posta inviata' || normalized === 'sent' || normalized === 'inviata') return 'SENT';
+        if (normalized === 'posta eliminata' || normalized === 'trash' || normalized === 'cestino' || normalized === 'eliminata') return 'TRASH';
+        if (normalized === 'bozze' || normalized === 'draft' || normalized === 'drafts') return 'DRAFT';
+        if (normalized === 'posta indesiderata' || normalized === 'spam' || normalized === 'junk') return 'SPAM';
+        if (normalized === 'archive' || normalized === 'archivia' || normalized === 'archivio') return 'ARCHIVE';
+        if (normalized === 'posta in uscita' || normalized === 'outbox') return 'OUTBOX';
+
+        return name; // Return original name if no mapping found
+      };
 
       folderResponse.providers.forEach((provider) => {
         const providerFolders: ProviderFolder[] =
           (folderResponse.foldersByProvider && folderResponse.foldersByProvider[provider.id]) || [];
 
         providerFolders.forEach((folder) => {
-          const folderKey = folder.path || folder.name;
+          const normalizedFolderName = normalizeFolderName(folder.name, folder.specialUse);
           dynamicFolders.push({
             id: `${provider.id}:${folder.id}`,
             label: folder.name,
-            icon: getIconForFolder(folder.specialUse),
+            icon: getIconForFolder(folder.specialUse || normalizedFolderName),
             providerId: provider.id,
             providerEmail: provider.email,
-            filterFolder: folderKey,
+            filterFolder: normalizedFolderName,
             count: folder.unreadCount ?? folder.unseenCount ?? folder.recentCount ?? folder.totalCount,
             queryOverrides: {
               providerId: provider.id,
-              folder: folderKey,
+              folder: normalizedFolderName,
             },
           });
         });
@@ -222,26 +252,96 @@ export function PmSyncMailbox() {
     }
     try {
       setLoading(true);
+      currentPageRef.current = 1;
 
       const providersRes = await providersApi.getProviders();
       setProviders(providersRes || []);
 
-      const emailsRes = await emailApi.listEmails({
+      // Build query parameters - load first page with 50 items per page
+      const queryParams: EmailListParams = {
+        limit: 50,
+        page: 1,
         ...activeFolder.queryOverrides,
         search: searchQuery || undefined,
-        limit: 50,
-      });
-      setEmails(emailsRes.data.emails || []);
+      };
 
-      if (!selectedEmail && emailsRes.data.emails?.[0]) {
-        setSelectedEmail(emailsRes.data.emails[0]);
-      }
+      console.log('Loading emails for folder:', activeFolder.label, 'with params:', queryParams);
+
+      const emailsRes = await emailApi.listEmails(queryParams);
+      console.log('API returned', emailsRes.data.emails?.length || 0, 'emails');
+
+      setEmails(emailsRes.data.emails || []);
+      // Check if there are more emails to load
+      setHasNextPage((emailsRes.data.emails?.length || 0) === 50);
+      setSelectedEmail(null);
     } catch (error) {
       console.error('Failed to load mailbox data:', error);
+      setEmails([]);
+      setSelectedEmail(null);
+      setHasNextPage(false);
     } finally {
       setLoading(false);
     }
-  }, [activeFolder, searchQuery, selectedEmail]);
+  }, [activeFolder, searchQuery]);
+
+  const loadMoreRows = useCallback(async (_startIndex: number, _stopIndex: number) => {
+    if (isLoadingMore || !hasNextPage || !activeFolder) {
+      return;
+    }
+
+    try {
+      setIsLoadingMore(true);
+      currentPageRef.current += 1;
+
+      const queryParams: EmailListParams = {
+        limit: 50,
+        page: currentPageRef.current,
+        ...activeFolder.queryOverrides,
+        search: searchQuery || undefined,
+      };
+
+      console.log('Loading more emails, page:', currentPageRef.current);
+
+      const emailsRes = await emailApi.listEmails(queryParams);
+      const newEmails = emailsRes.data.emails || [];
+
+      console.log('Loaded', newEmails.length, 'more emails');
+
+      // Append new emails to existing ones
+      setEmails((prev) => [...prev, ...newEmails]);
+      // Update hasNextPage based on response
+      setHasNextPage(newEmails.length === 50);
+    } catch (error) {
+      console.error('Failed to load more emails:', error);
+      setHasNextPage(false);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [activeFolder, searchQuery, hasNextPage, isLoadingMore]);
+
+  const totalRowCount = hasNextPage ? emails.length + 1 : emails.length;
+  const listHeight = typeof window === 'undefined' ? 600 : window.innerHeight - 250;
+
+  const isRowLoaded = useCallback(
+    (index: number) => !hasNextPage || index < emails.length,
+    [emails.length, hasNextPage],
+  );
+
+  const onRowsRendered = useInfiniteLoader({
+    isRowLoaded,
+    loadMoreRows,
+    minimumBatchSize: 50,
+    rowCount: totalRowCount,
+    threshold: 15,
+  });
+
+  const handleRowsRendered = useCallback(
+    (visibleRows: { startIndex: number; stopIndex: number }) => {
+      onRowsRendered(visibleRows);
+    },
+    [onRowsRendered],
+  );
+
 
   useEffect(() => {
     loadFolderMetadata();
@@ -257,23 +357,47 @@ export function PmSyncMailbox() {
     if (activeFolder) {
       loadData();
     }
-  }, [activeFolder, loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFolder, searchQuery]);
 
-  const handleRefresh = () => {
-    loadFolderMetadata();
-    if (activeFolder) {
-      loadData();
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      console.log('Refreshing folders and emails...');
+
+      // Reload folders first
+      await loadFolderMetadata();
+
+      // Then reload emails
+      if (activeFolder) {
+        await loadData();
+      }
+
+      console.log('Refresh completed');
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
-  const handleEmailClick = (email: Email) => {
-    setSelectedEmail(email);
-    // Mark as read
-    if (!email.isRead) {
-      emailApi.updateEmail(email.id, { isRead: true });
-      setEmails((prev) =>
-        prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e))
-      );
+  const handleEmailClick = async (email: Email) => {
+    // Fetch full email with bodyHtml
+    try {
+      const fullEmail = await emailApi.getEmail(email.id);
+      setSelectedEmail(fullEmail.data);
+
+      // Mark as read
+      if (!fullEmail.data.isRead) {
+        emailApi.updateEmail(email.id, { isRead: true });
+        setEmails((prev) =>
+          prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e))
+        );
+      }
+    } catch (error) {
+      console.error('Failed to fetch email:', error);
+      // Fallback to list email if fetch fails
+      setSelectedEmail(email);
     }
   };
 
@@ -296,12 +420,31 @@ export function PmSyncMailbox() {
   };
 
   const handleBulkDelete = async () => {
-    const ids = Array.from(selectedIds);
-    await Promise.all(ids.map((id) => emailApi.deleteEmail(id)));
-    setEmails((prev) => prev.filter((e) => !selectedIds.has(e.id)));
-    setSelectedIds(new Set());
-    if (selectedEmail && selectedIds.has(selectedEmail.id)) {
-      setSelectedEmail(emails[0] || null);
+    if (selectedIds.size === 0) {
+      return;
+    }
+
+    const idsToDelete = new Set(selectedIds);
+
+    try {
+      await Promise.all(Array.from(idsToDelete).map((id) => emailApi.deleteEmail(id)));
+
+      let nextSelection: Email | null = selectedEmail;
+      setEmails((prev) => {
+        const nextEmails = prev.filter((email) => !idsToDelete.has(email.id));
+        if (selectedEmail && idsToDelete.has(selectedEmail.id)) {
+          nextSelection = nextEmails[0] || null;
+        }
+        return nextEmails;
+      });
+
+      if (selectedEmail && idsToDelete.has(selectedEmail.id)) {
+        setSelectedEmail(nextSelection);
+      }
+    } catch (error) {
+      console.error('Failed to delete selected emails:', error);
+    } finally {
+      setSelectedIds(new Set());
     }
   };
 
@@ -373,16 +516,146 @@ export function PmSyncMailbox() {
     }
   };
 
+  const renderRow = useCallback(
+    ({ index, style, ariaAttributes }: RowComponentProps) => {
+      if (index >= emails.length) {
+        return (
+          <div style={style} {...ariaAttributes}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          </div>
+        );
+      }
+
+      const email = emails[index];
+      return (
+        <div style={style} {...ariaAttributes}>
+          <ListItemButton
+            selected={selectedEmail?.id === email.id}
+            onClick={() => handleEmailClick(email)}
+            sx={{
+              px: 2,
+              py: 1.5,
+              bgcolor: email.isRead ? 'transparent' : 'action.hover',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
+              <Checkbox
+                checked={selectedIds.has(email.id)}
+                onChange={() => handleToggleSelect(email.id)}
+                onClick={(e) => e.stopPropagation()}
+                size="small"
+              />
+              <Badge
+                badgeContent={getProviderIcon(email.providerId)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                sx={{
+                  '& .MuiBadge-badge': {
+                    fontSize: '0.6rem',
+                    minWidth: 16,
+                    height: 16,
+                    padding: 0,
+                    backgroundColor: 'transparent',
+                  },
+                }}
+              >
+                <Avatar sx={{ width: 36, height: 36 }}>
+                  {parseEmailFrom(email.from).name[0]?.toUpperCase() || 'U'}
+                </Avatar>
+              </Badge>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: email.isRead ? 400 : 600,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                    }}
+                  >
+                    {parseEmailFrom(email.from).name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {formatDate(email.sentAt)}
+                  </Typography>
+                </Box>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: email.isRead ? 400 : 600,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    mb: 0.5,
+                  }}
+                >
+                  {email.subject}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 1,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {email.snippet}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
+                  {hasAttachments(email) && (
+                    <Chip
+                      size="small"
+                      icon={<Paperclip size={12} />}
+                      label="Attachment"
+                      sx={{ height: 18, fontSize: '0.65rem' }}
+                    />
+                  )}
+                </Box>
+              </Box>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleStar(email.id, email.isStarred);
+                }}
+              >
+                <Star size={16} fill={email.isStarred ? '#FFB300' : 'none'} color={email.isStarred ? '#FFB300' : 'currentColor'} />
+              </IconButton>
+            </Box>
+          </ListItemButton>
+          <Divider />
+        </div>
+      );
+    },
+    [
+      emails,
+      selectedEmail,
+      handleEmailClick,
+      selectedIds,
+      handleToggleSelect,
+      getProviderIcon,
+      parseEmailFrom,
+      formatDate,
+      hasAttachments,
+      handleToggleStar,
+    ],
+  );
+
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', overflow: 'hidden' }}>
       {/* Folders Sidebar */}
       <Paper
         sx={{
-          width: 240,
+          width: { xs: '100%', sm: 240 },
           borderRadius: 0,
-          borderRight: 1,
+          borderRight: { xs: 0, sm: 1 },
           borderColor: 'divider',
-          display: { xs: 'none', md: 'flex' },
+          display: selectedEmail ? { xs: 'none', sm: 'flex' } : { xs: 'flex', sm: 'flex' },
           flexDirection: 'column',
         }}
       >
@@ -397,7 +670,7 @@ export function PmSyncMailbox() {
           </Button>
         </Box>
 
-        <List sx={{ px: 1, flex: 1 }}>
+        <MuiList sx={{ px: 1, flex: 1, overflow: 'auto' }}>
           {foldersLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
               <CircularProgress size={18} />
@@ -410,53 +683,85 @@ export function PmSyncMailbox() {
             </Box>
           ) : (
             foldersByProvider.map((group) => (
-              <Box key={group.providerId} sx={{ mb: 2 }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ px: 2, mb: 1, display: 'block', fontWeight: 600, textTransform: 'uppercase' }}
+              <Accordion
+                key={group.providerId}
+                expanded={expandedProviders.has(group.providerId)}
+                onChange={() => {
+                  const newExpanded = new Set(expandedProviders);
+                  if (expandedProviders.has(group.providerId)) {
+                    newExpanded.delete(group.providerId);
+                  } else {
+                    newExpanded.add(group.providerId);
+                  }
+                  setExpandedProviders(newExpanded);
+                }}
+                disableGutters
+                elevation={0}
+                sx={{
+                  '&:before': { display: 'none' },
+                  '&.Mui-expanded': { margin: 0 },
+                }}
+              >
+                <AccordionSummary
+                  expandIcon={<ChevronDown size={16} />}
+                  sx={{
+                    minHeight: 40,
+                    px: 2,
+                    '&.Mui-expanded': { minHeight: 40 },
+                    '& .MuiAccordionSummary-content': { my: 0.5 },
+                  }}
                 >
-                  {group.providerEmail}
-                </Typography>
-                {group.folders.map((folder) => (
-                  <ListItemButton
-                    key={folder.id}
-                    selected={activeFolder?.id === folder.id}
-                    onClick={() => setSelectedFolderId(folder.id)}
-                    sx={{ borderRadius: 2, mb: 0.5 }}
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ fontWeight: 600, textTransform: 'uppercase' }}
                   >
-                    <ListItemIcon
-                      sx={{
-                        minWidth: 36,
-                        color: folder.color || 'inherit',
-                      }}
-                    >
-                      {folder.icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={folder.label}
-                      primaryTypographyProps={{
-                        fontSize: '0.875rem',
-                        fontWeight: activeFolder?.id === folder.id ? 600 : 500,
-                      }}
-                    />
-                    {folder.count && folder.count > 0 && (
-                      <Chip
-                        label={folder.count}
-                        size="small"
-                        sx={{
-                          height: 20,
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                        }}
-                      />
-                    )}
-                  </ListItemButton>
-                ))}
-              </Box>
+                    {group.providerEmail}
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ p: 0 }}>
+                  <MuiList sx={{ py: 0 }}>
+                    {group.folders.map((folder) => (
+                      <ListItemButton
+                        key={folder.id}
+                        selected={activeFolder?.id === folder.id}
+                        onClick={() => setSelectedFolderId(folder.id)}
+                        sx={{ borderRadius: 2, mb: 0.5, mx: 1 }}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            minWidth: 36,
+                            color: folder.color || 'inherit',
+                          }}
+                        >
+                          {folder.icon}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={folder.label}
+                          primaryTypographyProps={{
+                            fontSize: '0.875rem',
+                            fontWeight: activeFolder?.id === folder.id ? 600 : 500,
+                          }}
+                        />
+                        {folder.count && folder.count > 0 && (
+                          <Chip
+                            label={folder.count}
+                            size="small"
+                            sx={{
+                              height: 20,
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                            }}
+                          />
+                        )}
+                      </ListItemButton>
+                    ))}
+                  </MuiList>
+                </AccordionDetails>
+              </Accordion>
             ))
           )}
-        </List>
+        </MuiList>
 
         <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
           <Typography variant="caption" color="text.secondary">
@@ -465,14 +770,14 @@ export function PmSyncMailbox() {
         </Box>
       </Paper>
 
-      {/* Email List */}
+      {/* Email List - hide on mobile when email is selected */}
       <Paper
         sx={{
           width: { xs: '100%', md: 360 },
           borderRadius: 0,
           borderRight: { xs: 0, md: 1 },
           borderColor: 'divider',
-          display: 'flex',
+          display: selectedEmail ? { xs: 'none', sm: 'flex' } : 'flex',
           flexDirection: 'column',
         }}
       >
@@ -507,8 +812,8 @@ export function PmSyncMailbox() {
               <>
                 <Checkbox onChange={handleSelectAll} />
                 <Tooltip title={t.common.refresh}>
-                  <IconButton size="small" onClick={handleRefresh}>
-                    <RefreshCw size={18} />
+                  <IconButton size="small" onClick={handleRefresh} disabled={refreshing}>
+                    <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
                   </IconButton>
                 </Tooltip>
                 <Box sx={{ flex: 1 }} />
@@ -536,7 +841,7 @@ export function PmSyncMailbox() {
         </Box>
 
         {/* Email List */}
-        <List sx={{ flex: 1, overflow: 'auto', p: 0 }}>
+        <Box sx={{ flex: 1, overflow: 'hidden' }}>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
               <CircularProgress />
@@ -549,124 +854,35 @@ export function PmSyncMailbox() {
               </Typography>
             </Box>
           ) : (
-            emails.map((email) => (
-              <React.Fragment key={email.id}>
-                <ListItemButton
-                  selected={selectedEmail?.id === email.id}
-                  onClick={() => handleEmailClick(email)}
-                  sx={{
-                    px: 2,
-                    py: 1.5,
-                    bgcolor: email.isRead ? 'transparent' : 'action.hover',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
-                    <Checkbox
-                      checked={selectedIds.has(email.id)}
-                      onChange={() => handleToggleSelect(email.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      size="small"
-                    />
-                    <Badge
-                      badgeContent={getProviderIcon(email.providerId)}
-                      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                      sx={{
-                        '& .MuiBadge-badge': {
-                          fontSize: '0.6rem',
-                          minWidth: 16,
-                          height: 16,
-                          padding: 0,
-                          backgroundColor: 'transparent',
-                        },
-                      }}
-                    >
-                      <Avatar sx={{ width: 36, height: 36 }}>
-                        {parseEmailFrom(email.from).name[0]?.toUpperCase() || 'U'}
-                      </Avatar>
-                    </Badge>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontWeight: email.isRead ? 400 : 600,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            flex: 1,
-                          }}
-                        >
-                          {parseEmailFrom(email.from).name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatDate(email.sentAt)}
-                        </Typography>
-                      </Box>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontWeight: email.isRead ? 400 : 600,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          mb: 0.5,
-                        }}
-                      >
-                        {email.subject}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 1,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {email.snippet}
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-                        {hasAttachments(email) && (
-                          <Chip
-                            size="small"
-                            icon={<Paperclip size={12} />}
-                            label="Attachment"
-                            sx={{ height: 18, fontSize: '0.65rem' }}
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleStar(email.id, email.isStarred);
-                      }}
-                    >
-                      <Star
-                        size={16}
-                        fill={email.isStarred ? '#FFB300' : 'none'}
-                        color={email.isStarred ? '#FFB300' : 'currentColor'}
-                      />
-                    </IconButton>
-                  </Box>
-                </ListItemButton>
-                <Divider />
-              </React.Fragment>
-            ))
+            <VirtualizedList
+              rowCount={totalRowCount}
+              rowHeight={120}
+              rowComponent={renderRow}
+              rowProps={{}}
+              onRowsRendered={handleRowsRendered}
+              style={{ height: listHeight, width: '100%' }}
+              defaultHeight={600}
+              overscanCount={5}
+            />
           )}
-        </List>
+        </Box>
       </Paper>
 
-      {/* Email Detail Panel */}
+      {/* Email Detail Panel - fullscreen on mobile, side panel on desktop */}
       {selectedEmail && (
         <Box
           sx={{
             flex: 1,
-            display: { xs: 'none', lg: 'flex' },
+            display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            position: { xs: 'fixed', sm: 'relative' },
+            top: { xs: 0, sm: 'auto' },
+            left: { xs: 0, sm: 'auto' },
+            right: { xs: 0, sm: 'auto' },
+            bottom: { xs: 0, sm: 'auto' },
+            zIndex: { xs: 1200, sm: 'auto' },
+            bgcolor: 'background.paper',
           }}
         >
           {/* Header */}
@@ -728,7 +944,7 @@ export function PmSyncMailbox() {
 
             <Divider sx={{ mb: 3 }} />
 
-            <Box sx={{ mb: 3 }} dangerouslySetInnerHTML={{ __html: sanitizedBody }} />
+            <Box sx={{ mb: 3 }} dangerouslySetInnerHTML={{ __html: emailBody }} />
 
             {hasAttachments(selectedEmail) && selectedEmail.attachments && (
               <Box>

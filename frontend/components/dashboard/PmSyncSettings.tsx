@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Paper,
@@ -20,24 +20,28 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   TextField,
-  Chip,
   Stack,
   CircularProgress,
+  Tabs,
+  Tab,
+  Alert,
 } from '@mui/material';
-import {
-  Settings,
-  User,
-  Bell,
-  Mail,
-  Moon,
-  Globe,
-  Clock,
-  Sparkles,
-} from 'lucide-react';
+import { Settings, User, Bell, Mail, Moon, Globe, Clock, Sparkles, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useTranslations } from '@/lib/hooks/use-translations';
+import { GoogleProviderCard } from '@/components/providers/GoogleProviderCard';
+import { MicrosoftProviderCard } from '@/components/providers/MicrosoftProviderCard';
+import { GenericProviderDialog } from '@/components/providers/GenericProviderDialog';
+import { ProvidersList } from '@/components/providers/ProvidersList';
+import {
+  DEFAULT_USER_SETTINGS,
+  getStoredUserSettings,
+  persistUserSettings,
+  resetUserSettings,
+  type ThemePreference,
+} from '@/lib/utils/user-settings';
 
 type SettingsSection =
   | 'general'
@@ -52,12 +56,17 @@ export function PmSyncSettings() {
   const t = useTranslations();
   const settingsCopy = useMemo(() => t.dashboard.settings, [t]);
   const [selectedSection, setSelectedSection] = useState<SettingsSection>('general');
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('dark');
-  const [language, setLanguage] = useState('en-US');
-  const [timezone, setTimezone] = useState('GMT-08:00');
-  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [theme, setTheme] = useState<ThemePreference>(DEFAULT_USER_SETTINGS.theme);
+  const [language, setLanguage] = useState(DEFAULT_USER_SETTINGS.language);
+  const [timezone, setTimezone] = useState(DEFAULT_USER_SETTINGS.timezone);
+  const [emailNotifications, setEmailNotifications] = useState(
+    DEFAULT_USER_SETTINGS.emailNotifications,
+  );
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
-  const [accountsLoading, setAccountsLoading] = useState(false);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providerError, setProviderError] = useState('');
+  const [providerSuccess, setProviderSuccess] = useState('');
+  const [saveLoading, setSaveLoading] = useState(false);
 
   const sections = useMemo(
     () => [
@@ -70,21 +79,151 @@ export function PmSyncSettings() {
     [settingsCopy.sections],
   );
 
+  const loadProviders = useCallback(async () => {
+    try {
+      setProvidersLoading(true);
+      setProviderError('');
+      const response = await providersApi.getProviders();
+      setProviders(response || []);
+    } catch (error) {
+      console.error('Failed to load providers:', error);
+      setProviderError('Failed to load providers. Please try again.');
+    } finally {
+      setProvidersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchProviders = async () => {
-      try {
-        setAccountsLoading(true);
-        const response = await providersApi.getProviders();
-        setProviders(response || []);
-      } catch (error) {
-        console.error('Failed to load providers:', error);
-      } finally {
-        setAccountsLoading(false);
+    loadProviders();
+  }, [loadProviders]);
+
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+    const sectionParam = router.query.section;
+    if (
+      typeof sectionParam === 'string' &&
+      sections.some((section) => section.id === sectionParam)
+    ) {
+      setSelectedSection(sectionParam as SettingsSection);
+    }
+  }, [router.isReady, router.query.section, sections]);
+
+  const handleSectionSelect = useCallback(
+    (sectionId: SettingsSection) => {
+      setSelectedSection(sectionId);
+      if (!router.isReady) {
+        return;
       }
+      const currentSection =
+        typeof router.query.section === 'string' ? router.query.section : undefined;
+      if (currentSection === sectionId) {
+        return;
+      }
+      router.replace(
+        { pathname: router.pathname, query: { section: sectionId } },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router],
+  );
+
+  const handleProviderInitiated = useCallback(() => {
+    setProviderError('');
+    setProviderSuccess('Redirecting to provider. Complete the authorization flow to finish connecting.');
+  }, []);
+
+  const handleProviderConnected = useCallback(() => {
+    setProviderError('');
+    setProviderSuccess('Provider connected successfully!');
+    loadProviders();
+  }, [loadProviders]);
+
+  const handleProviderDeleted = useCallback(() => {
+    setProviderError('');
+    setProviderSuccess('Provider disconnected successfully!');
+    loadProviders();
+  }, [loadProviders]);
+
+  const handleOAuthCallback = useCallback(
+    async (authorizationCode: string, providerType: string) => {
+      try {
+        setProviderError('');
+        setProviderSuccess('');
+        setProvidersLoading(true);
+
+        if (providerType === 'google') {
+          await providersApi.connectGoogle({
+            authorizationCode,
+            supportsCalendar: true,
+          });
+        } else if (providerType === 'microsoft') {
+          await providersApi.connectMicrosoft({
+            authorizationCode,
+            supportsCalendar: true,
+          });
+        } else {
+          setProviderError('Unsupported provider type');
+          return;
+        }
+
+        setProviderSuccess('Provider connected successfully!');
+        await loadProviders();
+      } catch (error) {
+        const err = error as { response?: { data?: { message?: string } } };
+        setProviderError(
+          err.response?.data?.message || `Failed to connect ${providerType} account`,
+        );
+      } finally {
+        setProvidersLoading(false);
+      }
+    },
+    [loadProviders],
+  );
+
+  useEffect(() => {
+    if (!router.isReady) {
+      return;
+    }
+
+    const { code, provider, error } = router.query;
+    if (!code && !error) {
+      return;
+    }
+
+    setSelectedSection('accounts');
+
+    const cleanupQuery = () => {
+      router.replace(
+        { pathname: router.pathname, query: { section: 'accounts' } },
+        undefined,
+        { shallow: true },
+      );
     };
 
-    fetchProviders();
-  }, []);
+    (async () => {
+      if (error && typeof error === 'string') {
+        setProviderError(`OAuth error: ${error}`);
+        setProviderSuccess('');
+        cleanupQuery();
+        return;
+      }
+
+      if (typeof code === 'string' && typeof provider === 'string') {
+        await handleOAuthCallback(code, provider);
+        cleanupQuery();
+      }
+    })();
+  }, [
+    router.isReady,
+    router.query.code,
+    router.query.error,
+    router.query.provider,
+    router.pathname,
+    handleOAuthCallback,
+  ]);
 
   const generalCopy = settingsCopy.generalPanel;
   const aiCopy = settingsCopy.aiPanel;
@@ -92,17 +231,44 @@ export function PmSyncSettings() {
   const accountCopy = settingsCopy.accountPanel;
   const notificationsCopy = settingsCopy.notificationsPanel;
 
-  const formatProviderType = (type: ProviderConfig['providerType']) =>
-    mailAccountsCopy.providerTypes[type] || type;
+  const accountName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || '';
 
-  const formatLastSynced = (value?: string | null) => {
-    if (!value) {
-      return mailAccountsCopy.neverSynced;
+  const handleSaveSettings = async () => {
+    try {
+      setSaveLoading(true);
+      // TODO: replace local persistence with backend once the API is ready
+      persistUserSettings({
+        theme,
+        language,
+        timezone,
+        emailNotifications,
+      });
+
+      alert('Settings saved successfully');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      alert('Failed to save settings');
+    } finally {
+      setSaveLoading(false);
     }
-    return new Date(value).toLocaleString();
   };
 
-  const accountName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || '';
+  const handleResetSettings = () => {
+    const defaults = resetUserSettings();
+    setTheme(defaults.theme);
+    setLanguage(defaults.language);
+    setTimezone(defaults.timezone);
+    setEmailNotifications(defaults.emailNotifications);
+  };
+
+  // Load saved settings on mount
+  useEffect(() => {
+    const savedSettings = getStoredUserSettings();
+    setTheme(savedSettings.theme);
+    setLanguage(savedSettings.language);
+    setTimezone(savedSettings.timezone);
+    setEmailNotifications(savedSettings.emailNotifications);
+  }, []);
 
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', overflow: 'hidden' }}>
@@ -133,7 +299,7 @@ export function PmSyncSettings() {
             <ListItemButton
               key={section.id}
               selected={selectedSection === section.id}
-              onClick={() => setSelectedSection(section.id as SettingsSection)}
+              onClick={() => handleSectionSelect(section.id as SettingsSection)}
               sx={{ borderRadius: 2, mb: 0.5 }}
             >
               <ListItemIcon sx={{ minWidth: 36 }}>{section.icon}</ListItemIcon>
@@ -155,7 +321,30 @@ export function PmSyncSettings() {
       </Paper>
 
       {/* Main Content */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 2, md: 3 } }}>
+        {/* Mobile Navigation Tabs */}
+        <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 3 }}>
+          <Tabs
+            value={sections.findIndex((s) => s.id === selectedSection)}
+            onChange={(_, newValue) =>
+              handleSectionSelect(sections[newValue].id as SettingsSection)
+            }
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ borderBottom: 1, borderColor: 'divider' }}
+          >
+            {sections.map((section) => (
+              <Tab
+                key={section.id}
+                label={section.label}
+                icon={section.icon}
+                iconPosition="start"
+                sx={{ minHeight: 48, textTransform: 'none' }}
+              />
+            ))}
+          </Tabs>
+        </Box>
+
         {/* General Settings */}
         {selectedSection === 'general' && (
           <Box>
@@ -272,8 +461,16 @@ export function PmSyncSettings() {
                 </Typography>
 
                 <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                  <Button variant="outlined">{generalCopy.reset}</Button>
-                  <Button variant="contained">{generalCopy.save}</Button>
+                  <Button variant="outlined" onClick={handleResetSettings} disabled={saveLoading}>
+                    {generalCopy.reset}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={handleSaveSettings}
+                    disabled={saveLoading}
+                  >
+                    {saveLoading ? 'Saving...' : generalCopy.save}
+                  </Button>
                 </Box>
               </CardContent>
             </Card>
@@ -290,74 +487,148 @@ export function PmSyncSettings() {
               {mailAccountsCopy.description}
             </Typography>
 
-            <Card>
-              <CardContent>
-                {accountsLoading ? (
-                  <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
-                    <CircularProgress size={28} />
-                  </Box>
-                ) : providers.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    {mailAccountsCopy.empty}
-                  </Typography>
-                ) : (
-                  <Stack spacing={2}>
-                    {providers.map((provider) => (
-                      <Paper
-                        key={provider.id}
-                        variant="outlined"
-                        sx={{ p: 2, borderRadius: 2 }}
-                      >
-                        <Stack
-                          direction={{ xs: 'column', sm: 'row' }}
-                          justifyContent="space-between"
-                          alignItems={{ xs: 'flex-start', sm: 'center' }}
-                          spacing={1}
-                        >
-                          <Box>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                              {provider.email}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              {formatProviderType(provider.providerType)}
-                            </Typography>
-                          </Box>
-                          <Stack direction="row" spacing={1}>
-                            {provider.isDefault && (
-                              <Chip
-                                label={mailAccountsCopy.defaultBadge}
-                                size="small"
-                                color="primary"
-                              />
-                            )}
-                          </Stack>
-                        </Stack>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
-                          {provider.supportsEmail && (
-                            <Chip label={mailAccountsCopy.emailBadge} size="small" />
-                          )}
-                          {provider.supportsCalendar && (
-                            <Chip label={mailAccountsCopy.calendarBadge} size="small" />
-                          )}
-                          {provider.supportsContacts && (
-                            <Chip label={mailAccountsCopy.contactsBadge} size="small" />
-                          )}
-                        </Stack>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                          {mailAccountsCopy.lastSyncPrefix} {formatLastSynced(provider.lastSyncedAt)}
-                        </Typography>
-                      </Paper>
-                    ))}
-                  </Stack>
-                )}
+            <Stack spacing={3}>
+              {(providerError || providerSuccess) && (
+                <Stack spacing={2}>
+                  {providerError && (
+                    <Alert severity="error" onClose={() => setProviderError('')}>
+                      {providerError}
+                    </Alert>
+                  )}
+                  {providerSuccess && (
+                    <Alert severity="success" onClose={() => setProviderSuccess('')}>
+                      {providerSuccess}
+                    </Alert>
+                  )}
+                </Stack>
+              )}
 
-                <Box sx={{ mt: 3 }}>
-                  <Button variant="outlined" onClick={() => router.push('/dashboard/providers')}>
-                    {mailAccountsCopy.manage}
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
+              <Card>
+                <CardContent>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    justifyContent="space-between"
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
+                    spacing={2}
+                    sx={{ mb: 3 }}
+                  >
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Connected providers
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Manage linked inboxes, calendars, and automation sources for your tenant.
+                      </Typography>
+                    </Box>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<RefreshCw size={16} />}
+                      onClick={loadProviders}
+                      disabled={providersLoading}
+                    >
+                      {providersLoading ? 'Refreshing...' : 'Refresh'}
+                    </Button>
+                  </Stack>
+
+                  {providersLoading ? (
+                    <Box sx={{ py: 6, display: 'flex', justifyContent: 'center' }}>
+                      <CircularProgress size={28} />
+                    </Box>
+                  ) : (
+                    <ProvidersList providers={providers} onDelete={handleProviderDeleted} />
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Add a provider
+                  </Typography>
+                  <Stack
+                    spacing={2}
+                    direction={{ xs: 'column', md: 'row' }}
+                    alignItems="stretch"
+                  >
+                    <Box sx={{ flex: 1 }}>
+                      <GoogleProviderCard onSuccess={handleProviderInitiated} />
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <MicrosoftProviderCard onSuccess={handleProviderInitiated} />
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Generic Email/Calendar Provider
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Connect any IMAP/SMTP or CalDAV provider to unify email and calendar data.
+                  </Typography>
+                  <GenericProviderDialog onSuccess={handleProviderConnected} />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Need Help?
+                  </Typography>
+                  <Box
+                    component="div"
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      fontSize: '0.9rem',
+                      color: 'text.primary',
+                    }}
+                  >
+                    <p>
+                      <strong>Google:</strong> Click &quot;Connect Google Account&quot; and sign in with
+                      your Google credentials. Grant access to Gmail, Calendar, and Contacts.
+                    </p>
+                    <p>
+                      <strong>Microsoft:</strong> Use &quot;Connect Microsoft Account&quot; and sign in
+                      with your Outlook/Microsoft 365 credentials.
+                    </p>
+                    <p>
+                      <strong>Generic IMAP:</strong> Provide IMAP/SMTP server details from your provider.
+                      CalDAV enables calendar sync.
+                    </p>
+                    <Box
+                      sx={{
+                        mt: 1,
+                        borderRadius: 3,
+                        border: 1,
+                        borderColor: 'divider',
+                        bgcolor: 'action.hover',
+                        p: 2,
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                        Common IMAP/SMTP Settings:
+                      </Typography>
+                      <Box component="ul" sx={{ pl: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <li>
+                          <strong>Gmail:</strong> imap.gmail.com:993, smtp.gmail.com:587 (requires app password)
+                        </li>
+                        <li>
+                          <strong>Outlook.com:</strong> outlook.office365.com:993, smtp.office365.com:587
+                        </li>
+                        <li>
+                          <strong>Yahoo:</strong> imap.mail.yahoo.com:993, smtp.mail.yahoo.com:587
+                        </li>
+                      </Box>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Stack>
           </Box>
         )}
 

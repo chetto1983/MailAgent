@@ -4,7 +4,7 @@
 
 - **Frontend:** `http://localhost:3001` (Next.js)
 - **Backend:** `http://localhost:3000` (NestJS)
-- **OAuth Redirect:** `http://localhost:3001/dashboard/providers`
+- **OAuth Redirect:** `http://localhost:3001/dashboard/settings?section=accounts`
 
 ---
 
@@ -40,7 +40,7 @@ Cerca e abilita queste API:
 
 5. **Authorized redirect URIs:**
    ```
-   http://localhost:3001/dashboard/providers
+   http://localhost:3001/dashboard/settings?section=accounts
    http://localhost:3000/providers/google/callback
    ```
 
@@ -56,7 +56,7 @@ Cerca e abilita queste API:
 # Google OAuth
 GOOGLE_CLIENT_ID=123456789-xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
-GOOGLE_REDIRECT_URI=http://localhost:3001/dashboard/providers
+GOOGLE_REDIRECT_URI=http://localhost:3001/dashboard/settings?section=accounts
 ```
 
 ### Passo 5: Test Users (Solo per External)
@@ -87,7 +87,7 @@ Se usi **External**, aggiungi il tuo account Gmail come test user:
 - Supported account types: **Accounts in any organizational directory and personal Microsoft accounts**
 - Redirect URI:
   - Platform: **Web**
-  - URI: `http://localhost:3001/dashboard/providers`
+  - URI: `http://localhost:3001/dashboard/settings?section=accounts`
 
 Click **Register**
 
@@ -97,7 +97,7 @@ Click **Register**
 2. **Redirect URIs** → **+ Add a platform** → **Web**
 3. Aggiungi:
    ```
-   http://localhost:3001/dashboard/providers
+   http://localhost:3001/dashboard/settings?section=accounts
    http://localhost:3000/providers/microsoft/callback
    ```
 4. Salva
@@ -145,7 +145,7 @@ Vai su **Overview** e copia:
 MICROSOFT_CLIENT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
 MICROSOFT_CLIENT_SECRET=xxxxxxxxxxxxx
 MICROSOFT_TENANT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
-MICROSOFT_REDIRECT_URI=http://localhost:3001/dashboard/providers
+MICROSOFT_REDIRECT_URI=http://localhost:3001/dashboard/settings?section=accounts
 ```
 
 ---
@@ -170,13 +170,13 @@ JWT_EXPIRES_IN=7d
 # Google OAuth
 GOOGLE_CLIENT_ID=123456789-xxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
-GOOGLE_REDIRECT_URI=http://localhost:3001/dashboard/providers
+GOOGLE_REDIRECT_URI=http://localhost:3001/dashboard/settings?section=accounts
 
 # Microsoft OAuth
 MICROSOFT_CLIENT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
 MICROSOFT_CLIENT_SECRET=xxxxxxxxxxxxx
 MICROSOFT_TENANT_ID=xxxxx-xxxx-xxxx-xxxx-xxxxx
-MICROSOFT_REDIRECT_URI=http://localhost:3001/dashboard/providers
+MICROSOFT_REDIRECT_URI=http://localhost:3001/dashboard/settings?section=accounts
 
 # Encryption (per token storage)
 ENCRYPTION_KEY=your-32-character-encryption-key!!
@@ -220,7 +220,7 @@ MICROSOFT_WEBHOOK_URL=https://your-ngrok-url.ngrok.io/webhooks/microsoft/notific
 5. **Autorizza l'app:**
    - Seleziona account Gmail
    - Accetta permissions
-   - Verrai reindirizzato a `/dashboard/providers?code=xxx`
+   - Verrai reindirizzato a `/dashboard/settings?section=accounts?code=xxx`
 
 6. **Frontend completerà automaticamente la connessione**
 
@@ -241,7 +241,7 @@ Stesso processo, ma click su **"Connect Microsoft"**
 2. Edit OAuth 2.0 Client ID
 3. Verifica Authorized redirect URIs contiene **esattamente**:
    ```
-   http://localhost:3001/dashboard/providers
+   http://localhost:3001/dashboard/settings?section=accounts
    ```
 4. Salva e riprova (può servire qualche minuto per propagazione)
 
@@ -254,7 +254,7 @@ Stesso processo, ma click su **"Connect Microsoft"**
 2. Authentication
 3. Verifica Redirect URIs contiene:
    ```
-   http://localhost:3001/dashboard/providers
+   http://localhost:3001/dashboard/settings?section=accounts
    ```
 4. Salva e riprova
 
@@ -306,7 +306,7 @@ Content-Type: application/json
 
 {
   "code": "4/0AeanSxxxxxxxxxxxxx",
-  "redirectUri": "http://localhost:3001/dashboard/providers"
+  "redirectUri": "http://localhost:3001/dashboard/settings?section=accounts"
 }
 ```
 
@@ -335,7 +335,7 @@ Content-Type: application/json
 
 {
   "code": "M.C507_BAY.xxxxxxxxx",
-  "redirectUri": "http://localhost:3001/dashboard/providers"
+  "redirectUri": "http://localhost:3001/dashboard/settings?section=accounts"
 }
 ```
 

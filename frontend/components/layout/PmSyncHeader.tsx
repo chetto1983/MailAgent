@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -17,6 +17,7 @@ import {
   Tooltip,
   useTheme,
   useMediaQuery,
+  CircularProgress,
 } from '@mui/material';
 import {
   Search,
@@ -30,6 +31,15 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useAuthStore } from '@/stores/auth-store';
+import { useAuth } from '@/lib/hooks/use-auth';
+import { emailApi } from '@/lib/api/email';
+
+interface HeaderNotification {
+  id: string;
+  subject: string;
+  sender: string;
+  receivedAt?: string;
+}
 
 export interface PmSyncHeaderProps {
   onMenuClick?: () => void;
@@ -46,10 +56,14 @@ export function PmSyncHeader({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const logout = useAuthStore((state: any) => state.logout);
+  const { user } = useAuth();
 
   const [searchValue, setSearchValue] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
+  const [notifications, setNotifications] = useState<HeaderNotification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
 
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -59,8 +73,61 @@ export function PmSyncHeader({
     setAnchorEl(null);
   };
 
+  const parseSender = (from: string) => {
+    if (!from) return '';
+    const match = from.match(/^(.+?)\s*<(.+?)>$/);
+    if (match) {
+      return match[1];
+    }
+    return from;
+  };
+
+  const formatRelativeTime = (isoDate?: string) => {
+    if (!isoDate) {
+      return '';
+    }
+    const date = new Date(isoDate);
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      setNotificationsLoading(true);
+      setNotificationsError(null);
+      const response = await emailApi.listEmails({
+        page: 1,
+        limit: 5,
+        isRead: false,
+      });
+
+      const items = response.data.emails || [];
+      const mapped: HeaderNotification[] = items.map((email) => ({
+        id: email.id,
+        subject: email.subject || 'No subject',
+        sender: parseSender(email.from),
+        receivedAt: email.receivedAt || email.sentAt || email.createdAt,
+      }));
+      setNotifications(mapped);
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+      setNotifications([]);
+      setNotificationsError('Unable to load notifications');
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, []);
+
   const handleNotificationOpen = (event: React.MouseEvent<HTMLElement>) => {
     setNotificationAnchor(event.currentTarget);
+    fetchNotifications();
   };
 
   const handleNotificationClose = () => {
@@ -79,6 +146,23 @@ export function PmSyncHeader({
       router.push(`/dashboard/search?q=${encodeURIComponent(searchValue)}`);
     }
   };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const unreadCount = notifications.length;
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() ||
+    user?.email ||
+    'Account';
+  const displayEmail = user?.email || '';
+  const avatarInitials =
+    displayName
+      .split(' ')
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2) || 'A';
 
   return (
     <AppBar
@@ -150,7 +234,11 @@ export function PmSyncHeader({
           {/* Notifications */}
           <Tooltip title="Notifications">
             <IconButton color="inherit" onClick={handleNotificationOpen}>
-              <Badge badgeContent={3} color="error">
+              <Badge
+                badgeContent={Math.min(99, unreadCount)}
+                color="error"
+                invisible={unreadCount === 0}
+              >
                 <Bell size={20} />
               </Badge>
             </IconButton>
@@ -167,7 +255,7 @@ export function PmSyncHeader({
                   fontSize: '0.875rem',
                 }}
               >
-                A
+                {avatarInitials}
               </Avatar>
             </IconButton>
           </Tooltip>
@@ -189,10 +277,10 @@ export function PmSyncHeader({
         >
           <Box sx={{ px: 2, py: 1.5 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Alex Johnson
+              {displayName}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              alex@example.com
+              {displayEmail}
             </Typography>
           </Box>
           <Divider />
@@ -256,46 +344,58 @@ export function PmSyncHeader({
             </Typography>
           </Box>
           <Divider />
-          <MenuItem onClick={handleNotificationClose}>
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                New email from Sarah
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                2 minutes ago
+          {notificationsLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <CircularProgress size={20} />
+            </Box>
+          )}
+          {!notificationsLoading && notificationsError && (
+            <Box sx={{ px: 2, py: 2 }}>
+              <Typography variant="body2" color="error">
+                {notificationsError}
               </Typography>
             </Box>
-          </MenuItem>
-          <MenuItem onClick={handleNotificationClose}>
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Meeting reminder
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                15 minutes ago
+          )}
+          {!notificationsLoading && !notificationsError && notifications.length === 0 && (
+            <Box sx={{ px: 2, py: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                tutto a posto
               </Typography>
             </Box>
-          </MenuItem>
-          <MenuItem onClick={handleNotificationClose}>
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Task deadline approaching
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                1 hour ago
-              </Typography>
-            </Box>
-          </MenuItem>
+          )}
+          {!notificationsLoading &&
+            !notificationsError &&
+            notifications.map((notification) => (
+              <MenuItem
+                key={notification.id}
+                onClick={() => {
+                  handleNotificationClose();
+                  router.push('/dashboard/email');
+                }}
+              >
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {notification.subject}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {notification.sender}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {formatRelativeTime(notification.receivedAt)}
+                  </Typography>
+                </Box>
+              </MenuItem>
+            ))}
           <Divider />
           <MenuItem
             onClick={() => {
-              router.push('/dashboard/notifications');
+              router.push('/dashboard/email');
               handleNotificationClose();
             }}
             sx={{ justifyContent: 'center', color: 'primary.main' }}
           >
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              View All
+              Go to Inbox
             </Typography>
           </MenuItem>
         </Menu>

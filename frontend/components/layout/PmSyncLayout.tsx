@@ -1,8 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Box, ThemeProvider, CssBaseline } from '@mui/material';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Box, ThemeProvider, CssBaseline, useMediaQuery } from '@mui/material';
 import { PmSyncSidebar } from './PmSyncSidebar';
 import { PmSyncHeader } from './PmSyncHeader';
 import { darkTheme, lightTheme } from '@/theme/pmSyncTheme';
+import {
+  DEFAULT_USER_SETTINGS,
+  getStoredUserSettings,
+  persistUserSettings,
+  resolveThemePreference,
+  type ThemePreference,
+  USER_SETTINGS_EVENT,
+  USER_SETTINGS_STORAGE_KEY,
+} from '@/lib/utils/user-settings';
 
 const DRAWER_WIDTH_EXPANDED = 240;
 const DRAWER_WIDTH_COLLAPSED = 72;
@@ -14,20 +23,51 @@ export interface PmSyncLayoutProps {
 export function PmSyncLayout({ children }: PmSyncLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+  const [themePreference, setThemePreference] = useState<ThemePreference>(
+    DEFAULT_USER_SETTINGS.theme,
+  );
 
-  // Load theme preference from localStorage
+  const resolvedThemeMode = resolveThemePreference(themePreference, prefersDarkMode);
+  const theme = resolvedThemeMode === 'dark' ? darkTheme : lightTheme;
+
   useEffect(() => {
-    const savedTheme = localStorage.getItem('pmSyncTheme');
-    if (savedTheme) {
-      setIsDarkMode(savedTheme === 'dark');
+    if (typeof window === 'undefined') {
+      return;
     }
-  }, []);
 
-  // Save theme preference to localStorage
-  useEffect(() => {
-    localStorage.setItem('pmSyncTheme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
+    // Load initial settings
+    const stored = getStoredUserSettings();
+    setThemePreference(stored.theme ?? DEFAULT_USER_SETTINGS.theme);
+
+    const handleSettingsEvent = (event: Event) => {
+      const detail = (event as CustomEvent<typeof stored>).detail;
+      if (detail?.theme) {
+        setThemePreference(detail.theme);
+      }
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === USER_SETTINGS_STORAGE_KEY && event.newValue) {
+        try {
+          const parsed = JSON.parse(event.newValue);
+          if (parsed.theme) {
+            setThemePreference(parsed.theme);
+          }
+        } catch {
+          // Ignore JSON errors
+        }
+      }
+    };
+
+    window.addEventListener(USER_SETTINGS_EVENT, handleSettingsEvent as EventListener);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener(USER_SETTINGS_EVENT, handleSettingsEvent as EventListener);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   const handleToggleCollapse = () => {
     setCollapsed(!collapsed);
@@ -37,11 +77,19 @@ export function PmSyncLayout({ children }: PmSyncLayoutProps) {
     setMobileOpen(!mobileOpen);
   };
 
+  const persistTheme = useCallback((preference: ThemePreference) => {
+    setThemePreference(preference);
+    if (typeof window === 'undefined') {
+      return;
+    }
+    persistUserSettings({ theme: preference });
+  }, []);
+
   const handleThemeToggle = () => {
-    setIsDarkMode(!isDarkMode);
+    const next = resolvedThemeMode === 'dark' ? 'light' : 'dark';
+    persistTheme(next);
   };
 
-  const theme = isDarkMode ? darkTheme : lightTheme;
   const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED;
 
   return (
@@ -83,7 +131,7 @@ export function PmSyncLayout({ children }: PmSyncLayoutProps) {
           <PmSyncHeader
             onMenuClick={handleMobileDrawerToggle}
             onThemeToggle={handleThemeToggle}
-            isDarkMode={isDarkMode}
+            isDarkMode={resolvedThemeMode === 'dark'}
           />
 
           {/* Page Content */}

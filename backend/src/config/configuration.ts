@@ -134,8 +134,33 @@ export function loadConfiguration(): Configuration {
   const smtpFromEmail = process.env.SMTP_FROM_EMAIL || 'noreply';
   const smtpFromDomain = process.env.SMTP_FROM_DOMAIN || 'mailagent.local';
 
+  // Security validation - throw error in production if critical secrets are not set
+  const nodeEnv = (process.env.NODE_ENV as any) || 'development';
+  const jwtSecret = process.env.JWT_SECRET;
+  const aesSecretKey = process.env.AES_SECRET_KEY;
+
+  if (nodeEnv === 'production') {
+    if (!jwtSecret || jwtSecret === 'change-me-in-production' || jwtSecret === 'secret') {
+      throw new Error('SECURITY ERROR: JWT_SECRET must be set to a strong secret in production. Generate one with: openssl rand -base64 32');
+    }
+    if (!aesSecretKey || aesSecretKey === 'default-key-change-in-production') {
+      throw new Error('SECURITY ERROR: AES_SECRET_KEY must be set to a strong secret in production. Generate one with: openssl rand -base64 32');
+    }
+    if (aesSecretKey.length < 32) {
+      throw new Error('SECURITY ERROR: AES_SECRET_KEY must be at least 32 characters long for AES-256 encryption');
+    }
+  } else {
+    // Development - warn about insecure defaults
+    if (!jwtSecret || jwtSecret === 'change-me-in-production' || jwtSecret === 'secret') {
+      console.warn('\x1b[33m⚠️  WARNING: Using default JWT_SECRET in development. Set JWT_SECRET environment variable.\x1b[0m');
+    }
+    if (!aesSecretKey || aesSecretKey === 'default-key-change-in-production') {
+      console.warn('\x1b[33m⚠️  WARNING: Using default AES_SECRET_KEY in development. Set AES_SECRET_KEY environment variable.\x1b[0m');
+    }
+  }
+
   return {
-    nodeEnv: (process.env.NODE_ENV as any) || 'development',
+    nodeEnv,
     logLevel: process.env.LOG_LEVEL || 'debug',
 
     database: {
@@ -161,7 +186,7 @@ export function loadConfiguration(): Configuration {
     },
 
     auth: {
-      jwtSecret: process.env.JWT_SECRET || 'change-me-in-production',
+      jwtSecret: jwtSecret || 'change-me-in-production',
       jwtExpiration: process.env.JWT_EXPIRATION || '24h',
       otpExpiration: parseInt(process.env.OTP_EXPIRATION || '900000'),
       passwordResetExpiration: parseInt(process.env.PASSWORD_RESET_EXPIRATION || '900000'),
@@ -197,7 +222,7 @@ export function loadConfiguration(): Configuration {
     },
 
     encryption: {
-      aesSecretKey: process.env.AES_SECRET_KEY || 'default-key-change-in-production',
+      aesSecretKey: aesSecretKey || 'default-key-change-in-production',
     },
 
     stt: {

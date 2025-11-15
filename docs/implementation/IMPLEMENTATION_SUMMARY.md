@@ -80,14 +80,14 @@
 **Directory**: `frontend/components/providers/`
 
 #### 3. Pagina Providers
-- ✅ Pagina completa `/dashboard/providers`
+- ✅ Pagina completa `/dashboard/settings?section=accounts`
 - ✅ Tab "Connected Providers" per visualizzare provider
 - ✅ Tab "Add Provider" per aggiungere nuovi provider
 - ✅ Gestione OAuth callback
 - ✅ Gestione errori e successi
 - ✅ Help section con configurazioni comuni
 
-**File**: `frontend/pages/dashboard/providers.tsx`
+**File**: `frontend/pages/dashboard/settings?section=accounts.tsx`
 
 #### 4. API Client
 - ✅ `providersApi` con tutti i metodi:

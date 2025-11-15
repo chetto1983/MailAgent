@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmailService } from '../../email/services/email.service';
 import { CryptoService } from '../../../common/services/crypto.service';
@@ -120,8 +121,8 @@ export class AuthService {
       return { success: true, message: 'If the email exists, an OTP has been sent' };
     }
 
-    // Generate 6-digit OTP
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate cryptographically secure 6-digit OTP
+    const code = crypto.randomInt(100000, 1000000).toString();
 
     // Clear previous OTP codes for this user
     await this.prisma.mfaCode.deleteMany({
@@ -159,7 +160,13 @@ export class AuthService {
    * Verify OTP code
    * Verifies the OTP and returns an access token on success
    */
-  async verifyOtpCode(email: string, code: string, tenantSlug?: string) {
+  async verifyOtpCode(
+    email: string,
+    code: string,
+    tenantSlug?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const normalizedEmail = email.trim();
     const slug = (tenantSlug || normalizedEmail).toLowerCase();
 
@@ -212,15 +219,15 @@ export class AuthService {
       role: user.role,
     });
 
-    // Create session
+    // Create session with actual client information
     const session = await this.prisma.session.create({
       data: {
         id: sessionId,
         userId: user.id,
         token,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        ipAddress: '127.0.0.1',
-        userAgent: 'unknown',
+        ipAddress: ipAddress || 'unknown',
+        userAgent: userAgent || 'unknown',
       },
     });
 
@@ -251,7 +258,13 @@ export class AuthService {
   /**
    * Login user
    */
-  async login(email: string, password: string, tenantSlug?: string) {
+  async login(
+    email: string,
+    password: string,
+    tenantSlug?: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
     const normalizedEmail = email.trim();
     const slug = (tenantSlug || normalizedEmail).toLowerCase();
 
@@ -297,15 +310,15 @@ export class AuthService {
       role: user.role,
     });
 
-    // Create session
+    // Create session with actual client information
     const session = await this.prisma.session.create({
       data: {
         id: sessionId,
         userId: user.id,
         token,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        ipAddress: '127.0.0.1',
-        userAgent: 'unknown',
+        ipAddress: ipAddress || 'unknown',
+        userAgent: userAgent || 'unknown',
       },
     });
 
