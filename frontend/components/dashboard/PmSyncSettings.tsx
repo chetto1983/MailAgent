@@ -33,7 +33,7 @@ import { useAuth } from '@/lib/hooks/use-auth';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { GoogleProviderCard } from '@/components/providers/GoogleProviderCard';
 import { MicrosoftProviderCard } from '@/components/providers/MicrosoftProviderCard';
-import { GenericProviderDialog } from '@/components/providers/GenericProviderDialog';
+import { GenericProviderCard } from '@/components/providers/GenericProviderCard';
 import { ProvidersList } from '@/components/providers/ProvidersList';
 import {
   DEFAULT_USER_SETTINGS,
@@ -539,30 +539,17 @@ export function PmSyncSettings() {
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                     Add a provider
                   </Typography>
-                  <Stack
-                    spacing={2}
-                    direction={{ xs: 'column', md: 'row' }}
-                    alignItems="stretch"
-                  >
+                  <Stack spacing={2} direction={{ xs: 'column', md: 'row' }} alignItems="stretch">
                     <Box sx={{ flex: 1 }}>
                       <GoogleProviderCard onSuccess={handleProviderInitiated} />
                     </Box>
                     <Box sx={{ flex: 1 }}>
                       <MicrosoftProviderCard onSuccess={handleProviderInitiated} />
                     </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <GenericProviderCard onSuccess={handleProviderConnected} />
+                    </Box>
                   </Stack>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    Generic Email/Calendar Provider
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Connect any IMAP/SMTP or CalDAV provider to unify email and calendar data.
-                  </Typography>
-                  <GenericProviderDialog onSuccess={handleProviderConnected} />
                 </CardContent>
               </Card>
 

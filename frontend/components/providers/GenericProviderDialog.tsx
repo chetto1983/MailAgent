@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { ReactElement, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,9 +14,10 @@ import { providersApi, ConnectGenericDto } from '@/lib/api/providers';
 
 interface GenericProviderDialogProps {
   onSuccess: () => void;
+  trigger?: ReactElement;
 }
 
-export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps) {
+export function GenericProviderDialog({ onSuccess, trigger }: GenericProviderDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -92,9 +93,11 @@ export function GenericProviderDialog({ onSuccess }: GenericProviderDialogProps)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="w-full">
-          Connect Generic Provider (IMAP/CalDAV)
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" className="w-full">
+            Connect Generic Provider (IMAP/CalDAV)
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto rounded-3xl border border-white/10 bg-slate-950/90 text-slate-100 shadow-2xl shadow-slate-950/60">
         <DialogHeader>
