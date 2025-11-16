@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -106,6 +106,11 @@ export function PmSyncContacts() {
     providerId: undefined,
   });
   const [actionLoading, setActionLoading] = useState(false);
+  const selectedContactIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedContactIdRef.current = selectedContact?.id ?? null;
+  }, [selectedContact]);
 
   const loadContacts = useCallback(async () => {
     try {
@@ -122,18 +127,17 @@ export function PmSyncContacts() {
         return;
       }
 
-      if (selectedContact) {
-        const updatedSelection = contactsData.find((contact) => contact.id === selectedContact.id);
-        setSelectedContact(updatedSelection || contactsData[0]);
-      } else {
-        setSelectedContact(contactsData[0]);
-      }
+      const previouslySelectedId = selectedContactIdRef.current;
+      const updatedSelection =
+        (previouslySelectedId && contactsData.find((contact) => contact.id === previouslySelectedId)) ||
+        contactsData[0];
+      setSelectedContact(updatedSelection);
     } catch (error) {
       console.error('Failed to load contacts:', error);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedContact]);
+  }, [searchQuery]);
 
   useEffect(() => {
     loadContacts();

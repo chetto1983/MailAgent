@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { CalendarService, CreateEventDto, UpdateEventDto, ListEventsFilters } from '../services/calendar.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
@@ -25,6 +26,7 @@ export class CalendarController {
    * GET /api/calendar/events
    */
   @Get('events')
+  @SkipThrottle()
   async listEvents(
     @Req() req: any,
     @Query('providerId') providerId?: string,
@@ -53,6 +55,7 @@ export class CalendarController {
    * GET /api/calendar/events/:id
    */
   @Get('events/:id')
+  @SkipThrottle()
   async getEvent(@Req() req: any, @Param('id') eventId: string) {
     const tenantId = req.user.tenantId;
     return this.calendarService.getEvent(tenantId, eventId);

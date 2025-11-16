@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ContactsService,
   CreateContactDto,
@@ -30,6 +31,7 @@ export class ContactsController {
    * GET /api/contacts
    */
   @Get()
+  @SkipThrottle()
   async listContacts(
     @Req() req: any,
     @Query('providerId') providerId?: string,
@@ -56,6 +58,7 @@ export class ContactsController {
    * GET /api/contacts/:id
    */
   @Get(':id')
+  @SkipThrottle()
   async getContact(@Req() req: any, @Param('id') contactId: string) {
     const tenantId = req.user.tenantId;
     return this.contactsService.getContact(tenantId, contactId);

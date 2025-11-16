@@ -15,6 +15,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import * as fs from 'fs';
 import * as path from 'path';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -56,6 +57,7 @@ export class EmailsController {
    * GET /emails - List emails with pagination and filters
    */
   @Get()
+  @SkipThrottle()
   async listEmails(
     @Req() req: any,
     @Query('page') page?: string,
@@ -115,6 +117,7 @@ export class EmailsController {
    * GET /emails/stats - Get email statistics
    */
   @Get('stats')
+  @SkipThrottle()
   async getStats(@Req() req: any, @Query('providerId') providerId?: string) {
     const tenantId = req.user.tenantId;
     return this.emailsService.getStats(tenantId, providerId);
@@ -124,6 +127,7 @@ export class EmailsController {
    * GET /emails/search - Search emails
    */
   @Get('search')
+  @SkipThrottle()
   async searchEmails(
     @Req() req: any,
     @Query('q') query: string,
