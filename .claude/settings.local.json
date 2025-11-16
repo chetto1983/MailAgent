@@ -20,7 +20,8 @@
       "Bash(node check-db.js:*)",
       "Bash(node check-embeddings.js:*)",
       "Bash(node test-delete-embeddings.js:*)",
-      "Bash(node check-full-cleanup.js:*)"
+      "Bash(node check-full-cleanup.js:*)",
+      "Bash(timeout 15 npm run start:dev:*)"
     ],
     "deny": [],
     "ask": []
