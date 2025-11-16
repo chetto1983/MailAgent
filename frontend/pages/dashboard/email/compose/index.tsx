@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import DOMPurify from 'isomorphic-dompurify';
 import {
   Box,
@@ -19,6 +19,7 @@ import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { emailApi } from '@/lib/api/email';
 import { useTranslations } from '@/lib/hooks/use-translations';
+import { cleanEmailAddresses, getInitialComposeFromQuery } from '@/lib/utils/email-utils';
 
 type ComposeMode = 'new' | 'reply' | 'forward';
 
@@ -30,31 +31,21 @@ type AttachmentDraft = {
   base64: string;
 };
 
-const parseRecipients = (value: string) =>
-  value
-    .split(/[,;]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
 function EmailComposeInner() {
   const router = useRouter();
   const t = useTranslations();
   const composerCopy = t.dashboard.composer;
-  const { replyTo, forwardFrom, to } = router.query;
+  const { replyTo, forwardFrom } = router.query;
   const [mode, setMode] = useState<ComposeMode>('new');
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [providerId, setProviderId] = useState<string>('');
-  const [form, setForm] = useState({
-    to: typeof to === 'string' ? to : '',
-    cc: '',
-    bcc: '',
-    subject: '',
-    bodyHtml: '',
-  });
+  const [form, setForm] = useState(() => getInitialComposeFromQuery(router.query));
   const [sending, setSending] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentDraft[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
+  const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const LOCAL_DRAFT_KEY = 'mailagent:compose-draft';
 
   // Sanitize HTML to prevent XSS attacks
   const sanitizedBodyHtml = useMemo(() => {
@@ -79,12 +70,60 @@ function EmailComposeInner() {
     };
 
     loadProviders();
-  }, [providerId]);
+  }, [providerId, router.query]);
+
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        setForm((prev) => ({
+          ...prev,
+          ...saved.form,
+        }));
+        if (saved.providerId) {
+          setProviderId(saved.providerId);
+        }
+      }
+    } catch {
+      // ignore JSON errors
+    }
+  }, []);
+
+  // Autosave draft after changes (excluding attachments for simplicity)
+  useEffect(() => {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+    autosaveTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          LOCAL_DRAFT_KEY,
+          JSON.stringify({
+            providerId,
+            form,
+          }),
+        );
+      } catch (error) {
+        console.error('Failed to save draft locally', error);
+      }
+    }, 800);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [providerId, form]);
 
   // Load email for reply/forward modes
   useEffect(() => {
     const loadEmail = async () => {
-      if ((!replyTo && !forwardFrom) || typeof replyTo !== 'string' && typeof forwardFrom !== 'string') {
+      // Populate from query on initial load
+      setForm(getInitialComposeFromQuery(router.query));
+
+      if ((!replyTo && !forwardFrom) || (typeof replyTo !== 'string' && typeof forwardFrom !== 'string')) {
         return;
       }
 
@@ -115,7 +154,7 @@ function EmailComposeInner() {
     };
 
     loadEmail();
-  }, [replyTo, forwardFrom]);
+  }, [replyTo, forwardFrom, router.query]);
 
   const handleInputChange = (field: 'to' | 'cc' | 'bcc' | 'subject') => (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -167,15 +206,15 @@ function EmailComposeInner() {
   };
 
   // Validate and send email
-  const handleSend = async () => {
+  const handleSend = useCallback(async () => {
     if (!providerId) {
       alert(composerCopy.selectProvider);
       return;
     }
 
-    const toRecipients = parseRecipients(form.to);
-    const ccRecipients = parseRecipients(form.cc);
-    const bccRecipients = parseRecipients(form.bcc);
+    const toRecipients = cleanEmailAddresses(form.to);
+    const ccRecipients = cleanEmailAddresses(form.cc);
+    const bccRecipients = cleanEmailAddresses(form.bcc);
 
     if (toRecipients.length === 0) {
       alert(composerCopy.validationTo);
@@ -200,6 +239,11 @@ function EmailComposeInner() {
     try {
       setSending(true);
       await emailApi.sendEmail(payload);
+      try {
+        localStorage.removeItem(LOCAL_DRAFT_KEY);
+      } catch {
+        // ignore
+      }
       router.push('/dashboard/email');
     } catch (error) {
       console.error('Failed to send email:', error);
@@ -207,7 +251,23 @@ function EmailComposeInner() {
     } finally {
       setSending(false);
     }
-  };
+  }, [attachments, composerCopy.selectProvider, composerCopy.sendError, composerCopy.validationTo, form.bcc, form.bodyHtml, form.cc, form.subject, form.to, providerId, router]);
+
+  // Hotkeys: Ctrl/Cmd+Enter to send, Esc to close
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const isCtrlEnter = (event.ctrlKey || event.metaKey) && event.key === 'Enter';
+      if (isCtrlEnter) {
+        event.preventDefault();
+        handleSend();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        router.back();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleSend, router]);
 
   const title = useMemo(() => {
     if (mode === 'reply') return composerCopy.titleReply;

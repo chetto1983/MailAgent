@@ -4,6 +4,7 @@ import { useEmailStore } from '@/stores/email-store';
 import { useCalendarStore } from '@/stores/calendar-store';
 import { useContactStore } from '@/stores/contact-store';
 import { useFoldersStore } from '@/stores/folders-store';
+import { useSyncStore } from '@/stores/sync-store';
 
 /**
  * Hook per gestire la connessione WebSocket e gli eventi realtime
@@ -25,6 +26,7 @@ export function useWebSocket(token: string | null, enabled = true) {
   const { addEvent, updateEvent, deleteEvent } = useCalendarStore();
   const { addContact, updateContact, deleteContact } = useContactStore();
   const { updateFolderCounts } = useFoldersStore();
+  const { setStatus: setSyncStatus } = useSyncStore();
 
   /**
    * Connetti al WebSocket
@@ -74,6 +76,11 @@ export function useWebSocket(token: string | null, enabled = true) {
     const unsubEmailUpdate = websocketClient.onEmailUpdate((data) => {
       console.log('[WS] Email update:', data);
       if (data.emailId && data.updates) {
+        // If the email has moved folder, remove it from the current list to avoid stale UI
+        if (data.updates.folder) {
+          deleteEmail(data.emailId);
+          return;
+        }
         updateEmail(data.emailId, data.updates);
       }
     });
@@ -146,7 +153,13 @@ export function useWebSocket(token: string | null, enabled = true) {
     // SYNC STATUS
     const unsubSyncStatus = websocketClient.onSyncStatus((data) => {
       console.log('[WS] Sync status:', data);
-      // You can add a toast notification here or update a sync status store
+      setSyncStatus({
+        providerId: data.providerId,
+        status: data.status,
+        progress: data.progress,
+        error: data.error,
+        timestamp: data.timestamp,
+      });
     });
 
     // Cleanup on unmount
@@ -181,6 +194,8 @@ export function useWebSocket(token: string | null, enabled = true) {
     addContact,
     updateContact,
     deleteContact,
+    updateFolderCounts,
+    setSyncStatus,
   ]);
 
   return {

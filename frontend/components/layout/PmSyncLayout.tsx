@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, ThemeProvider, CssBaseline, useMediaQuery } from '@mui/material';
+import { Box, ThemeProvider, CssBaseline, useMediaQuery, Snackbar, Alert } from '@mui/material';
 import { PmSyncSidebar } from './PmSyncSidebar';
 import { PmSyncHeader } from './PmSyncHeader';
 import { darkTheme, lightTheme } from '@/theme/pmSyncTheme';
@@ -14,6 +14,7 @@ import {
 } from '@/lib/utils/user-settings';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useWebSocket } from '@/hooks/use-websocket';
+import { useSyncStore } from '@/stores/sync-store';
 
 const DRAWER_WIDTH_EXPANDED = 240;
 const DRAWER_WIDTH_COLLAPSED = 72;
@@ -25,6 +26,7 @@ export interface PmSyncLayoutProps {
 export function PmSyncLayout({ children }: PmSyncLayoutProps) {
   const { token } = useAuth();
   useWebSocket(token || null, true);
+  const { lastStatus, clear } = useSyncStore();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
@@ -151,6 +153,24 @@ export function PmSyncLayout({ children }: PmSyncLayoutProps) {
             {children}
           </Box>
         </Box>
+        {lastStatus && (
+          <Snackbar
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            open={!!lastStatus}
+            autoHideDuration={4000}
+            onClose={clear}
+          >
+            <Alert
+              onClose={clear}
+              severity={lastStatus.status === 'failed' ? 'error' : lastStatus.status === 'completed' ? 'success' : 'info'}
+              variant="filled"
+            >
+              Sync {lastStatus.status}
+              {lastStatus.progress !== undefined ? ` (${Math.round(lastStatus.progress)}%)` : ''}
+              {lastStatus.error ? `: ${lastStatus.error}` : ''}
+            </Alert>
+          </Snackbar>
+        )}
       </Box>
     </ThemeProvider>
   );

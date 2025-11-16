@@ -113,6 +113,31 @@ export function PmSyncMailbox() {
   const [hasNextPage, setHasNextPage] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const currentPageRef = useRef(1);
+  const updateEmailState = useCallback(
+    (id: string, updates: Partial<Email>) => {
+      setEmails((prev) => {
+        const index = prev.findIndex((e) => e.id === id);
+        if (index === -1) return prev;
+        const newEmails = [...prev];
+        newEmails[index] = { ...prev[index], ...updates };
+        // Update selection if same email
+        if (selectedEmail && selectedEmail.id === id) {
+          setSelectedEmail(newEmails[index]);
+        }
+        return newEmails;
+      });
+    },
+    [selectedEmail],
+  );
+  const selectEmailByIndex = useCallback(
+    (index: number) => {
+      if (!emails.length) return;
+      const clampedIndex = Math.max(0, Math.min(index, emails.length - 1));
+      const email = emails[clampedIndex];
+      setSelectedEmail(email);
+    },
+    [emails],
+  );
   const foldersByProvider = useMemo(() => {
     const groups: Array<{
       providerId: string;
@@ -321,6 +346,40 @@ export function PmSyncMailbox() {
     }
   }, [activeFolder, searchQuery, hasNextPage, isLoadingMore]);
 
+  // Action helpers
+  const handleToggleRead = useCallback(
+    async (email: Email | null) => {
+      if (!email) return;
+      const next = !email.isRead;
+      updateEmailState(email.id, { isRead: next });
+      try {
+        await emailApi.updateEmail(email.id, { isRead: next });
+      } catch (error) {
+        console.error('Failed to toggle read state', error);
+        updateEmailState(email.id, { isRead: email.isRead });
+      }
+    },
+    [updateEmailState],
+  );
+
+  const openReply = useCallback(
+    (type: 'reply' | 'reply-all' | 'forward', email: Email | null) => {
+      if (!email) return;
+      if (type === 'reply') {
+        router.push(`/dashboard/email/compose?replyTo=${email.id}`);
+      } else if (type === 'reply-all') {
+        const cc = email.cc?.join(',') || '';
+        const bcc = email.bcc?.join(',') || '';
+        router.push(
+          `/dashboard/email/compose?replyTo=${email.id}&cc=${encodeURIComponent(cc)}&bcc=${encodeURIComponent(bcc)}`,
+        );
+      } else {
+        router.push(`/dashboard/email/compose?forwardFrom=${email.id}`);
+      }
+    },
+    [router],
+  );
+
   const totalRowCount = hasNextPage ? emails.length + 1 : emails.length;
   const listHeight = typeof window === 'undefined' ? 600 : window.innerHeight - 250;
 
@@ -413,13 +472,16 @@ export function PmSyncMailbox() {
     );
   }, []);
 
-  const handleDelete = async (emailId: string) => {
-    await emailApi.deleteEmail(emailId);
-    setEmails((prev) => prev.filter((e) => e.id !== emailId));
-    if (selectedEmail?.id === emailId) {
-      setSelectedEmail(emails[0] || null);
-    }
-  };
+  const handleDelete = useCallback(
+    async (emailId: string) => {
+      await emailApi.deleteEmail(emailId);
+      setEmails((prev) => prev.filter((e) => e.id !== emailId));
+      if (selectedEmail?.id === emailId) {
+        setSelectedEmail(emails[0] || null);
+      }
+    },
+    [emails, selectedEmail],
+  );
 
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) {
@@ -449,6 +511,86 @@ export function PmSyncMailbox() {
       setSelectedIds(new Set());
     }
   };
+
+  // Keyboard shortcuts for mailbox navigation and compose
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') || target?.isContentEditable;
+      if (isTyping) return;
+
+      const key = event.key.toLowerCase();
+      if (key === 'j' || key === 'arrowdown') {
+        event.preventDefault();
+        if (!emails.length) return;
+        const currentIndex = selectedEmail ? emails.findIndex((e) => e.id === selectedEmail.id) : -1;
+        selectEmailByIndex(currentIndex + 1);
+        return;
+      }
+
+      if (key === 'k' || key === 'arrowup') {
+        event.preventDefault();
+        if (!emails.length) return;
+        const currentIndex = selectedEmail ? emails.findIndex((e) => e.id === selectedEmail.id) : emails.length;
+        selectEmailByIndex(currentIndex - 1);
+        return;
+      }
+
+      if (key === 'o' || key === 'enter') {
+        if (!selectedEmail && emails.length) {
+          event.preventDefault();
+          selectEmailByIndex(0);
+        }
+        return;
+      }
+
+      if (key === 'c') {
+        event.preventDefault();
+        router.push('/dashboard/email/compose');
+        return;
+      }
+
+      if (key === 'r') {
+        event.preventDefault();
+        openReply('reply', selectedEmail);
+        return;
+      }
+
+      if (key === 'a') {
+        event.preventDefault();
+        openReply('reply-all', selectedEmail);
+        return;
+      }
+
+      if (key === 'f') {
+        event.preventDefault();
+        openReply('forward', selectedEmail);
+        return;
+      }
+
+      if (key === 'm') {
+        event.preventDefault();
+        handleToggleRead(selectedEmail);
+        return;
+      }
+
+      if (key === '#') {
+        event.preventDefault();
+        if (selectedEmail) {
+          handleDelete(selectedEmail.id);
+        }
+        return;
+      }
+
+      if (key === 'escape') {
+        setSelectedEmail(null);
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [emails, selectedEmail, selectEmailByIndex, router, openReply, handleToggleRead, handleDelete]);
 
   const handleSelectAll = () => {
     if (selectedIds.size === emails.length) {

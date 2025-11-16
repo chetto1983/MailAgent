@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { EmailSyncBackService } from './email-sync-back.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 export interface EmailListFilters {
   folder?: string;
@@ -31,6 +32,7 @@ export class EmailsService {
     private prisma: PrismaService,
     private emailSyncBack: EmailSyncBackService,
     private knowledgeBaseService: KnowledgeBaseService,
+    private realtimeEvents: RealtimeEventsService,
   ) {}
 
   /**
@@ -172,6 +174,50 @@ export class EmailsService {
       where: { id },
       data,
     });
+
+    const targetFolder = data.folder ?? email.folder;
+
+    // Emit realtime update event
+    this.realtimeEvents.emitEmailUpdate(tenantId, {
+      emailId: updated.id,
+      providerId: updated.providerId,
+      folder: targetFolder,
+      updates: data,
+      reason: 'message-processed',
+    });
+
+    // Emit unread count update if isRead changed
+    if (data.isRead !== undefined || data.folder) {
+      // Current/target folder
+      const unreadCountTarget = await this.prisma.email.count({
+        where: {
+          providerId: email.providerId,
+          folder: targetFolder,
+          isRead: false,
+        },
+      });
+      this.realtimeEvents.emitUnreadCountUpdate(tenantId, {
+        folder: targetFolder,
+        count: unreadCountTarget,
+        providerId: email.providerId,
+      });
+
+      // If folder changed, update source folder as well
+      if (data.folder && data.folder !== email.folder) {
+        const unreadCountSource = await this.prisma.email.count({
+          where: {
+            providerId: email.providerId,
+            folder: email.folder,
+            isRead: false,
+          },
+        });
+        this.realtimeEvents.emitUnreadCountUpdate(tenantId, {
+          folder: email.folder,
+          count: unreadCountSource,
+          providerId: email.providerId,
+        });
+      }
+    }
 
     // Sync changes back to provider (async, don't wait)
     this.syncChangesToProvider(email, data).catch((error) => {
