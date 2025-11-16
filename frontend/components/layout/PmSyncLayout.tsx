@@ -12,6 +12,8 @@ import {
   USER_SETTINGS_EVENT,
   USER_SETTINGS_STORAGE_KEY,
 } from '@/lib/utils/user-settings';
+import { useAuth } from '@/lib/hooks/use-auth';
+import { useWebSocket } from '@/hooks/use-websocket';
 
 const DRAWER_WIDTH_EXPANDED = 240;
 const DRAWER_WIDTH_COLLAPSED = 72;
@@ -21,6 +23,8 @@ export interface PmSyncLayoutProps {
 }
 
 export function PmSyncLayout({ children }: PmSyncLayoutProps) {
+  const { token } = useAuth();
+  useWebSocket(token || null, true);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');

@@ -6,6 +6,7 @@ import { GoogleOAuthService } from '../../providers/services/google-oauth.servic
 import { Folder } from '@prisma/client';
 import axios from 'axios';
 import { google } from 'googleapis';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 export interface FolderInfo {
   path: string;
@@ -26,6 +27,7 @@ export class FolderSyncService {
     private readonly imapService: ImapService,
     private readonly crypto: CryptoService,
     private readonly googleOAuth: GoogleOAuthService,
+    private readonly realtimeEvents: RealtimeEventsService,
   ) {}
 
   /**
@@ -614,14 +616,33 @@ export class FolderSyncService {
   async updateFolderCounts(
     providerId: string,
     folderPath: string,
-  ): Promise<void> {
-    const folder = await this.getFolderByPath(providerId, folderPath);
+    tenantId?: string,
+  ): Promise<{
+    folderId: string;
+    folderName: string;
+    totalCount: number;
+    unreadCount: number;
+    tenantId?: string;
+  } | null> {
+    const folder = await this.prisma.folder.findUnique({
+      where: {
+        providerId_path: {
+          providerId,
+          path: folderPath,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        tenantId: true,
+      },
+    });
 
     if (!folder) {
       this.logger.warn(
         `Folder not found: ${folderPath} (provider: ${providerId})`,
       );
-      return;
+      return null;
     }
 
     // Count total emails in folder
@@ -651,6 +672,14 @@ export class FolderSyncService {
         unreadCount,
       },
     });
+
+    return {
+      folderId: folder.id,
+      folderName: folder.name,
+      totalCount,
+      unreadCount,
+      tenantId: folder.tenantId ?? tenantId,
+    };
   }
 
   /**
@@ -659,12 +688,28 @@ export class FolderSyncService {
   async updateAllFolderCounts(providerId: string): Promise<void> {
     this.logger.log(`Updating folder counts for provider ${providerId}`);
 
+    const provider = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+      select: { id: true, tenantId: true },
+    });
+
     const folders = await this.prisma.folder.findMany({
       where: { providerId },
     });
 
     for (const folder of folders) {
-      await this.updateFolderCounts(providerId, folder.path);
+      const result = await this.updateFolderCounts(providerId, folder.path, provider?.tenantId);
+
+      if (result && provider?.tenantId) {
+        this.realtimeEvents.emitFolderCountsUpdate(provider.tenantId, {
+          providerId,
+          folderId: result.folderId,
+          folderName: result.folderName,
+          totalCount: result.totalCount,
+          unreadCount: result.unreadCount,
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     this.logger.log(

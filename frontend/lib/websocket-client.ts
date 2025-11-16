@@ -23,6 +23,15 @@ export interface RealtimeEmailEvent {
   timestamp: string;
 }
 
+export interface RealtimeFolderCountsEvent {
+  providerId: string;
+  folderId: string;
+  folderName: string;
+  totalCount: number;
+  unreadCount: number;
+  timestamp: string;
+}
+
 export interface RealtimeCalendarEvent {
   eventId?: string;
   externalId?: string;
@@ -201,6 +210,12 @@ class WebSocketClient {
     if (!this.socket) return () => {};
     this.socket.on('email:unread_count_update', handler);
     return () => this.socket?.off('email:unread_count_update', handler);
+  }
+
+  onFolderCountsUpdate(handler: EventHandler<RealtimeFolderCountsEvent>): () => void {
+    if (!this.socket) return () => {};
+    this.socket.on('email:folder_counts_update', handler);
+    return () => this.socket?.off('email:folder_counts_update', handler);
   }
 
   onThreadUpdate(handler: EventHandler<{ threadId: string; emailIds: string[]; timestamp: string }>): () => void {

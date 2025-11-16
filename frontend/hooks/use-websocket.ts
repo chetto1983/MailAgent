@@ -3,6 +3,7 @@ import { websocketClient } from '@/lib/websocket-client';
 import { useEmailStore } from '@/stores/email-store';
 import { useCalendarStore } from '@/stores/calendar-store';
 import { useContactStore } from '@/stores/contact-store';
+import { useFoldersStore } from '@/stores/folders-store';
 
 /**
  * Hook per gestire la connessione WebSocket e gli eventi realtime
@@ -23,6 +24,7 @@ export function useWebSocket(token: string | null, enabled = true) {
   const { addEmail, updateEmail, deleteEmail, setUnreadCount } = useEmailStore();
   const { addEvent, updateEvent, deleteEvent } = useCalendarStore();
   const { addContact, updateContact, deleteContact } = useContactStore();
+  const { updateFolderCounts } = useFoldersStore();
 
   /**
    * Connetti al WebSocket
@@ -88,6 +90,15 @@ export function useWebSocket(token: string | null, enabled = true) {
       setUnreadCount(data.count);
     });
 
+    const unsubFolderCounts = websocketClient.onFolderCountsUpdate((data) => {
+      console.log('[WS] Folder counts update:', data);
+      updateFolderCounts(data.providerId, data.folderId, {
+        totalCount: data.totalCount,
+        unreadCount: data.unreadCount,
+        folderName: data.folderName,
+      });
+    });
+
     // CALENDAR EVENTS
     const unsubCalendarNew = websocketClient.onCalendarEventNew((data) => {
       console.log('[WS] Calendar event new:', data);
@@ -145,6 +156,7 @@ export function useWebSocket(token: string | null, enabled = true) {
       unsubEmailUpdate();
       unsubEmailDelete();
       unsubUnreadCount();
+      unsubFolderCounts();
       unsubCalendarNew();
       unsubCalendarUpdate();
       unsubCalendarDelete();

@@ -51,6 +51,7 @@ import { emailApi, type Email, type EmailListParams } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
+import { useFoldersStore } from '@/stores/folders-store';
 
 interface FolderItem {
   id: string;
@@ -68,6 +69,7 @@ interface FolderItem {
 export function PmSyncMailbox() {
   const router = useRouter();
   const t = useTranslations();
+  const countsByFolderId = useFoldersStore((state) => state.countsByFolderId);
   const [loading, setLoading] = useState(true);
   const [emails, setEmails] = useState<Email[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
@@ -214,6 +216,7 @@ export function PmSyncMailbox() {
 
         providerFolders.forEach((folder) => {
           const normalizedFolderName = normalizeFolderName(folder.name, folder.specialUse);
+          const countsOverride = countsByFolderId[`${provider.id}:${folder.id}`];
           dynamicFolders.push({
             id: `${provider.id}:${folder.id}`,
             label: folder.name,
@@ -221,7 +224,12 @@ export function PmSyncMailbox() {
             providerId: provider.id,
             providerEmail: provider.email,
             filterFolder: normalizedFolderName,
-            count: folder.unreadCount ?? folder.unseenCount ?? folder.recentCount ?? folder.totalCount,
+            count:
+              countsOverride?.unreadCount ??
+              folder.unreadCount ??
+              folder.unseenCount ??
+              folder.recentCount ??
+              folder.totalCount,
             queryOverrides: {
               providerId: provider.id,
               folder: normalizedFolderName,
@@ -244,7 +252,7 @@ export function PmSyncMailbox() {
     } finally {
       setFoldersLoading(false);
     }
-  }, [selectedFolderId, aggregatorFolders, getIconForFolder]);
+  }, [selectedFolderId, aggregatorFolders, getIconForFolder, countsByFolderId]);
 
   const loadData = useCallback(async () => {
     if (!activeFolder) {

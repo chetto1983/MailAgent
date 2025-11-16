@@ -9,6 +9,7 @@ import { GoogleSyncService } from '../services/google-sync.service';
 import { MicrosoftSyncService } from '../services/microsoft-sync.service';
 import { ImapSyncService } from '../services/imap-sync.service';
 import { SyncSchedulerService } from '../services/sync-scheduler.service';
+import { FolderSyncService } from '../services/folder-sync.service';
 
 @Injectable()
 export class SyncWorker implements OnModuleInit, OnModuleDestroy {
@@ -38,6 +39,7 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     private imapSync: ImapSyncService,
     @Inject(forwardRef(() => SyncSchedulerService))
     private syncScheduler: SyncSchedulerService,
+    private folderSyncService: FolderSyncService,
   ) {}
 
   async onModuleInit() {
@@ -157,6 +159,9 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
 
       // Update activity rate and sync priority (Smart Sync)
       await this.syncScheduler.updateProviderActivity(providerId);
+
+      // Refresh folder counts and emit realtime updates
+      await this.folderSyncService.updateAllFolderCounts(providerId);
 
       result.syncDuration = Date.now() - startTime;
       return result;

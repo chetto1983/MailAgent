@@ -128,8 +128,25 @@ export class RealtimeEventsService {
   /**
    * Emette evento per aggiornamento contatore non lette
    */
-  emitUnreadCountUpdate(tenantId: string, payload: { folder: string; count: number; providerId: string }) {
-    this.emitToTenant(tenantId, 'email:unread_count_update', payload);
+ emitUnreadCountUpdate(tenantId: string, payload: { folder: string; count: number; providerId: string }) {
+   this.emitToTenant(tenantId, 'email:unread_count_update', payload);
+ }
+
+  /**
+   * Emette evento per aggiornamento conteggio cartelle (totale + non lette)
+   */
+  emitFolderCountsUpdate(
+    tenantId: string,
+    payload: {
+      providerId: string;
+      folderId: string;
+      folderName: string;
+      totalCount: number;
+      unreadCount: number;
+      timestamp: string;
+    },
+  ) {
+    this.emitToTenant(tenantId, 'email:folder_counts_update', payload);
   }
 
   /**

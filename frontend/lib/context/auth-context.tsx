@@ -6,12 +6,14 @@ export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  token: string | null;
 }
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   isAuthenticated: false,
+  token: null,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -77,8 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isLoading,
       isAuthenticated: !!user,
+      token,
     }),
-    [user, isLoading],
+    [user, isLoading, token],
   );
 
   return (

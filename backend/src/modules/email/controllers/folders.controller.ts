@@ -43,6 +43,11 @@ export class FoldersController {
       },
     });
 
+    // Refresh counts before returning folders
+    for (const provider of providers) {
+      await this.folderSyncService.updateAllFolderCounts(provider.id);
+    }
+
     // Get folders for all providers
     const foldersByProvider: Record<string, any[]> = {};
 
@@ -84,6 +89,9 @@ export class FoldersController {
     if (!provider) {
       throw new Error('Provider not found or access denied');
     }
+
+    // Refresh counts before returning folders
+    await this.folderSyncService.updateAllFolderCounts(provider.id);
 
     const folders = await (this.prisma as any).folder.findMany({
       where: {
