@@ -431,13 +431,18 @@ export class FolderSyncService {
         const specialUse = this.determineFolderTypeFromLabelId(label.id);
         const isSelectable = label.type !== 'system' || specialUse !== undefined;
 
+        // Strip CATEGORY_ prefix from Gmail category label names for better UX
+        const displayName = label.name.startsWith('CATEGORY_')
+          ? label.name.replace('CATEGORY_', '')
+          : label.name;
+
         await (this.prisma as any).folder.upsert({
           where: { providerId_path: { providerId, path: label.id } },
           create: {
             tenantId,
             providerId,
             path: label.id,
-            name: label.name,
+            name: displayName,
             delimiter: '/',
             specialUse,
             isSelectable,
@@ -446,7 +451,7 @@ export class FolderSyncService {
             level: 0,
           },
           update: {
-            name: label.name,
+            name: displayName,
             specialUse,
             isSelectable,
             totalCount: label.messagesTotal || 0,
@@ -620,10 +625,12 @@ export class FolderSyncService {
     }
 
     // Count total emails in folder
+    // Note: Email.folder stores the display name (e.g. "SOCIAL"),
+    // not the path (e.g. "CATEGORY_SOCIAL"), so we match on folder.name
     const totalCount = await this.prisma.email.count({
       where: {
         providerId,
-        folder: folderPath,
+        folder: folder.name,
       },
     });
 
@@ -631,7 +638,7 @@ export class FolderSyncService {
     const unreadCount = await this.prisma.email.count({
       where: {
         providerId,
-        folder: folderPath,
+        folder: folder.name,
         isRead: false,
       },
     });

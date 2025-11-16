@@ -309,7 +309,7 @@ export class EmailsService {
       this.prisma.email.groupBy({
         by: ['folder'],
         where,
-        _count: true,
+        _count: { id: true },
       }),
     ]);
 
@@ -318,7 +318,7 @@ export class EmailsService {
       unread,
       starred,
       byFolder: byFolder.reduce((acc, item) => {
-        acc[item.folder] = item._count;
+        acc[item.folder] = item._count.id;
         return acc;
       }, {} as Record<string, number>),
     };

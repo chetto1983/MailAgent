@@ -3,6 +3,18 @@
  * Builds derived variables from environment variables
  * No hardcoded values - everything comes from .env
  */
+import * as fs from 'fs';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
+
+// Load environment files before computing configuration to avoid missing values
+const envPaths = ['.env', '../.env', '../../.env'];
+for (const envPath of envPaths) {
+  const resolved = path.resolve(process.cwd(), envPath);
+  if (fs.existsSync(resolved)) {
+    dotenv.config({ path: resolved });
+  }
+}
 
 export interface DatabaseConfig {
   host: string;
@@ -24,6 +36,7 @@ export interface ApiConfig {
   port: number;
   url: string;
   corsOrigins: string[];
+  trustProxy: string | boolean;
 }
 
 export interface AuthConfig {
@@ -62,6 +75,11 @@ export interface AiConfig {
   };
 }
 
+export interface RateLimitConfig {
+  ttlMs: number;
+  limit: number;
+}
+
 export interface Configuration {
   nodeEnv: 'development' | 'production' | 'test';
   logLevel: string;
@@ -72,6 +90,7 @@ export interface Configuration {
   email: EmailConfig;
   oauth: OAuthConfig;
   ai: AiConfig;
+  rateLimit: RateLimitConfig;
   encryption: {
     aesSecretKey: string;
   };
@@ -108,23 +127,32 @@ export function loadConfiguration(): Configuration {
   const apiPort = parseInt(process.env.API_PORT || '3000');
   const defaultApiUrl = `http://${apiHost}:${apiPort}`;
   const apiUrl = process.env.API_PUBLIC_URL || defaultApiUrl;
+  const trustProxyOverride = process.env.TRUST_PROXY;
+  const trustProxy =
+    trustProxyOverride === undefined || trustProxyOverride === ''
+      ? // Trust first proxy hops on local networks by default (nginx/traefik)
+        'loopback, linklocal, uniquelocal'
+      : ['true', '1'].includes(trustProxyOverride.toLowerCase())
+        ? true
+        : ['false', '0'].includes(trustProxyOverride.toLowerCase())
+          ? false
+          : trustProxyOverride;
 
-  // CORS origins
-  const extraCorsOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  // CORS origins - honor explicit env list when provided
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
     .split(',')
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 
-  const corsOrigins = Array.from(
-    new Set([
-      apiUrl,
-      `http://localhost:${apiPort}`,
-      process.env.FRONTEND_URL || 'http://localhost:3001',
-      'https://localhost',
-      'https://localhost:443',
-      ...extraCorsOrigins,
-    ].filter(Boolean)),
-  );
+  const defaultOrigins = [
+    apiUrl,
+    `http://localhost:${apiPort}`,
+    process.env.FRONTEND_URL || 'http://localhost:3001',
+    'https://localhost',
+    'https://localhost:443',
+  ];
+
+  const corsOrigins = Array.from(new Set((allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins).filter(Boolean)));
 
   // OAuth redirect URIs - use explicit environment variables or fallback to API_URL
   const gmailRedirectUri = process.env.GOOGLE_REDIRECT_URI || `${apiUrl}/auth/gmail/callback`;
@@ -133,6 +161,10 @@ export function loadConfiguration(): Configuration {
   // SMTP config
   const smtpFromEmail = process.env.SMTP_FROM_EMAIL || 'noreply';
   const smtpFromDomain = process.env.SMTP_FROM_DOMAIN || 'mailagent.local';
+
+  // Rate limiting
+  const rateLimitTtlMs = parseInt(process.env.RATE_LIMIT_TTL_MS || '60000');
+  const rateLimitLimit = parseInt(process.env.RATE_LIMIT_MAX || '300');
 
   // Security validation - throw error in production if critical secrets are not set
   const nodeEnv = (process.env.NODE_ENV as any) || 'development';
@@ -183,6 +215,7 @@ export function loadConfiguration(): Configuration {
       port: apiPort,
       url: apiUrl,
       corsOrigins,
+      trustProxy,
     },
 
     auth: {
@@ -219,6 +252,11 @@ export function loadConfiguration(): Configuration {
         apiKey: process.env.MISTRAL_API_KEY || '',
         model: process.env.MISTRAL_MODEL || 'mistral-large-latest',
       },
+    },
+
+    rateLimit: {
+      ttlMs: rateLimitTtlMs,
+      limit: rateLimitLimit,
     },
 
     encryption: {

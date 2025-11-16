@@ -590,10 +590,8 @@ export class GoogleSyncService {
       return 'DRAFTS';
     }
 
-    if (labelIds.includes('INBOX')) {
-      return 'INBOX';
-    }
-
+    // Check for Gmail categories BEFORE generic INBOX
+    // Gmail adds both INBOX and CATEGORY_ labels, so we prioritize categories
     const categoryLabel = labelIds.find((label) => label.startsWith('CATEGORY_'));
     if (categoryLabel) {
       switch (categoryLabel) {
@@ -610,6 +608,10 @@ export class GoogleSyncService {
         default:
           break;
       }
+    }
+
+    if (labelIds.includes('INBOX')) {
+      return 'INBOX';
     }
 
     return fallback ?? 'INBOX';

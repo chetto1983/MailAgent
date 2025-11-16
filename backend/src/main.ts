@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -8,9 +9,12 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { getConfiguration } from './config/configuration';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');
   const config = getConfiguration();
+
+  // Respect real client IPs behind reverse proxies (prevents rate-limit false positives)
+  app.set('trust proxy', config.api.trustProxy);
 
   // Security middleware
   app.use(helmet());

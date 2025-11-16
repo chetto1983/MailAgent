@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { getConfiguration } from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -17,17 +18,19 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 
+const config = getConfiguration();
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '../.env', '../../.env'],
     }),
-    // Rate limiting: 100 requests per 60 seconds by default
+    // Rate limiting: configurable defaults to keep protection but avoid false positives
     ThrottlerModule.forRoot([
       {
-        ttl: 60000, // 60 seconds
-        limit: 100, // 100 requests
+        ttl: config.rateLimit.ttlMs,
+        limit: config.rateLimit.limit,
       },
     ]),
     PrismaModule,
