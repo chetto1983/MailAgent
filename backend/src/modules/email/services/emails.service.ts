@@ -371,6 +371,89 @@ export class EmailsService {
   }
 
   /**
+   * Save or update a draft (autosave)
+   */
+  async saveDraft(
+    tenantId: string,
+    dto: {
+      id?: string;
+      providerId: string;
+      to?: string[];
+      cc?: string[];
+      bcc?: string[];
+      subject?: string;
+      bodyHtml?: string;
+      bodyText?: string;
+    },
+  ) {
+    const data: Prisma.EmailUncheckedCreateInput = {
+      id: dto.id ?? undefined,
+      tenantId,
+      providerId: dto.providerId,
+      externalId: dto.id ?? `draft-${Date.now()}`,
+      threadId: null,
+      messageId: null,
+      inReplyTo: null,
+      references: null,
+      from: '',
+      to: dto.to ?? [],
+      cc: dto.cc ?? [],
+      bcc: dto.bcc ?? [],
+      replyTo: null,
+      subject: dto.subject ?? '',
+      bodyText: dto.bodyText ?? '',
+      bodyHtml: dto.bodyHtml ?? '',
+      snippet: null,
+      folder: 'DRAFTS',
+      labels: [],
+      isRead: true,
+      isStarred: false,
+      isFlagged: false,
+      isDraft: true,
+      isDeleted: false,
+      isArchived: false,
+      sentAt: new Date(),
+      receivedAt: new Date(),
+      size: null,
+      headers: Prisma.DbNull,
+      metadata: {},
+      crossProviderLinkId: null,
+    };
+
+    if (dto.id) {
+      await this.prisma.email.update({
+        where: { id: dto.id },
+        data,
+      });
+      return this.prisma.email.findUnique({ where: { id: dto.id } });
+    }
+
+    return this.prisma.email.create({ data });
+  }
+
+  /**
+   * Get draft by ID
+   */
+  async getDraft(id: string, tenantId: string) {
+    const draft = await this.prisma.email.findFirst({
+      where: { id, tenantId, isDraft: true },
+    });
+    if (!draft) {
+      throw new NotFoundException('Draft not found');
+    }
+    return draft;
+  }
+
+  /**
+   * Delete draft
+   */
+  async deleteDraft(id: string, tenantId: string) {
+    await this.prisma.email.deleteMany({
+      where: { id, tenantId, isDraft: true },
+    });
+  }
+
+  /**
    * Mark multiple emails as read/unread - syncs to provider
    */
   async bulkUpdateRead(

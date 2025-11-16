@@ -31,6 +31,12 @@ import {
   ConnectGenericProviderDto,
 } from '../dto';
 
+export interface ProviderAlias {
+  email: string;
+  name?: string;
+  providerId: string;
+}
+
 @Injectable()
 export class ProviderConfigService {
   private readonly logger = new Logger(ProviderConfigService.name);
@@ -61,6 +67,25 @@ export class ProviderConfigService {
     private readonly folderSync: FolderSyncService,
     private readonly contactsService: ContactsService,
   ) {}
+
+  /**
+   * Return aliases for a provider. Stub: currently returns the primary email as single alias.
+   */
+  async getAliases(providerId: string, tenantId: string): Promise<ProviderAlias[]> {
+    const provider = await this.prisma.providerConfig.findFirst({
+      where: { id: providerId, tenantId },
+      select: { id: true, email: true },
+    });
+    if (!provider) {
+      throw new NotFoundException('Provider not found');
+    }
+    return [
+      {
+        providerId: provider.id,
+        email: provider.email,
+      },
+    ];
+  }
 
   /**
    * Connect Google provider (Gmail + Calendar)

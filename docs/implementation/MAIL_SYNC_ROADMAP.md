@@ -39,3 +39,6 @@ Obiettivo: allineare la pipeline di sincronizzazione email con funzionalità sim
 - Aggiornato backend `updateEmail` per emettere eventi realtime (`email:update` con reason `message-processed`) e aggiornare in tempo reale i conteggi non letti per cartella, includendo il caso di spostamento cartella.
 - Frontend: listener `email:update` aggiorna lo store email e, se l’evento indica cambio cartella, rimuove l’email dalla lista corrente per evitare UI stantia; build e lint frontend OK.
 - Aggiunto store `sync-store` e snackbar UI: gli eventi `sync:status` (WebSocket) sono mostrati come toast nel layout, per rendere visibili gli stati di sincronizzazione lato frontend.
+- Bozze (backend): aggiunti endpoint draft (`POST/GET/DELETE /emails/drafts*`) e logica in `EmailsService.saveDraft/getDraft/deleteDraft` basata su `Email` con `isDraft=true`; build backend OK. Nessun supporto allegati/alias ancora.
+- Bozze (frontend): compose ora autosalva su backend via `emailApi.saveDraft` (usa `draftId` da query se presente, altrimenti crea) e cancella la bozza dopo l’invio; build/lint frontend OK. Attachments non ancora persistiti lato bozza.
+- Bozze: compose carica draft da backend se `draftId` è in query (imposta form e providerId); build/lint frontend OK.

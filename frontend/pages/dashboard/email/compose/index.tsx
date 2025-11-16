@@ -35,7 +35,7 @@ function EmailComposeInner() {
   const router = useRouter();
   const t = useTranslations();
   const composerCopy = t.dashboard.composer;
-  const { replyTo, forwardFrom } = router.query;
+  const { replyTo, forwardFrom, draftId: draftIdQuery } = router.query;
   const [mode, setMode] = useState<ComposeMode>('new');
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [providerId, setProviderId] = useState<string>('');
@@ -45,6 +45,9 @@ function EmailComposeInner() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [draftId, setDraftId] = useState<string | null>(
+    typeof draftIdQuery === 'string' ? draftIdQuery : null,
+  );
   const LOCAL_DRAFT_KEY = 'mailagent:compose-draft';
 
   // Sanitize HTML to prevent XSS attacks
@@ -70,7 +73,7 @@ function EmailComposeInner() {
     };
 
     loadProviders();
-  }, [providerId, router.query]);
+  }, [providerId]);
 
   // Load draft from localStorage on mount
   useEffect(() => {
@@ -91,37 +94,62 @@ function EmailComposeInner() {
     }
   }, []);
 
-  // Autosave draft after changes (excluding attachments for simplicity)
+  // Autosave draft to backend (excluding attachments for ora)
   useEffect(() => {
+    if (!providerId) return;
     if (autosaveTimerRef.current) {
       clearTimeout(autosaveTimerRef.current);
     }
-    autosaveTimerRef.current = setTimeout(() => {
+    autosaveTimerRef.current = setTimeout(async () => {
       try {
-        localStorage.setItem(
-          LOCAL_DRAFT_KEY,
-          JSON.stringify({
-            providerId,
-            form,
-          }),
-        );
+        const payload = {
+          id: draftId ?? undefined,
+          providerId,
+          to: cleanEmailAddresses(form.to),
+          cc: cleanEmailAddresses(form.cc),
+          bcc: cleanEmailAddresses(form.bcc),
+          subject: form.subject,
+          bodyHtml: form.bodyHtml,
+          bodyText: '',
+        };
+        const res = await emailApi.saveDraft(payload);
+        setDraftId(res.data.id);
       } catch (error) {
-        console.error('Failed to save draft locally', error);
+        console.error('Failed to autosave draft', error);
       }
-    }, 800);
+    }, 1000);
 
     return () => {
       if (autosaveTimerRef.current) {
         clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [providerId, form]);
+  }, [providerId, form, draftId]);
 
   // Load email for reply/forward modes
   useEffect(() => {
-    const loadEmail = async () => {
+    const loadEmailOrDraft = async () => {
       // Populate from query on initial load
       setForm(getInitialComposeFromQuery(router.query));
+
+      // Draft load takes precedence if draftId is provided
+      if (draftId) {
+        try {
+          const draftRes = await emailApi.getDraft(draftId);
+          const draft = draftRes.data;
+          setProviderId(draft.providerId || providerId);
+          setForm({
+            to: draft.to?.join(', ') || '',
+            cc: draft.cc?.join(', ') || '',
+            bcc: draft.bcc?.join(', ') || '',
+            subject: draft.subject || '',
+            bodyHtml: draft.bodyHtml || '',
+          });
+          return;
+        } catch (error) {
+          console.error('Failed to load draft:', error);
+        }
+      }
 
       if ((!replyTo && !forwardFrom) || (typeof replyTo !== 'string' && typeof forwardFrom !== 'string')) {
         return;
@@ -131,6 +159,8 @@ function EmailComposeInner() {
         const emailId = (replyTo as string) || (forwardFrom as string);
         const response = await emailApi.getEmail(emailId);
         const email = response.data;
+
+        setProviderId(email.providerId || providerId);
 
         if (replyTo) {
           setMode('reply');
@@ -153,8 +183,8 @@ function EmailComposeInner() {
       }
     };
 
-    loadEmail();
-  }, [replyTo, forwardFrom, router.query]);
+    loadEmailOrDraft();
+  }, [replyTo, forwardFrom, providerId, router.query, draftId]);
 
   const handleInputChange = (field: 'to' | 'cc' | 'bcc' | 'subject') => (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -239,10 +269,8 @@ function EmailComposeInner() {
     try {
       setSending(true);
       await emailApi.sendEmail(payload);
-      try {
-        localStorage.removeItem(LOCAL_DRAFT_KEY);
-      } catch {
-        // ignore
+      if (draftId) {
+        emailApi.deleteDraft(draftId).catch(() => {});
       }
       router.push('/dashboard/email');
     } catch (error) {
@@ -251,7 +279,7 @@ function EmailComposeInner() {
     } finally {
       setSending(false);
     }
-  }, [attachments, composerCopy.selectProvider, composerCopy.sendError, composerCopy.validationTo, form.bcc, form.bodyHtml, form.cc, form.subject, form.to, providerId, router]);
+  }, [attachments, composerCopy.selectProvider, composerCopy.sendError, composerCopy.validationTo, draftId, form.bcc, form.bodyHtml, form.cc, form.subject, form.to, providerId, router]);
 
   // Hotkeys: Ctrl/Cmd+Enter to send, Esc to close
   useEffect(() => {

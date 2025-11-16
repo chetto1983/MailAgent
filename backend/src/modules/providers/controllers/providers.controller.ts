@@ -117,6 +117,15 @@ export class ProvidersController {
     return this.providerConfigService.getProviderConfig(tenantId, id);
   }
 
+  @Get(':id/aliases')
+  @SkipThrottle()
+  @ApiOperation({ summary: 'Get sender aliases for a provider' })
+  @ApiResponse({ status: 200, description: 'List of aliases' })
+  async getAliases(@Request() req: any, @Param('id') id: string) {
+    const { tenantId } = req.user;
+    return this.providerConfigService.getAliases(id, tenantId);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a provider config' })

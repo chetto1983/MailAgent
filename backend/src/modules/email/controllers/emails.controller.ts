@@ -7,6 +7,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Put,
   Param,
   Patch,
   Post,
@@ -253,6 +254,50 @@ export class EmailsController {
   async deleteEmail(@Req() req: any, @Param('id') id: string) {
     const tenantId = req.user.tenantId;
     await this.emailsService.deleteEmail(id, tenantId);
+  }
+
+  /**
+   * Create or update a draft (autosave)
+   * POST /emails/drafts
+   */
+  @Post('drafts')
+  async saveDraft(
+    @Req() req: any,
+    @Body()
+    dto: {
+      id?: string;
+      providerId: string;
+      to?: string[];
+      cc?: string[];
+      bcc?: string[];
+      subject?: string;
+      bodyHtml?: string;
+      bodyText?: string;
+    },
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.saveDraft(tenantId, dto);
+  }
+
+  /**
+   * Get a draft by ID
+   * GET /emails/drafts/:id
+   */
+  @Get('drafts/:id')
+  async getDraft(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.getDraft(id, tenantId);
+  }
+
+  /**
+   * Delete a draft
+   * DELETE /emails/drafts/:id
+   */
+  @Delete('drafts/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteDraft(@Req() req: any, @Param('id') id: string) {
+    const tenantId = req.user.tenantId;
+    await this.emailsService.deleteDraft(id, tenantId);
   }
 
   /**

@@ -244,6 +244,39 @@ export const emailApi = {
   },
 
   /**
+   * Save or update a draft (autosave)
+   * POST /emails/drafts
+   */
+  saveDraft(payload: {
+    id?: string;
+    providerId: string;
+    to?: string[];
+    cc?: string[];
+    bcc?: string[];
+    subject?: string;
+    bodyHtml?: string;
+    bodyText?: string;
+  }) {
+    return apiClient.post<Email>('/emails/drafts', payload);
+  },
+
+  /**
+   * Get a draft by ID
+   * GET /emails/drafts/:id
+   */
+  getDraft(id: string) {
+    return apiClient.get<Email>(`/emails/drafts/${id}`);
+  },
+
+  /**
+   * Delete a draft
+   * DELETE /emails/drafts/:id
+   */
+  deleteDraft(id: string) {
+    return apiClient.delete<void>(`/emails/drafts/${id}`);
+  },
+
+  /**
    * Trigger manual sync for a provider
    * POST /email-sync/sync/:providerId
    */
