@@ -14,7 +14,6 @@ import {
   Checkbox,
   FormControlLabel,
   Alert,
-  Grid,
   Divider,
 } from '@mui/material';
 import { Mail } from 'lucide-react';
@@ -183,26 +182,22 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
               Basic Information
             </Typography>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Email Address"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => updateField('email', e.target.value)}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Display Name"
-                  value={formData.displayName}
-                  onChange={(e) => updateField('displayName', e.target.value)}
-                />
-              </Grid>
-            </Grid>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
+              <TextField
+                fullWidth
+                label="Email Address"
+                type="email"
+                value={formData.email}
+                onChange={(e) => updateField('email', e.target.value)}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Display Name"
+                value={formData.displayName}
+                onChange={(e) => updateField('displayName', e.target.value)}
+              />
+            </Stack>
 
             <Divider sx={{ my: 3 }} />
 
@@ -210,8 +205,8 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
               IMAP Settings (Incoming Mail)
             </Typography>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={8}>
+            <Stack spacing={2} sx={{ mb: 3 }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
                   fullWidth
                   label="IMAP Host"
@@ -219,9 +214,8 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
                   value={formData.imapHost}
                   onChange={(e) => updateField('imapHost', e.target.value)}
                   required
+                  sx={{ flex: 2 }}
                 />
-              </Grid>
-              <Grid item xs={12} sm={4}>
                 <TextField
                   fullWidth
                   label="Port"
@@ -229,9 +223,10 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
                   value={formData.imapPort}
                   onChange={(e) => updateField('imapPort', parseInt(e.target.value))}
                   required
+                  sx={{ flex: 1 }}
                 />
-              </Grid>
-              <Grid item xs={12} sm={6}>
+              </Stack>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
                   fullWidth
                   label="Username"
@@ -239,8 +234,6 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
                   onChange={(e) => updateField('imapUsername', e.target.value)}
                   required
                 />
-              </Grid>
-              <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Password"
@@ -249,8 +242,8 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
                   onChange={(e) => updateField('imapPassword', e.target.value)}
                   required
                 />
-              </Grid>
-            </Grid>
+              </Stack>
+            </Stack>
 
             <Divider sx={{ my: 3 }} />
 
@@ -261,26 +254,24 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Leave empty to use IMAP credentials
             </Typography>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={8}>
-                <TextField
-                  fullWidth
-                  label="SMTP Host"
-                  placeholder="smtp.example.com"
-                  value={formData.smtpHost}
-                  onChange={(e) => updateField('smtpHost', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  label="Port"
-                  type="number"
-                  value={formData.smtpPort}
-                  onChange={(e) => updateField('smtpPort', parseInt(e.target.value))}
-                />
-              </Grid>
-            </Grid>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
+              <TextField
+                fullWidth
+                label="SMTP Host"
+                placeholder="smtp.example.com"
+                value={formData.smtpHost}
+                onChange={(e) => updateField('smtpHost', e.target.value)}
+                sx={{ flex: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Port"
+                type="number"
+                value={formData.smtpPort}
+                onChange={(e) => updateField('smtpPort', parseInt(e.target.value))}
+                sx={{ flex: 1 }}
+              />
+            </Stack>
 
             <Divider sx={{ my: 3 }} />
 
@@ -301,25 +292,21 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
             </Box>
 
             {showCalDAV && (
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="CalDAV URL"
-                    placeholder="https://caldav.example.com/calendars/user"
-                    value={formData.caldavUrl}
-                    onChange={(e) => updateField('caldavUrl', e.target.value)}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
+              <Stack spacing={2}>
+                <TextField
+                  fullWidth
+                  label="CalDAV URL"
+                  placeholder="https://caldav.example.com/calendars/user"
+                  value={formData.caldavUrl}
+                  onChange={(e) => updateField('caldavUrl', e.target.value)}
+                />
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   <TextField
                     fullWidth
                     label="Username"
                     value={formData.caldavUsername}
                     onChange={(e) => updateField('caldavUsername', e.target.value)}
                   />
-                </Grid>
-                <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
                     label="Password"
@@ -327,8 +314,8 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
                     value={formData.caldavPassword}
                     onChange={(e) => updateField('caldavPassword', e.target.value)}
                   />
-                </Grid>
-              </Grid>
+                </Stack>
+              </Stack>
             )}
           </DialogContent>
 
