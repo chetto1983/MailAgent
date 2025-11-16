@@ -4,8 +4,6 @@ import { PmSyncMailbox } from '@/components/dashboard/PmSyncMailbox';
 
 /**
  * Email Page - New PmSync Design
- *
- * Modern email interface with Gmail-inspired UX
  */
 export default function EmailPage() {
   return (
