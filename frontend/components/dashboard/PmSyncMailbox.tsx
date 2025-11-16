@@ -216,7 +216,6 @@ export function PmSyncMailbox() {
 
         providerFolders.forEach((folder) => {
           const normalizedFolderName = normalizeFolderName(folder.name, folder.specialUse);
-          const countsOverride = countsByFolderId[`${provider.id}:${folder.id}`];
           dynamicFolders.push({
             id: `${provider.id}:${folder.id}`,
             label: folder.name,
@@ -224,12 +223,7 @@ export function PmSyncMailbox() {
             providerId: provider.id,
             providerEmail: provider.email,
             filterFolder: normalizedFolderName,
-            count:
-              countsOverride?.unreadCount ??
-              folder.unreadCount ??
-              folder.unseenCount ??
-              folder.recentCount ??
-              folder.totalCount,
+            count: folder.unreadCount ?? folder.unseenCount ?? folder.recentCount ?? folder.totalCount,
             queryOverrides: {
               providerId: provider.id,
               folder: normalizedFolderName,
@@ -252,7 +246,7 @@ export function PmSyncMailbox() {
     } finally {
       setFoldersLoading(false);
     }
-  }, [selectedFolderId, aggregatorFolders, getIconForFolder, countsByFolderId]);
+  }, [selectedFolderId, aggregatorFolders, getIconForFolder]);
 
   const loadData = useCallback(async () => {
     if (!activeFolder) {
@@ -729,7 +723,11 @@ export function PmSyncMailbox() {
                 </AccordionSummary>
                 <AccordionDetails sx={{ p: 0 }}>
                   <MuiList sx={{ py: 0 }}>
-                    {group.folders.map((folder) => (
+                    {group.folders.map((folder) => {
+                      const liveCounts = countsByFolderId[folder.id];
+                      const displayCount = liveCounts?.unreadCount ?? folder.count;
+
+                      return (
                       <ListItemButton
                         key={folder.id}
                         selected={activeFolder?.id === folder.id}
@@ -751,9 +749,9 @@ export function PmSyncMailbox() {
                             fontWeight: activeFolder?.id === folder.id ? 600 : 500,
                           }}
                         />
-                        {folder.count && folder.count > 0 && (
+                        {displayCount && displayCount > 0 && (
                           <Chip
-                            label={folder.count}
+                            label={displayCount}
                             size="small"
                             sx={{
                               height: 20,
@@ -763,7 +761,7 @@ export function PmSyncMailbox() {
                           />
                         )}
                       </ListItemButton>
-                    ))}
+                    )})}
                   </MuiList>
                 </AccordionDetails>
               </Accordion>
