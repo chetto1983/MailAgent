@@ -679,6 +679,7 @@ export class MicrosoftSyncService implements OnModuleInit {
         select: {
           specialUse: true,
           name: true,
+          id: true,
         },
       });
 
@@ -693,12 +694,41 @@ export class MicrosoftSyncService implements OnModuleInit {
 
       // Normalize Italian folder names to standard names
       const normalized = folder.name.toLowerCase().trim();
-      if (normalized === 'posta in arrivo' || normalized === 'inbox') return 'INBOX';
-      if (normalized === 'posta inviata' || normalized === 'sent' || normalized === 'inviata') return 'SENT';
-      if (normalized === 'posta eliminata' || normalized === 'trash' || normalized === 'cestino' || normalized === 'eliminata') return 'TRASH';
+      if (normalized === 'posta in arrivo' || normalized === 'inbox' || normalized === 'posteingang') return 'INBOX';
+      if (
+        normalized === 'posta inviata' ||
+        normalized === 'sent' ||
+        normalized === 'sent items' ||
+        normalized === 'elementi inviati' ||
+        normalized === 'inviata'
+      )
+        return 'SENT';
+      if (
+        normalized === 'posta eliminata' ||
+        normalized === 'trash' ||
+        normalized === 'deleted items' ||
+        normalized === 'elementi eliminati' ||
+        normalized === 'cestino' ||
+        normalized === 'eliminata'
+      )
+        return 'TRASH';
       if (normalized === 'bozze' || normalized === 'draft' || normalized === 'drafts') return 'DRAFTS';
-      if (normalized === 'posta indesiderata' || normalized === 'spam' || normalized === 'junk') return 'SPAM';
-      if (normalized === 'archive' || normalized === 'archivia' || normalized === 'archivio') return 'ARCHIVE';
+      if (
+        normalized === 'posta indesiderata' ||
+        normalized === 'spam' ||
+        normalized === 'junk' ||
+        normalized === 'junk email' ||
+        normalized === 'post indiserata'
+      )
+        return 'SPAM';
+      if (
+        normalized === 'archive' ||
+        normalized === 'archivia' ||
+        normalized === 'archivio' ||
+        normalized === 'all mail' ||
+        normalized === 'all'
+      )
+        return 'ARCHIVE';
       if (normalized === 'posta in uscita' || normalized === 'outbox') return 'OUTBOX';
 
       // Return original name if no mapping found

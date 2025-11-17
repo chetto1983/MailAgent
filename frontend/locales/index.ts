@@ -328,6 +328,9 @@ export interface AppTranslations {
       sent: string;
       drafts: string;
       trash: string;
+      spam: string;
+      archive: string;
+      outbox: string;
       starred: string;
     };
     composer: {
