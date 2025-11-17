@@ -50,7 +50,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
         removeOnComplete: true,
         removeOnFail: 1000,
       },
-    });
+    } });
 
     this.worker = new Worker<EmailEmbeddingJob, boolean>(
       'email-embedding',
