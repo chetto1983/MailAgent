@@ -43,3 +43,7 @@ Obiettivo: allineare la pipeline di sincronizzazione email con funzionalità sim
 - Bozze (frontend): compose ora autosalva su backend via `emailApi.saveDraft` (usa `draftId` da query se presente, altrimenti crea) e cancella la bozza dopo l’invio; build/lint frontend OK. Attachments non ancora persistiti lato bozza.
 - Bozze: compose carica draft da backend se `draftId` è in query (imposta form e providerId); build/lint frontend OK.
 - Alias (stub): endpoint `GET /providers/:id/aliases` restituisce per ora solo l’email primaria; compose popola il Select “Da” con alias se disponibili e ricarica alias al cambio provider. Build backend/frontend OK.
+- Bozze con allegati in metadata: autosave invia anche la lista allegati (base64) a `saveDraft` e ripristina draft/alias; build/lint frontend OK. Gli allegati restano in metadata, non ancora in storage definitivo.
+- Alias: `getAliases` ora legge eventuali alias in `providerConfig.metadata.aliases` (array {email,name}); fallback alla mail primaria. Necessario supporto real send-as/identities da Gmail/Graph in futuro.
+- Alias reali: `getAliases` prova a recuperare alias reali da Gmail (sendAs list) e Microsoft (Graph /me mail/userPrincipalName/otherMails), poi li salva in metadata.aliases; fallback alla mail primaria. Compose continua a usarli tramite API `/providers/:id/aliases`. Build backend/front OK.
+- Coda sync: dedup dei job per providerId+syncType e jobId stabile nei bulk per evitare burst da webhook/az bulk; log più chiaro sul jobId. Build backend OK.

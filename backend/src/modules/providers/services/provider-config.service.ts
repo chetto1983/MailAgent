@@ -74,17 +74,56 @@ export class ProviderConfigService {
   async getAliases(providerId: string, tenantId: string): Promise<ProviderAlias[]> {
     const provider = await this.prisma.providerConfig.findFirst({
       where: { id: providerId, tenantId },
-      select: { id: true, email: true },
+      select: { id: true, email: true, metadata: true, providerType: true },
     });
     if (!provider) {
       throw new NotFoundException('Provider not found');
     }
-    return [
-      {
+
+    let aliases: ProviderAlias[] = [];
+    const metadataAliases = Array.isArray((provider.metadata as any)?.aliases)
+      ? (provider.metadata as any).aliases
+      : [];
+
+    if (metadataAliases.length > 0) {
+      aliases = metadataAliases.map((alias: any) => ({
         providerId: provider.id,
-        email: provider.email,
+        email: alias.email || provider.email,
+        name: alias.name,
+      }));
+    } else if (provider.providerType === 'google') {
+      aliases = (await this.googleOAuth.getSendAsAliases(tenantId, providerId)).map((a) => ({
+        providerId: provider.id,
+        email: a.email,
+        name: a.name,
+      }));
+    } else if (provider.providerType === 'microsoft') {
+      aliases = (await this.microsoftOAuth.getAliases(tenantId, providerId)).map((a) => ({
+        providerId: provider.id,
+        email: a.email,
+        name: a.name,
+      }));
+    } else {
+      aliases = [{ providerId: provider.id, email: provider.email }];
+    }
+
+    // Persist aliases in metadata for quicker access
+    await this.prisma.providerConfig.update({
+      where: { id: providerId },
+      data: {
+        metadata: {
+          ...(provider.metadata as Record<string, any>),
+          aliases: aliases.map((a) => ({ email: a.email, name: a.name })),
+        },
       },
-    ];
+    });
+
+    // Fallback to primary email if list is empty
+    if (aliases.length === 0) {
+      aliases = [{ providerId: provider.id, email: provider.email }];
+    }
+
+    return aliases;
   }
 
   /**

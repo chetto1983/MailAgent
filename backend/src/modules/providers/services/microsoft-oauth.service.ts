@@ -314,6 +314,31 @@ export class MicrosoftOAuthService {
   }
 
   /**
+   * List aliases/identities for Microsoft account
+   * Uses /me with otherMails_userPrincipalName_mail
+   */
+  async getAliases(tenantId: string, providerId: string): Promise<{ email: string; name?: string }[]> {
+    const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
+    const graphClient = this.getGraphClient(accessToken);
+
+    const response = await graphClient
+      .api('/me')
+      .select('mail,userPrincipalName,otherMails,displayName')
+      .get();
+
+    const emails: string[] = [];
+    if (response.mail) emails.push(response.mail);
+    if (response.userPrincipalName) emails.push(response.userPrincipalName);
+    if (Array.isArray(response.otherMails)) emails.push(...response.otherMails);
+
+    const uniqueEmails = Array.from(new Set(emails.filter(Boolean)));
+    return uniqueEmails.map((email: string) => ({
+      email,
+      name: response.displayName || undefined,
+    }));
+  }
+
+  /**
    * Generate random state for CSRF protection
    */
   private generateRandomState(): string {

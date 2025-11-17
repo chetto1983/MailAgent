@@ -140,45 +140,50 @@ function EmailComposeInner() {
         clearTimeout(autosaveTimerRef.current);
       }
     };
-  }, [providerId, form, draftId]);
+  }, [providerId, form, draftId, attachments]);
 
-  // Load email for reply/forward modes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Load draft if draftId is present
   useEffect(() => {
-    const loadEmailOrDraft = async () => {
-      // Populate from query on initial load
-      setForm(getInitialComposeFromQuery(router.query));
+    setForm(getInitialComposeFromQuery(router.query));
+    if (!draftId) return;
 
-      // Draft load takes precedence if draftId is provided
-      if (draftId) {
-        try {
-          const draftRes = await emailApi.getDraft(draftId);
-          const draft = draftRes.data;
-          const nextProviderId = draft.providerId || providerId;
-          setProviderId(nextProviderId);
-          if (nextProviderId) {
-            providersApi
-              .getAliases(nextProviderId)
-              .then((aliasList) => setAliases(aliasList))
-              .catch(() => {});
-          }
-          setForm({
-            to: draft.to?.join(', ') || '',
-            cc: draft.cc?.join(', ') || '',
-            bcc: draft.bcc?.join(', ') || '',
-            subject: draft.subject || '',
-            bodyHtml: draft.bodyHtml || '',
-          });
-          return;
-        } catch (error) {
-          console.error('Failed to load draft:', error);
+    const loadDraft = async () => {
+      try {
+        const draftRes = await emailApi.getDraft(draftId);
+        const draft = draftRes.data;
+        const nextProviderId = draft.providerId || providerId;
+        setProviderId(nextProviderId);
+        if (nextProviderId) {
+          providersApi
+            .getAliases(nextProviderId)
+            .then((aliasList) => setAliases(aliasList))
+            .catch(() => {});
         }
+        setForm({
+          to: draft.to?.join(', ') || '',
+          cc: draft.cc?.join(', ') || '',
+          bcc: draft.bcc?.join(', ') || '',
+          subject: draft.subject || '',
+          bodyHtml: draft.bodyHtml || '',
+        });
+      } catch (error) {
+        console.error('Failed to load draft:', error);
       }
+    };
 
-      if ((!replyTo && !forwardFrom) || (typeof replyTo !== 'string' && typeof forwardFrom !== 'string')) {
-        return;
-      }
+    loadDraft();
+  }, [draftId, providerId, router.query]);
 
+  // Load source email for reply/forward when no draft
+  useEffect(() => {
+    if (draftId) return;
+    setForm(getInitialComposeFromQuery(router.query));
+
+    if ((!replyTo && !forwardFrom) || (typeof replyTo !== 'string' && typeof forwardFrom !== 'string')) {
+      return;
+    }
+
+    const loadEmail = async () => {
       try {
         const emailId = (replyTo as string) || (forwardFrom as string);
         const response = await emailApi.getEmail(emailId);
@@ -202,7 +207,6 @@ function EmailComposeInner() {
             bodyHtml: `<br><br>---------- Forwarded message ----------<br>From: ${email.from}<br>Date: ${email.receivedAt}<br>Subject: ${email.subject}<br><br>${email.bodyHtml ?? ''}`,
           }));
         }
-        // load aliases for this provider
         providersApi
           .getAliases(email.providerId)
           .then((aliasList) => setAliases(aliasList))
@@ -212,8 +216,8 @@ function EmailComposeInner() {
       }
     };
 
-    loadEmailOrDraft();
-  }, [replyTo, forwardFrom, providerId, router.query, draftId]);
+    loadEmail();
+  }, [draftId, forwardFrom, providerId, replyTo, router.query]);
 
   const handleInputChange = (field: 'to' | 'cc' | 'bcc' | 'subject') => (event: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));

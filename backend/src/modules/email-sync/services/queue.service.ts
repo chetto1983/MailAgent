@@ -157,16 +157,24 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   async addSyncJob(data: SyncJobData): Promise<void> {
     const queue = this.getQueueByPriority(data.priority);
 
+    // Dedup job per provider + syncType to avoid bursts
+    const jobId = `${data.providerId}-${data.syncType || 'delta'}`;
+    const existing = await queue.getJob(jobId);
+    if (existing) {
+      this.logger.verbose(`Job ${jobId} already queued, skipping duplicate`);
+      return;
+    }
+
     await queue.add(
       `sync-${data.providerType}-${data.email}`,
       data,
       {
-        jobId: `${data.providerId}-${Date.now()}`,
+        jobId,
         delay: 0, // Immediate execution
       },
     );
 
-    this.logger.log(`Added ${data.priority} priority sync job for ${data.email} (${data.providerType})`);
+    this.logger.log(`Added ${data.priority} priority sync job for ${data.email} (${data.providerType}) [jobId=${jobId}]`);
   }
 
   async addBulkSyncJobs(jobs: SyncJobData[]): Promise<void> {
@@ -191,7 +199,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         name: `sync-${job.providerType}-${job.email}`,
         data: job,
         opts: {
-          jobId: `${job.providerId}-${Date.now()}-${index}`,
+          jobId: `${job.providerId}-${job.syncType || 'delta'}`,
           delay: index * 100, // Stagger jobs by 100ms
         },
       }));

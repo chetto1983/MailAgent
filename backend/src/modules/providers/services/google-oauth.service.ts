@@ -266,6 +266,26 @@ export class GoogleOAuthService {
   }
 
   /**
+   * List Gmail send-as identities (aliases)
+   */
+  async getSendAsAliases(tenantId: string, providerId: string): Promise<{ email: string; name?: string }[]> {
+    const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
+    const auth = new OAuth2Client();
+    auth.setCredentials({ access_token: accessToken });
+
+    const gmail = google.gmail({ version: 'v1', auth: auth as any });
+    const response = await gmail.users.settings.sendAs.list({ userId: 'me' });
+    const sendAs = response.data.sendAs || [];
+
+    return sendAs
+      .map((alias) => ({
+        email: alias.sendAsEmail || '',
+        name: alias.displayName || undefined,
+      }))
+      .filter((alias) => alias.email);
+  }
+
+  /**
    * Test Gmail API - List recent messages
    */
   async testGmailMessages(tenantId: string, providerId: string): Promise<any> {
