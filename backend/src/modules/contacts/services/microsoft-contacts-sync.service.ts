@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
@@ -25,18 +26,32 @@ export interface MicrosoftContactsSyncResult {
 export class MicrosoftContactsSyncService {
   private readonly logger = new Logger(MicrosoftContactsSyncService.name);
   private readonly GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
+  private readonly contactsEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly microsoftOAuth: MicrosoftOAuthService,
     private realtimeEvents: RealtimeEventsService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.contactsEnabled =
+      (this.configService.get<string>('CONTACTS_SYNC_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.contactsEnabled) {
+      this.logger.warn('MicrosoftContactsSyncService disabled via CONTACTS_SYNC_ENABLED=false');
+    }
+  }
 
   /**
    * Sync contacts from Microsoft Graph API
    */
   async syncContacts(providerId: string): Promise<number> {
+    if (!this.contactsEnabled) {
+      this.logger.warn(
+        `Skipping Microsoft contacts sync for ${providerId} (CONTACTS_SYNC_ENABLED=false)`,
+      );
+      return 0;
+    }
     const startTime = Date.now();
     this.logger.log(`Starting Microsoft Contacts sync for provider ${providerId}`);
 

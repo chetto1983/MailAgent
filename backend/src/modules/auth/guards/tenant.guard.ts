@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 
@@ -13,6 +14,8 @@ import { PrismaService } from '../../../prisma/prisma.service';
  */
 @Injectable()
 export class TenantGuard implements CanActivate {
+  private readonly logger = new Logger(TenantGuard.name);
+
   constructor(private prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -20,6 +23,7 @@ export class TenantGuard implements CanActivate {
 
     const user = request.user;
     if (!user) {
+      this.logger.warn(`TenantGuard: missing user on request for path=${request.path}`);
       throw new UnauthorizedException('User context missing from request.');
     }
 
@@ -31,6 +35,9 @@ export class TenantGuard implements CanActivate {
     const providedTenantIdentifier = headerTenantId || user.tenantId;
 
     if (!providedTenantIdentifier) {
+      this.logger.warn(
+        `TenantGuard: no tenant id provided (header or token) for user=${user.userId} path=${request.path}`,
+      );
       throw new BadRequestException('Tenant ID not found in request');
     }
 
@@ -44,7 +51,17 @@ export class TenantGuard implements CanActivate {
       },
     });
 
-    if (!tenant || !tenant.isActive) {
+    if (!tenant) {
+      this.logger.warn(
+        `TenantGuard: tenant not found for identifier=${providedTenantIdentifier} user=${user.userId}`,
+      );
+      throw new ForbiddenException('Invalid or inactive tenant');
+    }
+
+    if (!tenant.isActive) {
+      this.logger.warn(
+        `TenantGuard: tenant inactive identifier=${providedTenantIdentifier} user=${user.userId}`,
+      );
       throw new ForbiddenException('Invalid or inactive tenant');
     }
 
@@ -52,6 +69,9 @@ export class TenantGuard implements CanActivate {
     const isCrossTenant = user.tenantId && user.tenantId !== resolvedTenantId;
 
     if (isCrossTenant && user.role !== 'super-admin') {
+      this.logger.warn(
+        `TenantGuard: cross-tenant access denied user=${user.userId} tokenTenant=${user.tenantId} targetTenant=${resolvedTenantId}`,
+      );
       throw new ForbiddenException('Cross-tenant access requires super-admin privileges.');
     }
 

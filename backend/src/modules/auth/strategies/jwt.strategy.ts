@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -14,6 +14,8 @@ const cookieExtractor = (req: any): string | null => {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(private prisma: PrismaService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -26,11 +28,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    if (!payload) {
+      this.logger.warn('JWT validation failed: empty payload');
+      return null;
+    }
+
+    if (!payload.userId || !payload.tenantId) {
+      this.logger.warn(
+        `JWT validation failed: missing userId/tenantId in payload keys=${Object.keys(payload).join(',')}`,
+      );
+      return null;
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: payload.userId },
     });
 
     if (!user) {
+      this.logger.warn(`JWT validation failed: user ${payload.userId} not found`);
       return null;
     }
 

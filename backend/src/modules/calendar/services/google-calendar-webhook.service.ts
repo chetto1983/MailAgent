@@ -20,6 +20,7 @@ export interface GoogleCalendarPushNotification {
 export class GoogleCalendarWebhookService {
   private readonly logger = new Logger(GoogleCalendarWebhookService.name);
   private readonly WEBHOOK_URL: string;
+  private readonly jobsEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -27,8 +28,18 @@ export class GoogleCalendarWebhookService {
     private readonly config: ConfigService,
     private readonly calendarSync: GoogleCalendarSyncService,
   ) {
-    const backendUrl = this.config.get<string>('BACKEND_URL', 'http://localhost:3000');
-    this.WEBHOOK_URL = `${backendUrl}/webhooks/calendar/google/push`;
+    const baseUrl =
+      this.config.get<string>('api.url') ||
+      this.config.get<string>('API_PUBLIC_URL') ||
+      this.config.get<string>('BACKEND_URL') ||
+      'http://localhost:3000';
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    this.WEBHOOK_URL = `${normalizedBase}/webhooks/calendar/google/push`;
+    this.jobsEnabled =
+      (this.config.get<string>('JOBS_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.jobsEnabled) {
+      this.logger.warn('GoogleCalendarWebhookService disabled via JOBS_ENABLED=false');
+    }
   }
 
   /**
@@ -241,6 +252,9 @@ export class GoogleCalendarWebhookService {
 
   @Cron(CronExpression.EVERY_6_HOURS)
   private async handleScheduledRenewal(): Promise<void> {
+    if (!this.jobsEnabled) {
+      return;
+    }
     try {
       const renewed = await this.renewExpiringSoon();
       if (renewed > 0) {

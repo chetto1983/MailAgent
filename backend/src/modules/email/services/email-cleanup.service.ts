@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
@@ -12,19 +13,33 @@ interface CleanupResult {
 export class EmailCleanupService {
   private readonly logger = new Logger(EmailCleanupService.name);
   private readonly purgeAfterHours = 24;
+  private readonly jobsEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly knowledgeBaseService: KnowledgeBaseService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.jobsEnabled =
+      (this.configService.get<string>('JOBS_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.jobsEnabled) {
+      this.logger.warn('EmailCleanupService disabled via JOBS_ENABLED=false');
+    }
+  }
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async purgeDeletedEmailsCron() {
+    if (!this.jobsEnabled) {
+      return;
+    }
     await this.purgeSoftDeletedEmails();
   }
 
   @Cron('0 30 3 * * *')
   async removeDuplicateEmailsCron() {
+    if (!this.jobsEnabled) {
+      return;
+    }
     await this.removeDuplicateEmails();
   }
 

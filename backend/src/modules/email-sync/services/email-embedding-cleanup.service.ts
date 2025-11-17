@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 
@@ -13,14 +14,26 @@ interface DeletedEmailRecord {
 export class EmailEmbeddingCleanupService {
   private readonly logger = new Logger(EmailEmbeddingCleanupService.name);
   private readonly BATCH_SIZE = 200;
+  private readonly jobsEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly knowledgeBaseService: KnowledgeBaseService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.jobsEnabled =
+      (this.configService.get<string>('JOBS_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.jobsEnabled) {
+      this.logger.warn('EmailEmbeddingCleanupService disabled via JOBS_ENABLED=false');
+    }
+  }
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async cleanupDeletedEmailEmbeddings(): Promise<void> {
+    if (!this.jobsEnabled) {
+      return;
+    }
+
     const emails = await this.prisma.email.findMany({
       where: {
         isDeleted: true,

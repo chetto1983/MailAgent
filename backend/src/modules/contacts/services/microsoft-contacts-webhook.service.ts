@@ -28,6 +28,7 @@ export class MicrosoftContactsWebhookService {
   private readonly GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
   private readonly WEBHOOK_URL: string;
   private readonly CLIENT_STATE: string;
+  private readonly contactsEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -46,12 +47,22 @@ export class MicrosoftContactsWebhookService {
       this.WEBHOOK_URL = `${backendUrl}/webhooks/contacts/microsoft/notifications`;
     }
     this.CLIENT_STATE = this.config.get<string>('WEBHOOK_CLIENT_STATE', nanoid());
+
+    this.contactsEnabled =
+      (this.config.get<string>('CONTACTS_SYNC_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.contactsEnabled) {
+      this.logger.warn('MicrosoftContactsWebhookService disabled via CONTACTS_SYNC_ENABLED=false');
+    }
   }
 
   /**
    * Setup Microsoft Contacts webhook subscription
    */
   async setupSubscription(providerId: string): Promise<void> {
+    if (!this.contactsEnabled) {
+      this.logger.warn('Skipping Microsoft Contacts subscription setup (CONTACTS_SYNC_ENABLED=false)');
+      return;
+    }
     try {
       const provider = await this.prisma.providerConfig.findUnique({
         where: { id: providerId },
@@ -145,6 +156,9 @@ export class MicrosoftContactsWebhookService {
   async handleNotifications(
     notifications: MicrosoftContactsNotification[],
   ): Promise<void> {
+    if (!this.contactsEnabled) {
+      return;
+    }
     for (const notification of notifications) {
       try {
         await this.handleSingleNotification(notification);

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { google, people_v1 } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
@@ -24,18 +25,30 @@ export interface GoogleContactsSyncResult {
 @Injectable()
 export class GoogleContactsSyncService {
   private readonly logger = new Logger(GoogleContactsSyncService.name);
+  private readonly contactsEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly googleOAuth: GoogleOAuthService,
     private realtimeEvents: RealtimeEventsService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.contactsEnabled =
+      (this.configService.get<string>('CONTACTS_SYNC_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.contactsEnabled) {
+      this.logger.warn('GoogleContactsSyncService disabled via CONTACTS_SYNC_ENABLED=false');
+    }
+  }
 
   /**
    * Sync contacts from Google People API
    */
   async syncContacts(providerId: string): Promise<number> {
+    if (!this.contactsEnabled) {
+      this.logger.warn(`Skipping Google contacts sync for ${providerId} (CONTACTS_SYNC_ENABLED=false)`);
+      return 0;
+    }
     const startTime = Date.now();
     this.logger.log(`Starting Google Contacts sync for provider ${providerId}`);
 

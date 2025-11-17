@@ -16,19 +16,30 @@ export const GOOGLE_CONTACTS_RESOURCE = '/contacts';
 @Injectable()
 export class GoogleContactsWebhookService {
   private readonly logger = new Logger(GoogleContactsWebhookService.name);
+  private readonly contactsEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly config: ConfigService,
     private readonly contactsSync: GoogleContactsSyncService,
-  ) {}
+  ) {
+    this.contactsEnabled =
+      (this.config.get<string>('CONTACTS_SYNC_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.contactsEnabled) {
+      this.logger.warn('GoogleContactsWebhookService disabled via CONTACTS_SYNC_ENABLED=false');
+    }
+  }
 
   /**
    * Setup "subscription" (really just marks provider for polling)
    * This maintains API compatibility with calendar webhooks
    */
   async setupWatch(providerId: string): Promise<void> {
+    if (!this.contactsEnabled) {
+      this.logger.warn('Skipping Google Contacts watch setup (CONTACTS_SYNC_ENABLED=false)');
+      return;
+    }
     try {
       const provider = await this.prisma.providerConfig.findUnique({
         where: { id: providerId },
@@ -207,6 +218,9 @@ export class GoogleContactsWebhookService {
    * Stop watching contacts for a provider
    */
   async stopWatch(providerId: string): Promise<void> {
+    if (!this.contactsEnabled) {
+      return;
+    }
     try {
       await this.prisma.webhookSubscription.updateMany({
         where: {

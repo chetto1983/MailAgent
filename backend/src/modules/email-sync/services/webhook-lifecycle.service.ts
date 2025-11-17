@@ -10,13 +10,20 @@ export class WebhookLifecycleService {
   private readonly logger = new Logger(WebhookLifecycleService.name);
   private isRenewalRunning = false;
   private isDeepCheckRunning = false;
+  private readonly jobsEnabled: boolean;
 
   constructor(
     private prisma: PrismaService,
     private gmailWebhook: GmailWebhookService,
     private microsoftWebhook: MicrosoftWebhookService,
     private configService: ConfigService,
-  ) {}
+  ) {
+    this.jobsEnabled =
+      (this.configService.get<string>('JOBS_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.jobsEnabled) {
+      this.logger.warn('WebhookLifecycleService disabled via JOBS_ENABLED=false');
+    }
+  }
 
   /**
    * Auto-create webhook subscriptions for new providers
@@ -124,6 +131,9 @@ export class WebhookLifecycleService {
     timeZone: 'UTC',
   })
   async performDeepCheck(): Promise<void> {
+    if (!this.jobsEnabled) {
+      return;
+    }
     if (this.isDeepCheckRunning) {
       this.logger.warn('Deep check already running, skipping...');
       return;
@@ -186,6 +196,9 @@ export class WebhookLifecycleService {
     name: 'cleanup-webhooks',
   })
   async cleanupInactiveWebhooks(): Promise<void> {
+    if (!this.jobsEnabled) {
+      return;
+    }
     try {
       this.logger.log('Starting webhook cleanup...');
 

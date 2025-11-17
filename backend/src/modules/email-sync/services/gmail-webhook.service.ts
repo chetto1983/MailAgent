@@ -387,18 +387,19 @@ export class GmailWebhookService {
    */
   private async updateSubscriptionStats(providerId: string): Promise<void> {
     try {
-      await this.prisma.webhookSubscription.update({
+      const result = await this.prisma.webhookSubscription.updateMany({
         where: {
-          providerId_resourcePath: {
-            providerId,
-            resourcePath: GMAIL_WEBHOOK_RESOURCE,
-          },
+          providerId,
+          resourcePath: GMAIL_WEBHOOK_RESOURCE,
         },
         data: {
           lastNotificationAt: new Date(),
           notificationCount: { increment: 1 },
         },
       });
+      if (result.count === 0) {
+        this.logger.warn(`No gmail subscription row found for stats update (providerId=${providerId})`);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // Ignore if subscription doesn't exist, but keep trace for diagnostics

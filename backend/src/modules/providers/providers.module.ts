@@ -12,6 +12,7 @@ import { MicrosoftOAuthService } from './services/microsoft-oauth.service';
 import { ImapService } from './services/imap.service';
 import { CalDavService } from './services/caldav.service';
 import { ProviderConfigService } from './services/provider-config.service';
+import { AuthDebugMiddleware } from '../../common/middleware/auth-debug.middleware';
 
 // Controllers
 import { ProvidersController } from './controllers/providers.controller';
@@ -46,4 +47,10 @@ import { OAuthCallbackController } from './controllers/oauth-callback.controller
     ProviderConfigService,
   ],
 })
-export class ProvidersModule {}
+export class ProvidersModule {
+  configure(consumer: any) {
+    if ((process.env.DEBUG_AUTH_LOG || '').toLowerCase() === 'true') {
+      consumer.apply(AuthDebugMiddleware).forRoutes(ProvidersController);
+    }
+  }
+}

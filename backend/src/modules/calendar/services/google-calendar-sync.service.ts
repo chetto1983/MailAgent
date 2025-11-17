@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
+import { ConfigService } from '@nestjs/config';
 
 export interface GoogleCalendarSyncResult {
   success: boolean;
@@ -18,19 +19,41 @@ export interface GoogleCalendarSyncResult {
 @Injectable()
 export class GoogleCalendarSyncService {
   private readonly logger = new Logger(GoogleCalendarSyncService.name);
+  private readonly calendarEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly googleOAuth: GoogleOAuthService,
     private readonly realtimeEvents: RealtimeEventsService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.calendarEnabled =
+      (this.configService.get<string>('CALENDAR_SYNC_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.calendarEnabled) {
+      this.logger.warn('GoogleCalendarSyncService disabled via CALENDAR_SYNC_ENABLED=false');
+    }
+  }
 
   /**
    * Sync calendar events from Google Calendar
    * Syncs events from last 60 days to next 60 days (120 days total)
    */
   async syncCalendar(providerId: string): Promise<GoogleCalendarSyncResult> {
+    if (!this.calendarEnabled) {
+      this.logger.warn(
+        `Skipping Google calendar sync for ${providerId} (CALENDAR_SYNC_ENABLED=false)`,
+      );
+      return {
+        success: true,
+        providerId,
+        eventsProcessed: 0,
+        newEvents: 0,
+        updatedEvents: 0,
+        deletedEvents: 0,
+        syncDuration: 0,
+      };
+    }
     const startTime = Date.now();
     this.logger.log(`Starting Google Calendar sync for provider ${providerId}`);
 

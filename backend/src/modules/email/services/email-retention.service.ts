@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -7,8 +8,18 @@ import { Prisma } from '@prisma/client';
 export class EmailRetentionService {
   private readonly logger = new Logger(EmailRetentionService.name);
   private readonly RETENTION_DAYS = 30; // Keep full content for 30 days
+  private readonly jobsEnabled: boolean;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {
+    this.jobsEnabled =
+      (this.configService.get<string>('JOBS_ENABLED') || 'true').toLowerCase() !== 'false';
+    if (!this.jobsEnabled) {
+      this.logger.warn('EmailRetentionService disabled via JOBS_ENABLED=false');
+    }
+  }
 
   /**
    * Run retention policy daily at 2 AM
@@ -16,6 +27,9 @@ export class EmailRetentionService {
    */
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async runRetentionPolicy() {
+    if (!this.jobsEnabled) {
+      return;
+    }
     this.logger.log('Starting email retention policy...');
 
     try {
