@@ -454,6 +454,9 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         sent: 'Sent',
         drafts: 'Drafts',
         trash: 'Trash',
+        spam: 'Spam',
+        archive: 'Archive',
+        outbox: 'Outbox',
         starred: 'Starred',
       },
       composer: {
@@ -957,6 +960,9 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         sent: 'Inviata',
         drafts: 'Bozze',
         trash: 'Cestino',
+        spam: 'Posta indesiderata',
+        archive: 'Archivio',
+        outbox: 'Posta in uscita',
         starred: 'Speciali',
       },
       composer: {

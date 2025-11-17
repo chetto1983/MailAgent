@@ -637,6 +637,8 @@ export class FolderSyncService {
         id: true,
         name: true,
         tenantId: true,
+        totalCount: true,
+        unreadCount: true,
       },
     });
 
@@ -666,7 +668,11 @@ export class FolderSyncService {
       },
     });
 
-    // Update folder counts
+    // Skip DB + realtime if counts unchanged (debounce)
+    if (folder.totalCount === totalCount && folder.unreadCount === unreadCount) {
+      return null;
+    }
+
     await this.prisma.folder.update({
       where: { id: folder.id },
       data: {
@@ -699,10 +705,12 @@ export class FolderSyncService {
       where: { providerId },
     });
 
+    let changed = 0;
     for (const folder of folders) {
       const result = await this.updateFolderCounts(providerId, folder.path, provider?.tenantId);
 
       if (result && provider?.tenantId) {
+        changed += 1;
         this.realtimeEvents.emitFolderCountsUpdate(provider.tenantId, {
           providerId,
           folderId: result.folderId,
@@ -715,7 +723,7 @@ export class FolderSyncService {
     }
 
     this.logger.log(
-      `Updated counts for ${folders.length} folders (provider: ${providerId})`,
+      `Updated counts for ${changed}/${folders.length} folders (provider: ${providerId})`,
     );
   }
 }

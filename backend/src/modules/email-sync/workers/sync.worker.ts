@@ -89,6 +89,9 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
           max: concurrency * 2, // Max jobs processed
           duration: 60000, // per minute
         },
+        // Long-running syncs need generous lock to avoid "missing lock" stalls
+        lockDuration: 180000,
+        stalledInterval: 60000,
       },
     );
 

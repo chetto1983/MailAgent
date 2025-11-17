@@ -37,12 +37,28 @@ export class RealtimeEventsService {
     { event: KnownRealtimeEvent; tenantId: string; payload: EmailEventPayload }
   >();
   private emailBufferTimer?: NodeJS.Timeout;
+  private folderCountsBuffer = new Map<
+    string,
+    Map<
+      string,
+      { tenantId: string; payload: RealtimeEventPayloads['email:folder_counts_update'] }
+    >
+  >(); // providerId -> folderId -> { tenantId, payload }
+  private folderBufferTimer?: NodeJS.Timeout;
+  private lastFolderCounts = new Map<
+    string,
+    Map<string, { totalCount: number; unreadCount: number }>
+  >(); // providerId -> folderId -> counts snapshot
   private readonly EMAIL_BUFFER_MS: number;
   private readonly EMAIL_BUFFER_MAX: number;
+  private readonly FOLDER_BUFFER_MS: number;
+  private readonly FOLDER_BUFFER_MAX: number;
 
   constructor(private readonly config: ConfigService) {
     this.EMAIL_BUFFER_MS = this.config.get<number>('REALTIME_EMAIL_BUFFER_MS', 200);
     this.EMAIL_BUFFER_MAX = this.config.get<number>('REALTIME_EMAIL_BUFFER_MAX', 500);
+    this.FOLDER_BUFFER_MS = this.config.get<number>('REALTIME_FOLDER_BUFFER_MS', 250);
+    this.FOLDER_BUFFER_MAX = this.config.get<number>('REALTIME_FOLDER_BUFFER_MAX', 200);
   }
 
   /**
@@ -94,7 +110,33 @@ export class RealtimeEventsService {
     tenantId: string,
     payload: RealtimeEventPayloads['email:folder_counts_update'],
   ) {
-    this.emitToTenant(tenantId, 'email:folder_counts_update', payload);
+    // Skip unchanged counts to avoid spamming the frontend
+    const providerCache =
+      this.lastFolderCounts.get(payload.providerId) ??
+      new Map<string, { totalCount: number; unreadCount: number }>();
+    const prev = providerCache.get(payload.folderId);
+    if (prev && prev.totalCount === payload.totalCount && prev.unreadCount === payload.unreadCount) {
+      return;
+    }
+    providerCache.set(payload.folderId, {
+      totalCount: payload.totalCount,
+      unreadCount: payload.unreadCount,
+    });
+    this.lastFolderCounts.set(payload.providerId, providerCache);
+
+    const providerBuffer =
+      this.folderCountsBuffer.get(payload.providerId) ??
+      new Map<string, { tenantId: string; payload: RealtimeEventPayloads['email:folder_counts_update'] }>();
+    providerBuffer.set(payload.folderId, { tenantId, payload });
+    this.folderCountsBuffer.set(payload.providerId, providerBuffer);
+
+    if (!this.folderBufferTimer) {
+      this.folderBufferTimer = setTimeout(() => this.flushFolderCountsBuffer(), this.FOLDER_BUFFER_MS);
+    }
+
+    if (providerBuffer.size >= this.FOLDER_BUFFER_MAX) {
+      this.flushFolderCountsBuffer();
+    }
   }
 
   /**
@@ -309,6 +351,28 @@ export class RealtimeEventsService {
     }
 
     this.logger.debug(`Flushed ${events.length} buffered email event(s)`);
+  }
+
+  /**
+   * Flush buffered folder count updates, emitting only the latest per folder.
+   */
+  private flushFolderCountsBuffer() {
+    if (this.folderBufferTimer) {
+      clearTimeout(this.folderBufferTimer);
+      this.folderBufferTimer = undefined;
+    }
+
+    for (const [, folderMap] of this.folderCountsBuffer) {
+      for (const entry of folderMap.values()) {
+        this.emitToTenant(entry.tenantId, 'email:folder_counts_update', entry.payload);
+      }
+    }
+
+    if (this.folderCountsBuffer.size) {
+      this.logger.debug(`Flushed folder count buffer with ${this.folderCountsBuffer.size} provider(s)`);
+    }
+
+    this.folderCountsBuffer.clear();
   }
 
   private emitInternal<E extends KnownRealtimeEvent>(

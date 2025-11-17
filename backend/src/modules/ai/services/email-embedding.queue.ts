@@ -27,6 +27,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
   private readonly WORKER_CONCURRENCY: number;
   private readonly RATE_MAX: number;
   private readonly RATE_DURATION_MS: number;
+  private readonly WORKER_LOCK_MS: number;
   private readonly seenIds = new Set<string>();
 
   constructor(
@@ -34,11 +35,12 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
     @Inject(forwardRef(() => KnowledgeBaseService))
     private readonly knowledgeBaseService: KnowledgeBaseService,
   ) {
-    this.BULK_SIZE = this.getPositiveNumber('EMBEDDING_BULK_SIZE', 50);
-    this.FLUSH_MS = this.getPositiveNumber('EMBEDDING_FLUSH_MS', 200);
-    this.WORKER_CONCURRENCY = this.getPositiveNumber('EMBEDDING_CONCURRENCY', 6);
-    this.RATE_MAX = this.getPositiveNumber('EMBEDDING_RATE_MAX', 20);
+    this.BULK_SIZE = this.getPositiveNumber('EMBEDDING_BULK_SIZE', 75);
+    this.FLUSH_MS = this.getPositiveNumber('EMBEDDING_FLUSH_MS', 100);
+    this.WORKER_CONCURRENCY = this.getPositiveNumber('EMBEDDING_CONCURRENCY', 8);
+    this.RATE_MAX = this.getPositiveNumber('EMBEDDING_RATE_MAX', 25);
     this.RATE_DURATION_MS = this.getPositiveNumber('EMBEDDING_RATE_DURATION_MS', 1000);
+    this.WORKER_LOCK_MS = this.getPositiveNumber('EMBEDDING_LOCK_MS', 180000);
   }
 
   onModuleInit() {
@@ -88,6 +90,8 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
           max: this.RATE_MAX,
           duration: this.RATE_DURATION_MS,
         },
+        lockDuration: this.WORKER_LOCK_MS, // long embeddings shouldn’t stall
+        stalledInterval: Math.max(1000, Math.floor(this.WORKER_LOCK_MS / 2)),
       },
     );
 

@@ -218,21 +218,70 @@ export function PmSyncMailbox() {
       console.log('Folders loaded:', folderResponse.providers.length, 'providers');
       const dynamicFolders: FolderItem[] = [];
 
-      // Map localized folder names to standard folder names
+      // Map localized folder names to standard folder names (backend uses folder name for filtering)
       const normalizeFolderName = (name: string, specialUse?: string | null): string => {
-        if (specialUse) return specialUse;
+        if (specialUse) return specialUse; // backend should emit specialUse when available
 
         const normalized = name.toLowerCase().trim();
-        // Italian mappings
-        if (normalized === 'posta in arrivo' || normalized === 'inbox') return 'INBOX';
-        if (normalized === 'posta inviata' || normalized === 'sent' || normalized === 'inviata') return 'SENT';
-        if (normalized === 'posta eliminata' || normalized === 'trash' || normalized === 'cestino' || normalized === 'eliminata') return 'TRASH';
-        if (normalized === 'bozze' || normalized === 'draft' || normalized === 'drafts') return 'DRAFT';
-        if (normalized === 'posta indesiderata' || normalized === 'spam' || normalized === 'junk') return 'SPAM';
-        if (normalized === 'archive' || normalized === 'archivia' || normalized === 'archivio') return 'ARCHIVE';
+
+        // Inbox
+        if (
+          normalized === 'posta in arrivo' ||
+          normalized === 'inbox' ||
+          normalized === 'posteingang'
+        )
+          return 'INBOX';
+
+        // Sent
+        if (
+          normalized === 'posta inviata' ||
+          normalized === 'sent' ||
+          normalized === 'sent items' ||
+          normalized === 'elementi inviati' ||
+          normalized === 'inviata'
+        )
+          return 'SENT';
+
+        // Trash / Deleted
+        if (
+          normalized === 'posta eliminata' ||
+          normalized === 'trash' ||
+          normalized === 'deleted items' ||
+          normalized === 'elementi eliminati' ||
+          normalized === 'cestino' ||
+          normalized === 'eliminata'
+        )
+          return 'TRASH';
+
+        // Drafts
+        if (normalized === 'bozze' || normalized === 'draft' || normalized === 'drafts')
+          return 'DRAFT';
+
+        // Spam / Junk
+        if (
+          normalized === 'posta indesiderata' ||
+          normalized === 'spam' ||
+          normalized === 'junk' ||
+          normalized === 'junk email' ||
+          normalized === 'post indiserata'
+        )
+          return 'SPAM';
+
+        // Archive / All Mail
+        if (
+          normalized === 'archive' ||
+          normalized === 'archivia' ||
+          normalized === 'archivio' ||
+          normalized === 'all' ||
+          normalized === 'all mail' ||
+          normalized === 'archived mail'
+        )
+          return 'ARCHIVE';
+
+        // Outbox
         if (normalized === 'posta in uscita' || normalized === 'outbox') return 'OUTBOX';
 
-        return name; // Return original name if no mapping found
+        return name; // fallback to original name if no mapping found
       };
 
       folderResponse.providers.forEach((provider) => {
