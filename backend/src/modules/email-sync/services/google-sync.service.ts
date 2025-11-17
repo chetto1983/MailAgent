@@ -13,6 +13,7 @@ import { EmailEventReason } from '../../realtime/types/realtime.types';
 @Injectable()
 export class GoogleSyncService {
   private readonly logger = new Logger(GoogleSyncService.name);
+  private readonly GMAIL_BATCH_GET_SIZE = 100;
 
   constructor(
     private prisma: PrismaService,
@@ -326,11 +327,25 @@ export class GoogleSyncService {
       let messagesProcessed = 0;
       let newMessages = 0;
 
-      for (const message of messages) {
-        const processed = await this.processMessage(gmail, message.id!, providerId, tenantId);
-        if (processed) {
-          messagesProcessed++;
-          newMessages++;
+      for (let i = 0; i < messages.length; i += this.GMAIL_BATCH_GET_SIZE) {
+        const chunkIds = messages.slice(i, i + this.GMAIL_BATCH_GET_SIZE).map((m) => m.id!).filter(Boolean);
+        if (!chunkIds.length) continue;
+
+        const batchResponse = await gmail.users.messages.batchGet({
+          userId: 'me',
+          ids: chunkIds,
+          format: 'full',
+        });
+
+        const responses = batchResponse.data.responses || [];
+        for (const r of responses) {
+          const msg = r.message;
+          if (!msg?.id) continue;
+          const processed = await this.processMessageData(msg, providerId, tenantId);
+          if (processed) {
+            messagesProcessed++;
+            newMessages++;
+          }
         }
       }
 
@@ -678,6 +693,7 @@ export class GoogleSyncService {
 
   /**
    * Process a single Gmail message and persist it locally.
+   * Kept for incremental/webhook paths when batch data is not available.
    */
   private async processMessage(
     gmail: gmail_v1.Gmail,
@@ -686,7 +702,6 @@ export class GoogleSyncService {
     tenantId: string,
   ): Promise<boolean> {
     try {
-      // Get full message with more details
       const messageResponse = await gmail.users.messages.get({
         userId: 'me',
         id: messageId,
@@ -694,7 +709,29 @@ export class GoogleSyncService {
       });
 
       const message = messageResponse.data;
+      if (!message) return false;
 
+      return await this.processMessageData(message, providerId, tenantId);
+    } catch (error) {
+      if (this.isNotFoundError(error)) {
+        this.logger.verbose(
+          `Gmail returned 404 for message ${messageId}; marking local record as deleted if present.`,
+        );
+        await this.handleMissingRemoteMessage(providerId, tenantId, messageId);
+        return true;
+      }
+
+      this.logger.error(`Failed to process message ${messageId}:`, error);
+      return false;
+    }
+  }
+
+  private async processMessageData(
+    message: gmail_v1.Schema$Message,
+    providerId: string,
+    tenantId: string,
+  ): Promise<boolean> {
+    try {
       // Extract metadata from headers
       const headers = message.payload?.headers || [];
       const from = headers.find((h) => h.name === 'From')?.value || '';
@@ -742,13 +779,13 @@ export class GoogleSyncService {
         where: {
           providerId_externalId: {
             providerId,
-            externalId: messageId,
+            externalId: message.id!,
           },
         },
         create: {
           tenantId,
           providerId,
-          externalId: messageId,
+          externalId: message.id!,
           threadId: message.threadId,
           messageId: messageIdHeader,
           inReplyTo,
@@ -792,7 +829,7 @@ export class GoogleSyncService {
 
       this.notifyMailboxChange(tenantId, providerId, 'message-processed', {
         emailId: emailRecord.id,
-        externalId: messageId,
+        externalId: message.id,
         folder,
       });
 
@@ -800,7 +837,7 @@ export class GoogleSyncService {
 
       if (alreadyEmbedded) {
         this.logger.verbose(
-          `Skipping embedding enqueue for Gmail message ${messageId} - embedding already exists.`,
+          `Skipping embedding enqueue for Gmail message ${message.id} - embedding already exists.`,
         );
       } else {
         try {
@@ -815,11 +852,11 @@ export class GoogleSyncService {
             from,
             receivedAt: emailRecord.receivedAt,
           });
-          this.logger.verbose(`Queued embedding job for Gmail message ${messageId}`);
+          this.logger.verbose(`Queued embedding job for Gmail message ${message.id}`);
         } catch (queueError) {
           const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
           this.logger.warn(
-            `Failed to enqueue embedding job for Gmail message ${messageId}: ${queueMessage}`,
+            `Failed to enqueue embedding job for Gmail message ${message.id}: ${queueMessage}`,
           );
         }
       }

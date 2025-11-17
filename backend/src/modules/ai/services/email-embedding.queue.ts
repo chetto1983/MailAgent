@@ -20,6 +20,10 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
   private readonly logger = new Logger(EmailEmbeddingQueueService.name);
   private queue!: Queue<EmailEmbeddingJob>;
   private worker!: Worker<EmailEmbeddingJob, boolean>;
+  private pending: EmailEmbeddingJob[] = [];
+  private flushTimer?: NodeJS.Timeout;
+  private readonly BULK_SIZE = 50;
+  private readonly FLUSH_MS = 200;
 
   constructor(
     private readonly config: ConfigService,
@@ -90,17 +94,48 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
   async onModuleDestroy() {
     await this.worker?.close();
     await this.queue?.close();
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+    }
   }
 
   async enqueue(job: EmailEmbeddingJob) {
-    await this.queue.add('create', job, {
-      jobId: job.emailId,
-      attempts: 6,
-      backoff: {
-        type: 'exponential',
-        delay: 1000,
+    this.pending.push(job);
+    if (this.pending.length >= this.BULK_SIZE) {
+      await this.flushPending();
+    } else if (!this.flushTimer) {
+      this.flushTimer = setTimeout(() => {
+        this.flushPending().catch((err) =>
+          this.logger.warn(`Failed to flush embedding jobs: ${err instanceof Error ? err.message : String(err)}`),
+        );
+      }, this.FLUSH_MS);
+    }
+  }
+
+  private async flushPending() {
+    if (!this.pending.length || !this.queue) {
+      this.flushTimer = undefined;
+      return;
+    }
+
+    const jobs = this.pending.splice(0, this.pending.length);
+    this.flushTimer = undefined;
+
+    const bullJobs = jobs.map((job) => ({
+      name: 'create',
+      data: job,
+      opts: {
+        jobId: job.emailId,
+        attempts: 6,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
       },
-    });
+    }));
+
+    await this.queue.addBulk(bullJobs);
+    this.logger.verbose(`Queued ${bullJobs.length} embedding job(s) in bulk`);
   }
 
   async removeJobsForTenant(tenantId: string): Promise<number> {
