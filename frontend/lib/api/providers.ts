@@ -20,6 +20,12 @@ export interface OAuthUrlResponse {
   state: string;
 }
 
+export interface ProviderAlias {
+  providerId: string;
+  email: string;
+  name?: string;
+}
+
 export interface ConnectGoogleDto {
   email?: string; // Optional - will be obtained from OAuth2 if not provided
   authorizationCode: string;
@@ -97,6 +103,11 @@ export const providersApi = {
 
   async getProvider(id: string): Promise<ProviderConfig> {
     const response = await apiClient.get(`/providers/${id}`);
+    return response.data;
+  },
+
+  async getAliases(id: string): Promise<ProviderAlias[]> {
+    const response = await apiClient.get(`/providers/${id}/aliases`);
     return response.data;
   },
 

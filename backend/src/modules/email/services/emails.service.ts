@@ -384,8 +384,15 @@ export class EmailsService {
       subject?: string;
       bodyHtml?: string;
       bodyText?: string;
+      attachments?: {
+        filename: string;
+        contentType: string;
+        size?: number;
+        contentBase64?: string;
+      }[];
     },
   ) {
+    const draftAttachments = dto.attachments ?? [];
     const data: Prisma.EmailUncheckedCreateInput = {
       id: dto.id ?? undefined,
       tenantId,
@@ -416,7 +423,9 @@ export class EmailsService {
       receivedAt: new Date(),
       size: null,
       headers: Prisma.DbNull,
-      metadata: {},
+      metadata: {
+        draftAttachments,
+      },
       crossProviderLinkId: null,
     };
 

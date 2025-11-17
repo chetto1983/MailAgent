@@ -42,3 +42,4 @@ Obiettivo: allineare la pipeline di sincronizzazione email con funzionalità sim
 - Bozze (backend): aggiunti endpoint draft (`POST/GET/DELETE /emails/drafts*`) e logica in `EmailsService.saveDraft/getDraft/deleteDraft` basata su `Email` con `isDraft=true`; build backend OK. Nessun supporto allegati/alias ancora.
 - Bozze (frontend): compose ora autosalva su backend via `emailApi.saveDraft` (usa `draftId` da query se presente, altrimenti crea) e cancella la bozza dopo l’invio; build/lint frontend OK. Attachments non ancora persistiti lato bozza.
 - Bozze: compose carica draft da backend se `draftId` è in query (imposta form e providerId); build/lint frontend OK.
+- Alias (stub): endpoint `GET /providers/:id/aliases` restituisce per ora solo l’email primaria; compose popola il Select “Da” con alias se disponibili e ricarica alias al cambio provider. Build backend/frontend OK.

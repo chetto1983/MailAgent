@@ -16,7 +16,7 @@ import {
 import { Paperclip, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
-import { providersApi, type ProviderConfig } from '@/lib/api/providers';
+import { providersApi, type ProviderConfig, type ProviderAlias } from '@/lib/api/providers';
 import { emailApi } from '@/lib/api/email';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { cleanEmailAddresses, getInitialComposeFromQuery } from '@/lib/utils/email-utils';
@@ -38,6 +38,7 @@ function EmailComposeInner() {
   const { replyTo, forwardFrom, draftId: draftIdQuery } = router.query;
   const [mode, setMode] = useState<ComposeMode>('new');
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
+  const [aliases, setAliases] = useState<ProviderAlias[]>([]);
   const [providerId, setProviderId] = useState<string>('');
   const [form, setForm] = useState(() => getInitialComposeFromQuery(router.query));
   const [sending, setSending] = useState(false);
@@ -48,6 +49,12 @@ function EmailComposeInner() {
   const [draftId, setDraftId] = useState<string | null>(
     typeof draftIdQuery === 'string' ? draftIdQuery : null,
   );
+  const fromOptions = useMemo(() => {
+    if (aliases.length) {
+      return aliases.map((alias) => ({ id: alias.providerId, email: alias.email, label: alias.name || alias.email }));
+    }
+    return providers.map((p) => ({ id: p.id, email: p.email, label: p.displayName || p.email }));
+  }, [aliases, providers]);
   const LOCAL_DRAFT_KEY = 'mailagent:compose-draft';
 
   // Sanitize HTML to prevent XSS attacks
@@ -64,8 +71,11 @@ function EmailComposeInner() {
       try {
         const providerList = await providersApi.getProviders();
         setProviders(providerList);
-        if (!providerId && providerList[0]) {
-          setProviderId(providerList[0].id);
+        const nextProviderId = providerId || providerList[0]?.id || '';
+        setProviderId(nextProviderId);
+        if (nextProviderId) {
+          const aliasList = await providersApi.getAliases(nextProviderId);
+          setAliases(aliasList);
         }
       } catch (error) {
         console.error('Failed to load providers:', error);
@@ -111,13 +121,19 @@ function EmailComposeInner() {
           subject: form.subject,
           bodyHtml: form.bodyHtml,
           bodyText: '',
+          attachments: attachments.map((attachment) => ({
+            filename: attachment.name,
+            contentType: attachment.type,
+            size: attachment.size,
+            contentBase64: attachment.base64,
+          })),
         };
         const res = await emailApi.saveDraft(payload);
         setDraftId(res.data.id);
       } catch (error) {
         console.error('Failed to autosave draft', error);
       }
-    }, 1000);
+    }, 1200);
 
     return () => {
       if (autosaveTimerRef.current) {
@@ -127,6 +143,7 @@ function EmailComposeInner() {
   }, [providerId, form, draftId]);
 
   // Load email for reply/forward modes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const loadEmailOrDraft = async () => {
       // Populate from query on initial load
@@ -137,7 +154,14 @@ function EmailComposeInner() {
         try {
           const draftRes = await emailApi.getDraft(draftId);
           const draft = draftRes.data;
-          setProviderId(draft.providerId || providerId);
+          const nextProviderId = draft.providerId || providerId;
+          setProviderId(nextProviderId);
+          if (nextProviderId) {
+            providersApi
+              .getAliases(nextProviderId)
+              .then((aliasList) => setAliases(aliasList))
+              .catch(() => {});
+          }
           setForm({
             to: draft.to?.join(', ') || '',
             cc: draft.cc?.join(', ') || '',
@@ -178,6 +202,11 @@ function EmailComposeInner() {
             bodyHtml: `<br><br>---------- Forwarded message ----------<br>From: ${email.from}<br>Date: ${email.receivedAt}<br>Subject: ${email.subject}<br><br>${email.bodyHtml ?? ''}`,
           }));
         }
+        // load aliases for this provider
+        providersApi
+          .getAliases(email.providerId)
+          .then((aliasList) => setAliases(aliasList))
+          .catch(() => {});
       } catch (error) {
         console.error('Failed to load email for reply/forward:', error);
       }
@@ -191,7 +220,12 @@ function EmailComposeInner() {
   };
 
   const handleProviderChange = (event: React.ChangeEvent<HTMLInputElement> | any) => {
-    setProviderId(event.target.value as string);
+    const nextProviderId = event.target.value as string;
+    setProviderId(nextProviderId);
+    providersApi
+      .getAliases(nextProviderId)
+      .then((aliasList) => setAliases(aliasList))
+      .catch(() => setAliases([]));
   };
 
   const handleEditorInput = () => {
@@ -269,16 +303,16 @@ function EmailComposeInner() {
     try {
       setSending(true);
       await emailApi.sendEmail(payload);
-      if (draftId) {
-        emailApi.deleteDraft(draftId).catch(() => {});
+        if (draftId) {
+          emailApi.deleteDraft(draftId).catch(() => {});
+        }
+        router.push('/dashboard/email');
+      } catch (error) {
+        console.error('Failed to send email:', error);
+        alert(composerCopy.sendError);
+      } finally {
+        setSending(false);
       }
-      router.push('/dashboard/email');
-    } catch (error) {
-      console.error('Failed to send email:', error);
-      alert(composerCopy.sendError);
-    } finally {
-      setSending(false);
-    }
   }, [attachments, composerCopy.selectProvider, composerCopy.sendError, composerCopy.validationTo, draftId, form.bcc, form.bodyHtml, form.cc, form.subject, form.to, providerId, router]);
 
   // Hotkeys: Ctrl/Cmd+Enter to send, Esc to close
@@ -328,9 +362,9 @@ function EmailComposeInner() {
             label={composerCopy.from}
             onChange={handleProviderChange}
           >
-            {providers.map((provider) => (
-              <MenuItem key={provider.id} value={provider.id}>
-                {provider.email}
+            {fromOptions.map((opt) => (
+              <MenuItem key={opt.id} value={opt.id}>
+                {opt.label}
               </MenuItem>
             ))}
           </Select>

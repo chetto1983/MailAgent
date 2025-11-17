@@ -273,6 +273,12 @@ export class EmailsController {
       subject?: string;
       bodyHtml?: string;
       bodyText?: string;
+      attachments?: {
+        filename: string;
+        contentType: string;
+        size?: number;
+        contentBase64?: string;
+      }[];
     },
   ) {
     const tenantId = req.user.tenantId;
