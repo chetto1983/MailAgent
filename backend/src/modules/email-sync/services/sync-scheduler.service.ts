@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { QueueService } from './queue.service';
 import { SyncJobData } from '../interfaces/sync-job.interface';
@@ -32,10 +33,21 @@ export class SyncSchedulerService {
     // < 0.1 emails/hour = Very Low (Priority 5)
   };
 
+  private readonly schedulerEnabled: boolean;
+
   constructor(
     private prisma: PrismaService,
     private queueService: QueueService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    const enabled =
+      (this.configService.get<string>('EMAIL_SYNC_SCHEDULER_ENABLED') || 'true').toLowerCase() !==
+      'false';
+    this.schedulerEnabled = enabled;
+    if (!enabled) {
+      this.logger.warn('SyncSchedulerService disabled via EMAIL_SYNC_SCHEDULER_ENABLED=false');
+    }
+  }
 
   /**
    * Main scheduler - runs every 5 minutes
@@ -43,6 +55,10 @@ export class SyncSchedulerService {
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async scheduleSyncJobs() {
+    if (!this.schedulerEnabled) {
+      return;
+    }
+
     if (this.isRunning) {
       this.logger.warn('Previous sync schedule still running, skipping...');
       return;

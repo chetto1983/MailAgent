@@ -18,7 +18,7 @@ describe('MicrosoftCalendarWebhookService', () => {
   let service: MicrosoftCalendarWebhookService;
   let prisma: jest.Mocked<PrismaService>;
   let crypto: jest.Mocked<CryptoService>;
-  let config: jest.Mocked<ConfigService>;
+  let _config: jest.Mocked<ConfigService>;
   let calendarSync: jest.Mocked<MicrosoftCalendarSyncService>;
 
   beforeEach(async () => {
@@ -68,7 +68,7 @@ describe('MicrosoftCalendarWebhookService', () => {
     service = module.get<MicrosoftCalendarWebhookService>(MicrosoftCalendarWebhookService);
     prisma = module.get(PrismaService);
     crypto = module.get(CryptoService);
-    config = module.get(ConfigService);
+    _config = module.get(ConfigService);
     calendarSync = module.get(MicrosoftCalendarSyncService);
 
     // Clear all mocks

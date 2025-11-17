@@ -53,6 +53,13 @@ export class GmailWebhookService {
           providerType: 'google',
           isActive: true,
         },
+        select: {
+          id: true,
+          email: true,
+          tenantId: true,
+          lastSyncedAt: true,
+          metadata: true,
+        },
       });
 
       if (!provider) {
@@ -65,18 +72,36 @@ export class GmailWebhookService {
       // Update webhook subscription stats
       await this.updateSubscriptionStats(provider.id);
 
-      // Trigger incremental sync with high priority
+      const lastHistoryIdRaw = (provider.metadata as any)?.historyId;
+      const lastHistoryId = lastHistoryIdRaw ? Number(lastHistoryIdRaw) : undefined;
+      const incomingHistoryId = data.historyId ? Number(data.historyId) : undefined;
+      const hasGap =
+        incomingHistoryId !== undefined &&
+        lastHistoryId !== undefined &&
+        incomingHistoryId < lastHistoryId;
+
+      // Trigger incremental sync with high priority (fallback full if gap detected)
       const syncJob: SyncJobData = {
         tenantId: provider.tenantId,
         providerId: provider.id,
         providerType: 'google',
         email: provider.email,
         priority: 'high', // Webhook triggers are high priority
-        syncType: 'incremental',
+        syncType: hasGap ? 'full' : 'incremental',
         lastSyncedAt: provider.lastSyncedAt ?? undefined,
       };
 
       await this.queueService.addSyncJob(syncJob);
+
+      // Persist latest historyId for next delta
+      const newMetadata = {
+        ...(provider.metadata as Record<string, any>),
+        historyId: data.historyId,
+      };
+      await this.prisma.providerConfig.update({
+        where: { id: provider.id },
+        data: { metadata: newMetadata },
+      });
 
       this.logger.log(
         `Triggered incremental sync for ${provider.email} via webhook`,
@@ -296,8 +321,9 @@ export class GmailWebhookService {
             providerType: 'google',
           });
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           this.logger.error(
-            `Failed to renew subscription for provider ${subscription.providerId}`,
+            `Failed to renew subscription for provider ${subscription.providerId}: ${errorMessage}`,
           );
         }
       }
@@ -374,8 +400,9 @@ export class GmailWebhookService {
         },
       });
     } catch (error) {
-      // Ignore if subscription doesn't exist
-      this.logger.debug(`Could not update stats for ${providerId}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Ignore if subscription doesn't exist, but keep trace for diagnostics
+      this.logger.debug(`Could not update stats for ${providerId}: ${errorMessage}`);
     }
   }
 

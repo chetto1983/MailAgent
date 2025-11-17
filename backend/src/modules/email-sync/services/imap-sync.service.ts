@@ -7,12 +7,7 @@ import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
-
-export type EmailRealtimeReason =
-  | 'message-processed'
-  | 'message-deleted'
-  | 'labels-updated'
-  | 'sync-complete';
+import { EmailEventReason } from '../../realtime/types/realtime.types';
 
 const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
 const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -352,7 +347,6 @@ export class ImapSyncService {
       let messagesProcessed = 0;
       let newMessages = 0;
       let maxUid = 0;
-      let fetchedCount = 0;
       const maxMessages = 1000;
 
       // Use IMAP SEARCH to find messages since the date
@@ -396,7 +390,6 @@ export class ImapSyncService {
               newMessages++;
             }
             maxUid = Math.max(maxUid, message.uid);
-            fetchedCount++;
           }
         }
 
@@ -703,7 +696,7 @@ export class ImapSyncService {
   private notifyMailboxChange(
     tenantId: string,
     providerId: string,
-    reason: EmailRealtimeReason,
+    reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
     try {

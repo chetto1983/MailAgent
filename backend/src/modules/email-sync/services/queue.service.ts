@@ -58,6 +58,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       totalDurationMs: 0,
     },
   };
+  private workerToken?: string;
 
   constructor(private configService: ConfigService) {}
 
@@ -66,6 +67,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     const redisHost = this.configService.get<string>('REDIS_HOST', 'localhost');
     const redisPort = this.configService.get<number>('REDIS_PORT', 6379);
     const redisPassword = this.configService.get<string>('REDIS_PASSWORD');
+    this.workerToken = this.configService.get<string>('EMAIL_SYNC_WORKER_TOKEN');
 
     this.redisConnection = new Redis({
       host: redisHost,
@@ -154,8 +156,22 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async hasPendingJob(providerId: string): Promise<boolean> {
+    const queues = [this.highQueue, this.normalQueue, this.lowQueue];
+    const states: JobType[] = ['waiting', 'active', 'delayed', 'paused', 'waiting-children'];
+
+    for (const queue of queues) {
+      const jobs = await queue.getJobs(states, 0, -1);
+      if (jobs.some((job) => job?.data?.providerId === providerId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   async addSyncJob(data: SyncJobData): Promise<void> {
     const queue = this.getQueueByPriority(data.priority);
+    const jobData = this.withJobToken(data);
 
     // Dedup job per provider + syncType to avoid bursts
     const jobId = `${data.providerId}-${data.syncType || 'delta'}`;
@@ -165,9 +181,15 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    // Soft guard: skip if any job for provider is in waiting/active/delayed
+    if (await this.hasPendingJob(data.providerId)) {
+      this.logger.verbose(`Provider ${data.providerId} already has a pending job; skipping new enqueue`);
+      return;
+    }
+
     await queue.add(
-      `sync-${data.providerType}-${data.email}`,
-      data,
+      `sync-${jobData.providerType}-${jobData.email}`,
+      jobData,
       {
         jobId,
         delay: 0, // Immediate execution
@@ -195,7 +217,21 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
       const queue = this.getQueueByPriority(priority as any);
 
-      const bullJobs = priorityJobs.map((job, index) => ({
+      // Filter out jobs that already have pending work for the same provider
+      const filteredJobs: SyncJobData[] = [];
+      for (const job of priorityJobs) {
+        if (await this.hasPendingJob(job.providerId)) {
+          this.logger.verbose(`Provider ${job.providerId} already has pending job; skipping bulk enqueue`);
+          continue;
+        }
+        filteredJobs.push(this.withJobToken(job));
+      }
+
+      if (filteredJobs.length === 0) {
+        continue;
+      }
+
+      const bullJobs = filteredJobs.map((job, index) => ({
         name: `sync-${job.providerType}-${job.email}`,
         data: job,
         opts: {
@@ -206,7 +242,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
       await queue.addBulk(bullJobs);
 
-      this.logger.log(`Added ${priorityJobs.length} ${priority} priority jobs`);
+      this.logger.log(`Added ${bullJobs.length} ${priority} priority jobs (filtered from ${priorityJobs.length})`);
     }
   }
 
@@ -315,6 +351,17 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     }
 
     return removed;
+  }
+
+  private withJobToken(job: SyncJobData): SyncJobData {
+    if (!this.workerToken) {
+      return job;
+    }
+
+    return {
+      ...job,
+      authToken: this.workerToken,
+    };
   }
 
   private getQueueByPriority(priority: 'high' | 'normal' | 'low'): Queue<SyncJobData> {

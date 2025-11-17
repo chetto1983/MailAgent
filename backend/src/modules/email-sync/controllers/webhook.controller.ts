@@ -2,13 +2,13 @@ import {
   Controller,
   Post,
   Body,
-  Headers,
   Logger,
   HttpCode,
   HttpStatus,
   Query,
   Get,
   BadRequestException,
+  Headers,
 } from '@nestjs/common';
 import { GmailWebhookService } from '../services/gmail-webhook.service';
 import { MicrosoftWebhookService } from '../services/microsoft-webhook.service';
@@ -16,6 +16,7 @@ import {
   GmailPubSubMessage,
   MicrosoftGraphWebhookPayload,
 } from '../interfaces/webhook.interface';
+import { SyncAuthService } from '../services/sync-auth.service';
 
 @Controller('webhooks')
 export class WebhookController {
@@ -24,6 +25,7 @@ export class WebhookController {
   constructor(
     private gmailWebhook: GmailWebhookService,
     private microsoftWebhook: MicrosoftWebhookService,
+    private readonly syncAuth: SyncAuthService,
   ) {}
 
   /**
@@ -32,8 +34,12 @@ export class WebhookController {
    */
   @Post('gmail/push')
   @HttpCode(HttpStatus.OK)
-  async handleGmailPush(@Body() payload: GmailPubSubMessage) {
+  async handleGmailPush(
+    @Body() payload: GmailPubSubMessage,
+    @Headers('x-webhook-token') webhookToken?: string,
+  ) {
     try {
+      this.syncAuth.validateWebhookToken(webhookToken);
       this.logger.log('Received Gmail Pub/Sub notification');
 
       // Decode and process the message
@@ -57,6 +63,8 @@ export class WebhookController {
   async handleMicrosoftNotification(
     @Body() payload: MicrosoftGraphWebhookPayload,
     @Query('validationToken') validationToken?: string,
+    @Query('token') token?: string,
+    @Headers('x-webhook-token') webhookToken?: string,
   ) {
     try {
       // Handle subscription validation (initial setup)
@@ -65,6 +73,7 @@ export class WebhookController {
         // Return the validation token in plain text
         return validationToken;
       }
+      this.syncAuth.validateWebhookToken(webhookToken, token);
 
       // Handle notification
       this.logger.log(

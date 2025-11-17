@@ -15,6 +15,7 @@ export interface FolderInfo {
   attributes: string[];
   specialUse?: string;
   parent?: string;
+  isSelectable?: boolean;
 }
 
 @Injectable()
@@ -179,6 +180,7 @@ export class FolderSyncService {
         attributes,
         specialUse,
         parent,
+        isSelectable,
       });
     }
 

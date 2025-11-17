@@ -9,7 +9,7 @@ import {
   WebhookStats,
 } from '../interfaces/webhook.interface';
 import { SyncJobData } from '../interfaces/sync-job.interface';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import type { ProviderConfig } from '@prisma/client';
@@ -254,8 +254,9 @@ export class MicrosoftWebhookService {
         try {
           await this.renewSubscription(subscription.subscriptionId, subscription.providerId);
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           this.logger.error(
-            `Failed to renew subscription ${subscription.subscriptionId}`,
+            `Failed to renew subscription ${subscription.subscriptionId}: ${errorMessage}`,
           );
         }
       }
@@ -404,7 +405,8 @@ export class MicrosoftWebhookService {
         },
       });
     } catch (error) {
-      this.logger.debug(`Could not update stats for ${providerId}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Could not update stats for ${providerId}: ${errorMessage}`);
     }
   }
 

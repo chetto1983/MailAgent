@@ -36,6 +36,8 @@ export interface ApiConfig {
   port: number;
   url: string;
   corsOrigins: string[];
+  corsAllowAll: boolean;
+  corsRegexOrigins: RegExp[];
   trustProxy: string | boolean;
 }
 
@@ -144,6 +146,12 @@ export function loadConfiguration(): Configuration {
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);
 
+  // Regex origins (e.g. ngrok, vercel preview)
+  const allowedOriginRegexes = (process.env.CORS_ALLOWED_REGEX || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
   const defaultOrigins = [
     apiUrl,
     `http://localhost:${apiPort}`,
@@ -153,6 +161,25 @@ export function loadConfiguration(): Configuration {
   ];
 
   const corsOrigins = Array.from(new Set((allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins).filter(Boolean)));
+
+  const corsRegexOrigins: RegExp[] = [
+    // Localhost with any port
+    /^https?:\/\/localhost(?::\d+)?$/i,
+    /^https?:\/\/127\.0\.0\.1(?::\d+)?$/i,
+    // Common tunneling domains
+    /^https?:\/\/([a-z0-9-]+\.)?ngrok\.io$/i,
+    /^https?:\/\/([a-z0-9-]+\.)?ngrok-free\.app$/i,
+    // Vercel previews
+    /^https?:\/\/([a-z0-9-]+\.)?vercel\.app$/i,
+    // Custom user-provided regex
+    ...allowedOriginRegexes.map((pattern) => {
+      try {
+        return new RegExp(pattern, 'i');
+      } catch {
+        return null;
+      }
+    }).filter((regex): regex is RegExp => Boolean(regex)),
+  ];
 
   // OAuth redirect URIs - use explicit environment variables or fallback to API_URL
   const gmailRedirectUri = process.env.GOOGLE_REDIRECT_URI || `${apiUrl}/auth/gmail/callback`;
@@ -215,6 +242,8 @@ export function loadConfiguration(): Configuration {
       port: apiPort,
       url: apiUrl,
       corsOrigins,
+      corsAllowAll: ['1', 'true', 'yes'].includes((process.env.CORS_ALLOW_ALL || '').toLowerCase()),
+      corsRegexOrigins,
       trustProxy,
     },
 

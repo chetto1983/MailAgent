@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { QueueService } from './services/queue.service';
@@ -33,10 +33,7 @@ export class EmailSyncController {
   @Post('sync/:providerId')
   @ApiOperation({ summary: 'Manually trigger sync for a provider' })
   @ApiResponse({ status: 200, description: 'Sync job queued successfully' })
-  async syncProvider(
-    @Request() req: any,
-    @Param('providerId') providerId: string,
-  ) {
+  async syncProvider(@Param('providerId') providerId: string) {
     await this.schedulerService.syncProviderNow(providerId, 'high');
 
     return {
@@ -84,7 +81,7 @@ export class EmailSyncController {
   @Post('webhooks/create-all')
   @ApiOperation({ summary: 'Create webhook subscriptions for all eligible providers' })
   @ApiResponse({ status: 200, description: 'Webhooks created successfully' })
-  async createAllWebhooks(@Request() req: any) {
+  async createAllWebhooks() {
     const result = await this.webhookLifecycle.createAllWebhooks();
 
     return {

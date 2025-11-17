@@ -8,12 +8,7 @@ import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
-
-export type EmailRealtimeReason =
-  | 'message-processed'
-  | 'message-deleted'
-  | 'labels-updated'
-  | 'sync-complete';
+import { EmailEventReason } from '../../realtime/types/realtime.types';
 
 interface MicrosoftMessage {
   id: string;
@@ -89,70 +84,8 @@ export class MicrosoftSyncService {
         throw new Error('Provider not found');
       }
 
-      // Check if token is expired and needs refresh
-      const now = new Date();
-      const isExpired = provider.tokenExpiresAt && now > new Date(provider.tokenExpiresAt);
-
-      let accessToken: string;
-
-      if (isExpired && provider.refreshToken && provider.refreshTokenEncryptionIv) {
-        // Token expired - refresh it using MicrosoftOAuthService
-        this.logger.log(`🔄 Access token expired for ${email}, refreshing...`);
-
-        try {
-          const refreshToken = this.crypto.decrypt(
-            provider.refreshToken,
-            provider.refreshTokenEncryptionIv,
-          );
-
-          const refreshed = await this.microsoftOAuth.refreshAccessToken(refreshToken);
-          accessToken = refreshed.accessToken;
-
-          this.logger.log(`✅ Token refreshed successfully, new expiry: ${refreshed.expiresAt}`);
-
-          // Save new token to database
-          const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-          const updateData: any = {
-            accessToken: encryptedAccess.encrypted,
-            tokenEncryptionIv: encryptedAccess.iv,
-            tokenExpiresAt: refreshed.expiresAt,
-          };
-
-          // If Microsoft provided a new refresh token, save it too
-          if (refreshed.refreshToken) {
-            this.logger.log('📝 Microsoft issued new refresh token, updating...');
-            const encryptedRefresh = this.crypto.encrypt(refreshed.refreshToken);
-            updateData.refreshToken = encryptedRefresh.encrypted;
-            updateData.refreshTokenEncryptionIv = encryptedRefresh.iv;
-          }
-
-          await this.prisma.providerConfig.update({
-            where: { id: providerId },
-            data: updateData,
-          });
-
-          this.logger.log(`💾 Updated token saved to database`);
-        } catch (refreshError) {
-          this.logger.error(`❌ Failed to refresh token for ${email}:`, refreshError);
-          throw new Error(
-            'Access token expired and refresh failed. User needs to re-authenticate.'
-          );
-        }
-      } else if (!provider.accessToken || !provider.tokenEncryptionIv) {
-        throw new Error('Provider missing access token');
-      } else {
-        // Token is still valid, use it
-        accessToken = this.crypto.decrypt(
-          provider.accessToken,
-          provider.tokenEncryptionIv,
-        );
-
-        if (isExpired) {
-          this.logger.warn(`⚠️ Token expired but no refresh token available for ${email}`);
-        } else {
-          this.logger.debug(`✓ Using existing valid access token for ${email}`);
-        }
-      }
+      // Get valid access token (refresh + persist if needed)
+      const accessToken = await this.microsoftOAuth.getTokenOrRefresh(provider);
 
       // Get tracking metadata
       const metadata = (provider.metadata as any) || {};
@@ -205,9 +138,22 @@ export class MicrosoftSyncService {
               this.logger.warn(
                 `Microsoft delta sync is not supported for ${email}; switching to timestamp-based incremental sync.`,
               );
-              shouldRunFull = true; // Will fall back to timestamp strategy during full sync
+              incrementalHandled = false; // will try timestamp mode below
+              shouldRunFull = false;
             } else {
-              throw deltaError;
+              this.logger.warn(
+                `Delta sync failed for ${email}, fallback to timestamp/full: ${
+                  deltaError instanceof Error ? deltaError.message : String(deltaError)
+                }`,
+              );
+              incrementalHandled = false;
+              shouldRunFull = false;
+              // Reset delta link to force re-initialization on next full
+              metadataUpdates = {
+                ...metadataUpdates,
+                lastSyncToken: undefined,
+                microsoftDeltaMode: 'timestamp',
+              };
             }
           }
         }
@@ -1025,7 +971,7 @@ export class MicrosoftSyncService {
   private notifyMailboxChange(
     tenantId: string,
     providerId: string,
-    reason: EmailRealtimeReason,
+    reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
     try {

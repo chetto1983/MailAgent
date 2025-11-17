@@ -8,12 +8,7 @@ import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.qu
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
-
-export type EmailRealtimeReason =
-  | 'message-processed'
-  | 'message-deleted'
-  | 'labels-updated'
-  | 'sync-complete';
+import { EmailEventReason } from '../../realtime/types/realtime.types';
 
 @Injectable()
 export class GoogleSyncService {
@@ -1014,7 +1009,7 @@ export class GoogleSyncService {
   private notifyMailboxChange(
     tenantId: string,
     providerId: string,
-    reason: EmailRealtimeReason,
+    reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
     try {

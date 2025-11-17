@@ -3,9 +3,9 @@ services:
     image: ankane/pgvector:latest
     container_name: mailagent-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-mailuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailpass}
-      POSTGRES_DB: ${POSTGRES_DB:-mailagent}
+      POSTGRES_USER: ${DB_USER:-mailuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mailpass}
+      POSTGRES_DB: ${DB_NAME:-mailagent}
     ports:
       - "5432:5432"
     volumes:
@@ -40,6 +40,20 @@ services:
     ports:
       - "1025:1025"  # SMTP port
       - "8025:8025"  # Web UI port
+    networks:
+      - mailagent-net
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mailagent-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@mailagent.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_LISTEN_PORT: 5050
+    ports:
+      - "5050:5050"
+    depends_on:
+      - postgres
     networks:
       - mailagent-net
 

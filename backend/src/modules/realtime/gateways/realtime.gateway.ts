@@ -8,18 +8,14 @@ import {
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import { Logger, OnModuleInit } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../../prisma/prisma.service';
 import { RealtimeEventsService } from '../services/realtime-events.service';
-
-interface AuthenticatedSocket extends Socket {
-  userId?: string;
-  tenantId?: string;
-  email?: string;
-}
+import { RealtimeHandshakeService } from '../services/realtime-handshake.service';
+import {
+  AuthenticatedSocket,
+  buildTenantScopedRoom,
+} from '../types/realtime.types';
 
 /**
  * WebSocket Gateway per comunicazione realtime multi-tenant
@@ -49,10 +45,8 @@ export class RealtimeGateway
   private heartbeatInterval: NodeJS.Timeout;
 
   constructor(
-    private jwtService: JwtService,
-    private configService: ConfigService,
-    private prisma: PrismaService,
-    private realtimeEvents: RealtimeEventsService,
+    private readonly realtimeEvents: RealtimeEventsService,
+    private readonly handshakeService: RealtimeHandshakeService,
   ) {}
 
   onModuleInit() {
@@ -75,55 +69,15 @@ export class RealtimeGateway
    */
   async handleConnection(client: AuthenticatedSocket) {
     try {
-      // Estrai token dal handshake (auth header o query param)
-      const token =
-        client.handshake.auth?.token ||
-        client.handshake.headers?.authorization?.replace('Bearer ', '') ||
-        client.handshake.query?.token;
+      const authContext = await this.handshakeService.authenticate(client);
 
-      if (!token) {
-        this.logger.warn(`Connection rejected - No token provided`);
-        client.disconnect();
-        return;
-      }
+      client.userId = authContext.userId;
+      client.tenantId = authContext.tenantId;
+      client.email = authContext.email;
 
-      // Verifica JWT
-      const decoded = this.jwtService.verify(token, {
-        secret: this.configService.get<string>('JWT_SECRET'),
-      });
+      await client.join(authContext.tenantRoom);
 
-      if (!decoded || !decoded.userId || !decoded.tenantId) {
-        this.logger.warn(`Connection rejected - Invalid token payload`);
-        client.disconnect();
-        return;
-      }
-
-      // Verifica che l'utente esista nel database
-      const user = await this.prisma.user.findUnique({
-        where: { id: decoded.userId },
-        select: { id: true, email: true, tenantId: true },
-      });
-
-      if (!user || user.tenantId !== decoded.tenantId) {
-        this.logger.warn(
-          `Connection rejected - User not found or tenant mismatch`,
-        );
-        client.disconnect();
-        return;
-      }
-
-      // Aggiungi metadata al socket
-      client.userId = decoded.userId;
-      client.tenantId = decoded.tenantId;
-      client.email = user.email;
-
-      // Aggiungi il socket alla room del tenant per isolamento
-      const tenantRoom = `tenant:${decoded.tenantId}`;
-      await client.join(tenantRoom);
-
-      this.logger.log(
-        `Client connected: ${client.id} | User: ${user.email} | Tenant: ${decoded.tenantId}`,
-      );
+      this.logger.log(`Client connected: ${client.id} | User: ${client.email} | Tenant: ${client.tenantId}`);
 
       // Notifica il client della connessione riuscita
       client.emit('connected', {
@@ -168,8 +122,13 @@ export class RealtimeGateway
     @MessageBody() data: { room: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
+    if (!client.tenantId) {
+      this.logger.warn(`join_room rejected for unauthenticated client ${client.id}`);
+      return { event: 'error', data: { message: 'unauthenticated' } };
+    }
+
     // Assicurati che la room inizi con il tenantId per sicurezza
-    const room = `tenant:${client.tenantId}:${data.room}`;
+    const room = buildTenantScopedRoom(client.tenantId, data.room);
     await client.join(room);
     this.logger.debug(`Client ${client.id} joined room: ${room}`);
     return { event: 'joined_room', data: { room } };
@@ -183,7 +142,12 @@ export class RealtimeGateway
     @MessageBody() data: { room: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
-    const room = `tenant:${client.tenantId}:${data.room}`;
+    if (!client.tenantId) {
+      this.logger.warn(`leave_room rejected for unauthenticated client ${client.id}`);
+      return { event: 'error', data: { message: 'unauthenticated' } };
+    }
+
+    const room = buildTenantScopedRoom(client.tenantId, data.room);
     await client.leave(room);
     this.logger.debug(`Client ${client.id} left room: ${room}`);
     return { event: 'left_room', data: { room } };

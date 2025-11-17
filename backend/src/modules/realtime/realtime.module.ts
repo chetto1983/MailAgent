@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RealtimeGateway } from './gateways/realtime.gateway';
 import { RealtimeEventsService } from './services/realtime-events.service';
+import { RealtimeHandshakeService } from './services/realtime-handshake.service';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -17,7 +18,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
       inject: [ConfigService],
     }),
   ],
-  providers: [RealtimeGateway, RealtimeEventsService],
+  providers: [RealtimeGateway, RealtimeEventsService, RealtimeHandshakeService],
   exports: [RealtimeEventsService],
 })
 export class RealtimeModule {}

@@ -10,6 +10,7 @@ import { MicrosoftSyncService } from '../services/microsoft-sync.service';
 import { ImapSyncService } from '../services/imap-sync.service';
 import { SyncSchedulerService } from '../services/sync-scheduler.service';
 import { FolderSyncService } from '../services/folder-sync.service';
+import { SyncAuthService } from '../services/sync-auth.service';
 
 @Injectable()
 export class SyncWorker implements OnModuleInit, OnModuleDestroy {
@@ -40,9 +41,18 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     @Inject(forwardRef(() => SyncSchedulerService))
     private syncScheduler: SyncSchedulerService,
     private folderSyncService: FolderSyncService,
+    private readonly syncAuth: SyncAuthService,
   ) {}
 
   async onModuleInit() {
+    const workersEnabled =
+      (this.configService.get<string>('EMAIL_SYNC_WORKERS_ENABLED') || 'true').toLowerCase() !==
+      'false';
+    if (!workersEnabled) {
+      this.logger.warn('Email sync workers are disabled via EMAIL_SYNC_WORKERS_ENABLED=false');
+      return;
+    }
+
     // Initialize Redis connection for workers
     const redisHost = this.configService.get<string>('REDIS_HOST', 'localhost');
     const redisPort = this.configService.get<number>('REDIS_PORT', 6379);
@@ -104,6 +114,9 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
 
   private async processJob(job: Job<SyncJobData>): Promise<SyncJobResult> {
     const { providerId, providerType, email, syncType } = job.data;
+
+    // Optional job token validation to align with webhook handshake pattern
+    this.syncAuth.validateJobToken(job.data.authToken);
 
     this.logger.log(`Processing ${syncType} sync for ${email} (${providerType})`);
 
@@ -195,6 +208,13 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
+    const workersEnabled =
+      (this.configService.get<string>('EMAIL_SYNC_WORKERS_ENABLED') || 'true').toLowerCase() !==
+      'false';
+    if (!workersEnabled) {
+      return;
+    }
+
     this.logger.log('Stopping email sync workers...');
 
     // Stop all workers

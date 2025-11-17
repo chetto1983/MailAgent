@@ -21,7 +21,7 @@ describe('AuthService', () => {
   let prismaService: jest.Mocked<PrismaService>;
   let jwtService: jest.Mocked<JwtService>;
   let emailService: jest.Mocked<EmailService>;
-  let cryptoService: jest.Mocked<CryptoService>;
+  let _cryptoService: jest.Mocked<CryptoService>;
 
   // Mock data
   const mockTenant = {
@@ -126,7 +126,7 @@ describe('AuthService', () => {
     prismaService = module.get(PrismaService);
     jwtService = module.get(JwtService);
     emailService = module.get(EmailService);
-    cryptoService = module.get(CryptoService);
+    _cryptoService = module.get(CryptoService);
   });
 
   afterEach(() => {

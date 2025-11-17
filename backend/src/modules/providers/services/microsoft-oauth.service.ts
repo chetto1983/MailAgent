@@ -212,6 +212,60 @@ export class MicrosoftOAuthService {
   }
 
   /**
+   * Return a valid access token, refreshing and persisting if needed.
+   */
+  async getTokenOrRefresh(provider: any): Promise<string> {
+    if (!provider.accessToken || !provider.tokenEncryptionIv) {
+      throw new UnauthorizedException('Provider has no access token');
+    }
+
+    let accessToken = this.cryptoService.decrypt(
+      provider.accessToken,
+      provider.tokenEncryptionIv,
+    );
+
+    const expiresSoon =
+      !provider.tokenExpiresAt ||
+      provider.tokenExpiresAt.getTime() <= Date.now() + 60 * 1000;
+
+    if (!expiresSoon) {
+      return accessToken;
+    }
+
+    if (!provider.refreshToken || !provider.refreshTokenEncryptionIv) {
+      throw new UnauthorizedException('Access token expired and no refresh token is available');
+    }
+
+    const refreshToken = this.cryptoService.decrypt(
+      provider.refreshToken,
+      provider.refreshTokenEncryptionIv,
+    );
+
+    const refreshed = await this.refreshAccessToken(refreshToken);
+    accessToken = refreshed.accessToken;
+
+    const encryptedAccess = this.cryptoService.encrypt(refreshed.accessToken);
+    const updateData: Record<string, any> = {
+      accessToken: encryptedAccess.encrypted,
+      tokenEncryptionIv: encryptedAccess.iv,
+      tokenExpiresAt: refreshed.expiresAt,
+    };
+
+    if (refreshed.refreshToken) {
+      const encryptedRefresh = this.cryptoService.encrypt(refreshed.refreshToken);
+      updateData.refreshToken = encryptedRefresh.encrypted;
+      updateData.refreshTokenEncryptionIv = encryptedRefresh.iv;
+    }
+
+    await this.prisma.providerConfig.update({
+      where: { id: provider.id },
+      data: updateData,
+    });
+
+    return accessToken;
+  }
+
+  /**
    * Test Outlook/Exchange API connection
    */
   async testMailConnection(accessToken: string): Promise<boolean> {

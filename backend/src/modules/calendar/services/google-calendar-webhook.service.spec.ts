@@ -13,7 +13,7 @@ describe('GoogleCalendarWebhookService', () => {
   let service: GoogleCalendarWebhookService;
   let prisma: jest.Mocked<PrismaService>;
   let crypto: jest.Mocked<CryptoService>;
-  let config: jest.Mocked<ConfigService>;
+  let _config: jest.Mocked<ConfigService>;
   let calendarSync: jest.Mocked<GoogleCalendarSyncService>;
 
   const mockOAuth2Client = {
@@ -82,7 +82,7 @@ describe('GoogleCalendarWebhookService', () => {
     service = module.get<GoogleCalendarWebhookService>(GoogleCalendarWebhookService);
     prisma = module.get(PrismaService);
     crypto = module.get(CryptoService);
-    config = module.get(ConfigService);
+    _config = module.get(ConfigService);
     calendarSync = module.get(GoogleCalendarSyncService);
 
     // Clear all mocks

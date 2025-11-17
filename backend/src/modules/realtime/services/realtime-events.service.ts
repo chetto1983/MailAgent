@@ -1,84 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RealtimeGateway } from '../gateways/realtime.gateway';
+import {
+  AIEventPayload,
+  CalendarEventPayload,
+  ContactEventPayload,
+  EmailEventPayload,
+  HITLEventPayload,
+  KnownRealtimeEvent,
+  RealtimeEventPayloads,
+  buildTenantRoom,
+} from '../types/realtime.types';
 
-/**
- * Payload per eventi email
- */
-export interface EmailEventPayload {
-  emailId?: string;
-  externalId?: string;
-  providerId: string;
-  folder?: string;
-  reason: 'message-processed' | 'message-deleted' | 'labels-updated' | 'message-sent' | 'sync-complete';
-  email?: any; // Full email object per email:new
-  updates?: any; // Partial updates per email:update
-  unreadCount?: number;
-  threadId?: string;
-}
-
-/**
- * Payload per eventi calendario
- */
-export interface CalendarEventPayload {
-  eventId?: string;
-  externalId?: string;
-  calendarId: string;
-  providerId?: string;
-  reason: 'event-created' | 'event-updated' | 'event-deleted';
-  event?: any; // Full event object
-  updates?: any; // Partial updates
-}
-
-/**
- * Payload per eventi contatti
- */
-export interface ContactEventPayload {
-  contactId?: string;
-  externalId?: string;
-  providerId?: string;
-  reason: 'contact-created' | 'contact-updated' | 'contact-deleted';
-  contact?: any; // Full contact object
-  updates?: any; // Partial updates
-}
-
-/**
- * Payload per eventi AI
- */
-export interface AIEventPayload {
-  type: 'classification' | 'task_suggestion' | 'insight';
-  emailId?: string;
-  classification?: {
-    category: string;
-    priority: string;
-    sentiment: string;
-    confidence: number;
-  };
-  task?: {
-    title: string;
-    description: string;
-    dueDate?: string;
-    priority: string;
-  };
-  insight?: {
-    message: string;
-    actionable: boolean;
-  };
-}
-
-/**
- * Payload per eventi HITL (Human In The Loop)
- */
-export interface HITLEventPayload {
-  type: 'approval_required' | 'approval_granted' | 'approval_denied';
-  taskId: string;
-  task: {
-    title: string;
-    description: string;
-    type: string;
-    context?: any;
-  };
-  approvalId?: string;
-}
+export type {
+  AIEventPayload,
+  CalendarEventPayload,
+  ContactEventPayload,
+  EmailEventPayload,
+  HITLEventPayload,
+} from '../types/realtime.types';
 
 /**
  * Servizio per emettere eventi realtime ai client WebSocket
@@ -128,23 +67,19 @@ export class RealtimeEventsService {
   /**
    * Emette evento per aggiornamento contatore non lette
    */
- emitUnreadCountUpdate(tenantId: string, payload: { folder: string; count: number; providerId: string }) {
-   this.emitToTenant(tenantId, 'email:unread_count_update', payload);
- }
+  emitUnreadCountUpdate(
+    tenantId: string,
+    payload: RealtimeEventPayloads['email:unread_count_update'],
+  ) {
+    this.emitToTenant(tenantId, 'email:unread_count_update', payload);
+  }
 
   /**
    * Emette evento per aggiornamento conteggio cartelle (totale + non lette)
    */
   emitFolderCountsUpdate(
     tenantId: string,
-    payload: {
-      providerId: string;
-      folderId: string;
-      folderName: string;
-      totalCount: number;
-      unreadCount: number;
-      timestamp: string;
-    },
+    payload: RealtimeEventPayloads['email:folder_counts_update'],
   ) {
     this.emitToTenant(tenantId, 'email:folder_counts_update', payload);
   }
@@ -152,7 +87,10 @@ export class RealtimeEventsService {
   /**
    * Emette evento per aggiornamento thread
    */
-  emitThreadUpdate(tenantId: string, payload: { threadId: string; emailIds: string[] }) {
+  emitThreadUpdate(
+    tenantId: string,
+    payload: RealtimeEventPayloads['email:thread_update'],
+  ) {
     this.emitToTenant(tenantId, 'email:thread_update', payload);
   }
 
@@ -263,15 +201,7 @@ export class RealtimeEventsService {
   /**
    * Emette evento per stato sincronizzazione provider
    */
-  emitSyncStatus(
-    tenantId: string,
-    payload: {
-      providerId: string;
-      status: 'started' | 'in_progress' | 'completed' | 'failed';
-      progress?: number;
-      error?: string;
-    },
-  ) {
+  emitSyncStatus(tenantId: string, payload: RealtimeEventPayloads['sync:status']) {
     this.emitToTenant(tenantId, 'sync:status', payload);
   }
 
@@ -282,25 +212,24 @@ export class RealtimeEventsService {
   /**
    * Emette un evento generico alla room del tenant
    */
-  private emitToTenant(tenantId: string, event: string, payload: any) {
+  private emitToTenant<E extends KnownRealtimeEvent>(
+    tenantId: string,
+    event: E,
+    payload: RealtimeEventPayloads[E],
+  ) {
     if (!this.gateway || !this.gateway.server) {
       this.logger.warn(`Gateway not initialized, cannot emit event: ${event}`);
       return;
     }
 
-    const room = `tenant:${tenantId}`;
-    this.gateway.server.to(room).emit(event, {
-      ...payload,
-      timestamp: new Date().toISOString(),
-    });
-
-    this.logger.debug(`Emitted ${event} to ${room}`, payload);
+    const room = buildTenantRoom(tenantId);
+    this.emitToRoom(room, event, payload);
   }
 
   /**
    * Emette evento a una room specifica (es. thread-based)
    */
-  emitToRoom(room: string, event: string, payload: any) {
+  emitToRoom<E extends KnownRealtimeEvent>(room: string, event: E, payload: RealtimeEventPayloads[E]) {
     if (!this.gateway || !this.gateway.server) {
       this.logger.warn(`Gateway not initialized, cannot emit event: ${event}`);
       return;
@@ -317,7 +246,7 @@ export class RealtimeEventsService {
   /**
    * Emette evento a tutti i client connessi (usare con cautela)
    */
-  emitToAll(event: string, payload: any) {
+  emitToAll<E extends KnownRealtimeEvent>(event: E, payload: RealtimeEventPayloads[E]) {
     if (!this.gateway || !this.gateway.server) {
       this.logger.warn(`Gateway not initialized, cannot emit event: ${event}`);
       return;

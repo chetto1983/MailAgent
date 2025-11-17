@@ -10,6 +10,7 @@ export interface SyncJobData {
   priority: 'high' | 'normal' | 'low';
   syncType: 'full' | 'incremental';
   lastSyncedAt?: Date;
+  authToken?: string;
 }
 
 export interface SyncJobResult {

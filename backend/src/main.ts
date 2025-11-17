@@ -19,12 +19,39 @@ async function bootstrap() {
   // Security middleware
   app.use(helmet());
 
-  // CORS configuration - using centralized config
+  // CORS configuration - allowlist + regex + optional allow-all
   app.enableCors({
-    origin: config.api.corsOrigins,
+    origin: (origin, callback) => {
+      // Allow same-origin/SSR calls without origin
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (config.api.corsAllowAll) {
+        return callback(null, true);
+      }
+
+      if (config.api.corsOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      if (config.api.corsRegexOrigins.some((regex) => regex.test(origin))) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS: origin ${origin} not allowed`), false);
+    },
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type,Authorization,ngrok-skip-browser-warning',
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'ngrok-skip-browser-warning',
+      'x-webhook-token',
+    ],
+    optionsSuccessStatus: 204,
+    preflightContinue: false,
   });
 
   // Global pipes
