@@ -65,3 +65,4 @@ Obiettivo: completare il refactor bulk mail e allineare contatti/calendari, cons
 - 🔜 Unit: parseGmailMessage, batch pipeline, enqueueMany dedupe, realtime buffer flush.
 - 🔜 Funzionali: bulk import mail, bulk move/delete (realtime throttling), Microsoft batch read/unread/move.
 - 🔜 Aggiornare i doc (strategy/roadmap) quando i passi vengono implementati.
+- ✅ Script snapshot (`backend/scripts/mail-sync-snapshot.ts`) per estrarre stato provider/email in `logs/`.

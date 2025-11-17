@@ -24,6 +24,9 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
   private flushTimer?: NodeJS.Timeout;
   private readonly BULK_SIZE: number;
   private readonly FLUSH_MS: number;
+  private readonly WORKER_CONCURRENCY: number;
+  private readonly RATE_MAX: number;
+  private readonly RATE_DURATION_MS: number;
   private readonly seenIds = new Set<string>();
 
   constructor(
@@ -31,8 +34,11 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
     @Inject(forwardRef(() => KnowledgeBaseService))
     private readonly knowledgeBaseService: KnowledgeBaseService,
   ) {
-    this.BULK_SIZE = this.config.get<number>('EMBEDDING_BULK_SIZE', 50);
-    this.FLUSH_MS = this.config.get<number>('EMBEDDING_FLUSH_MS', 200);
+    this.BULK_SIZE = this.getPositiveNumber('EMBEDDING_BULK_SIZE', 50);
+    this.FLUSH_MS = this.getPositiveNumber('EMBEDDING_FLUSH_MS', 200);
+    this.WORKER_CONCURRENCY = this.getPositiveNumber('EMBEDDING_CONCURRENCY', 6);
+    this.RATE_MAX = this.getPositiveNumber('EMBEDDING_RATE_MAX', 20);
+    this.RATE_DURATION_MS = this.getPositiveNumber('EMBEDDING_RATE_DURATION_MS', 1000);
   }
 
   onModuleInit() {
@@ -77,10 +83,10 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
       },
       {
         connection,
-        concurrency: 3, // Process up to 3 emails concurrently for better throughput
+        concurrency: this.WORKER_CONCURRENCY,
         limiter: {
-          max: 10, // Allow some concurrency with bulk embeddings
-          duration: 1000,
+          max: this.RATE_MAX,
+          duration: this.RATE_DURATION_MS,
         },
       },
     );
@@ -256,5 +262,14 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
     const delay = baseDelay * Math.pow(2, exponent);
     // Cap delay at 30 seconds to avoid runaway waits
     return Math.min(delay, 30000);
+  }
+
+  private getPositiveNumber(envKey: string, fallback: number): number {
+    const raw = this.config.get(envKey);
+    const asNumber = typeof raw === 'string' ? Number(raw) : (raw as number);
+    if (Number.isFinite(asNumber) && asNumber > 0) {
+      return asNumber;
+    }
+    return fallback;
   }
 }

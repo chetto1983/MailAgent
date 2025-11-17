@@ -1,5 +1,3 @@
-// Prisma schema for MailAgent multi-tenant system
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,80 +7,70 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ===== TENANT MODEL =====
 model Tenant {
-  id          String    @id @default(cuid())
-  name        String
-  slug        String    @unique
-  description String?
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-
-  // Relations
-  users                User[]
+  id                   String                @id @default(cuid())
+  name                 String
+  slug                 String                @unique
+  description          String?
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  deletedAt            DateTime?
+  auditLogs            AuditLog[]
+  calendarEvents       CalendarEvent[]
+  chatSessions         ChatSession[]
+  contacts             Contact[]
+  emails               Email[]
+  embeddings           Embedding[]
+  folders              Folder[]
   messages             Message[]
   providerConfigs      ProviderConfig[]
-  emails               Email[]
-  folders              Folder[]
-  embeddings           Embedding[]
-  auditLogs            AuditLog[]
-  chatSessions         ChatSession[]
-  calendarEvents       CalendarEvent[]
-  contacts             Contact[]
+  users                User[]
   webhookSubscriptions WebhookSubscription[]
 
   @@map("tenants")
 }
 
-// ===== USER MODEL =====
 model User {
-  id           String    @id @default(cuid())
+  id           String        @id @default(cuid())
   tenantId     String
   email        String
   passwordHash String
   firstName    String?
   lastName     String?
-  role         String    @default("user") // "admin", "user", "super-admin"
-  isActive     Boolean   @default(true)
-  isMfaEnabled Boolean   @default(true)
+  role         String        @default("user")
+  isActive     Boolean       @default(true)
+  isMfaEnabled Boolean       @default(true)
   lastLogin    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
-
-  // Relations
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  mfaCodes     MfaCode[]
-  sessions     Session[]
-  messages     Message[]
   auditLogs    AuditLog[]
   chatSessions ChatSession[]
+  messages     Message[]
+  mfaCodes     MfaCode[]
+  sessions     Session[]
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("users")
 }
 
-// ===== MFA CODE MODEL =====
 model MfaCode {
   id        String   @id @default(cuid())
   userId    String
   code      String   @unique
-  type      String   @default("email") // "email", "sms"
+  type      String   @default("email")
   isUsed    Boolean  @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, code])
   @@map("mfa_codes")
 }
 
-// ===== SESSION MODEL =====
 model Session {
   id        String   @id @default(cuid())
   userId    String
@@ -91,15 +79,12 @@ model Session {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, token])
   @@map("sessions")
 }
 
-// ===== PASSWORD RESET TOKEN =====
 model PasswordResetToken {
   id        String   @id @default(cuid())
   userEmail String
@@ -112,293 +97,205 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
-// ===== PROVIDER CONFIG MODEL (Email + Calendar) =====
 model ProviderConfig {
-  id           String  @id @default(cuid())
-  tenantId     String
-  userId       String?
-  providerType String // "google", "microsoft", "generic"
-  email        String
-  displayName  String?
-
-  // Capabilities (what this provider supports)
-  supportsEmail    Boolean @default(true)
-  supportsCalendar Boolean @default(false)
-  supportsContacts Boolean @default(false)
-
-  // OAuth2 tokens (for Google/Microsoft) - Encrypted
+  id                       String                @id @default(cuid())
+  tenantId                 String
+  userId                   String?
+  providerType             String
+  email                    String
+  displayName              String?
+  supportsEmail            Boolean               @default(true)
+  supportsCalendar         Boolean               @default(false)
+  supportsContacts         Boolean               @default(false)
   accessToken              String?
   refreshToken             String?
-  tokenEncryptionIv        String? // IV for token encryption
-  refreshTokenEncryptionIv String? // IV for refresh token encryption
+  tokenEncryptionIv        String?
   tokenExpiresAt           DateTime?
-
-  // IMAP/SMTP configuration (for generic providers)
-  imapHost         String?
-  imapPort         Int?
-  imapUsername     String?
-  imapPassword     String? // Encrypted
-  imapEncryptionIv String? // IV for IMAP password
-  imapUseTls       Boolean @default(true)
-
-  smtpHost         String?
-  smtpPort         Int?
-  smtpUsername     String?
-  smtpPassword     String? // Encrypted
-  smtpEncryptionIv String? // IV for SMTP password
-  smtpUseTls       Boolean @default(true)
-
-  // CalDAV/CardDAV configuration (for generic providers)
-  caldavUrl          String?
-  caldavUsername     String?
-  caldavPassword     String? // Encrypted
-  caldavEncryptionIv String? // IV for CalDAV password
-
-  carddavUrl          String?
-  carddavUsername     String?
-  carddavPassword     String? // Encrypted
-  carddavEncryptionIv String? // IV for CardDAV password
-
-  // Metadata
-  metadata     Json? // Additional provider-specific settings
-  isDefault    Boolean   @default(false)
-  isActive     Boolean   @default(true)
-  lastSyncedAt DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  // Smart Sync - Intelligent Synchronization Fields
-  avgActivityRate       Float?    @default(0.0) // Average emails per hour (moving average)
-  syncPriority          Int?      @default(3) // 1=High, 2-3=Medium, 4-5=Low
-  nextSyncAt            DateTime? // When to schedule next sync
-  emailsReceivedLast24h Int?      @default(0) // Counter for activity tracking
-  errorStreak           Int?      @default(0) // Consecutive sync errors (for monitoring)
-  lastActivityCheck     DateTime? // Last time activity rate was calculated
-
-  // Relations
-  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  emails               Email[]
-  folders              Folder[]
-  calendarEvents       CalendarEvent[]
-  contacts             Contact[]
-  webhookSubscriptions WebhookSubscription[]
+  imapHost                 String?
+  imapPort                 Int?
+  imapUsername             String?
+  imapPassword             String?
+  imapEncryptionIv         String?
+  imapUseTls               Boolean               @default(true)
+  smtpHost                 String?
+  smtpPort                 Int?
+  smtpUsername             String?
+  smtpPassword             String?
+  smtpEncryptionIv         String?
+  smtpUseTls               Boolean               @default(true)
+  caldavUrl                String?
+  caldavUsername           String?
+  caldavPassword           String?
+  caldavEncryptionIv       String?
+  carddavUrl               String?
+  carddavUsername          String?
+  carddavPassword          String?
+  carddavEncryptionIv      String?
+  metadata                 Json?
+  isDefault                Boolean               @default(false)
+  isActive                 Boolean               @default(true)
+  lastSyncedAt             DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  avgActivityRate          Float?                @default(0.0)
+  syncPriority             Int?                  @default(3)
+  nextSyncAt               DateTime?
+  emailsReceivedLast24h    Int?                  @default(0)
+  errorStreak              Int?                  @default(0)
+  lastActivityCheck        DateTime?
+  refreshTokenEncryptionIv String?
+  calendarEvents           CalendarEvent[]
+  contacts                 Contact[]
+  emails                   Email[]
+  folders                  Folder[]
+  tenant                   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  webhookSubscriptions     WebhookSubscription[]
 
   @@unique([tenantId, email, providerType])
   @@index([tenantId, isDefault])
   @@index([userId])
-  @@index([nextSyncAt, isActive]) // For scheduler queries
-  @@index([syncPriority, nextSyncAt]) // For priority-based scheduling
+  @@index([nextSyncAt, isActive])
+  @@index([syncPriority, nextSyncAt])
   @@map("provider_configs")
 }
 
-// ===== EMAIL MODEL (Synced emails from providers) =====
 model Email {
-  id         String @id @default(cuid())
-  tenantId   String
-  providerId String
+  id                  String                  @id @default(cuid())
+  tenantId            String
+  providerId          String
+  externalId          String
+  threadId            String?
+  messageId           String?
+  inReplyTo           String?
+  references          String?
+  from                String
+  to                  String[]
+  cc                  String[]                @default([])
+  bcc                 String[]                @default([])
+  replyTo             String?
+  subject             String
+  bodyText            String?
+  bodyHtml            String?
+  snippet             String?
+  folder              String                  @default("INBOX")
+  labels              String[]                @default([])
+  isRead              Boolean                 @default(false)
+  isStarred           Boolean                 @default(false)
+  isFlagged           Boolean                 @default(false)
+  isDraft             Boolean                 @default(false)
+  isDeleted           Boolean                 @default(false)
+  isArchived          Boolean                 @default(false)
+  sentAt              DateTime
+  receivedAt          DateTime
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  size                Int?
+  headers             Json?
+  metadata            Json?
+  crossProviderLinkId String?
+  attachments         EmailAttachment[]
+  crossProviderLink   EmailCrossProviderLink? @relation(fields: [crossProviderLinkId], references: [id])
+  provider            ProviderConfig          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  tenant              Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  // External IDs for sync tracking
-  externalId String // Gmail messageId, Microsoft ID, IMAP UID
-  threadId   String? // For conversation threading
-
-  // Email metadata
-  messageId  String? // RFC 2822 Message-ID header
-  inReplyTo  String? // RFC 2822 In-Reply-To header
-  references String? // RFC 2822 References header
-
-  // Sender and recipients
-  from    String // "Name <email@domain.com>"
-  to      String[] // Array of recipients
-  cc      String[] @default([])
-  bcc     String[] @default([])
-  replyTo String?
-
-  // Content
-  subject  String
-  bodyText String? // Plain text version
-  bodyHtml String? // HTML version
-  snippet  String? // Preview/summary (first 200 chars)
-
-  // Classification
-  folder String   @default("INBOX") // INBOX, SENT, DRAFTS, TRASH, etc.
-  labels String[] @default([]) // Gmail labels or categories
-
-  // Flags and status
-  isRead     Boolean @default(false)
-  isStarred  Boolean @default(false)
-  isFlagged  Boolean @default(false)
-  isDraft    Boolean @default(false)
-  isDeleted  Boolean @default(false)
-  isArchived Boolean @default(false) // Archived emails have body removed but keep ID + embeddings
-
-  // Dates
-  sentAt     DateTime // When email was sent
-  receivedAt DateTime // When email was received
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Size
-  size Int? // Size in bytes
-
-  // Metadata
-  headers  Json? // Full email headers
-  metadata Json? // Provider-specific metadata
-
-  // Cross-provider sync
-  crossProviderLinkId String? // Link to cross-provider group
-
-  // Relations
-  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  provider          ProviderConfig          @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  attachments       EmailAttachment[]
-  crossProviderLink EmailCrossProviderLink? @relation(fields: [crossProviderLinkId], references: [id], onDelete: SetNull)
-
-  @@unique([providerId, externalId]) // Prevent duplicates
+  @@unique([providerId, externalId])
   @@unique([tenantId, messageId])
-  @@index([tenantId, folder, receivedAt]) // List emails by folder
-  @@index([tenantId, isRead]) // Unread emails
-  @@index([tenantId, threadId]) // Thread grouping
-  @@index([sentAt]) // Sort by date
-  @@index([crossProviderLinkId]) // Cross-provider lookups
+  @@index([tenantId, folder, receivedAt])
+  @@index([tenantId, isRead])
+  @@index([tenantId, threadId])
+  @@index([sentAt])
+  @@index([crossProviderLinkId])
   @@map("emails")
 }
 
-// ===== FOLDER MODEL (Email folders/mailboxes from providers) =====
 model Folder {
-  id         String @id @default(cuid())
-  tenantId   String
-  providerId String
-
-  // Folder identification
-  name String // Display name (e.g., "Inbox", "Sent Items", "Work")
-  path String // Full path (e.g., "INBOX", "INBOX/Work", "[Gmail]/Sent Mail")
-
-  // Folder hierarchy
-  delimiter    String  @default("/") // Folder delimiter (/, ., etc.)
-  parentId     String? // Parent folder ID for hierarchy
-  level        Int     @default(0) // Nesting level (0 = root)
-  isSelectable Boolean @default(true) // Can emails be stored here?
-
-  // Special folder types (RFC 6154)
-  specialUse String? // INBOX, SENT, DRAFTS, TRASH, SPAM, JUNK, ARCHIVE, FLAGGED, ALL
-
-  // Folder metadata
-  attributes String[] @default([]) // IMAP attributes (\Noselect, \HasChildren, etc.)
-
-  // Counters (cached, updated during sync)
-  totalCount   Int @default(0) // Total emails in folder
-  unreadCount  Int @default(0) // Unread emails
-  recentCount  Int @default(0) // Recent emails (IMAP)
-  unseenCount  Int @default(0) // Unseen emails (IMAP)
-
-  // Sync metadata
-  uidValidity  String? // IMAP UIDVALIDITY
-  uidNext      Int?    @default(0) // IMAP UIDNEXT
+  id           String         @id @default(cuid())
+  tenantId     String
+  providerId   String
+  name         String
+  path         String
+  delimiter    String         @default("/")
+  parentId     String?
+  level        Int            @default(0)
+  isSelectable Boolean        @default(true)
+  specialUse   String?
+  attributes   String[]       @default([])
+  totalCount   Int            @default(0)
+  unreadCount  Int            @default(0)
+  recentCount  Int            @default(0)
+  unseenCount  Int            @default(0)
+  uidValidity  String?
+  uidNext      Int?           @default(0)
   lastSyncedAt DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  parent       Folder?        @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Folder[]       @relation("FolderHierarchy")
+  provider     ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  // Dates
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  provider ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  parent   Folder?        @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children Folder[]       @relation("FolderHierarchy")
-
-  @@unique([providerId, path]) // One folder per path per provider
+  @@unique([providerId, path])
   @@index([tenantId, providerId])
-  @@index([tenantId, specialUse]) // Quick lookup of special folders
-  @@index([providerId, parentId]) // Hierarchy queries
-  @@index([lastSyncedAt]) // Sync queries
+  @@index([tenantId, specialUse])
+  @@index([providerId, parentId])
+  @@index([lastSyncedAt])
   @@map("folders")
 }
 
-// ===== EMAIL ATTACHMENT MODEL =====
 model EmailAttachment {
-  id      String @id @default(cuid())
-  emailId String
-
-  // Attachment metadata
-  filename  String
-  mimeType  String
-  size      Int // Size in bytes
-  contentId String? // For inline images
-
-  // Storage
-  storageType String  @default("local") // "local", "s3", "azure"
-  storagePath String? // Path to file on disk or cloud
-
-  // Inline flag
-  isInline Boolean @default(false)
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  emailId     String
+  filename    String
+  mimeType    String
+  size        Int
+  contentId   String?
+  storageType String   @default("local")
+  storagePath String?
+  isInline    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  email       Email    @relation(fields: [emailId], references: [id], onDelete: Cascade)
 
   @@index([emailId])
   @@map("email_attachments")
 }
 
-// ===== CROSS-PROVIDER EMAIL LINK MODEL =====
-// Links the same email across multiple providers (e.g., Gmail + Outlook)
 model EmailCrossProviderLink {
-  id       String @id @default(cuid())
-  tenantId String
+  id               String    @id @default(cuid())
+  tenantId         String
+  contentHash      String
+  conflictStrategy String    @default("LAST_WRITE_WINS")
+  mergedIsRead     Boolean   @default(false)
+  mergedIsStarred  Boolean   @default(false)
+  mergedFolder     String    @default("INBOX")
+  mergedLabels     String[]  @default([])
+  providerCount    Int       @default(0)
+  lastSyncedAt     DateTime  @default(now())
+  lastConflictAt   DateTime?
+  lastConflict     Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  emails           Email[]
 
-  // Content hash for deduplication (SHA-256 of messageId + subject + sentAt)
-  contentHash String
-
-  // Conflict resolution strategy for this link
-  conflictStrategy String @default("LAST_WRITE_WINS") // "LAST_WRITE_WINS", "UNION", "INTERSECTION", "PRIORITY_BASED"
-
-  // Merged state across all providers (computed from provider states)
-  mergedIsRead    Boolean  @default(false)
-  mergedIsStarred Boolean  @default(false)
-  mergedFolder    String   @default("INBOX")
-  mergedLabels    String[] @default([])
-
-  // Tracking
-  providerCount  Int       @default(0) // How many providers have this email
-  lastSyncedAt   DateTime  @default(now())
-  lastConflictAt DateTime? // Last time a conflict was detected
-
-  // Conflict metadata (JSON with details about last conflict)
-  lastConflict Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  emails Email[] // All emails linked to this group
-
-  @@unique([tenantId, contentHash]) // One link per unique email per tenant
+  @@unique([tenantId, contentHash])
   @@index([tenantId, lastSyncedAt])
   @@index([contentHash])
   @@map("email_cross_provider_links")
 }
 
-// Update Tenant model to include emails relation
-// (Already exists, just documenting)
-
-// ===== MESSAGE MODEL =====
 model Message {
-  id             String   @id @default(cuid())
+  id             String     @id @default(cuid())
   tenantId       String
   userId         String
   conversationId String?
-  role           String // "user", "assistant"
+  role           String
   content        String
   embeddingId    String?
-  isDeleted      Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  // Relations
-  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  embedding Embedding? @relation(fields: [embeddingId], references: [id])
+  isDeleted      Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  embedding      Embedding? @relation(fields: [embeddingId], references: [id])
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, userId, conversationId])
   @@index([createdAt])
@@ -413,201 +310,141 @@ model ChatSession {
   messages  Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, userId, updatedAt])
   @@map("chat_sessions")
 }
 
-// ===== EMBEDDING MODEL (PGVECTOR) =====
 model Embedding {
   id             String                 @id @default(cuid())
   tenantId       String
   messageId      String?
   documentName   String?
   content        String
-  vector         Unsupported("vector")? // pgvector type
+  vector         Unsupported("vector")?
   embeddingModel String                 @default("mistral-embed")
   metadata       Json?
   createdAt      DateTime               @default(now())
-
-  // Relations
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  messages Message[]
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  messages       Message[]
 
   @@index([tenantId])
   @@map("embeddings")
 }
 
-// ===== CALENDAR EVENT MODEL (Synced calendar events from providers) =====
 model CalendarEvent {
-  id         String @id @default(cuid())
-  tenantId   String
-  providerId String
+  id               String         @id @default(cuid())
+  tenantId         String
+  providerId       String
+  externalId       String
+  calendarId       String?
+  iCalUID          String?
+  title            String
+  description      String?
+  location         String?
+  organizer        String?
+  attendees        Json?
+  startTime        DateTime
+  endTime          DateTime
+  isAllDay         Boolean        @default(false)
+  timeZone         String         @default("UTC")
+  recurrence       String[]       @default([])
+  recurringEventId String?
+  status           String         @default("confirmed")
+  visibility       String         @default("default")
+  isDeleted        Boolean        @default(false)
+  isCancelled      Boolean        @default(false)
+  reminders        Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  metadata         Json?
+  htmlLink         String?
+  lastSyncedAt     DateTime       @default(now())
+  syncVersion      Int            @default(1)
+  calendarName     String?
+  provider         ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  // External IDs for sync tracking
-  externalId   String // Google event ID, Microsoft event ID
-  calendarId   String? // Which calendar this event belongs to
-  calendarName String? // Friendly calendar name
-
-  // Event metadata
-  iCalUID String? // RFC 5545 UID (for cross-provider sync)
-
-  // Event details
-  title       String // Event title/summary
-  description String? // Event description/body
-  location    String? // Event location
-
-  // Attendees
-  organizer String? // Organizer email
-  attendees Json? // Array of attendees with status
-
-  // Time and recurrence
-  startTime        DateTime // Event start time
-  endTime          DateTime // Event end time
-  isAllDay         Boolean  @default(false)
-  timeZone         String   @default("UTC")
-  recurrence       String[] @default([]) // RRULE strings
-  recurringEventId String? // ID of parent recurring event
-
-  // Status and flags
-  status      String  @default("confirmed") // confirmed, tentative, cancelled
-  visibility  String  @default("default") // default, public, private, confidential
-  isDeleted   Boolean @default(false)
-  isCancelled Boolean @default(false)
-
-  // Reminders
-  reminders Json? // Reminder settings
-
-  // Dates
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Metadata
-  metadata Json? // Provider-specific metadata
-  htmlLink String? // Link to event in provider's UI
-
-  // Sync tracking
-  lastSyncedAt DateTime @default(now())
-  syncVersion  Int      @default(1) // Increment on each update for conflict resolution
-
-  // Relations
-  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  provider ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@unique([providerId, externalId]) // Prevent duplicates
-  @@index([tenantId, startTime]) // List events by date
-  @@index([tenantId, calendarId, startTime]) // List events in a calendar
-  @@index([iCalUID]) // Cross-provider sync
+  @@unique([providerId, externalId])
+  @@index([tenantId, startTime])
+  @@index([tenantId, calendarId, startTime])
+  @@index([iCalUID])
   @@map("calendar_events")
 }
 
-// ===== CONTACT MODEL (Synced contacts from providers) =====
 model Contact {
-  id         String @id @default(cuid())
-  tenantId   String
-  providerId String
+  id             String         @id @default(cuid())
+  tenantId       String
+  providerId     String
+  externalId     String
+  contactGroup   String?
+  firstName      String?
+  lastName       String?
+  middleName     String?
+  displayName    String?
+  nickname       String?
+  prefix         String?
+  suffix         String?
+  emails         Json?
+  phoneNumbers   Json?
+  addresses      Json?
+  company        String?
+  jobTitle       String?
+  department     String?
+  birthday       DateTime?
+  anniversary    DateTime?
+  websites       Json?
+  socialProfiles Json?
+  notes          String?
+  photoUrl       String?
+  photoEtag      String?
+  isDeleted      Boolean        @default(false)
+  isStarred      Boolean        @default(false)
+  isFavorite     Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  metadata       Json?
+  vCardVersion   String?        @default("4.0")
+  lastSyncedAt   DateTime       @default(now())
+  syncVersion    Int            @default(1)
+  eTag           String?
+  provider       ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  // External IDs for sync tracking
-  externalId   String // Google People API resourceName, Microsoft contact ID
-  contactGroup String? // Contact group/label
-
-  // Basic information
-  firstName   String?
-  lastName    String?
-  middleName  String?
-  displayName String? // Full name
-  nickname    String?
-  prefix      String? // Mr., Mrs., Dr., etc.
-  suffix      String? // Jr., Sr., III, etc.
-
-  // Email addresses
-  emails Json? // Array of {value: string, type: string, primary: boolean}
-
-  // Phone numbers
-  phoneNumbers Json? // Array of {value: string, type: string, primary: boolean}
-
-  // Physical addresses
-  addresses Json? // Array of {street, city, state, postalCode, country, type}
-
-  // Organization
-  company    String?
-  jobTitle   String?
-  department String?
-
-  // Dates
-  birthday    DateTime? // Birthday
-  anniversary DateTime? // Anniversary
-
-  // Social and web
-  websites       Json? // Array of {url: string, type: string}
-  socialProfiles Json? // Array of {platform: string, username: string, url: string}
-
-  // Additional info
-  notes     String? // Notes about contact
-  photoUrl  String? // Profile photo URL
-  photoEtag String? // Photo ETag for caching
-
-  // Status and flags
-  isDeleted  Boolean @default(false)
-  isStarred  Boolean @default(false) // Favorite/starred
-  isFavorite Boolean @default(false)
-
-  // Dates
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Metadata
-  metadata     Json? // Provider-specific metadata
-  vCardVersion String? @default("4.0") // vCard version for compatibility
-
-  // Sync tracking
-  lastSyncedAt DateTime @default(now())
-  syncVersion  Int      @default(1) // Increment on each update for conflict resolution
-  eTag         String? // Entity tag for optimistic concurrency
-
-  // Relations
-  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  provider ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@unique([providerId, externalId]) // Prevent duplicates
-  @@index([tenantId, lastName, firstName]) // Search by name
-  @@index([tenantId, displayName]) // Search by display name
-  @@index([tenantId, company]) // Search by company
-  @@index([contactGroup]) // Filter by group
+  @@unique([providerId, externalId])
+  @@index([tenantId, lastName, firstName])
+  @@index([tenantId, displayName])
+  @@index([tenantId, company])
+  @@index([contactGroup])
   @@map("contacts")
 }
 
-// ===== AUDIT LOG MODEL =====
 model AuditLog {
   id        String   @id @default(cuid())
   tenantId  String
   userId    String?
-  action    String // "CREATE", "UPDATE", "DELETE"
-  entity    String // "User", "Message", "ProviderConfig"
+  action    String
+  entity    String
   entityId  String
   changes   Json?
   ipAddress String?
   createdAt DateTime @default(now())
-
-  // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id])
 
   @@index([tenantId, createdAt])
   @@index([userId, createdAt])
   @@map("audit_logs")
 }
 
-// ===== JOB QUEUE MODEL (for tracking BullMQ jobs) =====
 model JobQueue {
   id          String    @id @default(cuid())
   tenantId    String
   jobId       String
-  jobType     String // "email_sync", "ai_processing", "embedding"
-  status      String    @default("pending") // "pending", "running", "completed", "failed"
+  jobType     String
+  status      String    @default("pending")
   data        Json
   result      Json?
   error       String?
@@ -622,60 +459,44 @@ model JobQueue {
   @@map("job_queue")
 }
 
-// ===== WEBHOOK SUBSCRIPTION MODEL (for real-time sync) =====
 model WebhookSubscription {
-  id           String @id @default(cuid())
-  tenantId     String // Multi-tenant isolation
-  providerId   String // May have multiple subscriptions per provider
-  providerType String // "google", "microsoft"
-
-  // Provider-specific subscription ID
-  subscriptionId String // Gmail historyId, Microsoft/Microsoft Calendar subscription ID
-
-  // Webhook details
-  webhookUrl   String? // For Microsoft Graph
-  resourcePath String  @default("generic") // Resource being watched (calendar, mailbox, etc.)
-
-  // Lifecycle
-  isActive      Boolean  @default(true)
-  expiresAt     DateTime // When subscription expires
-  lastRenewedAt DateTime @default(now())
-
-  // Metadata
-  metadata Json? // Provider-specific data (topic name, etc.)
-
-  // Tracking
+  id                 String         @id @default(cuid())
+  providerId         String
+  providerType       String
+  subscriptionId     String
+  webhookUrl         String?
+  resourcePath       String         @default("generic")
+  isActive           Boolean        @default(true)
+  expiresAt          DateTime
+  lastRenewedAt      DateTime       @default(now())
+  metadata           Json?
   lastNotificationAt DateTime?
-  notificationCount  Int       @default(0)
-  errorCount         Int       @default(0)
+  notificationCount  Int            @default(0)
+  errorCount         Int            @default(0)
   lastError          String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  provider ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  tenantId           String
+  provider           ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, resourcePath])
   @@index([tenantId])
   @@index([tenantId, isActive])
   @@index([providerId, isActive])
-  @@index([expiresAt]) // For renewal queries
+  @@index([expiresAt])
   @@index([providerType])
   @@index([subscriptionId])
   @@map("webhook_subscriptions")
 }
 
-// ===== HEALTH CHECK =====
 model HealthCheck {
   id            String   @id @default(cuid())
-  service       String // "database", "redis", "mistral", "email"
-  status        String   @default("up") // "up", "down", "degraded"
+  service       String   @unique
+  status        String   @default("up")
   lastCheckedAt DateTime @default(now())
-  responseTime  Int? // milliseconds
+  responseTime  Int?
   error         String?
 
-  @@unique([service])
   @@map("health_checks")
 }
