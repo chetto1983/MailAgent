@@ -22,15 +22,18 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
   private worker!: Worker<EmailEmbeddingJob, boolean>;
   private pending: EmailEmbeddingJob[] = [];
   private flushTimer?: NodeJS.Timeout;
-  private readonly BULK_SIZE = 50;
-  private readonly FLUSH_MS = 200;
+  private readonly BULK_SIZE: number;
+  private readonly FLUSH_MS: number;
   private readonly seenIds = new Set<string>();
 
   constructor(
     private readonly config: ConfigService,
     @Inject(forwardRef(() => KnowledgeBaseService))
     private readonly knowledgeBaseService: KnowledgeBaseService,
-  ) {}
+  ) {
+    this.BULK_SIZE = this.config.get<number>('EMBEDDING_BULK_SIZE', 50);
+    this.FLUSH_MS = this.config.get<number>('EMBEDDING_FLUSH_MS', 200);
+  }
 
   onModuleInit() {
     const connection = {
@@ -50,7 +53,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
         removeOnComplete: true,
         removeOnFail: 1000,
       },
-    } });
+    });
 
     this.worker = new Worker<EmailEmbeddingJob, boolean>(
       'email-embedding',
@@ -76,7 +79,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
         connection,
         concurrency: 3, // Process up to 3 emails concurrently for better throughput
         limiter: {
-          max: 10, // Increased to allow more concurrent operations with bulk embeddings
+          max: 10, // Allow some concurrency with bulk embeddings
           duration: 1000,
         },
       },
@@ -101,7 +104,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
   }
 
   async enqueue(job: EmailEmbeddingJob) {
-    this.enqueueMany([job]);
+    await this.enqueueMany([job]);
   }
 
   async enqueueMany(jobs: EmailEmbeddingJob[]) {
@@ -157,7 +160,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
     }
 
     this.flushTimer = setTimeout(() => {
-      this.flushPending().catch((err) =>
+      void this.flushPending().catch((err) =>
         this.logger.warn(
           `Failed to flush embedding jobs: ${err instanceof Error ? err.message : String(err)}`,
         ),

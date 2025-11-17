@@ -26,6 +26,7 @@ interface InternalQueueMetrics {
   lastCompletedAt?: string;
   lastFailedAt?: string;
   lastError?: string;
+  lastJobId?: string;
 }
 
 @Injectable()
@@ -83,18 +84,10 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.highQueue = new Queue<SyncJobData>('email-sync-high', {
       connection: this.redisConnection,
       defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-        removeOnComplete: {
-          count: 50, // Keep last 50 completed jobs
-          age: 3600, // Keep for 1 hour
-        },
-        removeOnFail: {
-          count: 100, // Keep last 100 failures
-        },
+        attempts: this.getAttempts('HIGH'),
+        backoff: this.getBackoff('HIGH'),
+        removeOnComplete: this.getRemoveOnComplete('HIGH'),
+        removeOnFail: this.getRemoveOnFail('HIGH'),
       },
     });
 
@@ -102,12 +95,9 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.normalQueue = new Queue<SyncJobData>('email-sync-normal', {
       connection: this.redisConnection,
       defaultJobOptions: {
-        attempts: 2,
-        backoff: {
-          type: 'exponential',
-          delay: 10000,
-        },
-        removeOnComplete: true,
+        attempts: this.getAttempts('NORMAL'),
+        backoff: this.getBackoff('NORMAL'),
+        removeOnComplete: this.getRemoveOnComplete('NORMAL'),
       },
     });
 
@@ -115,8 +105,9 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     this.lowQueue = new Queue<SyncJobData>('email-sync-low', {
       connection: this.redisConnection,
       defaultJobOptions: {
-        attempts: 1,
-        removeOnComplete: true,
+        attempts: this.getAttempts('LOW'),
+        backoff: this.getBackoff('LOW'),
+        removeOnComplete: this.getRemoveOnComplete('LOW'),
       },
     });
 
@@ -149,24 +140,11 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
 
       queueEvents.on('failed', ({ jobId, failedReason }) => {
         this.logger.error(`[${name}] Job ${jobId} failed: ${failedReason}`);
-        this.recordFailure(name as QueuePriority, failedReason);
+        this.recordFailure(name as QueuePriority, failedReason, jobId);
       });
 
       this.queueEvents.push(queueEvents);
     }
-  }
-
-  private async hasPendingJob(providerId: string): Promise<boolean> {
-    const queues = [this.highQueue, this.normalQueue, this.lowQueue];
-    const states: JobType[] = ['waiting', 'active', 'delayed', 'paused', 'waiting-children'];
-
-    for (const queue of queues) {
-      const jobs = await queue.getJobs(states, 0, -1);
-      if (jobs.some((job) => job?.data?.providerId === providerId)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   async addSyncJob(data: SyncJobData): Promise<void> {
@@ -182,7 +160,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Soft guard: skip if any job for provider is in waiting/active/delayed
-    if (await this.hasPendingJob(data.providerId)) {
+    if (await this.hasPendingJob(data.providerId, data.tenantId)) {
       this.logger.verbose(`Provider ${data.providerId} already has a pending job; skipping new enqueue`);
       return;
     }
@@ -220,7 +198,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       // Filter out jobs that already have pending work for the same provider
       const filteredJobs: SyncJobData[] = [];
       for (const job of priorityJobs) {
-        if (await this.hasPendingJob(job.providerId)) {
+        if (await this.hasPendingJob(job.providerId, job.tenantId)) {
           this.logger.verbose(`Provider ${job.providerId} already has pending job; skipping bulk enqueue`);
           continue;
         }
@@ -419,6 +397,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     const metric = this.metrics[priority];
     metric.completed += 1;
     metric.lastCompletedAt = new Date().toISOString();
+    metric.lastJobId = jobId;
 
     if (!jobId) {
       return;
@@ -443,10 +422,99 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private recordFailure(priority: QueuePriority, failedReason?: string) {
+  private recordFailure(priority: QueuePriority, failedReason?: string, _jobId?: string) {
     const metric = this.metrics[priority];
     metric.failed += 1;
     metric.lastFailedAt = new Date().toISOString();
     metric.lastError = failedReason;
+    metric.lastJobId = undefined;
+  }
+
+  private getAttempts(level: 'HIGH' | 'NORMAL' | 'LOW'): number {
+    switch (level) {
+      case 'HIGH':
+        return this.configService.get<number>('QUEUE_HIGH_ATTEMPTS', 3);
+      case 'NORMAL':
+        return this.configService.get<number>('QUEUE_NORMAL_ATTEMPTS', 2);
+      case 'LOW':
+        return this.configService.get<number>('QUEUE_LOW_ATTEMPTS', 1);
+      default:
+        return 1;
+    }
+  }
+
+  private getBackoff(level: 'HIGH' | 'NORMAL' | 'LOW'):
+    | { type: 'exponential'; delay: number }
+    | undefined {
+    switch (level) {
+      case 'HIGH':
+        return {
+          type: 'exponential',
+          delay: this.configService.get<number>('QUEUE_HIGH_BACKOFF_MS', 5000),
+        };
+      case 'NORMAL':
+        return {
+          type: 'exponential',
+          delay: this.configService.get<number>('QUEUE_NORMAL_BACKOFF_MS', 10000),
+        };
+      case 'LOW':
+        return undefined;
+      default:
+        return undefined;
+    }
+  }
+
+  private getRemoveOnComplete(level: 'HIGH' | 'NORMAL' | 'LOW'): boolean | { count?: number; age?: number } {
+    switch (level) {
+      case 'HIGH':
+        return {
+          count: this.configService.get<number>('QUEUE_HIGH_REMOVE_ON_COMPLETE_COUNT', 50),
+          age: this.configService.get<number>('QUEUE_HIGH_REMOVE_ON_COMPLETE_AGE', 3600),
+        };
+      case 'NORMAL':
+      case 'LOW':
+        return true;
+      default:
+        return true;
+    }
+  }
+
+  private getRemoveOnFail(level: 'HIGH' | 'NORMAL' | 'LOW'): boolean | { count?: number } {
+    switch (level) {
+      case 'HIGH':
+        return {
+          count: this.configService.get<number>('QUEUE_HIGH_REMOVE_ON_FAIL_COUNT', 100),
+        };
+      case 'NORMAL':
+      case 'LOW':
+        return true;
+      default:
+        return true;
+    }
+  }
+  private async hasPendingJob(providerId: string, tenantId?: string): Promise<boolean> {
+    const queues = [this.highQueue, this.normalQueue, this.lowQueue];
+    const states: JobType[] = ['waiting', 'active', 'delayed', 'paused', 'waiting-children'];
+
+    // Soft guard: skip if any job for provider is in waiting/active/delayed
+    for (const queue of queues) {
+      const jobs = await queue.getJobs(states, 0, -1);
+      if (
+        jobs.some(
+          (job) =>
+            job?.data?.providerId === providerId &&
+            (!tenantId || job?.data?.tenantId === tenantId),
+        )
+      ) {
+        return true;
+      }
+    }
+
+    // Hard guard: check in Redis keys for any job referencing providerId
+    const keyPattern = `bull:*:jobs:*`;
+    const keys = await this.redisConnection.keys(keyPattern);
+    return keys.some(
+      (k) => k.includes(providerId) && (!tenantId || k.includes(tenantId)),
+    );
   }
 }

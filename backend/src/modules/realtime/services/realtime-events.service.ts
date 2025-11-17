@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { RealtimeGateway } from '../gateways/realtime.gateway';
 import {
   AIEventPayload,
@@ -36,8 +37,13 @@ export class RealtimeEventsService {
     { event: KnownRealtimeEvent; tenantId: string; payload: EmailEventPayload }
   >();
   private emailBufferTimer?: NodeJS.Timeout;
-  private readonly EMAIL_BUFFER_MS = 200;
-  private readonly EMAIL_BUFFER_MAX = 500;
+  private readonly EMAIL_BUFFER_MS: number;
+  private readonly EMAIL_BUFFER_MAX: number;
+
+  constructor(private readonly config: ConfigService) {
+    this.EMAIL_BUFFER_MS = this.config.get<number>('REALTIME_EMAIL_BUFFER_MS', 200);
+    this.EMAIL_BUFFER_MAX = this.config.get<number>('REALTIME_EMAIL_BUFFER_MAX', 500);
+  }
 
   /**
    * Setter per iniettare il gateway (per evitare circular dependency)
@@ -99,6 +105,13 @@ export class RealtimeEventsService {
     payload: RealtimeEventPayloads['email:thread_update'],
   ) {
     this.emitToTenant(tenantId, 'email:thread_update', payload);
+  }
+
+  /**
+   * Emette evento di batch processing (es. full import senza eventi granulari)
+   */
+  emitEmailBatchProcessed(tenantId: string, payload: RealtimeEventPayloads['email:batch_processed']) {
+    this.emitToTenant(tenantId, 'email:batch_processed', payload);
   }
 
   /**

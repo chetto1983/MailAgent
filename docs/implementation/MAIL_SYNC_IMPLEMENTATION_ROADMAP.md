@@ -8,49 +8,58 @@ Sintesi esecutiva dei documenti:
 Obiettivo: completare il refactor bulk mail e allineare contatti/calendari, consolidando codebase e realtime.
 
 ## 1) Gmail Sync (full/incremental)
-- Estrarre helper `fetchMessagesBatch(gmail, ids, format)` (batchGet + fallback) e riuso in full/incremental.
-- Creare `parseGmailMessage` unico; usare pipeline batch (parse → createMany/update → enqueueMany) per tutti i path; deprecare `processMessageData`.
-- Label/Deletion: processare set in chunk con `Promise.allSettled` + backoff; flag per sopprimere eventi granulari in bulk e summary finale (`sync:status`).
-- Config: spostare costanti (BATCH size, history max pages, buffer ms) in config/env.
-- Test: unit su parsing e batch pipeline; e2e su full import 200–500 mail con realtime throttling.
+- ✅ Helper `fetchMessagesBatch(gmail, ids, format)` (batchGet + fallback) riusato.
+- ✅ Pipeline unica `parseGmailMessage` + `processMessagesBatch` (createMany/update + enqueueMany); rimossa `processMessageData`.
+- ✅ Label/Deletion in chunk con `Promise.allSettled`.
+- ✅ Flag per sopprimere eventi granulari e summary finale (`email:batch_processed` quando suppression attiva).
+- ✅ Config parziale: BATCH size e history pages leggono da config (default 100/25).
+- ✅ Retry/backoff 429/5xx (config: GMAIL_RETRY_*).
+- 🔜 Test: unit su parsing/batch; e2e full import 200–500 mail con realtime throttling.
 
 ## 2) Microsoft Mail Sync (parità con Gmail + spunti Zero-main)
-- Fetch in chunk (`top` 50–100) + parse pipeline unica (createMany/update + enqueueMany).
-- Batch operations: usare Graph `/$batch` per read/unread/move bulk (spunto Zero-main).
-- Normalizzazione cartelle (Inbox/Sent/Drafts/Bin/Archive/Spam) e cache id.
-- Retry/backoff 429/5xx centralizzato; error wrapper comune.
-- Realtime throttling identico a Gmail; summary per bulk move/delete dal frontend.
+- ✅ Fetch in chunk (`/$batch` + fallback) + parse pipeline unica (createMany/update + enqueueMany).
+- ✅ Normalizzazione cartelle (mapping da parentId/specialUse).
+- ✅ Config parziale: batch fetch size da config (default 20).
+- ✅ Batch operations (read/unread) via Graph `/$batch` + update locale.
+- ✅ Helper per move bulk via Graph `/$batch` + update locale (integrazione frontend ancora da collegare).
+- ✅ Retry/backoff 429/5xx centralizzato via wrapper `msRequestWithRetry`.
+- ✅ Realtime throttling identico a Gmail (suppress granular + batch summary/status quando attivo).
 
 ## 3) Embedding Pipeline
-- Unificare `enqueue`/`enqueueMany` con `scheduleFlush` e dedupe per `emailId` prima di `addBulk`.
-- Metriche/log ridotti (verbose) per flush; parametri BULK_SIZE/FLUSH_MS da config.
+- ✅ Unificato `enqueue`/`enqueueMany` con `scheduleFlush` e dedupe per `emailId`.
+- ✅ Parametri BULK_SIZE/FLUSH_MS da config (default 50/200); metriche/log a livello verbose.
 
 ## 4) Realtime Events
-- Unificare emit helper (`emitToTenant` vs immediate) e rendere configurabile il buffer (ms, max) da config.
-- Considerare evento summary `email:batch_processed` per full import/move bulk; log a livello verbose.
+- ✅ Emit helper unificato (via `emitInternal`), buffer email.
+- ✅ Buffer configurabile da config (REALTIME_EMAIL_BUFFER_MS/REALTIME_EMAIL_BUFFER_MAX).
+- ✅ Config flag per sopprimere eventi granulari (`REALTIME_SUPPRESS_MESSAGE_EVENTS`).
+- ✅ Evento summary `email:batch_processed` emesso quando suppression attiva.
+- ✅ Sync status progress (processed count) inviato quando suppression attiva.
+- 🔜 Log a livello verbose/summary per progress.
 
 ## 5) QueueService (email sync queues)
-- Estrarre config queue (attempts, backoff, removeOn*) in costanti/config.
-- Dedupe job per provider/tenant centralizzato; helper per metriche durata (evitare codice duplicato).
+- ✅ Estrarre config queue (attempts, backoff, removeOn*) in costanti/config.
+- ✅ Dedupe job per provider/tenant (soft+hard guard su queue/redis).
+- ✅ Metriche arricchite (lastJobId, tracking completati/falliti).
 
 ## 6) CrossProviderConflict
-- Spostare priorità provider in config/tipo; validare input (strategy/states).
-- Helper condivisi per log conflitti e stats (riuso per report).
+- 🔜 Spostare priorità provider in config/tipo; validare input (strategy/states).
+- 🔜 Helper condivisi per log conflitti e stats (riuso per report).
 
 ## 7) Contatti & Calendari
-- Applicare pipeline bulk (list chunk → parse → createMany/update) a Google/Microsoft contacts/calendar.
-- Normalizzazione campi (email/phone) e dedupe; retry 429/5xx condiviso.
-- Realtime throttling per import iniziale.
+- 🔜 Applicare pipeline bulk (list chunk → parse → createMany/update) a Google/Microsoft contacts/calendar.
+- 🔜 Normalizzazione campi e dedupe; retry 429/5xx condiviso.
+- 🔜 Realtime throttling per import iniziale.
 
 ## 8) Error Handling & Logging
-- Wrapper comune `withErrorHandler` (Google/Microsoft) con contesto provider/tenant, fatal handling, backoff hint.
-- Ridurre logging rumoroso su emit e su loop grandi; usare livelli debug/verbose coerenti.
+- 🔜 Wrapper comune `withErrorHandler` (Google/Microsoft) con contesto provider/tenant, fatal handling, backoff hint.
+- 🔜 Ridurre logging rumoroso su emit/loop grandi; usare livelli debug/verbose coerenti.
 
 ## 9) Config & Constants
-- Centralizzare in config/env: batch sizes, buffer ms, retry/backoff, queue options, realtime buffer.
-- Documentare le variabili in README modulo sync/realtime.
+- 🔜 Centralizzare in config/env: batch sizes, buffer ms, retry/backoff, queue options, realtime buffer.
+- 🔜 Documentare le variabili in README modulo sync/realtime.
 
 ## 10) Test & Docs
-- Unit: parseGmailMessage, batch pipeline, enqueueMany dedupe, realtime buffer flush.
-- Funzionali: bulk import mail, bulk move/delete (realtime throttling), Microsoft batch read/unread/move.
-- Aggiornare i doc (strategy/roadmap) quando i passi vengono implementati.
+- 🔜 Unit: parseGmailMessage, batch pipeline, enqueueMany dedupe, realtime buffer flush.
+- 🔜 Funzionali: bulk import mail, bulk move/delete (realtime throttling), Microsoft batch read/unread/move.
+- 🔜 Aggiornare i doc (strategy/roadmap) quando i passi vengono implementati.

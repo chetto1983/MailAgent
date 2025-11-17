@@ -75,6 +75,12 @@ export interface RealtimeEventPayloads {
   'email:new': EmailEventPayload;
   'email:update': EmailEventPayload;
   'email:delete': EmailEventPayload;
+  'email:batch_processed': {
+    providerId: string;
+    processed: number;
+    created?: number;
+    syncType?: 'full' | 'incremental' | (string & {});
+  };
   'email:unread_count_update': { folder: string; count: number; providerId: string };
   'email:folder_counts_update': {
     providerId: string;
@@ -102,6 +108,8 @@ export interface RealtimeEventPayloads {
     status: 'started' | 'in_progress' | 'completed' | 'failed';
     progress?: number;
     error?: string;
+    processed?: number;
+    total?: number;
   };
 }
 

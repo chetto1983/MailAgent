@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 export type ConflictStrategy =
@@ -34,8 +35,37 @@ export interface ConflictResolution {
 @Injectable()
 export class CrossProviderConflictService {
   private readonly logger = new Logger(CrossProviderConflictService.name);
+  private readonly providerPriority: Record<string, number>;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {
+    // Priorità provider configurabile via env CROSS_PROVIDER_PRIORITY_JSON (es. {"google":1,"microsoft":2,"generic":3})
+    const raw = this.config.get<string>('CROSS_PROVIDER_PRIORITY_JSON');
+    if (raw) {
+      try {
+        this.providerPriority = JSON.parse(raw);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to parse CROSS_PROVIDER_PRIORITY_JSON: ${
+            error instanceof Error ? error.message : String(error)
+          } - using defaults.`,
+        );
+        this.providerPriority = {
+          google: 1,
+          microsoft: 2,
+          generic: 3,
+        };
+      }
+    } else {
+      this.providerPriority = {
+        google: 1,
+        microsoft: 2,
+        generic: 3,
+      };
+    }
+  }
 
   /**
    * Resolve conflicts between email states from different providers
@@ -201,9 +231,13 @@ export class CrossProviderConflictService {
   private resolvePriorityBased(states: EmailState[]): ConflictResolution {
     // Define provider priority (lower number = higher priority)
     const getProviderPriority = (providerId: string): number => {
-      if (providerId.includes('google')) return 1;
-      if (providerId.includes('microsoft')) return 2;
-      return 3; // IMAP/generic
+      const lower = providerId.toLowerCase();
+      if (this.providerPriority[lower] !== undefined) {
+        return this.providerPriority[lower];
+      }
+      if (lower.includes('google')) return this.providerPriority['google'] ?? 1;
+      if (lower.includes('microsoft')) return this.providerPriority['microsoft'] ?? 2;
+      return this.providerPriority['generic'] ?? 3;
     };
 
     const sortedStates = [...states].sort(

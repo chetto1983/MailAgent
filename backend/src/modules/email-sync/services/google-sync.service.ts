@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { gmail_v1, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
@@ -10,12 +10,17 @@ import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { EmailEventReason } from '../../realtime/types/realtime.types';
 import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class GoogleSyncService {
+export class GoogleSyncService implements OnModuleInit {
   private readonly logger = new Logger(GoogleSyncService.name);
-  private readonly GMAIL_BATCH_GET_SIZE = 100;
-  private readonly GMAIL_HISTORY_MAX_PAGES = 25;
+  private GMAIL_BATCH_GET_SIZE: number;
+  private GMAIL_HISTORY_MAX_PAGES: number;
+  private suppressMessageEvents = false;
+  private RETRY_MAX_ATTEMPTS = 3;
+  private RETRY_429_DELAY_MS = 2000;
+  private RETRY_5XX_DELAY_MS = 2000;
 
   constructor(
     private prisma: PrismaService,
@@ -25,7 +30,17 @@ export class GoogleSyncService {
     private embeddingsService: EmbeddingsService,
     private knowledgeBaseService: KnowledgeBaseService,
     private realtimeEvents: RealtimeEventsService,
+    private config: ConfigService,
   ) {}
+
+  onModuleInit() {
+    this.GMAIL_BATCH_GET_SIZE = this.config.get<number>('GMAIL_BATCH_GET_SIZE', 100);
+    this.GMAIL_HISTORY_MAX_PAGES = this.config.get<number>('GMAIL_HISTORY_MAX_PAGES', 25);
+    this.suppressMessageEvents = this.config.get<boolean>('REALTIME_SUPPRESS_MESSAGE_EVENTS', false);
+    this.RETRY_MAX_ATTEMPTS = this.config.get<number>('GMAIL_RETRY_MAX_ATTEMPTS', 3);
+    this.RETRY_429_DELAY_MS = this.config.get<number>('GMAIL_RETRY_429_DELAY_MS', 2000);
+    this.RETRY_5XX_DELAY_MS = this.config.get<number>('GMAIL_RETRY_5XX_DELAY_MS', 2000);
+  }
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
     const { providerId, email, syncType } = jobData;
@@ -132,6 +147,20 @@ export class GoogleSyncService {
         newHistoryId = fullResult.historyId;
       }
 
+      if (this.suppressMessageEvents && messagesProcessed > 0) {
+        this.realtimeEvents.emitEmailBatchProcessed(provider.tenantId, {
+          providerId,
+          processed: messagesProcessed,
+          created: newMessages,
+          syncType,
+        });
+        this.realtimeEvents.emitSyncStatus(provider.tenantId, {
+          providerId,
+          status: 'in_progress',
+          processed: messagesProcessed,
+        });
+      }
+
       return {
         success: true,
         providerId,
@@ -152,6 +181,44 @@ export class GoogleSyncService {
     oauth2Client.setCredentials({ access_token: accessToken });
 
     return google.gmail({ version: 'v1', auth: oauth2Client });
+  }
+
+  private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    let attempt = 0;
+    let lastError: any;
+
+    while (attempt < this.RETRY_MAX_ATTEMPTS) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        const status =
+          (error as any)?.response?.status ??
+          (error as any)?.response?.statusCode ??
+          (error as any)?.code ??
+          (error as any)?.statusCode;
+
+        attempt += 1;
+
+        if (status === 429) {
+          const delay = this.RETRY_429_DELAY_MS * attempt;
+          this.logger.warn(`Gmail 429 on attempt ${attempt}/${this.RETRY_MAX_ATTEMPTS}, retry in ${delay}ms`);
+          await new Promise((res) => setTimeout(res, delay));
+          continue;
+        }
+
+        if (status && status >= 500 && status < 600) {
+          const delay = this.RETRY_5XX_DELAY_MS * attempt;
+          this.logger.warn(`Gmail ${status} on attempt ${attempt}/${this.RETRY_MAX_ATTEMPTS}, retry in ${delay}ms`);
+          await new Promise((res) => setTimeout(res, delay));
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw lastError;
   }
 
   /**
@@ -776,11 +843,13 @@ export class GoogleSyncService {
     const batchGet = (gmail.users.messages as any)?.batchGet;
     if (typeof batchGet === 'function') {
       try {
-        const batchResponse = await batchGet.call(gmail.users.messages, {
-          userId: 'me',
-          ids,
-          format,
-        });
+        const batchResponse = await this.withRetry<any>(() =>
+          batchGet.call(gmail.users.messages, {
+            userId: 'me',
+            ids,
+            format,
+          }),
+        );
 
         const responses = batchResponse.data.responses || [];
         return responses
@@ -800,10 +869,12 @@ export class GoogleSyncService {
 
     const chunkResponses = await Promise.all(
       ids.map((id) =>
-        gmail.users.messages
-          .get({ userId: 'me', id, format })
-          .then((res) => res.data)
-          .catch(() => null),
+        this.withRetry(() =>
+          gmail.users.messages
+            .get({ userId: 'me', id, format })
+            .then((res) => res.data)
+            .catch(() => null),
+        ),
       ),
     );
     return chunkResponses.filter((msg): msg is gmail_v1.Schema$Message => !!msg?.id);
@@ -913,7 +984,9 @@ export class GoogleSyncService {
       return { processed: 0, created: 0 };
     }
 
-    const externalIds = mapped.map((m) => m.externalId);
+    const safeMapped = mapped;
+
+    const externalIds = safeMapped.map((m) => m.externalId);
     const existing = await this.prisma.email.findMany({
       where: {
         providerId,
@@ -927,8 +1000,8 @@ export class GoogleSyncService {
     });
     const existingMap = new Map(existing.map((e) => [e.externalId, e]));
 
-    const creates = mapped.filter((m) => !existingMap.has(m.externalId));
-    const updates = mapped.filter((m) => existingMap.has(m.externalId));
+    const creates = safeMapped.filter((m) => !existingMap.has(m.externalId));
+    const updates = safeMapped.filter((m) => existingMap.has(m.externalId));
 
     if (creates.length) {
       await this.prisma.email.createMany({
@@ -1231,6 +1304,10 @@ export class GoogleSyncService {
         reason,
         ...payload,
       };
+
+      if (this.suppressMessageEvents && (reason === 'message-processed' || reason === 'labels-updated' || reason === 'message-deleted')) {
+        return;
+      }
 
       switch (reason) {
         case 'message-processed':

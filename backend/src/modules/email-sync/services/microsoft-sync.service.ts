@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import axios, { AxiosResponse } from 'axios';
 import { URLSearchParams } from 'url';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -9,6 +9,7 @@ import { EmailEmbeddingJob, EmailEmbeddingQueueService } from '../../ai/services
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { EmailEventReason } from '../../realtime/types/realtime.types';
+import { ConfigService } from '@nestjs/config';
 
 interface MicrosoftMessage {
   id: string;
@@ -56,10 +57,14 @@ interface MicrosoftFullSyncInitResult {
 }
 
 @Injectable()
-export class MicrosoftSyncService {
+export class MicrosoftSyncService implements OnModuleInit {
   private readonly logger = new Logger(MicrosoftSyncService.name);
   private readonly GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
-  private readonly BATCH_FETCH_SIZE = 20;
+  private BATCH_FETCH_SIZE = 20;
+  private suppressMessageEvents = false;
+  private RETRY_ON_429_DELAY_MS = 2000;
+  private RETRY_ON_5XX_DELAY_MS = 2000;
+  private RETRY_MAX_ATTEMPTS = 3;
 
   constructor(
     private prisma: PrismaService,
@@ -68,7 +73,16 @@ export class MicrosoftSyncService {
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
     private realtimeEvents: RealtimeEventsService,
+    private readonly config: ConfigService,
   ) {}
+
+  onModuleInit() {
+    this.BATCH_FETCH_SIZE = this.config.get<number>('MS_BATCH_FETCH_SIZE', 20);
+    this.suppressMessageEvents = this.config.get<boolean>('REALTIME_SUPPRESS_MESSAGE_EVENTS', false);
+    this.RETRY_ON_429_DELAY_MS = this.config.get<number>('MS_RETRY_429_DELAY_MS', 2000);
+    this.RETRY_ON_5XX_DELAY_MS = this.config.get<number>('MS_RETRY_5XX_DELAY_MS', 2000);
+    this.RETRY_MAX_ATTEMPTS = this.config.get<number>('MS_RETRY_MAX_ATTEMPTS', 3);
+  }
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
     const { providerId, email, syncType, lastSyncedAt } = jobData;
@@ -213,6 +227,20 @@ export class MicrosoftSyncService {
         if (fullResult.latestTimestamp) {
           metadataUpdates.microsoftLastSyncTimestamp = fullResult.latestTimestamp;
         }
+      }
+
+      if (this.suppressMessageEvents && messagesProcessed > 0) {
+        this.realtimeEvents.emitEmailBatchProcessed(provider.tenantId, {
+          providerId,
+          processed: messagesProcessed,
+          created: newMessages,
+          syncType,
+        });
+        this.realtimeEvents.emitSyncStatus(provider.tenantId, {
+          providerId,
+          status: 'in_progress',
+          processed: messagesProcessed,
+        });
       }
 
       return {
@@ -697,14 +725,16 @@ export class MicrosoftSyncService {
       }));
 
       try {
-        const resp = await axios.post(
-          `${this.GRAPH_API_BASE}/$batch`,
-          { requests },
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
+        const resp = await this.msRequestWithRetry(() =>
+          axios.post(
+            `${this.GRAPH_API_BASE}/$batch`,
+            { requests },
+            {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
             },
-          },
+          ),
         );
         const responses = resp.data?.responses ?? [];
         responses.forEach((r: any) => {
@@ -959,6 +989,135 @@ export class MicrosoftSyncService {
     return this.processParsedMessagesBatch(parsed, providerId, tenantId);
   }
 
+  private async msRequestWithRetry<T>(fn: () => Promise<T>): Promise<T> {
+    let attempt = 0;
+    let lastError: any;
+
+    while (attempt < this.RETRY_MAX_ATTEMPTS) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        const status =
+          (error as any)?.response?.status ??
+          (error as any)?.response?.statusCode ??
+          (error as any)?.status ??
+          (error as any)?.statusCode;
+
+        attempt += 1;
+
+        if (status === 429) {
+          const delay = this.RETRY_ON_429_DELAY_MS * attempt;
+          this.logger.warn(`Graph 429 on attempt ${attempt}/${this.RETRY_MAX_ATTEMPTS}, retry in ${delay}ms`);
+          await new Promise((res) => setTimeout(res, delay));
+          continue;
+        }
+
+        if (status && status >= 500 && status < 600) {
+          const delay = this.RETRY_ON_5XX_DELAY_MS * attempt;
+          this.logger.warn(`Graph ${status} on attempt ${attempt}/${this.RETRY_MAX_ATTEMPTS}, retry in ${delay}ms`);
+          await new Promise((res) => setTimeout(res, delay));
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
+   * Batch update read/unread state via Graph /$batch and reflect locally.
+   */
+  private async batchUpdateReadState(
+    accessToken: string,
+    providerId: string,
+    tenantId: string,
+    messageIds: string[],
+    isRead: boolean,
+  ): Promise<void> {
+    if (!messageIds.length) return;
+
+    const chunkSize = Math.min(this.BATCH_FETCH_SIZE, 20);
+    for (let i = 0; i < messageIds.length; i += chunkSize) {
+      const slice = messageIds.slice(i, i + chunkSize);
+      const requests = slice.map((id, idx) => ({
+        id: `${idx}`,
+        method: 'PATCH',
+        url: `/me/messages/${id}`,
+        body: { isRead },
+        headers: { 'Content-Type': 'application/json' },
+      }));
+
+      await this.msRequestWithRetry(() =>
+        axios.post(
+          `${this.GRAPH_API_BASE}/$batch`,
+          { requests },
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        ),
+      );
+
+      await this.prisma.email.updateMany({
+        where: {
+          providerId,
+          tenantId,
+          externalId: { in: slice },
+        },
+        data: {
+          isRead,
+          metadata: this.mergeEmailStatusMetadata(null, 'active'),
+        },
+      });
+    }
+  }
+
+  /**
+   * Batch move messages to another folder via Graph /$batch and reflect locally.
+   */
+  private async batchMoveMessages(
+    accessToken: string,
+    providerId: string,
+    tenantId: string,
+    messageIds: string[],
+    destinationFolderId: string,
+    destinationFolderName?: string,
+  ): Promise<void> {
+    if (!messageIds.length || !destinationFolderId) return;
+
+    const chunkSize = Math.min(this.BATCH_FETCH_SIZE, 20);
+    for (let i = 0; i < messageIds.length; i += chunkSize) {
+      const slice = messageIds.slice(i, i + chunkSize);
+      const requests = slice.map((id, idx) => ({
+        id: `${idx}`,
+        method: 'POST',
+        url: `/me/messages/${id}/move`,
+        body: { destinationId: destinationFolderId },
+        headers: { 'Content-Type': 'application/json' },
+      }));
+
+      await this.msRequestWithRetry(() =>
+        axios.post(
+          `${this.GRAPH_API_BASE}/$batch`,
+          { requests },
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        ),
+      );
+
+      await this.prisma.email.updateMany({
+        where: {
+          providerId,
+          tenantId,
+          externalId: { in: slice },
+        },
+        data: {
+          folder: destinationFolderName ?? destinationFolderId,
+          metadata: this.mergeEmailStatusMetadata(null, 'active'),
+        },
+      });
+    }
+  }
+
   /**
    * Process a single Microsoft message
    */
@@ -1164,12 +1323,18 @@ export class MicrosoftSyncService {
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
     try {
-      // Emit WebSocket event
       const eventPayload = {
         providerId,
         reason,
         ...payload,
       };
+
+      if (
+        this.suppressMessageEvents &&
+        (reason === 'message-processed' || reason === 'labels-updated' || reason === 'message-deleted')
+      ) {
+        return;
+      }
 
       switch (reason) {
         case 'message-processed':
