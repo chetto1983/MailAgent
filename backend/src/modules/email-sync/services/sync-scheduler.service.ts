@@ -304,10 +304,15 @@ export class SyncSchedulerService {
         select: { errorStreak: true, syncPriority: true },
       });
 
-      const errorStreak = (provider?.errorStreak ?? 0) + 1;
+      if (!provider) {
+        this.logger.warn(`Provider ${providerId} not found while incrementing error streak; skipping update.`);
+        return;
+      }
 
-      // If too many errors, lower priority
-      let syncPriority = provider?.syncPriority ?? 3;
+    const errorStreak = (provider?.errorStreak ?? 0) + 1;
+
+    // If too many errors, lower priority
+    let syncPriority = provider?.syncPriority ?? 3;
       if (errorStreak >= 3 && syncPriority < 5) {
         syncPriority = Math.min(5, syncPriority + 1); // Demote priority
         this.logger.warn(
