@@ -24,6 +24,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
   private flushTimer?: NodeJS.Timeout;
   private readonly BULK_SIZE = 50;
   private readonly FLUSH_MS = 200;
+  private readonly seenIds = new Set<string>();
 
   constructor(
     private readonly config: ConfigService,
@@ -100,15 +101,26 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
   }
 
   async enqueue(job: EmailEmbeddingJob) {
-    this.pending.push(job);
+    this.enqueueMany([job]);
+  }
+
+  async enqueueMany(jobs: EmailEmbeddingJob[]) {
+    if (!jobs.length) return;
+
+    for (const job of jobs) {
+      if (job.emailId && this.seenIds.has(job.emailId)) {
+        continue;
+      }
+      if (job.emailId) {
+        this.seenIds.add(job.emailId);
+      }
+      this.pending.push(job);
+    }
+
     if (this.pending.length >= this.BULK_SIZE) {
       await this.flushPending();
-    } else if (!this.flushTimer) {
-      this.flushTimer = setTimeout(() => {
-        this.flushPending().catch((err) =>
-          this.logger.warn(`Failed to flush embedding jobs: ${err instanceof Error ? err.message : String(err)}`),
-        );
-      }, this.FLUSH_MS);
+    } else {
+      this.scheduleFlush();
     }
   }
 
@@ -120,6 +132,7 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
 
     const jobs = this.pending.splice(0, this.pending.length);
     this.flushTimer = undefined;
+    this.seenIds.clear();
 
     const bullJobs = jobs.map((job) => ({
       name: 'create',
@@ -136,6 +149,20 @@ export class EmailEmbeddingQueueService implements OnModuleInit, OnModuleDestroy
 
     await this.queue.addBulk(bullJobs);
     this.logger.verbose(`Queued ${bullJobs.length} embedding job(s) in bulk`);
+  }
+
+  private scheduleFlush() {
+    if (this.flushTimer) {
+      return;
+    }
+
+    this.flushTimer = setTimeout(() => {
+      this.flushPending().catch((err) =>
+        this.logger.warn(
+          `Failed to flush embedding jobs: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }, this.FLUSH_MS);
   }
 
   async removeJobsForTenant(tenantId: string): Promise<number> {

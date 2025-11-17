@@ -4,16 +4,18 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
+import { EmailEmbeddingJob, EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { EmailEventReason } from '../../realtime/types/realtime.types';
+import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
 
 @Injectable()
 export class GoogleSyncService {
   private readonly logger = new Logger(GoogleSyncService.name);
   private readonly GMAIL_BATCH_GET_SIZE = 100;
+  private readonly GMAIL_HISTORY_MAX_PAGES = 25;
 
   constructor(
     private prisma: PrismaService,
@@ -184,7 +186,10 @@ export class GoogleSyncService {
       let newMessages = 0;
       let pageToken: string | undefined;
       let pagesFetched = 0;
-      const MAX_PAGES = 25;
+      const MAX_PAGES = this.GMAIL_HISTORY_MAX_PAGES;
+      const addedMessageIds = new Set<string>();
+      const labelRefreshIds = new Set<string>();
+      const deletedMessageIds = new Set<string>();
 
       do {
         const historyResponse = await gmail.users.history.list({
@@ -204,11 +209,7 @@ export class GoogleSyncService {
               if (!messageId) {
                 continue;
               }
-              const processed = await this.processMessage(gmail, messageId, providerId, tenantId);
-              if (processed) {
-                messagesProcessed++;
-                newMessages++;
-              }
+              addedMessageIds.add(messageId);
             }
           }
 
@@ -218,8 +219,7 @@ export class GoogleSyncService {
               if (!messageId) {
                 continue;
               }
-              await this.refreshMessageMetadata(gmail, messageId, providerId, tenantId);
-              messagesProcessed++;
+              labelRefreshIds.add(messageId);
             }
           }
 
@@ -229,8 +229,7 @@ export class GoogleSyncService {
               if (!messageId) {
                 continue;
               }
-              await this.refreshMessageMetadata(gmail, messageId, providerId, tenantId);
-              messagesProcessed++;
+              labelRefreshIds.add(messageId);
             }
           }
 
@@ -240,8 +239,7 @@ export class GoogleSyncService {
               if (!messageId) {
                 continue;
               }
-              await this.handleMessageDeletion(gmail, messageId, providerId, tenantId);
-              messagesProcessed++;
+              deletedMessageIds.add(messageId);
             }
           }
         }
@@ -255,6 +253,65 @@ export class GoogleSyncService {
           `Gmail history pagination truncated after ${pagesFetched} pages for provider ${providerId}.`,
         );
       }
+
+      // Process added messages in batches
+      const addedIds = Array.from(addedMessageIds);
+      for (let i = 0; i < addedIds.length; i += this.GMAIL_BATCH_GET_SIZE) {
+        const chunkIds = addedIds.slice(i, i + this.GMAIL_BATCH_GET_SIZE);
+        if (!chunkIds.length) continue;
+
+        const batchGet = (gmail.users.messages as any)?.batchGet;
+        let fullMessages: gmail_v1.Schema$Message[] = [];
+
+        if (typeof batchGet === 'function') {
+          const batchResponse = await batchGet.call(gmail.users.messages, {
+            userId: 'me',
+            ids: chunkIds,
+            format: 'full',
+          });
+
+          const responses = batchResponse.data.responses || [];
+          fullMessages = responses
+            .map((r: { message?: gmail_v1.Schema$Message }) => r.message)
+            .filter(
+              (msg: gmail_v1.Schema$Message | undefined | null): msg is gmail_v1.Schema$Message =>
+                !!msg?.id,
+            );
+        } else {
+          const chunkResponses = await Promise.all(
+            chunkIds.map((id) =>
+              gmail.users.messages
+                .get({ userId: 'me', id, format: 'full' })
+                .then((res) => res.data)
+                .catch(() => null),
+            ),
+          );
+          fullMessages = chunkResponses.filter((msg): msg is gmail_v1.Schema$Message => !!msg?.id);
+        }
+
+        if (fullMessages.length) {
+          const batchResult = await this.processMessagesBatch(fullMessages, providerId, tenantId);
+          messagesProcessed += batchResult.processed;
+          newMessages += batchResult.created;
+        }
+      }
+
+      // Process label changes
+      await Promise.allSettled(
+        Array.from(labelRefreshIds).map((id) =>
+          this.refreshMessageMetadata(gmail, id, providerId, tenantId).then(() => {
+            messagesProcessed++;
+          }),
+        ),
+      );
+
+      await Promise.allSettled(
+        Array.from(deletedMessageIds).map((id) =>
+          this.handleMessageDeletion(gmail, id, providerId, tenantId).then(() => {
+            messagesProcessed++;
+          }),
+        ),
+      );
 
       return {
         messagesProcessed,
@@ -331,21 +388,12 @@ export class GoogleSyncService {
         const chunkIds = messages.slice(i, i + this.GMAIL_BATCH_GET_SIZE).map((m) => m.id!).filter(Boolean);
         if (!chunkIds.length) continue;
 
-        const batchResponse = await gmail.users.messages.batchGet({
-          userId: 'me',
-          ids: chunkIds,
-          format: 'full',
-        });
+        const fullMessages = await this.fetchMessagesBatch(gmail, chunkIds, 'full');
 
-        const responses = batchResponse.data.responses || [];
-        for (const r of responses) {
-          const msg = r.message;
-          if (!msg?.id) continue;
-          const processed = await this.processMessageData(msg, providerId, tenantId);
-          if (processed) {
-            messagesProcessed++;
-            newMessages++;
-          }
+        if (fullMessages.length) {
+          const batchResult = await this.processMessagesBatch(fullMessages, providerId, tenantId);
+          messagesProcessed += batchResult.processed;
+          newMessages += batchResult.created;
         }
       }
 
@@ -404,10 +452,7 @@ export class GoogleSyncService {
       const isDeleted = labelIds.includes('TRASH');
       const isRead = !labelIds.includes('UNREAD');
       const isStarred = labelIds.includes('STARRED');
-      const metadata = this.mergeEmailStatusMetadata(
-        existing.metadata as Record<string, any> | null,
-        isDeleted ? 'deleted' : 'active',
-      );
+      const metadata = mergeEmailStatusMetadata(existing.metadata as Record<string, any> | null, isDeleted ? 'deleted' : 'active');
 
       try {
         await this.prisma.email.update({
@@ -485,10 +530,7 @@ export class GoogleSyncService {
       const labelsWithTrash = Array.from(new Set([...labelIds, 'TRASH']));
       const isRead = !labelsWithTrash.includes('UNREAD');
       const isStarred = labelsWithTrash.includes('STARRED');
-      const metadata = this.mergeEmailStatusMetadata(
-        existing.metadata as Record<string, any> | null,
-        'deleted',
-      );
+      const metadata = mergeEmailStatusMetadata(existing.metadata as Record<string, any> | null, 'deleted');
 
       try {
         await this.prisma.email.update({
@@ -702,16 +744,11 @@ export class GoogleSyncService {
     tenantId: string,
   ): Promise<boolean> {
     try {
-      const messageResponse = await gmail.users.messages.get({
-        userId: 'me',
-        id: messageId,
-        format: 'full', // Get full message including body
-      });
+      const messages = await this.fetchMessagesBatch(gmail, [messageId], 'full');
+      if (!messages.length) return false;
 
-      const message = messageResponse.data;
-      if (!message) return false;
-
-      return await this.processMessageData(message, providerId, tenantId);
+      const result = await this.processMessagesBatch(messages, providerId, tenantId);
+      return result.processed > 0;
     } catch (error) {
       if (this.isNotFoundError(error)) {
         this.logger.verbose(
@@ -726,154 +763,292 @@ export class GoogleSyncService {
     }
   }
 
-  private async processMessageData(
+  /**
+   * Fetch Gmail messages in batch (batchGet if available, otherwise parallel get).
+   */
+  private async fetchMessagesBatch(
+    gmail: gmail_v1.Gmail,
+    ids: string[],
+    format: gmail_v1.Params$Resource$Users$Messages$Get['format'] = 'full',
+  ): Promise<gmail_v1.Schema$Message[]> {
+    if (!ids.length) return [];
+
+    const batchGet = (gmail.users.messages as any)?.batchGet;
+    if (typeof batchGet === 'function') {
+      try {
+        const batchResponse = await batchGet.call(gmail.users.messages, {
+          userId: 'me',
+          ids,
+          format,
+        });
+
+        const responses = batchResponse.data.responses || [];
+        return responses
+          .map((r: { message?: gmail_v1.Schema$Message }) => r.message)
+          .filter(
+            (msg: gmail_v1.Schema$Message | undefined | null): msg is gmail_v1.Schema$Message =>
+              !!msg?.id,
+          );
+      } catch (error) {
+        this.logger.warn(
+          `Gmail batchGet failed, falling back to parallel gets: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
+    const chunkResponses = await Promise.all(
+      ids.map((id) =>
+        gmail.users.messages
+          .get({ userId: 'me', id, format })
+          .then((res) => res.data)
+          .catch(() => null),
+      ),
+    );
+    return chunkResponses.filter((msg): msg is gmail_v1.Schema$Message => !!msg?.id);
+  }
+
+  private parseGmailMessage(
     message: gmail_v1.Schema$Message,
+  ): {
+    externalId: string;
+    threadId?: string | null;
+    messageIdHeader?: string | undefined;
+    inReplyTo?: string | undefined;
+    references?: string | undefined;
+    from: string;
+    to: string[];
+    cc: string[];
+    bcc: string[];
+    subject: string;
+    bodyText: string;
+    bodyHtml: string;
+    snippet: string;
+    folder: string | undefined;
+    labels: string[];
+    isRead: boolean;
+    isStarred: boolean;
+    isDeleted: boolean;
+    sentAt: Date;
+    receivedAt: Date;
+    size?: number | null;
+    headers: Record<string, any>;
+    metadataStatus: 'active' | 'deleted';
+  } | null {
+    const headers = message.payload?.headers || [];
+    const from = headers.find((h) => h.name === 'From')?.value || '';
+    const to = headers.find((h) => h.name === 'To')?.value?.split(',').map((e) => e.trim()) || [];
+    const cc = headers.find((h) => h.name === 'Cc')?.value?.split(',').map((e) => e.trim()) || [];
+    const bcc = headers.find((h) => h.name === 'Bcc')?.value?.split(',').map((e) => e.trim()) || [];
+    const subject = headers.find((h) => h.name === 'Subject')?.value || '(No Subject)';
+    const dateStr = headers.find((h) => h.name === 'Date')?.value;
+    const messageIdHeader = headers.find((h) => h.name === 'Message-ID')?.value || undefined;
+    const inReplyTo = headers.find((h) => h.name === 'In-Reply-To')?.value || undefined;
+    const references = headers.find((h) => h.name === 'References')?.value || undefined;
+
+    let bodyText = '';
+    let bodyHtml = '';
+
+    const extractBody = (part: any) => {
+      if (part.mimeType === 'text/plain' && part.body?.data) {
+        bodyText = Buffer.from(part.body.data, 'base64').toString('utf8');
+      } else if (part.mimeType === 'text/html' && part.body?.data) {
+        bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf8');
+      } else if (part.parts) {
+        part.parts.forEach(extractBody);
+      }
+    };
+
+    if (message.payload) {
+      extractBody(message.payload);
+    }
+
+    const snippet = message.snippet || bodyText.substring(0, 200);
+    const sentAt = dateStr ? new Date(dateStr) : new Date(message.internalDate ? parseInt(message.internalDate) : Date.now());
+    const labelIds = message.labelIds ?? [];
+    const folder = this.determineFolderFromLabels(labelIds);
+    const isRead = !labelIds.includes('UNREAD');
+    const isStarred = labelIds.includes('STARRED');
+    const isDeleted = labelIds.includes('TRASH');
+    const externalId = message.id;
+
+    if (!externalId) {
+      return null;
+    }
+
+    return {
+      externalId,
+      threadId: message.threadId,
+      messageIdHeader,
+      inReplyTo,
+      references,
+      from,
+      to,
+      cc,
+      bcc,
+      subject,
+      bodyText,
+      bodyHtml,
+      snippet,
+      folder,
+      labels: labelIds,
+      isRead,
+      isStarred,
+      isDeleted,
+      sentAt,
+      receivedAt: new Date(parseInt(message.internalDate || Date.now().toString())),
+      size: message.sizeEstimate,
+      headers: headers.reduce((acc, h) => ({ ...acc, [h.name || '']: h.value }), {} as Record<string, any>),
+      metadataStatus: isDeleted ? 'deleted' : 'active',
+    };
+  }
+
+  private async processParsedMessagesBatch(
+    mapped: Array<NonNullable<ReturnType<GoogleSyncService['parseGmailMessage']>>>,
     providerId: string,
     tenantId: string,
-  ): Promise<boolean> {
-    try {
-      // Extract metadata from headers
-      const headers = message.payload?.headers || [];
-      const from = headers.find((h) => h.name === 'From')?.value || '';
-      const to = headers.find((h) => h.name === 'To')?.value?.split(',').map((e) => e.trim()) || [];
-      const cc = headers.find((h) => h.name === 'Cc')?.value?.split(',').map((e) => e.trim()) || [];
-      const bcc = headers.find((h) => h.name === 'Bcc')?.value?.split(',').map((e) => e.trim()) || [];
-      const subject = headers.find((h) => h.name === 'Subject')?.value || '(No Subject)';
-      const dateStr = headers.find((h) => h.name === 'Date')?.value;
-      const messageIdHeader = headers.find((h) => h.name === 'Message-ID')?.value;
-      const inReplyTo = headers.find((h) => h.name === 'In-Reply-To')?.value;
-      const references = headers.find((h) => h.name === 'References')?.value;
+  ): Promise<{ processed: number; created: number }> {
+    if (!mapped.length) {
+      return { processed: 0, created: 0 };
+    }
 
-      // Extract body
-      let bodyText = '';
-      let bodyHtml = '';
+    const externalIds = mapped.map((m) => m.externalId);
+    const existing = await this.prisma.email.findMany({
+      where: {
+        providerId,
+        externalId: { in: externalIds },
+      },
+      select: {
+        id: true,
+        externalId: true,
+        metadata: true,
+      },
+    });
+    const existingMap = new Map(existing.map((e) => [e.externalId, e]));
 
-      const extractBody = (part: any) => {
-        if (part.mimeType === 'text/plain' && part.body?.data) {
-          bodyText = Buffer.from(part.body.data, 'base64').toString('utf8');
-        } else if (part.mimeType === 'text/html' && part.body?.data) {
-          bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf8');
-        } else if (part.parts) {
-          part.parts.forEach(extractBody);
-        }
-      };
+    const creates = mapped.filter((m) => !existingMap.has(m.externalId));
+    const updates = mapped.filter((m) => existingMap.has(m.externalId));
 
-      if (message.payload) {
-        extractBody(message.payload);
-      }
-
-      // Create snippet
-      const snippet = message.snippet || bodyText.substring(0, 200);
-
-      // Parse date
-      const sentAt = dateStr ? new Date(dateStr) : new Date(message.internalDate ? parseInt(message.internalDate) : Date.now());
-
-      const labelIds = message.labelIds ?? [];
-      const folder = this.determineFolderFromLabels(labelIds);
-      const isRead = !labelIds.includes('UNREAD');
-      const isStarred = labelIds.includes('STARRED');
-      const isDeleted = labelIds.includes('TRASH');
-
-      // Check if email already exists (upsert)
-      const emailRecord = await this.prisma.email.upsert({
-        where: {
-          providerId_externalId: {
-            providerId,
-            externalId: message.id!,
-          },
-        },
-        create: {
+    if (creates.length) {
+      await this.prisma.email.createMany({
+        data: creates.map((m) => ({
           tenantId,
           providerId,
-          externalId: message.id!,
-          threadId: message.threadId,
-          messageId: messageIdHeader,
-          inReplyTo,
-          references,
-          from,
-          to,
-          cc,
-          bcc,
-          subject,
-          bodyText,
-          bodyHtml,
-          snippet,
-          folder,
-          labels: labelIds,
-          isRead,
-          isStarred,
-          isDeleted,
-          sentAt,
-          receivedAt: new Date(parseInt(message.internalDate || Date.now().toString())),
-          size: message.sizeEstimate,
-          headers: headers.reduce((acc, h) => ({ ...acc, [h.name || '']: h.value }), {} as Record<string, any>),
-          metadata: this.mergeEmailStatusMetadata(null, isDeleted ? 'deleted' : 'active'),
-        },
-        update: {
-          // Update flags and labels in case they changed
-          labels: labelIds,
-          folder,
-          isRead,
-          isStarred,
-          isDeleted,
-        },
+          externalId: m.externalId,
+          threadId: m.threadId,
+          messageId: m.messageIdHeader,
+          inReplyTo: m.inReplyTo,
+          references: m.references,
+          from: m.from,
+          to: m.to,
+          cc: m.cc,
+          bcc: m.bcc,
+          subject: m.subject,
+          bodyText: m.bodyText,
+          bodyHtml: m.bodyHtml,
+          snippet: m.snippet,
+          folder: m.folder,
+          labels: m.labels,
+          isRead: m.isRead,
+          isStarred: m.isStarred,
+          isDeleted: m.isDeleted,
+          sentAt: m.sentAt,
+          receivedAt: m.receivedAt,
+          size: m.size,
+          headers: m.headers,
+          metadata: this.mergeEmailStatusMetadata(null, m.metadataStatus),
+        })),
+        skipDuplicates: true,
       });
-
-      this.logger.debug(`Saved email: ${subject} from ${from}`);
-
-      await this.applyStatusMetadata(
-        emailRecord.id,
-        emailRecord.metadata as Record<string, any> | null,
-        isDeleted ? 'deleted' : 'active',
-      );
-
-      this.notifyMailboxChange(tenantId, providerId, 'message-processed', {
-        emailId: emailRecord.id,
-        externalId: message.id,
-        folder,
-      });
-
-      const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(tenantId, emailRecord.id);
-
-      if (alreadyEmbedded) {
-        this.logger.verbose(
-          `Skipping embedding enqueue for Gmail message ${message.id} - embedding already exists.`,
-        );
-      } else {
-        try {
-          await this.emailEmbeddingQueue.enqueue({
-            tenantId,
-            providerId,
-            emailId: emailRecord.id,
-            subject,
-            snippet,
-            bodyText,
-            bodyHtml,
-            from,
-            receivedAt: emailRecord.receivedAt,
-          });
-          this.logger.verbose(`Queued embedding job for Gmail message ${message.id}`);
-        } catch (queueError) {
-          const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
-          this.logger.warn(
-            `Failed to enqueue embedding job for Gmail message ${message.id}: ${queueMessage}`,
-          );
-        }
-      }
-
-      return true;
-    } catch (error) {
-      if (this.isNotFoundError(error)) {
-        this.logger.verbose(
-          `Gmail returned 404 for message ${messageId}; marking local record as deleted if present.`,
-        );
-        await this.handleMissingRemoteMessage(providerId, tenantId, messageId);
-        return true;
-      }
-
-      this.logger.error(`Failed to process message ${messageId}:`, error);
-      return false;
     }
+
+    if (updates.length) {
+      await Promise.all(
+        updates.map(async (m) => {
+          const existingEmail = existingMap.get(m.externalId);
+          if (!existingEmail) return;
+
+          const metadata = this.mergeEmailStatusMetadata(
+            existingEmail.metadata as Record<string, any> | null,
+            m.metadataStatus,
+          );
+
+          await this.prisma.email.update({
+            where: { id: existingEmail.id },
+            data: {
+              labels: m.labels,
+              folder: m.folder,
+              isRead: m.isRead,
+              isStarred: m.isStarred,
+              isDeleted: m.isDeleted,
+              metadata,
+            },
+          });
+        }),
+      );
+    }
+
+    // Fetch persisted records to drive embedding enqueue (jobId uniqueness avoids duplicates)
+    const persisted = await this.prisma.email.findMany({
+      where: {
+        providerId,
+        externalId: { in: externalIds },
+      },
+      select: {
+        id: true,
+        externalId: true,
+        receivedAt: true,
+      },
+    });
+    const persistedMap = new Map(persisted.map((p) => [p.externalId, p]));
+
+    const embeddingJobs: EmailEmbeddingJob[] = [];
+    for (const m of mapped) {
+      const persistedEmail = persistedMap.get(m.externalId);
+      if (!persistedEmail) continue;
+
+      const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(
+        tenantId,
+        persistedEmail.id,
+      );
+      if (alreadyEmbedded) {
+        continue;
+      }
+
+      embeddingJobs.push({
+        tenantId,
+        providerId,
+        emailId: persistedEmail.id,
+        subject: m.subject,
+        snippet: m.snippet,
+        bodyText: m.bodyText,
+        bodyHtml: m.bodyHtml,
+        from: m.from,
+        receivedAt: persistedEmail.receivedAt,
+      });
+    }
+
+    if (embeddingJobs.length) {
+      await this.emailEmbeddingQueue.enqueueMany(embeddingJobs);
+    }
+
+    return {
+      processed: mapped.length,
+      created: creates.length,
+    };
+  }
+
+  private async processMessagesBatch(
+    messages: gmail_v1.Schema$Message[],
+    providerId: string,
+    tenantId: string,
+  ): Promise<{ processed: number; created: number }> {
+    const parsed = messages
+      .map((m) => this.parseGmailMessage(m))
+      .filter((m): m is NonNullable<typeof m> => !!m);
+
+    return this.processParsedMessagesBatch(parsed, providerId, tenantId);
   }
 
   private async handleMissingRemoteMessage(

@@ -31,6 +31,13 @@ export type {
 export class RealtimeEventsService {
   private readonly logger = new Logger(RealtimeEventsService.name);
   private gateway: RealtimeGateway;
+  private emailEventBuffer = new Map<
+    string,
+    { event: KnownRealtimeEvent; tenantId: string; payload: EmailEventPayload }
+  >();
+  private emailBufferTimer?: NodeJS.Timeout;
+  private readonly EMAIL_BUFFER_MS = 200;
+  private readonly EMAIL_BUFFER_MAX = 500;
 
   /**
    * Setter per iniettare il gateway (per evitare circular dependency)
@@ -47,21 +54,21 @@ export class RealtimeEventsService {
    * Emette evento per nuova email ricevuta
    */
   emitEmailNew(tenantId: string, payload: EmailEventPayload) {
-    this.emitToTenant(tenantId, 'email:new', payload);
+    this.bufferEmailEvent(tenantId, 'email:new', payload);
   }
 
   /**
    * Emette evento per email aggiornata (es. letta, starred, labels)
    */
   emitEmailUpdate(tenantId: string, payload: EmailEventPayload) {
-    this.emitToTenant(tenantId, 'email:update', payload);
+    this.bufferEmailEvent(tenantId, 'email:update', payload);
   }
 
   /**
    * Emette evento per email eliminata
    */
   emitEmailDelete(tenantId: string, payload: EmailEventPayload) {
-    this.emitToTenant(tenantId, 'email:delete', payload);
+    this.bufferEmailEvent(tenantId, 'email:delete', payload);
   }
 
   /**
@@ -226,37 +233,93 @@ export class RealtimeEventsService {
     this.emitToRoom(room, event, payload);
   }
 
+  private emitToTenantImmediate<E extends KnownRealtimeEvent>(
+    tenantId: string,
+    event: E,
+    payload: RealtimeEventPayloads[E],
+  ) {
+    this.emitInternal(buildTenantRoom(tenantId), event, payload);
+  }
+
   /**
    * Emette evento a una room specifica (es. thread-based)
    */
   emitToRoom<E extends KnownRealtimeEvent>(room: string, event: E, payload: RealtimeEventPayloads[E]) {
-    if (!this.gateway || !this.gateway.server) {
-      this.logger.warn(`Gateway not initialized, cannot emit event: ${event}`);
-      return;
-    }
-
-    this.gateway.server.to(room).emit(event, {
-      ...payload,
-      timestamp: new Date().toISOString(),
-    });
-
-    this.logger.debug(`Emitted ${event} to room ${room}`, payload);
+    this.emitInternal(room, event, payload);
   }
 
   /**
    * Emette evento a tutti i client connessi (usare con cautela)
    */
   emitToAll<E extends KnownRealtimeEvent>(event: E, payload: RealtimeEventPayloads[E]) {
+    this.emitInternal('all', event, payload, true);
+  }
+
+  /**
+   * Bufferizza eventi email per ridurre spam su bulk (sync/import/move).
+   */
+  private bufferEmailEvent(tenantId: string, event: KnownRealtimeEvent, payload: EmailEventPayload) {
+    const dedupeKey = `${tenantId}:${event}:${payload.externalId ?? payload.emailId ?? ''}`;
+    this.emailEventBuffer.set(dedupeKey, { event, tenantId, payload });
+
+    if (this.emailEventBuffer.size >= this.EMAIL_BUFFER_MAX) {
+      void this.flushEmailEvents();
+      return;
+    }
+
+    if (!this.emailBufferTimer) {
+      this.emailBufferTimer = setTimeout(() => {
+        this.flushEmailEvents().catch((err) =>
+          this.logger.warn(
+            `Failed flushing email events buffer: ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        );
+      }, this.EMAIL_BUFFER_MS);
+    }
+  }
+
+  private async flushEmailEvents() {
+    if (this.emailBufferTimer) {
+      clearTimeout(this.emailBufferTimer);
+      this.emailBufferTimer = undefined;
+    }
+
+    if (!this.emailEventBuffer.size) {
+      return;
+    }
+
+    const events = Array.from(this.emailEventBuffer.values());
+    this.emailEventBuffer.clear();
+
+    for (const item of events) {
+      this.emitToTenantImmediate(item.tenantId, item.event, item.payload as any);
+    }
+
+    this.logger.debug(`Flushed ${events.length} buffered email event(s)`);
+  }
+
+  private emitInternal<E extends KnownRealtimeEvent>(
+    room: string,
+    event: E,
+    payload: RealtimeEventPayloads[E],
+    toAll = false,
+  ) {
     if (!this.gateway || !this.gateway.server) {
       this.logger.warn(`Gateway not initialized, cannot emit event: ${event}`);
       return;
     }
 
-    this.gateway.server.emit(event, {
+    const enriched = {
       ...payload,
       timestamp: new Date().toISOString(),
-    });
+    };
 
-    this.logger.debug(`Emitted ${event} to all clients`, payload);
+    if (toAll) {
+      this.gateway.server.emit(event, enriched);
+      this.logger.debug(`Emitted ${event} to all clients`, payload);
+    } else {
+      this.gateway.server.to(room).emit(event, enriched);
+      this.logger.debug(`Emitted ${event} to room ${room}`, payload);
+    }
   }
 }

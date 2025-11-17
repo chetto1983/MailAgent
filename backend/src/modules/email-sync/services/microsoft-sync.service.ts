@@ -5,7 +5,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
+import { EmailEmbeddingJob, EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { EmailEventReason } from '../../realtime/types/realtime.types';
@@ -59,6 +59,7 @@ interface MicrosoftFullSyncInitResult {
 export class MicrosoftSyncService {
   private readonly logger = new Logger(MicrosoftSyncService.name);
   private readonly GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
+  private readonly BATCH_FETCH_SIZE = 20;
 
   constructor(
     private prisma: PrismaService,
@@ -266,6 +267,7 @@ export class MicrosoftSyncService {
           });
 
         const items = response.data.value ?? [];
+        const toProcessIds: string[] = [];
 
         for (const item of items) {
           const messageId = item?.id;
@@ -283,24 +285,25 @@ export class MicrosoftSyncService {
             continue;
           }
 
-          const processed = await this.processMessage(
-            messageId,
-            accessToken,
-            providerId,
-            tenantId,
-          );
+          toProcessIds.push(messageId);
 
-          if (processed) {
-            messagesProcessed++;
-            newMessages++;
-
-            if (itemReceived) {
-              if (!latestReceivedDate) {
-                latestReceivedDate = itemReceived;
-              } else if (new Date(itemReceived).getTime() > new Date(latestReceivedDate).getTime()) {
-                latestReceivedDate = itemReceived;
-              }
+          if (itemReceived) {
+            if (!latestReceivedDate) {
+              latestReceivedDate = itemReceived;
+            } else if (new Date(itemReceived).getTime() > new Date(latestReceivedDate).getTime()) {
+              latestReceivedDate = itemReceived;
             }
+          }
+        }
+
+        if (toProcessIds.length) {
+          for (let i = 0; i < toProcessIds.length; i += this.BATCH_FETCH_SIZE) {
+            const chunk = toProcessIds.slice(i, i + this.BATCH_FETCH_SIZE);
+            const messages = await this.fetchMessagesBatch(accessToken, chunk);
+            if (!messages.length) continue;
+            const result = await this.processMessagesBatch(messages, providerId, tenantId);
+            messagesProcessed += result.processed;
+            newMessages += result.created;
           }
         }
 
@@ -360,6 +363,7 @@ export class MicrosoftSyncService {
     let messagesProcessed = 0;
     let newMessages = 0;
     let latestTimestamp = sinceIso;
+    const toProcessIds: string[] = [];
 
     while (nextLink) {
       if (page++ >= maxPages) {
@@ -383,20 +387,10 @@ export class MicrosoftSyncService {
           continue;
         }
 
-        const processed = await this.processMessage(
-          message.id,
-          accessToken,
-          providerId,
-          tenantId,
-        );
+        toProcessIds.push(message.id);
 
-        if (processed) {
-          messagesProcessed++;
-          newMessages++;
-
-          if (message.receivedDateTime) {
-            latestTimestamp = message.receivedDateTime;
-          }
+        if (message.receivedDateTime) {
+          latestTimestamp = message.receivedDateTime;
         }
       }
 
@@ -405,6 +399,17 @@ export class MicrosoftSyncService {
 
       if (!nextLink) {
         break;
+      }
+    }
+
+    if (toProcessIds.length) {
+      for (let i = 0; i < toProcessIds.length; i += this.BATCH_FETCH_SIZE) {
+        const chunk = toProcessIds.slice(i, i + this.BATCH_FETCH_SIZE);
+        const messages = await this.fetchMessagesBatch(accessToken, chunk);
+        if (!messages.length) continue;
+        const result = await this.processMessagesBatch(messages, providerId, tenantId);
+        messagesProcessed += result.processed;
+        newMessages += result.created;
       }
     }
 
@@ -481,17 +486,17 @@ export class MicrosoftSyncService {
       let messagesProcessed = 0;
       let newMessages = 0;
 
-      for (const message of allMessages) {
-        const processed = await this.processMessage(
-          message.id,
-          accessToken,
-          providerId,
-          tenantId,
-        );
-        if (processed) {
-          messagesProcessed++;
-          newMessages++;
-        }
+      const ids = allMessages.map((m) => m.id).filter((id): id is string => !!id);
+      for (let i = 0; i < ids.length; i += this.BATCH_FETCH_SIZE) {
+        const chunk = ids.slice(i, i + this.BATCH_FETCH_SIZE);
+        if (!chunk.length) continue;
+
+        const messages = await this.fetchMessagesBatch(accessToken, chunk);
+        if (!messages.length) continue;
+
+        const result = await this.processMessagesBatch(messages, providerId, tenantId);
+        messagesProcessed += result.processed;
+        newMessages += result.created;
       }
 
       const latestReceivedDate = allMessages.length > 0 ? allMessages[0].receivedDateTime : undefined;
@@ -675,6 +680,285 @@ export class MicrosoftSyncService {
     }
   }
 
+  private async fetchMessagesBatch(
+    accessToken: string,
+    ids: string[],
+  ): Promise<any[]> {
+    if (!ids.length) return [];
+
+    const results: any[] = [];
+    for (let i = 0; i < ids.length; i += this.BATCH_FETCH_SIZE) {
+      const slice = ids.slice(i, i + this.BATCH_FETCH_SIZE);
+      const requests = slice.map((id, idx) => ({
+        id: `${idx}`,
+        method: 'GET',
+        url: `/me/messages/${id}`,
+        headers: { 'Content-Type': 'application/json' },
+      }));
+
+      try {
+        const resp = await axios.post(
+          `${this.GRAPH_API_BASE}/$batch`,
+          { requests },
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+        );
+        const responses = resp.data?.responses ?? [];
+        responses.forEach((r: any) => {
+          if (r?.status === 200 && r.body?.id) {
+            results.push(r.body);
+          }
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Microsoft batch fetch failed for ${slice.length} ids, fallback to sequential: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        const sequential = await Promise.all(
+          slice.map((id) =>
+            axios
+              .get(`${this.GRAPH_API_BASE}/me/messages/${id}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              })
+              .then((res) => res.data)
+              .catch(() => null),
+          ),
+        );
+        sequential.filter(Boolean).forEach((m) => results.push(m));
+      }
+    }
+
+    return results;
+  }
+
+  private async parseMicrosoftMessage(
+    message: any,
+    providerId: string,
+  ): Promise<{
+    externalId: string;
+    threadId?: string | null;
+    messageIdHeader?: string | null;
+    from: string;
+    to: string[];
+    cc: string[];
+    bcc: string[];
+    subject: string;
+    bodyText: string;
+    bodyHtml: string;
+    snippet: string;
+    folder: string;
+    labels: string[];
+    isRead: boolean;
+    isStarred: boolean;
+    isDeleted: boolean;
+    sentAt: Date;
+    receivedAt: Date;
+    size?: number | null;
+    metadataStatus: 'active' | 'deleted';
+  } | null> {
+    const externalId = message.id;
+    if (!externalId) return null;
+
+    const from = message.from?.emailAddress?.address || '';
+    const to = (message.toRecipients || [])
+      .map((r: any) => r.emailAddress?.address)
+      .filter(Boolean);
+    const cc = (message.ccRecipients || [])
+      .map((r: any) => r.emailAddress?.address)
+      .filter(Boolean);
+    const bcc = (message.bccRecipients || [])
+      .map((r: any) => r.emailAddress?.address)
+      .filter(Boolean);
+
+    const subject = message.subject || '(No Subject)';
+    const bodyText = message.body?.contentType === 'text' ? message.body.content : '';
+    const bodyHtml =
+      message.body?.contentType === 'html' ? message.body.content : message.body?.content || '';
+    const snippet = message.bodyPreview || bodyText.substring(0, 200);
+    const sentAt = message.sentDateTime ? new Date(message.sentDateTime) : new Date();
+    const receivedAt = message.receivedDateTime ? new Date(message.receivedDateTime) : new Date();
+    const labels = message.categories || [];
+    const isRead = !!message.isRead;
+    const isStarred = message.flag?.flagStatus === 'flagged';
+    const folder = await this.determineFolderFromParentId(
+      message.parentFolderId,
+      providerId,
+      message.isDraft || false,
+    );
+    const isDeleted = folder === 'TRASH';
+
+    return {
+      externalId,
+      threadId: message.conversationId,
+      messageIdHeader: message.internetMessageId,
+      from,
+      to,
+      cc,
+      bcc,
+      subject,
+      bodyText,
+      bodyHtml,
+      snippet,
+      folder,
+      labels,
+      isRead,
+      isStarred,
+      isDeleted,
+      sentAt,
+      receivedAt,
+      size: message.size,
+      metadataStatus: isDeleted ? 'deleted' : 'active',
+    };
+  }
+
+  private async processParsedMessagesBatch(
+    mapped: Array<NonNullable<Awaited<ReturnType<MicrosoftSyncService['parseMicrosoftMessage']>>>>,
+    providerId: string,
+    tenantId: string,
+  ): Promise<{ processed: number; created: number }> {
+    if (!mapped.length) return { processed: 0, created: 0 };
+
+    const externalIds = mapped.map((m) => m.externalId);
+    const existing = await this.prisma.email.findMany({
+      where: {
+        providerId,
+        externalId: { in: externalIds },
+      },
+      select: {
+        id: true,
+        externalId: true,
+        metadata: true,
+      },
+    });
+    const existingMap = new Map(existing.map((e) => [e.externalId, e]));
+    const creates = mapped.filter((m) => !existingMap.has(m.externalId));
+    const updates = mapped.filter((m) => existingMap.has(m.externalId));
+
+    if (creates.length) {
+      await this.prisma.email.createMany({
+        data: creates.map((m) => ({
+          tenantId,
+          providerId,
+          externalId: m.externalId,
+          threadId: m.threadId,
+          messageId: m.messageIdHeader ?? undefined,
+          inReplyTo: null,
+          references: null,
+          from: m.from,
+          to: m.to,
+          cc: m.cc,
+          bcc: m.bcc,
+          subject: m.subject,
+          bodyText: m.bodyText,
+          bodyHtml: m.bodyHtml,
+          snippet: m.snippet,
+          folder: m.folder,
+          labels: m.labels,
+          isRead: m.isRead,
+          isStarred: m.isStarred,
+          isDeleted: m.isDeleted,
+          sentAt: m.sentAt,
+          receivedAt: m.receivedAt,
+          size: m.size,
+          metadata: this.mergeEmailStatusMetadata(null, m.metadataStatus),
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    if (updates.length) {
+      await Promise.all(
+        updates.map(async (m) => {
+          const existingEmail = existingMap.get(m.externalId);
+          if (!existingEmail) return;
+
+          const metadata = this.mergeEmailStatusMetadata(
+            existingEmail.metadata as Record<string, any> | null,
+            m.metadataStatus,
+          );
+
+          await this.prisma.email.update({
+            where: { id: existingEmail.id },
+            data: {
+              labels: m.labels,
+              folder: m.folder,
+              isRead: m.isRead,
+              isStarred: m.isStarred,
+              isDeleted: m.isDeleted,
+              metadata,
+            },
+          });
+        }),
+      );
+    }
+
+    const persisted = await this.prisma.email.findMany({
+      where: {
+        providerId,
+        externalId: { in: externalIds },
+      },
+      select: {
+        id: true,
+        externalId: true,
+        receivedAt: true,
+      },
+    });
+    const persistedMap = new Map(persisted.map((p) => [p.externalId, p]));
+
+    const embeddingJobs: EmailEmbeddingJob[] = [];
+    for (const m of mapped) {
+      const persistedEmail = persistedMap.get(m.externalId);
+      if (!persistedEmail) continue;
+
+      const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(
+        tenantId,
+        persistedEmail.id,
+      );
+      if (alreadyEmbedded) continue;
+
+      embeddingJobs.push({
+        tenantId,
+        providerId,
+        emailId: persistedEmail.id,
+        subject: m.subject,
+        snippet: m.snippet,
+        bodyText: m.bodyText,
+        bodyHtml: m.bodyHtml,
+        from: m.from,
+        receivedAt: persistedEmail.receivedAt,
+      });
+    }
+
+    if (embeddingJobs.length) {
+      await this.emailEmbeddingQueue.enqueueMany(embeddingJobs);
+    }
+
+    return { processed: mapped.length, created: creates.length };
+  }
+
+  private async processMessagesBatch(
+    messages: any[],
+    providerId: string,
+    tenantId: string,
+  ): Promise<{ processed: number; created: number }> {
+    const parsed: Array<
+      NonNullable<Awaited<ReturnType<MicrosoftSyncService['parseMicrosoftMessage']>>>
+    > = [];
+
+    for (const msg of messages) {
+      const mapped = await this.parseMicrosoftMessage(msg, providerId);
+      if (mapped) {
+        parsed.push(mapped);
+      }
+    }
+
+    return this.processParsedMessagesBatch(parsed, providerId, tenantId);
+  }
+
   /**
    * Process a single Microsoft message
    */
@@ -685,127 +969,32 @@ export class MicrosoftSyncService {
     tenantId: string,
   ): Promise<boolean> {
     try {
-      // Fetch full message details including body
-      const messageUrl = `${this.GRAPH_API_BASE}/me/messages/${messageId}`;
-      const response = await axios.get(messageUrl, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      const messages = await this.fetchMessagesBatch(accessToken, [messageId]);
+      if (!messages.length) return false;
 
-      const message = response.data;
-
-      // Extract email addresses
-      const from = message.from?.emailAddress?.address || '';
-      const to = (message.toRecipients || []).map((r: any) => r.emailAddress?.address).filter(Boolean);
-      const cc = (message.ccRecipients || []).map((r: any) => r.emailAddress?.address).filter(Boolean);
-      const bcc = (message.bccRecipients || []).map((r: any) => r.emailAddress?.address).filter(Boolean);
-
-      // Extract subject and body
-      const subject = message.subject || '(No Subject)';
-      const bodyText = message.body?.contentType === 'text' ? message.body.content : '';
-      const bodyHtml = message.body?.contentType === 'html' ? message.body.content : message.body?.content || '';
-      const snippet = message.bodyPreview || bodyText.substring(0, 200);
-
-      // Extract dates
-      const sentAt = message.sentDateTime ? new Date(message.sentDateTime) : new Date();
-      const receivedAt = message.receivedDateTime ? new Date(message.receivedDateTime) : new Date();
-
-      // Extract folder from parentFolderId using database lookup
-      const folder = await this.determineFolderFromParentId(
-        message.parentFolderId,
-        providerId,
-        message.isDraft || false,
-      );
-
-      // Categories as labels
-      const labels = message.categories || [];
-
-      // Save to database with upsert to prevent duplicates
-      const emailRecord = await this.prisma.email.upsert({
-        where: {
-          providerId_externalId: {
-            providerId,
-            externalId: messageId,
-          },
-        },
-        create: {
-          tenantId,
-          providerId,
-          externalId: messageId,
-          threadId: message.conversationId,
-          messageId: message.internetMessageId,
-          inReplyTo: null, // Microsoft API doesn't expose this directly
-          references: null, // Microsoft API doesn't expose this directly
-          from,
-          to,
-          cc,
-          bcc,
-          subject,
-          bodyText,
-          bodyHtml,
-          snippet,
-          folder,
-          labels,
-          isRead: message.isRead || false,
-          isStarred: message.flag?.flagStatus === 'flagged',
-          sentAt,
-          receivedAt,
-          size: message.size,
-          headers: {
-            importance: message.importance,
-            hasAttachments: message.hasAttachments,
-          } as Record<string, any>,
-        },
-        update: {
-          // Update flags and labels in case they changed
-          labels,
-          isRead: message.isRead || false,
-          isStarred: message.flag?.flagStatus === 'flagged',
-        },
-      });
-
-      this.logger.debug(`Saved email: ${subject} from ${from}`);
-
-      const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(tenantId, emailRecord.id);
-
-      this.notifyMailboxChange(tenantId, providerId, 'message-processed', {
-        emailId: emailRecord.id,
-        externalId: messageId,
-        folder,
-      });
-
-      if (alreadyEmbedded) {
-        this.logger.verbose(
-          `Skipping embedding enqueue for Microsoft message ${messageId} - embedding already exists.`,
-        );
-      } else {
-        try {
-          await this.emailEmbeddingQueue.enqueue({
-            tenantId,
-            providerId,
-            emailId: emailRecord.id,
-            subject,
-            snippet,
-            bodyText,
-            bodyHtml,
-            from,
-            receivedAt: emailRecord.receivedAt,
-          });
-          this.logger.verbose(`Queued embedding job for Microsoft message ${messageId}`);
-        } catch (queueError) {
-          const queueMessage = queueError instanceof Error ? queueError.message : String(queueError);
-          this.logger.warn(
-            `Failed to enqueue embedding job for Microsoft message ${messageId}: ${queueMessage}`,
-          );
-        }
-      }
-
-      return true;
+      const result = await this.processMessagesBatch(messages, providerId, tenantId);
+      return result.processed > 0;
     } catch (error) {
-      this.logger.error(`Failed to process message ${messageId}:`, error);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to process Microsoft message ${messageId}: ${message}`);
       return false;
     }
+  }
+
+  private mergeEmailStatusMetadata(
+    existing: Record<string, any> | null | undefined,
+    status: 'deleted' | 'active',
+  ): Record<string, any> {
+    const metadata = { ...(existing ?? {}) };
+    metadata.status = status;
+    if (status === 'deleted') {
+      if (!metadata.deletedAt) {
+        metadata.deletedAt = new Date().toISOString();
+      }
+    } else if (metadata.deletedAt) {
+      delete metadata.deletedAt;
+    }
+    return metadata;
   }
 
   private async handleRemoteRemoval(
@@ -1007,3 +1196,4 @@ export class MicrosoftSyncService {
     }
   }
 }
+
