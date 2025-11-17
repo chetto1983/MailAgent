@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 
 export type ConflictStrategy =
@@ -65,6 +66,40 @@ export class CrossProviderConflictService {
         generic: 3,
       };
     }
+  }
+
+  /**
+   * Elenco conflitti recenti per tenant (per report/diagnostica)
+   */
+  async listRecentConflicts(
+    tenantId: string,
+    limit = 50,
+  ): Promise<
+    Array<{
+      linkId: string;
+      lastConflictAt: Date | null;
+      lastConflict?: Record<string, any> | null;
+    }>
+  > {
+    const links = await this.prisma.emailCrossProviderLink.findMany({
+      where: {
+        tenantId,
+        lastConflict: { not: Prisma.JsonNull },
+      },
+      orderBy: { lastConflictAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        lastConflictAt: true,
+        lastConflict: true,
+      },
+    });
+
+    return links.map((l) => ({
+      linkId: l.id,
+      lastConflictAt: l.lastConflictAt,
+      lastConflict: l.lastConflict as Record<string, any> | null,
+    }));
   }
 
   /**

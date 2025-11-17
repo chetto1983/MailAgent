@@ -15,6 +15,7 @@ Obiettivo: completare il refactor bulk mail e allineare contatti/calendari, cons
 - ✅ Config parziale: BATCH size e history pages leggono da config (default 100/25).
 - ✅ Retry/backoff 429/5xx (config: GMAIL_RETRY_*).
 - 🔜 Test: unit su parsing/batch; e2e full import 200–500 mail con realtime throttling.
+- ✅ Cap messaggi full (config: GMAIL_FULL_MAX_MESSAGES, default 200 per test).
 
 ## 2) Microsoft Mail Sync (parità con Gmail + spunti Zero-main)
 - ✅ Fetch in chunk (`/$batch` + fallback) + parse pipeline unica (createMany/update + enqueueMany).
@@ -24,6 +25,7 @@ Obiettivo: completare il refactor bulk mail e allineare contatti/calendari, cons
 - ✅ Helper per move bulk via Graph `/$batch` + update locale (integrazione frontend ancora da collegare).
 - ✅ Retry/backoff 429/5xx centralizzato via wrapper `msRequestWithRetry`.
 - ✅ Realtime throttling identico a Gmail (suppress granular + batch summary/status quando attivo).
+- ✅ Cap messaggi full (config: MS_FULL_MAX_MESSAGES, default 200 per test).
 
 ## 3) Embedding Pipeline
 - ✅ Unificato `enqueue`/`enqueueMany` con `scheduleFlush` e dedupe per `emailId`.
@@ -43,8 +45,8 @@ Obiettivo: completare il refactor bulk mail e allineare contatti/calendari, cons
 - ✅ Metriche arricchite (lastJobId, tracking completati/falliti).
 
 ## 6) CrossProviderConflict
-- 🔜 Spostare priorità provider in config/tipo; validare input (strategy/states).
-- 🔜 Helper condivisi per log conflitti e stats (riuso per report).
+- ✅ Priorità provider configurabile (CROSS_PROVIDER_PRIORITY_JSON) e fallback google/microsoft/generic.
+- ✅ Helper elenco conflitti recenti per tenant (listRecentConflicts).
 
 ## 7) Contatti & Calendari
 - 🔜 Applicare pipeline bulk (list chunk → parse → createMany/update) a Google/Microsoft contacts/calendar.

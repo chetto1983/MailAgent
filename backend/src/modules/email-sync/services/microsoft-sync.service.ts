@@ -65,6 +65,7 @@ export class MicrosoftSyncService implements OnModuleInit {
   private RETRY_ON_429_DELAY_MS = 2000;
   private RETRY_ON_5XX_DELAY_MS = 2000;
   private RETRY_MAX_ATTEMPTS = 3;
+  private FULL_MAX_MESSAGES = 200;
 
   constructor(
     private prisma: PrismaService,
@@ -82,6 +83,7 @@ export class MicrosoftSyncService implements OnModuleInit {
     this.RETRY_ON_429_DELAY_MS = this.config.get<number>('MS_RETRY_429_DELAY_MS', 2000);
     this.RETRY_ON_5XX_DELAY_MS = this.config.get<number>('MS_RETRY_5XX_DELAY_MS', 2000);
     this.RETRY_MAX_ATTEMPTS = this.config.get<number>('MS_RETRY_MAX_ATTEMPTS', 3);
+    this.FULL_MAX_MESSAGES = this.config.get<number>('MS_FULL_MAX_MESSAGES', 200);
   }
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -479,16 +481,16 @@ export class MicrosoftSyncService implements OnModuleInit {
       const params = new URLSearchParams({
         $filter: `receivedDateTime ge ${sinceIso}`,
         $orderby: 'receivedDateTime desc',
-        $top: '100', // Microsoft Graph API max per request
+        $top: '50', // keep lower to stay within FULL_MAX_MESSAGES cap with fewer pages
       });
 
       let messagesUrl: string | undefined = `${this.GRAPH_API_BASE}/me/messages?${params.toString()}`;
       let allMessages: MicrosoftMessage[] = [];
       let page = 0;
-      const maxPages = 10; // 10 pages * 100 = max 1000 messages
+      const maxPages = 10; // safety guard
 
       // Fetch all pages up to limit
-      while (messagesUrl && page < maxPages) {
+      while (messagesUrl && page < maxPages && allMessages.length < this.FULL_MAX_MESSAGES) {
         const messagesResponse: AxiosResponse<MicrosoftDeltaResponse<MicrosoftMessage>> = await axios.get(messagesUrl, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -504,7 +506,7 @@ export class MicrosoftSyncService implements OnModuleInit {
         messagesUrl = messagesResponse.data['@odata.nextLink'];
         page++;
 
-        if (allMessages.length >= 1000) {
+        if (allMessages.length >= this.FULL_MAX_MESSAGES) {
           break;
         }
       }

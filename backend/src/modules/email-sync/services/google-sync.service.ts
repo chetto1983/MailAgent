@@ -17,6 +17,7 @@ export class GoogleSyncService implements OnModuleInit {
   private readonly logger = new Logger(GoogleSyncService.name);
   private GMAIL_BATCH_GET_SIZE: number;
   private GMAIL_HISTORY_MAX_PAGES: number;
+  private GMAIL_FULL_MAX_MESSAGES: number;
   private suppressMessageEvents = false;
   private RETRY_MAX_ATTEMPTS = 3;
   private RETRY_429_DELAY_MS = 2000;
@@ -36,6 +37,7 @@ export class GoogleSyncService implements OnModuleInit {
   onModuleInit() {
     this.GMAIL_BATCH_GET_SIZE = this.config.get<number>('GMAIL_BATCH_GET_SIZE', 100);
     this.GMAIL_HISTORY_MAX_PAGES = this.config.get<number>('GMAIL_HISTORY_MAX_PAGES', 25);
+    this.GMAIL_FULL_MAX_MESSAGES = this.config.get<number>('GMAIL_FULL_MAX_MESSAGES', 200);
     this.suppressMessageEvents = this.config.get<boolean>('REALTIME_SUPPRESS_MESSAGE_EVENTS', false);
     this.RETRY_MAX_ATTEMPTS = this.config.get<number>('GMAIL_RETRY_MAX_ATTEMPTS', 3);
     this.RETRY_429_DELAY_MS = this.config.get<number>('GMAIL_RETRY_429_DELAY_MS', 2000);
@@ -420,20 +422,21 @@ export class GoogleSyncService implements OnModuleInit {
 
       // List messages from last 60 days (max 1000)
       // Remove folder restriction to sync all folders (inbox, sent, drafts, etc.)
+      const remaining = this.GMAIL_FULL_MAX_MESSAGES;
       const messagesResponse = await gmail.users.messages.list({
         userId: 'me',
-        maxResults: 500, // Gmail API max per request
+        maxResults: Math.min(500, remaining), // Gmail API max per request
         q: `after:${afterDate}`, // All folders from last 60 days
       });
 
       let messages = messagesResponse.data.messages || [];
       let pageToken = messagesResponse.data.nextPageToken;
 
-      // Fetch additional pages if needed (up to 1000 total)
-      while (pageToken && messages.length < 1000) {
+      // Fetch additional pages if needed (up to configured total)
+      while (pageToken && messages.length < this.GMAIL_FULL_MAX_MESSAGES) {
         const nextResponse = await gmail.users.messages.list({
           userId: 'me',
-          maxResults: Math.min(500, 1000 - messages.length),
+          maxResults: Math.min(500, this.GMAIL_FULL_MAX_MESSAGES - messages.length),
           q: `after:${afterDate}`,
           pageToken,
         });
@@ -441,7 +444,7 @@ export class GoogleSyncService implements OnModuleInit {
         messages = [...messages, ...(nextResponse.data.messages || [])];
         pageToken = nextResponse.data.nextPageToken;
 
-        if (!pageToken || messages.length >= 1000) {
+        if (!pageToken || messages.length >= this.GMAIL_FULL_MAX_MESSAGES) {
           break;
         }
       }
