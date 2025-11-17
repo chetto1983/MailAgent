@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
 import { providersApi } from '@/lib/api/providers';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useRef } from 'react';
 
 /**
  * OAuth callback page - doesn't require authentication
@@ -14,8 +15,13 @@ function OAuthCallbackPage() {
   const { isAuthenticated } = useAuth();
   const [error, setError] = useState<string>('');
   const [status, setStatus] = useState<string>('Processing OAuth callback...');
+  // Prevent multiple executions (Next.js effects can re-run)
+  const hasConnectedRef = useRef(false);
 
   useEffect(() => {
+    if (hasConnectedRef.current) return;
+    hasConnectedRef.current = true;
+
     if (!router.isReady) {
       return;
     }
@@ -93,7 +99,10 @@ function OAuthCallbackPage() {
       }
     };
 
-    checkAuthAndConnect();
+    checkAuthAndConnect().finally(() => {
+      // Allow future retries if the user refreshes the page with a new code
+      hasConnectedRef.current = false;
+    });
   }, [router, isAuthenticated]);
 
   return (
