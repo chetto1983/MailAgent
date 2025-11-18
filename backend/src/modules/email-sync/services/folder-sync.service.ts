@@ -639,6 +639,7 @@ export class FolderSyncService {
         tenantId: true,
         totalCount: true,
         unreadCount: true,
+        specialUse: true,
       },
     });
 
@@ -650,12 +651,19 @@ export class FolderSyncService {
     }
 
     // Count total emails in folder
-    // Note: Email.folder stores the display name (e.g. "SOCIAL"),
-    // not the path (e.g. "CATEGORY_SOCIAL"), so we match on folder.name
+    // Email.folder may store either the display name or the normalized specialUse
+    const folderNames = [folder.name];
+    if (folder.name.toUpperCase() !== folder.name) {
+      folderNames.push(folder.name.toUpperCase());
+    }
+    if (folder.specialUse) {
+      folderNames.push(folder.specialUse.replace('\\', '').toUpperCase());
+    }
+
     const totalCount = await this.prisma.email.count({
       where: {
         providerId,
-        folder: folder.name,
+        folder: { in: folderNames },
       },
     });
 
@@ -663,7 +671,7 @@ export class FolderSyncService {
     const unreadCount = await this.prisma.email.count({
       where: {
         providerId,
-        folder: folder.name,
+        folder: { in: folderNames },
         isRead: false,
       },
     });

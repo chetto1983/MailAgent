@@ -90,8 +90,11 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
           duration: 60000, // per minute
         },
         // Long-running syncs need generous lock to avoid "missing lock" stalls
-        lockDuration: 180000,
-        stalledInterval: 60000,
+        lockDuration: this.configService.get<number>('SYNC_WORKER_LOCK_MS', 300000),
+        stalledInterval: Math.max(
+          1000,
+          this.configService.get<number>('SYNC_WORKER_STALLED_INTERVAL_MS', 120000),
+        ),
       },
     );
 
