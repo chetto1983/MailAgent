@@ -380,7 +380,7 @@ export class MicrosoftCalendarProvider implements ICalendarProvider {
         throw new CalendarProviderError('Event does not belong to specified calendar', 'INVALID_OPERATION', 'microsoft');
       }
 
-      const result = await this.prisma.calendarEvent.updateMany({
+      await this.prisma.calendarEvent.updateMany({
         where: {
           providerId: this.config.providerId,
           externalId: eventId,

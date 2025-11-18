@@ -214,6 +214,7 @@ model Folder {
   providerId   String
   name         String
   path         String
+  externalId   String?
   delimiter    String         @default("/")
   parentId     String?
   level        Int            @default(0)
@@ -226,6 +227,7 @@ model Folder {
   unseenCount  Int            @default(0)
   uidValidity  String?
   uidNext      Int?           @default(0)
+  syncToken    String?
   lastSyncedAt DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -235,6 +237,7 @@ model Folder {
   tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, path])
+  @@index([providerId, externalId])
   @@index([tenantId, providerId])
   @@index([tenantId, specialUse])
   @@index([providerId, parentId])

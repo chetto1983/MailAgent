@@ -1,16 +1,16 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import { ProviderFactory } from '../../../src/modules/providers/factory/provider.factory';
-import { ProviderTokenService } from '../../../src/modules/email-sync/services/provider-token.service';
-import { IEmailProvider } from '../../../src/modules/providers/interfaces/email-provider.interface';
+import { CryptoService } from '../../../src/common/services/crypto.service';
+import { ProviderConfig } from '../../../src/modules/providers/interfaces/email-provider.interface';
 
 describe('Provider Integration Tests', () => {
   let prisma: PrismaClient;
-  let providerTokenService: ProviderTokenService;
+  let cryptoService: CryptoService;
 
   beforeAll(async () => {
     // Initialize Prisma client
     prisma = new PrismaClient();
+    cryptoService = new CryptoService();
   });
 
   afterAll(async () => {
@@ -286,16 +286,6 @@ describe('Provider Integration Tests', () => {
       throw new Error(`Provider ${providerId} not found`);
     }
 
-    // Get real access token using our token service
-    if (!providerTokenService) {
-      // Initialize token service if not available
-      const _module: TestingModule = await Test.createTestingModule({
-        providers: [],
-      }).compile();
-    }
-
-    // For now, we'll use direct token access
-    // In a production test, you'd inject the real ProviderTokenService
     const encryptedToken = providerData.accessToken;
     const tokenIv = providerData.tokenEncryptionIv;
 
@@ -303,15 +293,20 @@ describe('Provider Integration Tests', () => {
       throw new Error('No access token available for provider');
     }
 
-    // For testing, we'll create a simplified config
-    // In real implementation, use the CryptoService to decrypt
-    const config = {
-      userId: 'integration-test',
+    const accessToken = cryptoService.decrypt(encryptedToken, tokenIv);
+    const refreshToken =
+      providerData.refreshToken && providerData.refreshTokenEncryptionIv
+        ? cryptoService.decrypt(providerData.refreshToken, providerData.refreshTokenEncryptionIv)
+        : '';
+
+    const config: ProviderConfig = {
+      userId: providerData.userId || 'integration-test',
       providerId: providerData.id,
-      providerType: providerData.providerType as 'google' | 'microsoft' | 'imap',
+      providerType: providerData.providerType as ProviderConfig['providerType'],
       email: providerData.email,
-      accessToken: 'PLACEHOLDER_TOKEN', // Would be real decrypted token
-      refreshToken: '', // Would be real decrypted refresh token
+      accessToken,
+      refreshToken,
+      expiresAt: providerData.tokenExpiresAt ?? undefined,
     };
 
     return ProviderFactory.create(providerData.providerType, config);

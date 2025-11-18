@@ -9,12 +9,16 @@ import { ProviderTokenService } from './provider-token.service';
 
 export interface FolderInfo {
   path: string;
+  externalId?: string;
   name: string;
   delimiter: string;
   attributes: string[];
   specialUse?: string;
   parent?: string;
   isSelectable?: boolean;
+  uidNext?: number;
+  uidValidity?: string;
+  syncToken?: string;
 }
 
 @Injectable()
@@ -141,6 +145,7 @@ export class FolderSyncService {
       const path = folder.path;
       const delimiter = folder.delimiter || '/';
       const attributes = folder.attributes || [];
+      const syncToken = folder.uidNext ? String(folder.uidNext) : undefined;
 
       // Extract folder name from path
       const parts = path.split(delimiter);
@@ -165,12 +170,16 @@ export class FolderSyncService {
 
       folderInfos.push({
         path,
+        externalId: path,
         name,
         delimiter,
         attributes,
         specialUse,
         parent,
         isSelectable,
+        uidNext: folder.uidNext,
+        uidValidity: folder.uidValidity,
+        syncToken,
       });
     }
 
@@ -284,6 +293,7 @@ export class FolderSyncService {
         create: {
           tenantId,
           providerId,
+          externalId: folderInfo.externalId,
           path: folderInfo.path,
           name: folderInfo.name,
           delimiter: folderInfo.delimiter,
@@ -296,12 +306,16 @@ export class FolderSyncService {
               attr === '\\NonExistent' ||
               attr.toLowerCase() === '\\noselect',
           ),
+          syncToken: folderInfo.syncToken,
+          uidNext: folderInfo.uidNext,
+          uidValidity: folderInfo.uidValidity,
         },
         update: {
           name: folderInfo.name,
           delimiter: folderInfo.delimiter,
           attributes: folderInfo.attributes,
           specialUse: folderInfo.specialUse,
+          externalId: folderInfo.externalId,
           level,
           isSelectable: !folderInfo.attributes.some(
             (attr) =>
@@ -309,6 +323,9 @@ export class FolderSyncService {
               attr === '\\NonExistent' ||
               attr.toLowerCase() === '\\noselect',
           ),
+          syncToken: folderInfo.syncToken ?? undefined,
+          uidNext: folderInfo.uidNext ?? undefined,
+          uidValidity: folderInfo.uidValidity ?? undefined,
           lastSyncedAt: new Date(),
         },
       });
@@ -351,6 +368,13 @@ export class FolderSyncService {
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
       const labelsResponse = await gmail.users.labels.list({ userId: 'me' });
       const labels = labelsResponse.data.labels || [];
+      const provider = await this.prisma.providerConfig.findUnique({
+        where: { id: providerId },
+      });
+      const syncToken =
+        (provider?.metadata as any)?.lastSyncToken ??
+        (provider?.metadata as any)?.historyId ??
+        undefined;
 
       this.logger.log(`Found ${labels.length} Gmail labels for provider ${providerId}`);
 
@@ -391,6 +415,7 @@ export class FolderSyncService {
           create: {
             tenantId,
             providerId,
+            externalId: label.id,
             path: label.id,
             name: displayName,
             delimiter: '/',
@@ -399,14 +424,17 @@ export class FolderSyncService {
             totalCount: label.messagesTotal || 0,
             unreadCount: label.messagesUnread || 0,
             level: 0,
+            syncToken,
           },
           update: {
             name: displayName,
             specialUse,
+            externalId: label.id,
             isSelectable,
             totalCount: label.messagesTotal || 0,
             unreadCount: label.messagesUnread || 0,
             lastSyncedAt: new Date(),
+            syncToken: syncToken ?? undefined,
           },
         });
       }
@@ -429,12 +457,7 @@ export class FolderSyncService {
     try {
       const { accessToken } = await this.providerTokenService.getProviderWithToken(providerId);
 
-      const url = `${this.GRAPH_API_BASE}/me/mailFolders`;
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      const folders = response.data.value || [];
+      const { folders, deltaLink } = await this.fetchMicrosoftFolders(accessToken);
       this.logger.log(`Found ${folders.length} Microsoft folders for provider ${providerId}`);
 
       const existingFolders = await (this.prisma as any).folder.findMany({
@@ -468,6 +491,7 @@ export class FolderSyncService {
           create: {
             tenantId,
             providerId,
+            externalId: folder.id,
             path: folder.id,
             name: folder.displayName,
             delimiter: '/',
@@ -476,13 +500,17 @@ export class FolderSyncService {
             totalCount: folder.totalItemCount || 0,
             unreadCount: folder.unreadItemCount || 0,
             level: folder.parentFolderId ? 1 : 0,
+            syncToken: deltaLink,
+            lastSyncedAt: new Date(),
           },
           update: {
             name: folder.displayName,
+            externalId: folder.id,
             specialUse,
             totalCount: folder.totalItemCount || 0,
             unreadCount: folder.unreadItemCount || 0,
             lastSyncedAt: new Date(),
+            syncToken: deltaLink ?? undefined,
           },
         });
       }
@@ -518,6 +546,25 @@ export class FolderSyncService {
     if (lowerName === 'junk email' || lowerName === 'junk' || lowerName === 'spam') return 'JUNK';
     if (lowerName === 'archive') return 'ARCHIVE';
     return undefined;
+  }
+
+  private async fetchMicrosoftFolders(
+    accessToken: string,
+  ): Promise<{ folders: any[]; deltaLink?: string }> {
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    let url = `${this.GRAPH_API_BASE}/me/mailFolders/delta`;
+    const folders: any[] = [];
+    let deltaLink: string | undefined;
+
+    while (url) {
+      const response = await axios.get(url, { headers });
+      const value = response.data.value || [];
+      folders.push(...value);
+      deltaLink = response.data['@odata.deltaLink'] || deltaLink;
+      url = response.data['@odata.nextLink'] || '';
+    }
+
+    return { folders, deltaLink };
   }
 
   /**

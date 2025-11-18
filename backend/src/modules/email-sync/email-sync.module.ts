@@ -5,6 +5,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { AiModule } from '../ai/ai.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { RetryService } from '../../common/services/retry.service';
 
 // Services
 import { QueueService } from './services/queue.service';
@@ -67,6 +68,7 @@ import { WebhookController } from './controllers/webhook.controller';
     WebhookLifecycleService,
     SyncAuthService,
     ProviderTokenService,
+    RetryService,
 
     // Cross-Provider Sync services
     CrossProviderDedupService,

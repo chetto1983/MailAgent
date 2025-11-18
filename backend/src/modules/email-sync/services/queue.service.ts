@@ -172,8 +172,13 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     const jobId = `${data.providerId}-${data.syncType || 'delta'}`;
     const existing = await queue.getJob(jobId);
     if (existing) {
-      this.logger.verbose(`Job ${jobId} already queued, skipping duplicate`);
-      return;
+      const state = await existing.getState();
+      if (state === 'completed' || state === 'failed' || state === 'delayed') {
+        await existing.remove();
+      } else {
+        this.logger.verbose(`Job ${jobId} already queued (state=${state}), skipping duplicate`);
+        return;
+      }
     }
 
     // Soft guard: skip if any job for provider is in waiting/active/delayed

@@ -330,7 +330,7 @@ export class GoogleContactsProvider implements IContactsProvider {
     });
   }
 
-  async updateGroup(groupId: string, name: string, description?: string): Promise<void> {
+  async updateGroup(groupId: string, name: string, _description?: string): Promise<void> {
     return this.withErrorHandling('updateGroup', async () => {
       // Check if group exists (has at least one contact)
       const groupExists = await this.prisma.contact.findFirst({
@@ -455,7 +455,7 @@ export class GoogleContactsProvider implements IContactsProvider {
 
   // ==================== Sync Operations ====================
 
-  async syncContacts(options?: ContactsSyncOptions): Promise<ContactsSyncResult> {
+  async syncContacts(_options?: ContactsSyncOptions): Promise<ContactsSyncResult> {
     return this.withErrorHandling('syncContacts', async () => {
       try {
         const syncedCount = await this.googleContactsSync.syncContacts(this.config.providerId);

@@ -8,7 +8,9 @@ process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only';
 process.env.JWT_EXPIRATION = '24h';
 process.env.AES_SECRET_KEY = 'test-aes-256-secret-key-32chars!';
-process.env.DATABASE_URL = 'postgresql://testuser:testpass@localhost:5432/mailagent_test';
+// Use DATABASE_URL from env if provided, otherwise default to local dev DB
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://mailuser:mailpass@localhost:5432/mailagent';
 process.env.REDIS_HOST = 'localhost';
 process.env.REDIS_PORT = '6379';
 process.env.MISTRAL_API_KEY = '50yMLyTFFOyyqc1AqMLpE6Y5N4tT5GPW';

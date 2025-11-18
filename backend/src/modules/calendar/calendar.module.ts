@@ -7,8 +7,6 @@ import { MicrosoftCalendarSyncService } from './services/microsoft-calendar-sync
 import { GoogleCalendarWebhookService } from './services/google-calendar-webhook.service';
 import { MicrosoftCalendarWebhookService } from './services/microsoft-calendar-webhook.service';
 import { CalendarProviderFactory } from './calendar-provider.factory';
-import { GoogleCalendarProvider } from './providers/google-calendar.provider';
-import { MicrosoftCalendarProvider } from './providers/microsoft-calendar.provider';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { RealtimeModule } from '../realtime/realtime.module';
@@ -30,8 +28,6 @@ import { RealtimeModule } from '../realtime/realtime.module';
     GoogleCalendarWebhookService,
     MicrosoftCalendarWebhookService,
     CalendarProviderFactory,
-    GoogleCalendarProvider,
-    MicrosoftCalendarProvider,
   ],
   exports: [
     CalendarService,

@@ -40,12 +40,68 @@ export class ProviderTokenService {
       case 'google':
         return { provider, accessToken: await this.getGoogleToken(provider) };
       case 'microsoft':
-        return { provider, accessToken: await this.microsoftOAuth.getTokenOrRefresh(provider) };
+        return { provider, accessToken: await this.getMicrosoftToken(provider) };
       case 'imap':
         return { provider, accessToken: await this.getImapToken(provider) };
       default:
         throw new Error(`Unsupported provider type: ${provider.providerType}`);
     }
+  }
+
+  private async getMicrosoftToken(provider: ProviderEntity): Promise<string> {
+    if (!provider.accessToken || !provider.tokenEncryptionIv) {
+      throw new Error('Provider missing access token');
+    }
+
+    const now = new Date();
+    const expiresSoon = provider.tokenExpiresAt
+      ? now.getTime() >= new Date(provider.tokenExpiresAt).getTime() - 60_000
+      : true;
+
+    let accessToken = this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
+    const tokenLooksValid = accessToken.includes('.');
+
+    const canRefresh = provider.refreshToken && provider.refreshTokenEncryptionIv;
+
+    if ((!tokenLooksValid || expiresSoon) && canRefresh) {
+      const refreshToken = this.crypto.decrypt(
+        provider.refreshToken!,
+        provider.refreshTokenEncryptionIv!,
+      );
+
+      const refreshed = await this.microsoftOAuth.refreshAccessToken(refreshToken);
+      accessToken = refreshed.accessToken;
+
+      const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
+      const updateData: Record<string, any> = {
+        accessToken: encryptedAccess.encrypted,
+        tokenEncryptionIv: encryptedAccess.iv,
+        tokenExpiresAt: refreshed.expiresAt,
+      };
+
+      if (refreshed.refreshToken) {
+        const encryptedRefresh = this.crypto.encrypt(refreshed.refreshToken);
+        updateData.refreshToken = encryptedRefresh.encrypted;
+        updateData.refreshTokenEncryptionIv = encryptedRefresh.iv;
+      }
+
+      await this.prisma.providerConfig.update({
+        where: { id: provider.id },
+        data: updateData,
+      });
+
+      this.logger.log(`Microsoft token refreshed for ${provider.email}`);
+      return accessToken;
+    }
+
+    if (!tokenLooksValid && !canRefresh) {
+      this.logger.error(
+        `Microsoft token invalid and no refresh token available for ${provider.email} (${provider.id})`,
+      );
+      throw new Error('Microsoft provider requires re-authentication (invalid access token)');
+    }
+
+    return accessToken;
   }
 
   private async getGoogleToken(provider: ProviderEntity): Promise<string> {

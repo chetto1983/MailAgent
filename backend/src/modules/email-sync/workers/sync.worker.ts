@@ -10,6 +10,7 @@ import { FolderSyncService } from '../services/folder-sync.service';
 import { SyncAuthService } from '../services/sync-auth.service';
 import { ProviderFactory } from '../../providers/factory/provider.factory';
 import { ProviderConfig, IEmailProvider } from '../../providers/interfaces/email-provider.interface';
+import { ProviderTokenService } from '../services/provider-token.service';
 
 @Injectable()
 export class SyncWorker implements OnModuleInit, OnModuleDestroy {
@@ -38,6 +39,7 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     private syncScheduler: SyncSchedulerService,
     private folderSyncService: FolderSyncService,
     private readonly syncAuth: SyncAuthService,
+    private readonly providerTokenService: ProviderTokenService,
   ) {}
 
   async onModuleInit() {
@@ -227,39 +229,22 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
    * Helper method to convert database ProviderConfig to IEmailProvider config
    */
   private async createProviderConfigFromDb(providerId: string): Promise<ProviderConfig> {
-    const dbProvider = await this.prisma.providerConfig.findUnique({
-      where: { id: providerId },
-      select: {
-        id: true,
-        userId: true,
-        providerType: true,
-        email: true,
-        accessToken: true,
-        refreshToken: true,
-        tokenExpiresAt: true,
-      },
-    });
+    const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+      providerId,
+    );
 
-    if (!dbProvider) {
-      throw new Error(`Provider ${providerId} not found in database`);
-    }
-
-    if (!dbProvider.userId) {
+    if (!provider.userId) {
       throw new Error(`Provider ${providerId} has no userId`);
     }
 
-    // Decrypt tokens if needed (assuming they're stored encrypted)
-    const accessToken = dbProvider.accessToken || '';
-    const refreshToken = dbProvider.refreshToken || '';
-
     return {
-      userId: dbProvider.userId,
-      providerId: dbProvider.id,
-      providerType: dbProvider.providerType as 'google' | 'microsoft' | 'imap',
-      email: dbProvider.email,
+      userId: provider.userId,
+      providerId: provider.id,
+      providerType: provider.providerType as 'google' | 'microsoft' | 'imap',
+      email: provider.email,
       accessToken,
-      refreshToken,
-      expiresAt: dbProvider.tokenExpiresAt || undefined,
+      refreshToken: provider.refreshToken ? '***' : '', // not needed by provider instance
+      expiresAt: provider.tokenExpiresAt || undefined,
     };
   }
 
