@@ -1,33 +1,35 @@
 /**
  * IMAP Email Provider
  *
- * Implementation of IEmailProvider for generic IMAP/SMTP servers
- * Based on IMAP protocol and SMTP for sending
+ * Attualmente fornisce una superficie coerente con IEmailProvider ma demanda le
+ * operazioni reali all'integrazione futura (manca configurazione host/porta).
+ * Espone errori typed invece di throw generici per una migliore DX.
  */
 
-import { Logger } from '@nestjs/common';
+import { BaseEmailProvider } from '../base/base-email-provider';
 import {
-  IEmailProvider,
-  ProviderConfig,
-  ThreadResponse,
+  Draft,
+  DraftData,
+  EmailAttachment,
   EmailMessage,
-  SendEmailData,
+  IEmailProvider,
+  Label,
   ListEmailsParams,
   ListEmailsResponse,
-  UserInfo,
-  Label,
+  ProviderConfig,
+  ProviderError,
+  SendEmailData,
   SyncOptions,
   SyncResult,
-  DraftData,
-  Draft,
-  EmailAttachment,
+  ThreadResponse,
+  UserInfo,
 } from '../interfaces/email-provider.interface';
 
-export class ImapEmailProvider implements IEmailProvider {
-  private readonly logger = new Logger(ImapEmailProvider.name);
+export class ImapEmailProvider extends BaseEmailProvider implements IEmailProvider {
   readonly config: ProviderConfig;
 
   constructor(config: ProviderConfig) {
+    super(ImapEmailProvider.name);
     this.config = config;
     this.logger.log(`ImapEmailProvider initialized for user ${config.userId}`);
   }
@@ -35,7 +37,6 @@ export class ImapEmailProvider implements IEmailProvider {
   // ==================== User & Authentication ====================
 
   async getUserInfo(): Promise<UserInfo> {
-    // For IMAP, just return the email from config
     return {
       email: this.config.email,
       name: this.config.email.split('@')[0],
@@ -43,115 +44,113 @@ export class ImapEmailProvider implements IEmailProvider {
   }
 
   async refreshToken(): Promise<{ accessToken: string; expiresAt: Date }> {
-    // IMAP doesn't use OAuth tokens
-    throw new Error('IMAP provider does not support token refresh');
+    throw new ProviderError('IMAP provider does not support token refresh', 'NOT_SUPPORTED', 'imap');
   }
 
   async revokeToken(): Promise<boolean> {
-    // IMAP doesn't use OAuth tokens
     return false;
   }
 
   // ==================== Thread Operations ====================
 
-  async getThread(threadId: string, includeMessages?: boolean): Promise<ThreadResponse> {
-    throw new Error('Method not implemented yet.');
+  async getThread(_threadId: string, _includeMessages?: boolean): Promise<ThreadResponse> {
+    throw new ProviderError('IMAP thread retrieval not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
-  async listThreads(params: ListEmailsParams): Promise<ListEmailsResponse> {
-    throw new Error('Method not implemented yet.');
+  async listThreads(_params: ListEmailsParams): Promise<ListEmailsResponse> {
+    throw new ProviderError('IMAP listing not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
-  async deleteThreads(threadIds: string[]): Promise<void> {
-    throw new Error('Method not implemented yet.');
+  async deleteThreads(_threadIds: string[]): Promise<void> {
+    throw new ProviderError('IMAP delete not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
   // ==================== Message Operations ====================
 
-  async getMessage(messageId: string): Promise<EmailMessage> {
-    throw new Error('Method not implemented yet.');
+  async getMessage(_messageId: string): Promise<EmailMessage> {
+    throw new ProviderError('IMAP getMessage not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
-  async sendEmail(data: SendEmailData): Promise<{ id: string }> {
-    throw new Error('Method not implemented yet.');
+  async sendEmail(_data: SendEmailData): Promise<{ id: string }> {
+    throw new ProviderError('IMAP sendEmail not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
   // ==================== Draft Operations ====================
 
-  async createDraft(data: DraftData): Promise<{ id: string }> {
-    throw new Error('Method not implemented yet.');
+  async createDraft(_data: DraftData): Promise<{ id: string }> {
+    throw new ProviderError('IMAP drafts not supported', 'NOT_SUPPORTED', 'imap');
   }
 
-  async getDraft(draftId: string): Promise<Draft> {
-    throw new Error('Method not implemented yet.');
+  async getDraft(_draftId: string): Promise<Draft> {
+    throw new ProviderError('IMAP drafts not supported', 'NOT_SUPPORTED', 'imap');
   }
 
-  async updateDraft(draftId: string, data: DraftData): Promise<void> {
-    throw new Error('Method not implemented yet.');
+  async updateDraft(_draftId: string, _data: DraftData): Promise<void> {
+    throw new ProviderError('IMAP drafts not supported', 'NOT_SUPPORTED', 'imap');
   }
 
-  async deleteDraft(draftId: string): Promise<void> {
-    throw new Error('Method not implemented yet.');
+  async deleteDraft(_draftId: string): Promise<void> {
+    throw new ProviderError('IMAP drafts not supported', 'NOT_SUPPORTED', 'imap');
   }
 
-  async sendDraft(draftId: string): Promise<{ id: string }> {
-    throw new Error('Method not implemented yet.');
+  async sendDraft(_draftId: string): Promise<{ id: string }> {
+    throw new ProviderError('IMAP drafts not supported', 'NOT_SUPPORTED', 'imap');
   }
 
   async listDrafts(): Promise<{ drafts: Draft[]; nextPageToken?: string }> {
-    throw new Error('Method not implemented yet.');
+    throw new ProviderError('IMAP drafts not supported', 'NOT_SUPPORTED', 'imap');
   }
 
   // ==================== Attachment Operations ====================
 
-  async getAttachment(messageId: string, attachmentId: string): Promise<string> {
-    throw new Error('Method not implemented yet.');
+  async getAttachment(_messageId: string, _attachmentId: string): Promise<string> {
+    throw new ProviderError('IMAP attachments not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
-  async getMessageAttachments(messageId: string): Promise<EmailAttachment[]> {
-    throw new Error('Method not implemented yet.');
+  async getMessageAttachments(_messageId: string): Promise<EmailAttachment[]> {
+    throw new ProviderError('IMAP attachments not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
   // ==================== Label/Folder Operations ====================
 
   async getLabels(): Promise<Label[]> {
-    throw new Error('Method not implemented yet.');
+    throw new ProviderError('IMAP labels not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
-  async getLabel(labelId: string): Promise<Label> {
-    throw new Error('Method not implemented yet.');
+  async getLabel(_labelId: string): Promise<Label> {
+    throw new ProviderError('IMAP labels not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
   async createLabel(): Promise<{ id: string }> {
-    throw new Error('IMAP does not support creating labels');
+    throw new ProviderError('IMAP does not support creating labels', 'NOT_SUPPORTED', 'imap');
   }
 
   async updateLabel(): Promise<void> {
-    throw new Error('IMAP does not support updating labels');
+    throw new ProviderError('IMAP does not support updating labels', 'NOT_SUPPORTED', 'imap');
   }
 
   async deleteLabel(): Promise<void> {
-    throw new Error('IMAP does not support deleting labels');
+    throw new ProviderError('IMAP does not support deleting labels', 'NOT_SUPPORTED', 'imap');
   }
 
   async modifyLabels(): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    throw new ProviderError('IMAP labels not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
   // ==================== Read/Unread Operations ====================
 
-  async markAsRead(threadIds: string[]): Promise<void> {
-    throw new Error('Method not implemented yet.');
+  async markAsRead(_threadIds: string[]): Promise<void> {
+    throw new ProviderError('IMAP markAsRead not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
-  async markAsUnread(threadIds: string[]): Promise<void> {
-    throw new Error('Method not implemented yet.');
+  async markAsUnread(_threadIds: string[]): Promise<void> {
+    throw new ProviderError('IMAP markAsUnread not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
   // ==================== Sync Operations ====================
 
-  async syncEmails(options: SyncOptions): Promise<SyncResult> {
-    throw new Error('Method not implemented yet.');
+  async syncEmails(_options: SyncOptions): Promise<SyncResult> {
+    throw new ProviderError('IMAP sync not implemented', 'NOT_IMPLEMENTED', 'imap');
   }
 
   // ==================== Utility Methods ====================
@@ -160,10 +159,13 @@ export class ImapEmailProvider implements IEmailProvider {
     return { threadIds: ids };
   }
 
+  async getEmailCount(): Promise<Array<{ label: string; count: number }>> {
+    throw new ProviderError('IMAP getEmailCount not implemented', 'NOT_IMPLEMENTED', 'imap');
+  }
+
   async testConnection(): Promise<boolean> {
     try {
-      // Try to connect to IMAP server
-      // Implementation pending
+      await this.getUserInfo();
       return true;
     } catch (error) {
       this.logger.error('Connection test failed:', error);

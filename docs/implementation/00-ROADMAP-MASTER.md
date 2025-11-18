@@ -71,12 +71,20 @@ Nov  Dec  Jan  Feb  Mar  Apr  May
 - ✅ GoogleEmailProvider refactor
 - ✅ Unit tests provider abstraction
 
+#### Stato aggiornato (2025-11-18)
+- Creato `BaseEmailProvider` con gestione errori unificata (Token/RateLimit/Permissions)
+- Refactor `GoogleEmailProvider` con operazioni concrete (thread, labels, drafts, history, sync leggero)
+- Refactor `MicrosoftEmailProvider` su Graph SDK (send/list/drafts/labels/sync delta)
+- IMAP provider riallineato con errori tipizzati in attesa di config host/porta
+
 #### File Modificati
 ```
 NEW:  backend/src/modules/providers/interfaces/email-provider.interface.ts
 NEW:  backend/src/modules/providers/factory/provider.factory.ts
 NEW:  backend/src/modules/providers/base/base-email-provider.ts
-REFACTOR: backend/src/modules/email-sync/services/google-sync.service.ts
+REFACTOR: backend/src/modules/providers/providers/google-email.provider.ts
+REFACTOR: backend/src/modules/providers/providers/microsoft-email.provider.ts
+REFACTOR: backend/src/modules/providers/providers/imap-email.provider.ts
 ```
 
 #### Metriche

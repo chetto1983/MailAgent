@@ -1,35 +1,32 @@
-/**
- * Google Email Provider
- *
- * Self-contained implementation of IEmailProvider for Gmail
- * Based on Gmail API and OAuth2
- */
-
-import { Logger } from '@nestjs/common';
 import { gmail_v1, google } from 'googleapis';
+import { BaseEmailProvider } from '../base/base-email-provider';
 import {
-  IEmailProvider,
-  ProviderConfig,
-  ThreadResponse,
+  EmailAttachment,
+  Draft,
+  DraftData,
   EmailMessage,
-  SendEmailData,
+  IEmailProvider,
+  Label,
   ListEmailsParams,
   ListEmailsResponse,
-  UserInfo,
-  Label,
+  ProviderConfig,
+  SendEmailData,
   SyncOptions,
   SyncResult,
-  DraftData,
-  Draft,
-  EmailAttachment,
+  ThreadResponse,
+  UserInfo,
+  ProviderError,
 } from '../interfaces/email-provider.interface';
 
-export class GoogleEmailProvider implements IEmailProvider {
-  private readonly logger = new Logger(GoogleEmailProvider.name);
+type GmailMessage = gmail_v1.Schema$Message;
+
+export class GoogleEmailProvider extends BaseEmailProvider implements IEmailProvider {
   readonly config: ProviderConfig;
   private gmail: gmail_v1.Gmail;
+  private readonly SYSTEM_LABELS = new Set(['UNREAD', 'STARRED']);
 
   constructor(config: ProviderConfig) {
+    super(GoogleEmailProvider.name);
     this.config = config;
     this.gmail = this.createGmailClient(config.accessToken);
     this.logger.log(`GoogleEmailProvider initialized for ${config.email}`);
@@ -47,117 +44,371 @@ export class GoogleEmailProvider implements IEmailProvider {
   // ==================== User & Authentication ====================
 
   async getUserInfo(): Promise<UserInfo> {
-    try {
+    return this.withErrorHandling('getUserInfo', async () => {
       const profile = await this.gmail.users.getProfile({ userId: 'me' });
       return {
         email: profile.data.emailAddress || this.config.email,
         name: profile.data.emailAddress?.split('@')[0] || '',
       };
-    } catch (error) {
-      this.logger.error('Failed to get user info:', error);
-      throw error;
-    }
+    });
   }
 
   async refreshToken(): Promise<{ accessToken: string; expiresAt: Date }> {
-    // Token refresh requires OAuth service - not implemented in provider
-    // This should be handled by the worker using GoogleOAuthService
-    throw new Error('Token refresh must be handled by worker/service layer');
+    // Token refresh is delegated to the OAuth service layer (GoogleOAuthService).
+    throw new ProviderError(
+      'Token refresh delegated to OAuth service layer',
+      'TOKEN_REFRESH_EXTERNAL',
+      'google',
+    );
   }
 
   async revokeToken(): Promise<boolean> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('revokeToken', async () => {
+      const oauth2Client = new google.auth.OAuth2();
+      oauth2Client.setCredentials({ access_token: this.config.accessToken });
+      const res = await oauth2Client.revokeToken(this.config.accessToken);
+      return res.status === 200;
+    });
   }
 
   // ==================== Thread Operations ====================
 
-  async getThread(threadId: string, includeMessages?: boolean): Promise<ThreadResponse> {
-    throw new Error('Method not implemented yet.');
+  async getThread(threadId: string, includeMessages = true): Promise<ThreadResponse> {
+    return this.withErrorHandling('getThread', async () => {
+      const response = await this.gmail.users.threads.get({
+        userId: 'me',
+        id: threadId,
+        format: 'full',
+        metadataHeaders: ['Subject', 'From'],
+      });
+
+      const thread = response.data;
+      const messages = includeMessages
+        ? (thread.messages || []).map((msg) => this.toEmailMessage(msg))
+        : [];
+
+      const latest = messages[messages.length - 1];
+
+      return {
+        id: thread.id || threadId,
+        messages,
+        latest,
+        hasUnread: messages.some((m) => !m.isRead),
+        totalMessages: messages.length,
+        labels: thread.messages?.[0]?.labelIds || [],
+      };
+    });
   }
 
   async listThreads(params: ListEmailsParams): Promise<ListEmailsResponse> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('listThreads', async () => {
+      const response = await this.gmail.users.threads.list({
+        userId: 'me',
+        labelIds: params.labelIds,
+        q: params.query,
+        maxResults: params.maxResults ?? 50,
+        pageToken: params.pageToken as string | undefined,
+      });
+
+      const threads = (response.data.threads || []).map((thread) => ({
+        id: thread.id!,
+        historyId: thread.historyId,
+        snippet: thread.snippet || '',
+      }));
+
+      return {
+        threads,
+        nextPageToken: response.data.nextPageToken ?? undefined,
+        total: response.data.resultSizeEstimate ?? undefined,
+      };
+    });
   }
 
   async deleteThreads(threadIds: string[]): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('deleteThreads', async () => {
+      await Promise.all(
+        threadIds.map((id) =>
+          this.gmail.users.threads.trash({
+            userId: 'me',
+            id,
+          }),
+        ),
+      );
+    });
   }
 
   // ==================== Message Operations ====================
 
   async getMessage(messageId: string): Promise<EmailMessage> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('getMessage', async () => {
+      const response = await this.gmail.users.messages.get({
+        userId: 'me',
+        id: messageId,
+        format: 'full',
+      });
+
+      return this.toEmailMessage(response.data);
+    });
   }
 
   async sendEmail(data: SendEmailData): Promise<{ id: string }> {
-    throw new Error('Method not implemented yet.');
+    if (data.attachments && data.attachments.length > 0) {
+      // Attachment support rich MIME boundaries; defer to worker when needed.
+      throw new ProviderError(
+        'Attachments not supported in lightweight provider send; use worker pipeline',
+        'ATTACHMENTS_NOT_SUPPORTED',
+        'google',
+      );
+    }
+
+    return this.withErrorHandling('sendEmail', async () => {
+      const raw = this.buildMimeMessage(data);
+      const response = await this.gmail.users.messages.send({
+        userId: 'me',
+        requestBody: {
+          raw,
+          threadId: data.threadId,
+        },
+      });
+
+      return { id: response.data.id! };
+    });
   }
 
   // ==================== Draft Operations ====================
 
   async createDraft(data: DraftData): Promise<{ id: string }> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('createDraft', async () => {
+      const raw = this.buildMimeMessage({
+        to: data.to || [],
+        cc: data.cc,
+        bcc: data.bcc,
+        subject: data.subject ?? '',
+        bodyHtml: data.bodyHtml,
+        bodyText: data.bodyText ?? '',
+      });
+
+      const response = await this.gmail.users.drafts.create({
+        userId: 'me',
+        requestBody: {
+          message: {
+            raw,
+          },
+        },
+      });
+
+      return { id: response.data.id! };
+    });
   }
 
   async getDraft(draftId: string): Promise<Draft> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('getDraft', async () => {
+      const response = await this.gmail.users.drafts.get({
+        userId: 'me',
+        id: draftId,
+        format: 'full',
+      });
+
+      const message = response.data.message as GmailMessage;
+      const parsed = this.toEmailMessage(message);
+
+      return {
+        id: draftId,
+        to: parsed.to,
+        cc: parsed.cc,
+        bcc: parsed.bcc,
+        subject: parsed.subject,
+        bodyHtml: parsed.bodyHtml,
+        bodyText: parsed.bodyText,
+        attachments: parsed.attachments,
+      };
+    });
   }
 
   async updateDraft(draftId: string, data: DraftData): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('updateDraft', async () => {
+      const raw = this.buildMimeMessage({
+        to: data.to || [],
+        cc: data.cc,
+        bcc: data.bcc,
+        subject: data.subject ?? '',
+        bodyHtml: data.bodyHtml,
+        bodyText: data.bodyText ?? '',
+      });
+
+      await this.gmail.users.drafts.update({
+        userId: 'me',
+        id: draftId,
+        requestBody: {
+          message: {
+            raw,
+          },
+        },
+      });
+    });
   }
 
   async deleteDraft(draftId: string): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('deleteDraft', async () => {
+      await this.gmail.users.drafts.delete({ userId: 'me', id: draftId });
+    });
   }
 
   async sendDraft(draftId: string): Promise<{ id: string }> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('sendDraft', async () => {
+      const response = await this.gmail.users.drafts.send({
+        userId: 'me',
+        requestBody: { id: draftId },
+      });
+
+      return { id: response.data.id! };
+    });
   }
 
   async listDrafts(params?: { maxResults?: number; pageToken?: string }): Promise<{
     drafts: Draft[];
     nextPageToken?: string;
   }> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('listDrafts', async () => {
+      const response = await this.gmail.users.drafts.list({
+        userId: 'me',
+        maxResults: params?.maxResults,
+        pageToken: params?.pageToken,
+      });
+
+      const drafts =
+        (response.data.drafts || []).map((draft) => ({
+          id: draft.id!,
+        })) || [];
+
+      return {
+        drafts,
+        nextPageToken: response.data.nextPageToken ?? undefined,
+      };
+    });
   }
 
   // ==================== Attachment Operations ====================
 
   async getAttachment(messageId: string, attachmentId: string): Promise<string> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('getAttachment', async () => {
+      const response = await this.gmail.users.messages.attachments.get({
+        userId: 'me',
+        messageId,
+        id: attachmentId,
+      });
+
+      return response.data.data || '';
+    });
   }
 
   async getMessageAttachments(messageId: string): Promise<EmailAttachment[]> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('getMessageAttachments', async () => {
+      const message = await this.gmail.users.messages.get({
+        userId: 'me',
+        id: messageId,
+        format: 'full',
+      });
+
+      const parts = message.data.payload?.parts || [];
+      const attachments: EmailAttachment[] = [];
+
+      this.walkParts(parts, (part) => {
+        if (part.filename && part.body?.attachmentId) {
+          attachments.push({
+            id: part.body.attachmentId,
+            filename: part.filename,
+            mimeType: part.mimeType || 'application/octet-stream',
+            size: part.body.size || 0,
+          });
+        }
+      });
+
+      return attachments;
+    });
   }
 
   // ==================== Label/Folder Operations ====================
 
   async getLabels(): Promise<Label[]> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('getLabels', async () => {
+      const response = await this.gmail.users.labels.list({ userId: 'me' });
+      return (
+        response.data.labels?.map((label) => ({
+          id: label.id!,
+          name: label.name || '',
+          type: label.type as Label['type'],
+          color: label.color
+            ? {
+                backgroundColor: label.color.backgroundColor || undefined,
+                textColor: label.color.textColor || undefined,
+              }
+            : undefined,
+        })) || []
+      );
+    });
   }
 
   async getLabel(labelId: string): Promise<Label> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('getLabel', async () => {
+      const response = await this.gmail.users.labels.get({
+        userId: 'me',
+        id: labelId,
+      });
+
+      const l = response.data;
+      return {
+        id: l.id!,
+        name: l.name || '',
+        type: l.type as Label['type'],
+        color: l.color
+          ? {
+              backgroundColor: l.color.backgroundColor || undefined,
+              textColor: l.color.textColor || undefined,
+            }
+          : undefined,
+      };
+    });
   }
 
   async createLabel(label: {
     name: string;
     color?: { backgroundColor: string; textColor: string };
   }): Promise<{ id: string }> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('createLabel', async () => {
+      const response = await this.gmail.users.labels.create({
+        userId: 'me',
+        requestBody: {
+          name: label.name,
+          color: label.color,
+          labelListVisibility: 'labelShow',
+          messageListVisibility: 'show',
+        },
+      });
+      return { id: response.data.id! };
+    });
   }
 
   async updateLabel(
     labelId: string,
     label: { name: string; color?: { backgroundColor: string; textColor: string } },
   ): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('updateLabel', async () => {
+      await this.gmail.users.labels.update({
+        userId: 'me',
+        id: labelId,
+        requestBody: {
+          name: label.name,
+          color: label.color,
+        },
+      });
+    });
   }
 
   async deleteLabel(labelId: string): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('deleteLabel', async () => {
+      await this.gmail.users.labels.delete({ userId: 'me', id: labelId });
+    });
   }
 
   async modifyLabels(
@@ -165,50 +416,122 @@ export class GoogleEmailProvider implements IEmailProvider {
     addLabels: string[],
     removeLabels: string[],
   ): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('modifyLabels', async () => {
+      await Promise.all(
+        threadIds.map((id) =>
+          this.gmail.users.threads.modify({
+            userId: 'me',
+            id,
+            requestBody: {
+              addLabelIds: addLabels,
+              removeLabelIds: removeLabels,
+            },
+          }),
+        ),
+      );
+    });
   }
 
   // ==================== Read/Unread Operations ====================
 
   async markAsRead(threadIds: string[]): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.modifyLabels(threadIds, [], ['UNREAD']);
   }
 
   async markAsUnread(threadIds: string[]): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.modifyLabels(threadIds, ['UNREAD'], []);
   }
 
   async markAsStarred(threadIds: string[]): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.modifyLabels(threadIds, ['STARRED'], []);
   }
 
   async markAsUnstarred(threadIds: string[]): Promise<void> {
-    throw new Error('Method not implemented yet.');
+    return this.modifyLabels(threadIds, [], ['STARRED']);
   }
 
   // ==================== Sync Operations ====================
 
   async syncEmails(options: SyncOptions): Promise<SyncResult> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('syncEmails', async () => {
+      if (options.syncType === 'incremental' && options.historyId) {
+        const historyResult = await this.listHistory(options.historyId);
+        const messages = historyResult.history.flatMap((h: any) => h.messages || []);
+
+        return {
+          success: true,
+          emailsSynced: messages.length,
+          newEmails: messages.length,
+          updatedEmails: 0,
+          deletedEmails: 0,
+          nextHistoryId: historyResult.historyId,
+        };
+      }
+
+      // Fall back to lightweight full sync listing messages
+      const response = await this.gmail.users.messages.list({
+        userId: 'me',
+        labelIds: options.folderId ? [options.folderId] : undefined,
+        maxResults: options.maxMessages ?? 50,
+      });
+
+      const messages = response.data.messages || [];
+
+      return {
+        success: true,
+        emailsSynced: messages.length,
+        newEmails: messages.length,
+        updatedEmails: 0,
+        deletedEmails: 0,
+        nextHistoryId: undefined,
+      };
+    });
   }
 
   async getHistoryId(): Promise<string> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('getHistoryId', async () => {
+      const response = await this.gmail.users.history.list({
+        userId: 'me',
+        maxResults: 1,
+      });
+
+      const historyId = response.data.historyId || response.data.history?.[0]?.id;
+      return historyId?.toString() || '';
+    });
   }
 
   async listHistory(historyId: string): Promise<{ history: any[]; historyId: string }> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('listHistory', async () => {
+      const response = await this.gmail.users.history.list({
+        userId: 'me',
+        startHistoryId: historyId,
+      });
+
+      return {
+        history: response.data.history || [],
+        historyId: response.data.historyId || historyId,
+      };
+    });
   }
 
   // ==================== Utility Methods ====================
 
   normalizeIds(ids: string[]): { threadIds: string[] } {
-    // Simple implementation: assume all IDs are already thread IDs
-    return { threadIds: ids };
+    // Gmail threadId e messageId non coincidono: se arrivano ID di messaggio,
+    // li rimappiamo usando prefisso "msg_" per distinguerli.
+    const threadIds = ids.map((id) => (id.startsWith('msg_') ? id.substring(4) : id));
+    return { threadIds };
   }
 
   async getEmailCount(): Promise<Array<{ label: string; count: number }>> {
-    throw new Error('Method not implemented yet.');
+    return this.withErrorHandling('getEmailCount', async () => {
+      const labels = await this.gmail.users.labels.list({ userId: 'me' });
+      return (
+        labels.data.labels
+          ?.filter((l) => l.messagesTotal !== undefined)
+          .map((l) => ({ label: l.name || l.id || '', count: l.messagesTotal! })) || []
+      );
+    });
   }
 
   async testConnection(): Promise<boolean> {
@@ -219,5 +542,146 @@ export class GoogleEmailProvider implements IEmailProvider {
       this.logger.error('Connection test failed:', error);
       return false;
     }
+  }
+
+  // ==================== Helpers ====================
+
+  private toEmailMessage(message: GmailMessage): EmailMessage {
+    const headers = this.extractHeaders(message);
+    const labels = message.labelIds || [];
+
+    return {
+      id: message.id || '',
+      threadId: message.threadId || '',
+      subject: headers['subject'] || '',
+      from: this.parseAddress(headers['from'] || this.config.email),
+      to: this.parseAddressList(headers['to']),
+      cc: this.parseAddressList(headers['cc']),
+      bcc: this.parseAddressList(headers['bcc']),
+      date: headers['date'] ? new Date(headers['date']) : new Date(),
+      snippet: message.snippet || '',
+      bodyHtml: this.extractBody(message.payload, 'text/html'),
+      bodyText: this.extractBody(message.payload, 'text/plain'),
+      isRead: !labels.includes('UNREAD'),
+      isStarred: labels.includes('STARRED'),
+      hasAttachments: this.hasAttachments(message.payload),
+      attachments: this.extractAttachmentMetadata(message.payload),
+      headers,
+      labels,
+      internalDate: message.internalDate ?? undefined,
+      historyId: message.historyId ?? undefined,
+      raw: message,
+    };
+  }
+
+  private extractHeaders(message: GmailMessage): Record<string, string> {
+    const headers = message.payload?.headers || [];
+    return headers.reduce<Record<string, string>>((acc, h) => {
+      if (h.name && h.value) {
+        acc[h.name.toLowerCase()] = h.value;
+      }
+      return acc;
+    }, {});
+  }
+
+  private extractBody(
+    payload: gmail_v1.Schema$MessagePart | undefined,
+    mimeType: 'text/html' | 'text/plain',
+  ): string | undefined {
+    if (!payload) {
+      return undefined;
+    }
+
+    if (payload.mimeType === mimeType && payload.body?.data) {
+      return Buffer.from(payload.body.data, 'base64').toString('utf-8');
+    }
+
+    if (payload.parts) {
+      for (const part of payload.parts) {
+        const content = this.extractBody(part, mimeType);
+        if (content) return content;
+      }
+    }
+
+    return undefined;
+  }
+
+  private hasAttachments(payload?: gmail_v1.Schema$MessagePart): boolean {
+    if (!payload) return false;
+    if (payload.filename && payload.body?.attachmentId) return true;
+    return (payload.parts || []).some((p) => this.hasAttachments(p));
+  }
+
+  private extractAttachmentMetadata(
+    payload?: gmail_v1.Schema$MessagePart,
+  ): EmailAttachment[] | undefined {
+    if (!payload) return undefined;
+    const attachments: EmailAttachment[] = [];
+    this.walkParts(payload.parts || [], (part) => {
+      if (part.filename && part.body?.attachmentId) {
+        attachments.push({
+          id: part.body.attachmentId,
+          filename: part.filename,
+          mimeType: part.mimeType || 'application/octet-stream',
+          size: part.body.size || 0,
+        });
+      }
+    });
+    return attachments.length ? attachments : undefined;
+  }
+
+  private walkParts(
+    parts: gmail_v1.Schema$MessagePart[],
+    visitor: (part: gmail_v1.Schema$MessagePart) => void,
+  ) {
+    for (const part of parts) {
+      visitor(part);
+      if (part.parts) {
+        this.walkParts(part.parts, visitor);
+      }
+    }
+  }
+
+  private parseAddress(value?: string): { email: string; name?: string } {
+    if (!value) return { email: '' };
+    const match = /"?([^"]*)"?\s*<([^>]+)>/.exec(value);
+    if (match) {
+      return { email: match[2], name: match[1] || undefined };
+    }
+    return { email: value };
+  }
+
+  private parseAddressList(value?: string): Array<{ email: string; name?: string }> {
+    if (!value) return [];
+    return value.split(',').map((addr) => this.parseAddress(addr.trim()));
+  }
+
+  private buildMimeMessage(data: SendEmailData): string {
+    const headers = [
+      `From: ${this.formatAddress(this.config.email)}`,
+      `To: ${data.to.map((a) => this.formatAddress(a.email, a.name)).join(', ')}`,
+    ];
+
+    if (data.cc?.length) {
+      headers.push(`Cc: ${data.cc.map((a) => this.formatAddress(a.email, a.name)).join(', ')}`);
+    }
+
+    if (data.bcc?.length) {
+      headers.push(`Bcc: ${data.bcc.map((a) => this.formatAddress(a.email, a.name)).join(', ')}`);
+    }
+
+    headers.push(`Subject: ${data.subject}`);
+    headers.push('Content-Type: text/plain; charset="UTF-8"');
+    headers.push('MIME-Version: 1.0');
+    headers.push('');
+
+    const body = data.bodyText || '';
+    const message = `${headers.join('\r\n')}\r\n${body}`;
+
+    return Buffer.from(message, 'utf-8').toString('base64url');
+  }
+
+  private formatAddress(email: string, name?: string): string {
+    return name ? `"${name}" <${email}>` : `<${email}>`;
   }
 }
