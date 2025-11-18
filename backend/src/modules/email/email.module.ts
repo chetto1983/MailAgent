@@ -6,6 +6,7 @@ import { EmailRetentionService } from './services/email-retention.service';
 import { EmailSendService } from './services/email-send.service';
 import { EmailSyncBackService } from './services/email-sync-back.service';
 import { EmailCleanupService } from './services/email-cleanup.service';
+import { AttachmentStorageService } from './services/attachment.storage';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { AiModule } from '../ai/ai.module';
@@ -13,6 +14,7 @@ import { EmailsController } from './controllers/emails.controller';
 import { FoldersController } from './controllers/folders.controller';
 import { EmailSyncModule } from '../email-sync/email-sync.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { StorageService } from './services/storage.service';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { RealtimeModule } from '../realtime/realtime.module';
     EmailSendService,
     EmailSyncBackService,
     EmailCleanupService,
+    AttachmentStorageService,
+    StorageService,
   ],
   controllers: [EmailsController, FoldersController],
   exports: [

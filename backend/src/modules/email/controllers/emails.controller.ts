@@ -16,14 +16,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
-import * as fs from 'fs';
-import * as path from 'path';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { EmailsService, EmailListFilters } from '../services/emails.service';
 import { EmailRetentionService } from '../services/email-retention.service';
 import { EmailFetchService } from '../services/email-fetch.service';
 import { EmailSendService } from '../services/email-send.service';
 import { EmailCleanupService } from '../services/email-cleanup.service';
+import { StorageService } from '../services/storage.service';
 import {
   ReplyForwardEmailRequestDto,
   SendEmailRequestDto,
@@ -51,6 +50,7 @@ export class EmailsController {
     private fetchService: EmailFetchService,
     private emailSendService: EmailSendService,
     private cleanupService: EmailCleanupService,
+    private storageService: StorageService,
   ) {}
 
   /**
@@ -371,34 +371,11 @@ export class EmailsController {
     const tenantId = req.user.tenantId;
     const attachment = await this.emailsService.getAttachmentDownloadUrl(emailId, attachmentId, tenantId);
 
-    // Handle different storage types
-    if (attachment.storageType === 'local' && attachment.storagePath) {
-      // Stream file from local filesystem
-      // Security: Ensure path is absolute and exists
-      const absolutePath = path.isAbsolute(attachment.storagePath)
-        ? attachment.storagePath
-        : path.join(process.cwd(), attachment.storagePath);
-
-      if (!fs.existsSync(absolutePath)) {
-        return res.status(404).json({ message: 'File not found on disk' });
-      }
-
-      res.set({
-        'Content-Type': attachment.mimeType,
-        'Content-Disposition': `attachment; filename="${attachment.filename}"`,
-        'Content-Length': attachment.size,
-      });
-
-      const fileStream = fs.createReadStream(absolutePath);
-      fileStream.pipe(res);
-    } else if (attachment.storageType === 's3' || attachment.storageType === 'azure') {
-      // Cloud storage - would need to generate signed URL
-      return res.status(501).json({
-        message: 'Cloud storage download not yet implemented',
-        storageType: attachment.storageType,
-      });
-    } else {
-      return res.status(400).json({ message: 'Invalid storage configuration' });
+    if (attachment.storageType === 's3' && attachment.storagePath) {
+      const signedUrl = await this.storageService.getSignedDownloadUrl(attachment.storagePath);
+      return res.redirect(signedUrl);
     }
+
+    return res.status(400).json({ message: 'Invalid or unsupported storage configuration' });
   }
 }

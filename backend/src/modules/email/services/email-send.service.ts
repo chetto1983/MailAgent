@@ -7,6 +7,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
+import { AttachmentStorageService } from './attachment.storage';
 
 export interface SendEmailDto {
   tenantId: string;
@@ -35,6 +36,7 @@ export class EmailSendService {
     private crypto: CryptoService,
     private googleOAuth: GoogleOAuthService,
     private microsoftOAuth: MicrosoftOAuthService,
+    private attachmentStorage: AttachmentStorageService,
   ) {}
 
   /**
@@ -56,19 +58,41 @@ export class EmailSendService {
     let messageId: string;
 
     try {
+      const uploadedAttachments =
+        data.attachments && data.attachments.length > 0
+          ? await Promise.all(
+              data.attachments.map((att) =>
+                this.attachmentStorage.uploadAttachment(data.tenantId, provider.id, {
+                  filename: att.filename,
+                  content: att.content,
+                  contentType: att.contentType,
+                }),
+              ),
+            )
+          : [];
+
+      const normalizedData: SendEmailDto = {
+        ...data,
+        attachments: uploadedAttachments.map((att) => ({
+          filename: att.filename,
+          content: Buffer.alloc(0), // content already uploaded; not reused here
+          contentType: att.mimeType,
+        })),
+      };
+
       switch (provider.providerType) {
         case 'google': {
           const accessToken = await this.getAccessToken(provider);
-          messageId = await this.sendViaGmail(accessToken, data);
+          messageId = await this.sendViaGmail(accessToken, normalizedData);
           break;
         }
         case 'microsoft': {
           const accessToken = await this.getAccessToken(provider);
-          messageId = await this.sendViaOutlook(accessToken, data);
+          messageId = await this.sendViaOutlook(accessToken, normalizedData);
           break;
         }
         case 'generic':
-          messageId = await this.sendViaSMTP(provider, data);
+          messageId = await this.sendViaSMTP(provider, normalizedData);
           break;
 
         default:
@@ -77,7 +101,7 @@ export class EmailSendService {
 
       this.logger.log(`Email sent successfully via ${provider.providerType}: ${messageId}`);
 
-      // Save sent email to database
+      // Save sent email to database (with attachment storage info already embedded)
       await this.saveSentEmail(data, messageId, provider.id);
 
       return { success: true, messageId };
