@@ -1,8 +1,9 @@
-require("dotenv").config();
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
 (async () => {
-  const rows = await prisma.$queryRawUnsafe('SELECT "folder", COUNT(*)::int as cnt FROM "emails" WHERE "providerId"=''"'"''"'"'cmi3ms10j0001yheg5tc06tic''"'"''"'"' GROUP BY "folder" ORDER BY cnt DESC');
+  const rows = await prisma.$queryRawUnsafe(
+    'SELECT "providerId", "folder", COUNT(*)::int as cnt, SUM(CASE WHEN "isRead"=false THEN 1 ELSE 0 END)::int as unread FROM "emails" GROUP BY "providerId", "folder" ORDER BY "providerId", cnt DESC'
+  );
   console.log(rows);
 })()
   .catch((err) => { console.error(err); })

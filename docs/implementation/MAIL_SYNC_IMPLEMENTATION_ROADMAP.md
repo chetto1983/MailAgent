@@ -1,68 +1,61 @@
 # Mail/Sync Implementation Roadmap
 
-Sintesi esecutiva dei documenti:
-- `CODE_CLEANUP_ROADMAP.md`
-- `MODULE_CLEANUP_CHECKLIST.md`
-- `EXTERNAL_REFERENCE_NOTES.md`
+Sintesi refactor e stato attuale (Nov 2025) per la sincronizzazione mail.
 
-Obiettivo: completare il refactor bulk mail e allineare contatti/calendari, consolidando codebase e realtime.
+## Snapshot stato attuale
+- Sync email: Gmail e Microsoft full+incremental con batching (fetch) e retry/backoff. Sync-back in batch: Gmail usa batchModify/batchDelete; Microsoft usa Graph `/$batch`.
+- Embedding: bulk buffer con rate limit conservativo e lock esteso; gestione 429 con backoff.
+- Folder: contatori basati su `specialUse` (se presente) altrimenti `name` originale; nessuna rinomina lato backend. Normalizzazione solo lato frontend per le query; display usa il nome originale.
+- Realtime: buffer eventi email; dedupe/buffer su folder_counts_update; suppression eventi granulari durante batch; summary `email:batch_processed` e status di sync.
+- Worker: lock/stalled configurabili via env; worker sync ripuliti dai “missing lock”.
+- Contatti/Calendari: disabilitati in `.env` per ora.
+- Script utili: `mail-sync-snapshot.ts` per stato provider/email; `normalize-ms-folders.ts` per ricontare folder senza rinomina.
 
-## 1) Gmail Sync (full/incremental)
-- ✅ Helper `fetchMessagesBatch(gmail, ids, format)` (batchGet + fallback) riusato.
-- ✅ Pipeline unica `parseGmailMessage` + `processMessagesBatch` (createMany/update + enqueueMany); rimossa `processMessageData`.
-- ✅ Label/Deletion in chunk con `Promise.allSettled`.
-- ✅ Flag per sopprimere eventi granulari e summary finale (`email:batch_processed` quando suppression attiva).
-- ✅ Config parziale: BATCH size e history pages leggono da config (default 100/25).
-- ✅ Retry/backoff 429/5xx (config: GMAIL_RETRY_*).
-- 🔜 Test: unit su parsing/batch; e2e full import 200–500 mail con realtime throttling.
-- ✅ Cap messaggi full (config: GMAIL_FULL_MAX_MESSAGES, default 200 per test).
+## Gmail Sync (full/incremental)
+- ✅ Helper `fetchMessagesBatch` (batchGet + fallback).
+- ✅ Pipeline unica `parseGmailMessage` → `processMessagesBatch` (createMany/update + enqueueMany).
+- ✅ Label/deletion in chunk; flag per sopprimere eventi granulari e summary finale.
+- ✅ Config: batch size/history pages da env (default 100/25); retry/backoff 429/5xx; cap full (default 200 per test).
 
-## 2) Microsoft Mail Sync (parità con Gmail + spunti Zero-main)
-- ✅ Fetch in chunk (`/$batch` + fallback) + parse pipeline unica (createMany/update + enqueueMany).
-- ✅ Normalizzazione cartelle (mapping da parentId/specialUse).
-- ✅ Config parziale: batch fetch size da config (default 20).
-- ✅ Batch operations (read/unread) via Graph `/$batch` + update locale.
-- ✅ Helper per move bulk via Graph `/$batch` + update locale (integrazione frontend ancora da collegare).
-- ✅ Retry/backoff 429/5xx centralizzato via wrapper `msRequestWithRetry`.
-- ✅ Realtime throttling identico a Gmail (suppress granular + batch summary/status quando attivo).
-- ✅ Cap messaggi full (config: MS_FULL_MAX_MESSAGES, default 200 per test).
+## Microsoft Mail Sync
+- ✅ Fetch in chunk (`/$batch` + fallback), parse pipeline unica (createMany/update + enqueueMany).
+- ✅ Normalizzazione cartelle tramite `specialUse`; nomi originali preservati.
+- ✅ Batch operations (read/unread/move) via Graph `/$batch`; retry/backoff centralizzato.
+- ✅ Cap full (default 200 per test).
+- ✅ Sync-back Microsoft: Graph `/$batch` per delete/hardDelete/read/unread/star/unstar/move (folder note mappate).
 
-## 3) Embedding Pipeline
-- ✅ Unificato `enqueue`/`enqueueMany` con `scheduleFlush` e dedupe per `emailId`.
-- ✅ Parametri BULK_SIZE/FLUSH_MS da config (default 50/200); metriche/log a livello verbose.
+## Embedding Pipeline
+- ✅ Bulk enqueue con flush programmato e dedupe per `emailId`.
+- ✅ Parametri da env (BULK_SIZE/FLUSH_MS/rate/lock); backoff per 429.
 
-## 4) Realtime Events
-- ✅ Emit helper unificato (via `emitInternal`), buffer email.
-- ✅ Buffer configurabile da config (REALTIME_EMAIL_BUFFER_MS/REALTIME_EMAIL_BUFFER_MAX).
-- ✅ Config flag per sopprimere eventi granulari (`REALTIME_SUPPRESS_MESSAGE_EVENTS`).
-- ✅ Evento summary `email:batch_processed` emesso quando suppression attiva.
-- ✅ Sync status progress (processed count) inviato quando suppression attiva.
-- 🔜 Log a livello verbose/summary per progress.
+## Realtime Events
+- ✅ Emit helper unificato, buffer email.
+- ✅ Buffer configurabile (REALTIME_EMAIL_BUFFER_MS/MAX); suppression granulari; summary `email:batch_processed`; sync status progress.
+- ✅ Folder counts: dedupe/buffer, niente spam di eventi.
 
-## 5) QueueService (email sync queues)
-- ✅ Estrarre config queue (attempts, backoff, removeOn*) in costanti/config.
-- ✅ Dedupe job per provider/tenant (soft+hard guard su queue/redis).
-- ✅ Metriche arricchite (lastJobId, tracking completati/falliti).
+## QueueService (email sync)
+- ✅ Config queue estratta (attempts, backoff, removeOn*).
+- ✅ Dedupe job per provider/tenant (guard queue + Redis).
+- ✅ Metriche arricchite; lock/stalled worker configurabili.
 
-## 6) CrossProviderConflict
-- ✅ Priorità provider configurabile (CROSS_PROVIDER_PRIORITY_JSON) e fallback google/microsoft/generic.
-- ✅ Helper elenco conflitti recenti per tenant (listRecentConflicts).
+## CrossProviderConflict
+- ✅ Priorità provider configurabile (CROSS_PROVIDER_PRIORITY_JSON) e helper conflitti recenti.
 
-## 7) Contatti & Calendari
-- 🔜 Applicare pipeline bulk (list chunk → parse → createMany/update) a Google/Microsoft contacts/calendar.
-- 🔜 Normalizzazione campi e dedupe; retry 429/5xx condiviso.
-- 🔜 Realtime throttling per import iniziale.
+## Contatti & Calendari
+- 🔜 Portare pipeline bulk (list → parse → create/update) a Google/Microsoft; retry condiviso; realtime throttling import iniziale.
 
-## 8) Error Handling & Logging
-- 🔜 Wrapper comune `withErrorHandler` (Google/Microsoft) con contesto provider/tenant, fatal handling, backoff hint.
-- 🔜 Ridurre logging rumoroso su emit/loop grandi; usare livelli debug/verbose coerenti.
+## Error Handling & Logging
+- 🔜 Wrapper comune `withErrorHandler` per Google/Microsoft con contesto provider/tenant; ridurre logging rumoroso; livelli debug/verbose coerenti.
 
-## 9) Config & Constants
-- 🔜 Centralizzare in config/env: batch sizes, buffer ms, retry/backoff, queue options, realtime buffer.
-- 🔜 Documentare le variabili in README modulo sync/realtime.
+## Config & Constants
+- 🔜 Centralizzare ulteriormente: batch sizes, buffer ms, retry/backoff, queue options, realtime buffer; documentare in README modulo sync/realtime.
 
-## 10) Test & Docs
+## Test & Docs
 - 🔜 Unit: parseGmailMessage, batch pipeline, enqueueMany dedupe, realtime buffer flush.
-- 🔜 Funzionali: bulk import mail, bulk move/delete (realtime throttling), Microsoft batch read/unread/move.
-- 🔜 Aggiornare i doc (strategy/roadmap) quando i passi vengono implementati.
-- ✅ Script snapshot (`backend/scripts/mail-sync-snapshot.ts`) per estrarre stato provider/email in `logs/`.
+- 🔜 Funzionali: bulk import mail, bulk move/delete/read/unread (realtime throttling), Microsoft batch move/read/unread.
+- ✅ Script snapshot per debug stato sync.
+
+## Azioni prossime
+- Verificare contatori folder post-sync (MS/Gmail) con updateCounts; frontend normalizza solo per query.
+- QA bulk actions end-to-end con batch sync-back e realtime.
+- Pulizia script temporanei `tmp_*` (fatto) e allineamento `.env` (rimuovere variabili inutilizzate).

@@ -26,7 +26,9 @@
       "Bash(node check-sync-status.js:*)",
       "Bash(node backend/check-sync-status.js:*)",
       "Bash(node backend/fix-category-folders.js:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": []

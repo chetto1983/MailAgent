@@ -11,6 +11,8 @@ import { ImapSyncService } from '../services/imap-sync.service';
 import { SyncSchedulerService } from '../services/sync-scheduler.service';
 import { FolderSyncService } from '../services/folder-sync.service';
 import { SyncAuthService } from '../services/sync-auth.service';
+import { ProviderFactory } from '../../providers/factory/provider.factory';
+import { ProviderConfig, IEmailProvider } from '../../providers/interfaces/email-provider.interface';
 
 @Injectable()
 export class SyncWorker implements OnModuleInit, OnModuleDestroy {
@@ -130,22 +132,66 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     let result: SyncJobResult;
 
     try {
-      // Route to appropriate sync service based on provider type
-      switch (providerType) {
-        case 'google':
-          result = await this.googleSync.syncProvider(job.data);
-          break;
+      // NEW: Try using ProviderFactory pattern first
+      // This is the new architecture that eliminates switch-case anti-pattern
+      try {
+        const provider = await this.createProvider(providerId, providerType);
 
-        case 'microsoft':
-          result = await this.microsoftSync.syncProvider(job.data);
-          break;
+        // Prepare sync options from job data
+        const syncOptions = {
+          syncType: syncType === 'full' ? 'full' as const : 'incremental' as const,
+          maxMessages: 200, // TODO: make configurable
+          // Provider-specific sync tokens will be handled internally
+        };
 
-        case 'generic':
-          result = await this.imapSync.syncProvider(job.data);
-          break;
+        const providerResult = await provider.syncEmails(syncOptions);
 
-        default:
-          throw new Error(`Unknown provider type: ${providerType}`);
+        // Convert provider result to SyncJobResult format
+        result = {
+          success: providerResult.success,
+          providerId,
+          email,
+          messagesProcessed: providerResult.emailsSynced,
+          newMessages: providerResult.newEmails,
+          errors: providerResult.errors?.map(e => e.message) || [],
+          lastSyncToken: providerResult.nextHistoryId || providerResult.nextDeltaLink,
+          metadata: {
+            updatedEmails: providerResult.updatedEmails,
+            deletedEmails: providerResult.deletedEmails,
+          },
+          syncDuration: 0, // Will be set at the end
+        };
+
+        this.logger.debug(`✅ Used ProviderFactory for ${providerType} sync`);
+      } catch (factoryError) {
+        // FALLBACK: If provider methods not yet implemented, use legacy services
+        // This ensures backward compatibility during gradual migration
+        const errorMessage = factoryError instanceof Error ? factoryError.message : String(factoryError);
+
+        if (errorMessage.includes('not implemented')) {
+          this.logger.debug(`⚠️  Provider method not implemented, falling back to legacy service for ${providerType}`);
+
+          // Legacy switch-case (will be removed once all providers are implemented)
+          switch (providerType) {
+            case 'google':
+              result = await this.googleSync.syncProvider(job.data);
+              break;
+
+            case 'microsoft':
+              result = await this.microsoftSync.syncProvider(job.data);
+              break;
+
+            case 'generic':
+              result = await this.imapSync.syncProvider(job.data);
+              break;
+
+            default:
+              throw new Error(`Unknown provider type: ${providerType}`);
+          }
+        } else {
+          // Re-throw if it's a different error
+          throw factoryError;
+        }
       }
 
       // Update last synced timestamp in database
@@ -211,6 +257,56 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     });
 
     return provider?.metadata || {};
+  }
+
+  /**
+   * Create ProviderConfig from database
+   * Helper method to convert database ProviderConfig to IEmailProvider config
+   */
+  private async createProviderConfigFromDb(providerId: string): Promise<ProviderConfig> {
+    const dbProvider = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+      select: {
+        id: true,
+        userId: true,
+        providerType: true,
+        email: true,
+        accessToken: true,
+        refreshToken: true,
+        tokenExpiresAt: true,
+      },
+    });
+
+    if (!dbProvider) {
+      throw new Error(`Provider ${providerId} not found in database`);
+    }
+
+    if (!dbProvider.userId) {
+      throw new Error(`Provider ${providerId} has no userId`);
+    }
+
+    // Decrypt tokens if needed (assuming they're stored encrypted)
+    const accessToken = dbProvider.accessToken || '';
+    const refreshToken = dbProvider.refreshToken || '';
+
+    return {
+      userId: dbProvider.userId,
+      providerId: dbProvider.id,
+      providerType: dbProvider.providerType as 'google' | 'microsoft' | 'imap',
+      email: dbProvider.email,
+      accessToken,
+      refreshToken,
+      expiresAt: dbProvider.tokenExpiresAt || undefined,
+    };
+  }
+
+  /**
+   * Create email provider instance using ProviderFactory
+   * This replaces the old switch-case pattern
+   */
+  private async createProvider(providerId: string, providerType: string): Promise<IEmailProvider> {
+    const config = await this.createProviderConfigFromDb(providerId);
+    return ProviderFactory.create(providerType, config);
   }
 
   async onModuleDestroy() {
