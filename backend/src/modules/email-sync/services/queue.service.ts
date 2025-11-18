@@ -83,7 +83,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     // Initialize Redis connection
     const redisHost = this.configService.get<string>('REDIS_HOST', 'localhost');
-    const redisPort = this.configService.get<number>('REDIS_PORT', 6379);
+    const redisPort = this.getNumber('REDIS_PORT', 6379);
     const redisPassword = this.configService.get<string>('REDIS_PASSWORD');
     this.workerToken = this.configService.get<string>('EMAIL_SYNC_WORKER_TOKEN');
 
@@ -115,6 +115,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         attempts: this.getAttempts('NORMAL'),
         backoff: this.getBackoff('NORMAL'),
         removeOnComplete: this.getRemoveOnComplete('NORMAL'),
+        removeOnFail: this.getRemoveOnFail('NORMAL'),
       },
     });
 
@@ -125,6 +126,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         attempts: this.getAttempts('LOW'),
         backoff: this.getBackoff('LOW'),
         removeOnComplete: this.getRemoveOnComplete('LOW'),
+        removeOnFail: this.getRemoveOnFail('LOW'),
       },
     });
 
@@ -455,11 +457,11 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
   private getAttempts(level: 'HIGH' | 'NORMAL' | 'LOW'): number {
     switch (level) {
       case 'HIGH':
-        return this.configService.get<number>('QUEUE_HIGH_ATTEMPTS', 3);
+        return this.getNumber('QUEUE_HIGH_ATTEMPTS', 3);
       case 'NORMAL':
-        return this.configService.get<number>('QUEUE_NORMAL_ATTEMPTS', 2);
+        return this.getNumber('QUEUE_NORMAL_ATTEMPTS', 2);
       case 'LOW':
-        return this.configService.get<number>('QUEUE_LOW_ATTEMPTS', 1);
+        return this.getNumber('QUEUE_LOW_ATTEMPTS', 1);
       default:
         return 1;
     }
@@ -472,12 +474,12 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       case 'HIGH':
         return {
           type: 'exponential',
-          delay: this.configService.get<number>('QUEUE_HIGH_BACKOFF_MS', 5000),
+          delay: this.getNumber('QUEUE_HIGH_BACKOFF_MS', 5000),
         };
       case 'NORMAL':
         return {
           type: 'exponential',
-          delay: this.configService.get<number>('QUEUE_NORMAL_BACKOFF_MS', 10000),
+          delay: this.getNumber('QUEUE_NORMAL_BACKOFF_MS', 10000),
         };
       case 'LOW':
         return undefined;
@@ -490,8 +492,8 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     switch (level) {
       case 'HIGH':
         return {
-          count: this.configService.get<number>('QUEUE_HIGH_REMOVE_ON_COMPLETE_COUNT', 50),
-          age: this.configService.get<number>('QUEUE_HIGH_REMOVE_ON_COMPLETE_AGE', 3600),
+          count: this.getNumber('QUEUE_HIGH_REMOVE_ON_COMPLETE_COUNT', 50),
+          age: this.getNumber('QUEUE_HIGH_REMOVE_ON_COMPLETE_AGE', 3600),
         };
       case 'NORMAL':
       case 'LOW':
@@ -505,7 +507,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     switch (level) {
       case 'HIGH':
         return {
-          count: this.configService.get<number>('QUEUE_HIGH_REMOVE_ON_FAIL_COUNT', 100),
+          count: this.getNumber('QUEUE_HIGH_REMOVE_ON_FAIL_COUNT', 100),
         };
       case 'NORMAL':
       case 'LOW':
@@ -513,6 +515,16 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       default:
         return true;
     }
+  }
+
+  private getNumber(envKey: string, defaultValue: number): number {
+    const raw = this.configService.get<string | number>(envKey);
+    if (raw === undefined || raw === null || raw === '') {
+      return defaultValue;
+    }
+
+    const parsed = typeof raw === 'number' ? raw : Number(raw);
+    return Number.isFinite(parsed) ? parsed : defaultValue;
   }
 
   private async hasPendingJob(providerId: string, tenantId?: string): Promise<boolean> {

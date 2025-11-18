@@ -3,14 +3,13 @@ import { Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { QueueService } from '../services/queue.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { SyncSchedulerService } from '../services/sync-scheduler.service';
 import { FolderSyncService } from '../services/folder-sync.service';
 import { SyncAuthService } from '../services/sync-auth.service';
-import { ProviderFactory } from '../../providers/factory/provider.factory';
-import { ProviderConfig, IEmailProvider } from '../../providers/interfaces/email-provider.interface';
-import { ProviderTokenService } from '../services/provider-token.service';
+import { GoogleSyncService } from '../services/google-sync.service';
+import { MicrosoftSyncService } from '../services/microsoft-sync.service';
+import { ImapSyncService } from '../services/imap-sync.service';
 
 @Injectable()
 export class SyncWorker implements OnModuleInit, OnModuleDestroy {
@@ -34,12 +33,13 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
-    private queueService: QueueService,
     @Inject(forwardRef(() => SyncSchedulerService))
     private syncScheduler: SyncSchedulerService,
     private folderSyncService: FolderSyncService,
     private readonly syncAuth: SyncAuthService,
-    private readonly providerTokenService: ProviderTokenService,
+    private readonly googleSyncService: GoogleSyncService,
+    private readonly microsoftSyncService: MicrosoftSyncService,
+    private readonly imapSyncService: ImapSyncService,
   ) {}
 
   async onModuleInit() {
@@ -125,39 +125,10 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`Processing ${syncType} sync for ${email} (${providerType})`);
 
     const startTime = Date.now();
-    let result: SyncJobResult;
 
     try {
-      // Use ProviderFactory pattern for all providers (Google, Microsoft, IMAP)
-      // All providers are now fully implemented
-      const provider = await this.createProvider(providerId, providerType);
-
-      // Prepare sync options from job data
-      const syncOptions = {
-        syncType: syncType === 'full' ? 'full' as const : 'incremental' as const,
-        maxMessages: this.configService.get<number>('SYNC_MAX_MESSAGES_PER_JOB', 200),
-        // Provider-specific sync tokens will be handled internally
-      };
-
-      const providerResult = await provider.syncEmails(syncOptions);
-
-      // Convert provider result to SyncJobResult format
-      result = {
-        success: providerResult.success,
-        providerId,
-        email,
-        messagesProcessed: providerResult.emailsSynced,
-        newMessages: providerResult.newEmails,
-        errors: providerResult.errors?.map(e => e.message) || [],
-        lastSyncToken: providerResult.nextHistoryId || providerResult.nextDeltaLink,
-        metadata: {
-          updatedEmails: providerResult.updatedEmails,
-          deletedEmails: providerResult.deletedEmails,
-        },
-        syncDuration: 0, // Will be set at the end
-      };
-
-      this.logger.debug(`✅ Used ProviderFactory for ${providerType} sync`);
+      // Delegate to provider-specific sync services (they also persist emails to DB)
+      const result = await this.runProviderSync(job.data);
 
       // Update last synced timestamp in database
       const metadataUpdates: Record<string, any> = {
@@ -193,8 +164,10 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
       // Refresh folder counts and emit realtime updates
       await this.folderSyncService.updateAllFolderCounts(providerId);
 
-      result.syncDuration = Date.now() - startTime;
-      return result;
+      return {
+        ...result,
+        syncDuration: Date.now() - startTime,
+      };
     } catch (error) {
       this.logger.error(`Sync failed for ${email}:`, error);
 
@@ -215,6 +188,19 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async runProviderSync(jobData: SyncJobData): Promise<SyncJobResult> {
+    switch (jobData.providerType) {
+      case 'google':
+        return this.googleSyncService.syncProvider(jobData);
+      case 'microsoft':
+        return this.microsoftSyncService.syncProvider(jobData);
+      case 'generic':
+        return this.imapSyncService.syncProvider(jobData);
+      default:
+        throw new Error(`Unsupported provider type: ${jobData.providerType}`);
+    }
+  }
+
   private async getProviderMetadata(providerId: string): Promise<any> {
     const provider = await this.prisma.providerConfig.findUnique({
       where: { id: providerId },
@@ -222,39 +208,6 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     });
 
     return provider?.metadata || {};
-  }
-
-  /**
-   * Create ProviderConfig from database
-   * Helper method to convert database ProviderConfig to IEmailProvider config
-   */
-  private async createProviderConfigFromDb(providerId: string): Promise<ProviderConfig> {
-    const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
-      providerId,
-    );
-
-    if (!provider.userId) {
-      throw new Error(`Provider ${providerId} has no userId`);
-    }
-
-    return {
-      userId: provider.userId,
-      providerId: provider.id,
-      providerType: provider.providerType as 'google' | 'microsoft' | 'imap',
-      email: provider.email,
-      accessToken,
-      refreshToken: provider.refreshToken ? '***' : '', // not needed by provider instance
-      expiresAt: provider.tokenExpiresAt || undefined,
-    };
-  }
-
-  /**
-   * Create email provider instance using ProviderFactory
-   * This replaces the old switch-case pattern
-   */
-  private async createProvider(providerId: string, providerType: string): Promise<IEmailProvider> {
-    const config = await this.createProviderConfigFromDb(providerId);
-    return ProviderFactory.create(providerType, config);
   }
 
   async onModuleDestroy() {
@@ -278,3 +231,5 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     this.logger.log('All workers stopped successfully');
   }
 }
+
+

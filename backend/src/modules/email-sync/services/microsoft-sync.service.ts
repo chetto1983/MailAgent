@@ -450,7 +450,7 @@ export class MicrosoftSyncService implements OnModuleInit {
   }
 
   /**
-   * Full sync - fetch messages from last 60 days (max 1000)
+   * Full sync - fetch the most recent messages up to FULL_MAX_MESSAGES
    */
   private async syncFull(
     accessToken: string,
@@ -462,19 +462,11 @@ export class MicrosoftSyncService implements OnModuleInit {
     newMessages: number;
     latestReceivedDate?: string;
   }> {
-    this.logger.debug('Full sync - fetching messages from last 60 days');
+    this.logger.debug(`Full sync - fetching latest Microsoft messages (limit ${this.FULL_MAX_MESSAGES})`);
 
     try {
-      // Calculate date 60 days ago
-      const sixtyDaysAgo = new Date();
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-      const sinceIso = sixtyDaysAgo.toISOString();
-
-      this.logger.debug(`Fetching Microsoft messages since ${sinceIso}`);
-
-      // Fetch messages from last 60 days with pagination (max 1000)
+      // Fetch newest messages with pagination until FULL_MAX_MESSAGES
       const params = new URLSearchParams({
-        $filter: `receivedDateTime ge ${sinceIso}`,
         $orderby: 'receivedDateTime desc',
         $top: '50', // keep lower to stay within FULL_MAX_MESSAGES cap with fewer pages
       });
@@ -506,7 +498,7 @@ export class MicrosoftSyncService implements OnModuleInit {
         }
       }
 
-      this.logger.debug(`Found ${allMessages.length} Microsoft messages in last 60 days`);
+      this.logger.debug(`Found ${allMessages.length} Microsoft messages from most recent pages`);
 
       let messagesProcessed = 0;
       let newMessages = 0;
@@ -1334,4 +1326,3 @@ export class MicrosoftSyncService implements OnModuleInit {
     });
   }
 }
-

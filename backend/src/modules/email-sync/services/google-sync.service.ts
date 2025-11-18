@@ -307,7 +307,7 @@ export class GoogleSyncService implements OnModuleInit {
   }
 
   /**
-   * Full sync - fetch messages from last 60 days (max 1000)
+   * Full sync - fetch the most recent messages up to configured cap
    */
   private async syncFull(
     gmail: gmail_v1.Gmail,
@@ -319,27 +319,18 @@ export class GoogleSyncService implements OnModuleInit {
     newMessages: number;
     historyId: string;
   }> {
-    this.logger.debug('Full sync - fetching messages from last 60 days');
+    this.logger.debug(`Full sync - fetching latest Gmail messages (limit ${this.GMAIL_FULL_MAX_MESSAGES})`);
 
     try {
       // Get profile for historyId
       const profile = await gmail.users.getProfile({ userId: 'me' });
       const historyId = profile.data.historyId!;
 
-      // Calculate date 60 days ago in Gmail query format (YYYY/MM/DD)
-      const sixtyDaysAgo = new Date();
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-      const afterDate = sixtyDaysAgo.toISOString().split('T')[0].replace(/-/g, '/');
-
-      this.logger.debug(`Fetching Gmail messages after ${afterDate}`);
-
-      // List messages from last 60 days (max 1000)
-      // Remove folder restriction to sync all folders (inbox, sent, drafts, etc.)
+      // List newest messages (all folders) up to the configured cap
       const remaining = this.GMAIL_FULL_MAX_MESSAGES;
       const messagesResponse = await gmail.users.messages.list({
         userId: 'me',
         maxResults: Math.min(500, remaining), // Gmail API max per request
-        q: `after:${afterDate}`, // All folders from last 60 days
       });
 
       let messages = messagesResponse.data.messages || [];
@@ -350,7 +341,6 @@ export class GoogleSyncService implements OnModuleInit {
         const nextResponse = await gmail.users.messages.list({
           userId: 'me',
           maxResults: Math.min(500, this.GMAIL_FULL_MAX_MESSAGES - messages.length),
-          q: `after:${afterDate}`,
           pageToken,
         });
 
@@ -362,7 +352,7 @@ export class GoogleSyncService implements OnModuleInit {
         }
       }
 
-      this.logger.debug(`Found ${messages.length} Gmail messages in last 60 days`);
+      this.logger.debug(`Found ${messages.length} Gmail messages from the most recent pages`);
 
       let messagesProcessed = 0;
       let newMessages = 0;

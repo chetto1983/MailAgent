@@ -484,7 +484,9 @@ export class FolderSyncService {
       for (const folder of folders) {
         if (!folder.id || !folder.displayName) continue;
 
-        const specialUse = this.determineMicrosoftFolderType(folder.displayName);
+        const specialUse =
+          this.determineMicrosoftFolderType(folder.displayName) ||
+          this.normalizeFolderName(folder.displayName);
 
         await (this.prisma as any).folder.upsert({
           where: { providerId_path: { providerId, path: folder.id } },
@@ -723,6 +725,45 @@ export class FolderSyncService {
     if (folder.specialUse) {
       return [folder.specialUse.replace('\\', '').toUpperCase()];
     }
-    return [folder.name];
+
+    // Fallback: normalize common folder names even if specialUse was not set
+    return [this.normalizeFolderName(folder.name)];
+  }
+
+  private normalizeFolderName(name: string): string {
+    const lowerName = name.toLowerCase().trim();
+
+    if (lowerName === 'inbox' || lowerName === 'posta in arrivo' || lowerName === 'posteingang') return 'INBOX';
+    if (
+      lowerName === 'sent items' ||
+      lowerName === 'sentitems' ||
+      lowerName === 'sent' ||
+      lowerName === 'posta inviata' ||
+      lowerName === 'inviata' ||
+      lowerName === 'elementi inviati'
+    )
+      return 'SENT';
+    if (
+      lowerName === 'deleted items' ||
+      lowerName === 'deleteditems' ||
+      lowerName === 'trash' ||
+      lowerName === 'posta eliminata' ||
+      lowerName === 'cestino' ||
+      lowerName === 'eliminata'
+    )
+      return 'TRASH';
+    if (lowerName === 'drafts' || lowerName === 'bozze' || lowerName === 'draft') return 'DRAFTS';
+    if (
+      lowerName === 'junk email' ||
+      lowerName === 'junk' ||
+      lowerName === 'spam' ||
+      lowerName === 'posta indesiderata' ||
+      lowerName === 'post indiserata'
+    )
+      return 'SPAM';
+    if (lowerName === 'archive' || lowerName === 'archivia' || lowerName === 'archivio' || lowerName === 'all mail')
+      return 'ARCHIVE';
+
+    return name.toUpperCase();
   }
 }
