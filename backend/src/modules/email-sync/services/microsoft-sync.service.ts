@@ -1337,13 +1337,37 @@ export class MicrosoftSyncService implements OnModuleInit {
     const lowerName = folderName.toLowerCase();
 
     // Well-known Microsoft folder names
-    if (lowerName === 'inbox') return 'INBOX';
-    if (lowerName === 'sent items' || lowerName === 'sentitems') return 'SENT';
-    if (lowerName === 'drafts') return 'DRAFTS';
-    if (lowerName === 'deleted items' || lowerName === 'deleteditems' || lowerName === 'trash') return 'TRASH';
-    if (lowerName === 'junk email' || lowerName === 'junk' || lowerName === 'spam') return 'JUNK';
-    if (lowerName === 'archive') return 'ARCHIVE';
-    if (lowerName === 'outbox') return undefined; // Outbox is temporary
+    if (lowerName === 'inbox' || lowerName === 'posta in arrivo' || lowerName === 'posteingang') return 'INBOX';
+    if (
+      lowerName === 'sent items' ||
+      lowerName === 'sentitems' ||
+      lowerName === 'sent' ||
+      lowerName === 'posta inviata' ||
+      lowerName === 'inviata' ||
+      lowerName === 'elementi inviati'
+    )
+      return 'SENT';
+    if (lowerName === 'drafts' || lowerName === 'bozze' || lowerName === 'draft') return 'DRAFTS';
+    if (
+      lowerName === 'deleted items' ||
+      lowerName === 'deleteditems' ||
+      lowerName === 'trash' ||
+      lowerName === 'posta eliminata' ||
+      lowerName === 'cestino' ||
+      lowerName === 'eliminata'
+    )
+      return 'TRASH';
+    if (
+      lowerName === 'junk email' ||
+      lowerName === 'junk' ||
+      lowerName === 'spam' ||
+      lowerName === 'posta indesiderata' ||
+      lowerName === 'post indiserata'
+    )
+      return 'JUNK';
+    if (lowerName === 'archive' || lowerName === 'archivia' || lowerName === 'archivio' || lowerName === 'all mail')
+      return 'ARCHIVE';
+    if (lowerName === 'outbox' || lowerName === 'posta in uscita') return undefined; // Outbox is temporary
 
     return undefined;
   }

@@ -650,20 +650,12 @@ export class FolderSyncService {
       return null;
     }
 
-    // Count total emails in folder
-    // Email.folder may store either the display name or the normalized specialUse
-    const folderNames = [folder.name];
-    if (folder.name.toUpperCase() !== folder.name) {
-      folderNames.push(folder.name.toUpperCase());
-    }
-    if (folder.specialUse) {
-      folderNames.push(folder.specialUse.replace('\\', '').toUpperCase());
-    }
+    const folderKeys = this.getFolderKeys(folder);
 
     const totalCount = await this.prisma.email.count({
       where: {
         providerId,
-        folder: { in: folderNames },
+        folder: { in: folderKeys },
       },
     });
 
@@ -671,7 +663,7 @@ export class FolderSyncService {
     const unreadCount = await this.prisma.email.count({
       where: {
         providerId,
-        folder: { in: folderNames },
+        folder: { in: folderKeys },
         isRead: false,
       },
     });
@@ -733,5 +725,19 @@ export class FolderSyncService {
     this.logger.log(
       `Updated counts for ${changed}/${folders.length} folders (provider: ${providerId})`,
     );
+  }
+
+  /**
+   * Resolve folder keys used for counting/filtering.
+   * Prefer normalized specialUse if present, otherwise use the display name as-is.
+   */
+  private getFolderKeys(folder: {
+    name: string;
+    specialUse?: string | null;
+  }): string[] {
+    if (folder.specialUse) {
+      return [folder.specialUse.replace('\\', '').toUpperCase()];
+    }
+    return [folder.name];
   }
 }

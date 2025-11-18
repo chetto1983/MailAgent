@@ -25,7 +25,8 @@
       "Bash(node check-user-data.js:*)",
       "Bash(node check-sync-status.js:*)",
       "Bash(node backend/check-sync-status.js:*)",
-      "Bash(node backend/fix-category-folders.js:*)"
+      "Bash(node backend/fix-category-folders.js:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []
