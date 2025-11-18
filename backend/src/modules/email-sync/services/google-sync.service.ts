@@ -591,7 +591,7 @@ export class GoogleSyncService implements OnModuleInit {
     const updatedLabels = currentLabels.includes('TRASH')
       ? currentLabels
       : [...currentLabels, 'TRASH'];
-    const metadata = this.mergeEmailStatusMetadata(existing.metadata, 'deleted');
+    const metadata = mergeEmailStatusMetadata(existing.metadata, 'deleted');
 
     try {
       await this.prisma.email.update({
@@ -684,7 +684,7 @@ export class GoogleSyncService implements OnModuleInit {
     existing: Record<string, any> | null | undefined,
     status: 'deleted' | 'active',
   ): Promise<void> {
-    const next = this.mergeEmailStatusMetadata(existing, status);
+    const next = mergeEmailStatusMetadata(existing, status);
     const shouldUpdate =
       !existing ||
       existing.status !== next.status ||
@@ -705,25 +705,6 @@ export class GoogleSyncService implements OnModuleInit {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Failed to update metadata for email ${emailId}: ${message}`);
     }
-  }
-
-  private mergeEmailStatusMetadata(
-    existing: Record<string, any> | null | undefined,
-    status: 'deleted' | 'active',
-  ): Record<string, any> {
-    const metadata = { ...(existing ?? {}) };
-
-    metadata.status = status;
-
-    if (status === 'deleted') {
-      if (!metadata.deletedAt) {
-        metadata.deletedAt = new Date().toISOString();
-      }
-    } else if (metadata.deletedAt) {
-      delete metadata.deletedAt;
-    }
-
-    return metadata;
   }
 
   private isNotFoundError(error: unknown): boolean {
@@ -973,7 +954,7 @@ export class GoogleSyncService implements OnModuleInit {
           receivedAt: m.receivedAt,
           size: m.size,
           headers: m.headers,
-          metadata: this.mergeEmailStatusMetadata(null, m.metadataStatus),
+          metadata: mergeEmailStatusMetadata(null, m.metadataStatus),
         })),
         skipDuplicates: true,
       });
@@ -985,7 +966,7 @@ export class GoogleSyncService implements OnModuleInit {
           const existingEmail = existingMap.get(m.externalId);
           if (!existingEmail) return;
 
-          const metadata = this.mergeEmailStatusMetadata(
+          const metadata = mergeEmailStatusMetadata(
             existingEmail.metadata as Record<string, any> | null,
             m.metadataStatus,
           );

@@ -5,8 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { QueueService } from '../services/queue.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { GoogleSyncService } from '../services/google-sync.service';
-import { MicrosoftSyncService } from '../services/microsoft-sync.service';
 import { ImapSyncService } from '../services/imap-sync.service';
 import { SyncSchedulerService } from '../services/sync-scheduler.service';
 import { FolderSyncService } from '../services/folder-sync.service';
@@ -37,9 +35,7 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     private configService: ConfigService,
     private prisma: PrismaService,
     private queueService: QueueService,
-    private googleSync: GoogleSyncService,
-    private microsoftSync: MicrosoftSyncService,
-    private imapSync: ImapSyncService,
+    private imapSync: ImapSyncService, // Only IMAP still uses legacy service (fallback)
     @Inject(forwardRef(() => SyncSchedulerService))
     private syncScheduler: SyncSchedulerService,
     private folderSyncService: FolderSyncService,
@@ -164,32 +160,15 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
 
         this.logger.debug(`✅ Used ProviderFactory for ${providerType} sync`);
       } catch (factoryError) {
-        // FALLBACK: If provider methods not yet implemented, use legacy services
-        // This ensures backward compatibility during gradual migration
+        // FALLBACK: Only for IMAP provider which is not yet fully implemented
+        // Google and Microsoft providers are complete and no longer need fallback
         const errorMessage = factoryError instanceof Error ? factoryError.message : String(factoryError);
 
-        if (errorMessage.includes('not implemented')) {
-          this.logger.debug(`⚠️  Provider method not implemented, falling back to legacy service for ${providerType}`);
-
-          // Legacy switch-case (will be removed once all providers are implemented)
-          switch (providerType) {
-            case 'google':
-              result = await this.googleSync.syncProvider(job.data);
-              break;
-
-            case 'microsoft':
-              result = await this.microsoftSync.syncProvider(job.data);
-              break;
-
-            case 'generic':
-              result = await this.imapSync.syncProvider(job.data);
-              break;
-
-            default:
-              throw new Error(`Unknown provider type: ${providerType}`);
-          }
+        if (errorMessage.includes('NOT_IMPLEMENTED') && providerType === 'generic') {
+          this.logger.warn(`⚠️  IMAP provider not implemented, falling back to legacy ImapSyncService`);
+          result = await this.imapSync.syncProvider(job.data);
         } else {
-          // Re-throw if it's a different error
+          // Re-throw all other errors (including errors from complete providers)
           throw factoryError;
         }
       }

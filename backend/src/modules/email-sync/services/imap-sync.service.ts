@@ -8,6 +8,7 @@ import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.qu
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { EmailEventReason } from '../../realtime/types/realtime.types';
+import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
 
 const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
 const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -257,7 +258,7 @@ export class ImapSyncService {
               data: {
                 isDeleted: true,
                 folder: 'TRASH',
-                metadata: this.mergeEmailStatusMetadata(
+                metadata: mergeEmailStatusMetadata(
                   email.metadata as Record<string, any> | null,
                   'deleted',
                 ),
@@ -296,7 +297,7 @@ export class ImapSyncService {
             data: {
               isDeleted: true,
               folder: 'TRASH',
-              metadata: this.mergeEmailStatusMetadata(
+              metadata: mergeEmailStatusMetadata(
                 email.metadata as Record<string, any> | null,
                 'deleted',
               ),
@@ -542,7 +543,7 @@ export class ImapSyncService {
             uid: message.uid,
             flags: Array.from(flags),
           } as Record<string, any>,
-          metadata: this.mergeEmailStatusMetadata(null, isDeleted ? 'deleted' : 'active'),
+          metadata: mergeEmailStatusMetadata(null, isDeleted ? 'deleted' : 'active'),
         },
         update: {
           // Update flags in case they changed
@@ -647,7 +648,7 @@ export class ImapSyncService {
     existing: Record<string, any> | null | undefined,
     status: 'deleted' | 'active',
   ): Promise<void> {
-    const next = this.mergeEmailStatusMetadata(existing, status);
+    const next = mergeEmailStatusMetadata(existing, status);
     const shouldUpdate =
       !existing ||
       existing.status !== next.status ||
@@ -668,25 +669,6 @@ export class ImapSyncService {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Failed to update metadata for IMAP email ${emailId}: ${message}`);
     }
-  }
-
-  private mergeEmailStatusMetadata(
-    existing: Record<string, any> | null | undefined,
-    status: 'deleted' | 'active',
-  ): Record<string, any> {
-    const metadata = { ...(existing ?? {}) };
-
-    metadata.status = status;
-
-    if (status === 'deleted') {
-      if (!metadata.deletedAt) {
-        metadata.deletedAt = new Date().toISOString();
-      }
-    } else if (metadata.deletedAt) {
-      delete metadata.deletedAt;
-    }
-
-    return metadata;
   }
 
   private stripHtml(html: string): string {

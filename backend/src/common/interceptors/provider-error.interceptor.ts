@@ -313,19 +313,3 @@ export class ProviderErrorInterceptor implements NestInterceptor {
     return 'Insufficient permissions. Please reconnect and grant all required permissions.';
   }
 }
-
-/**
- * Legacy Error Handler for Backward Compatibility
- *
- * Use this until all services migrate to the new interceptor.
- * @deprecated Use ProviderErrorInterceptor instead
- */
-export class LegacyProviderErrorHandler {
-  static async handle(error: any, _context: any): Promise<never> {
-    const logger = new Logger('LegacyProviderErrorHandler');
-
-    // For now, just re-throw - implement specific logic as needed
-    logger.warn('Using legacy error handler - please migrate to ProviderErrorInterceptor');
-    throw error;
-  }
-}

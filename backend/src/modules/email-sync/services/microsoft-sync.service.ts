@@ -10,6 +10,7 @@ import { RealtimeEventsService } from '../../realtime/services/realtime-events.s
 import { EmailEventReason } from '../../realtime/types/realtime.types';
 import { ConfigService } from '@nestjs/config';
 import { ProviderTokenService } from './provider-token.service';
+import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
 
 interface MicrosoftMessage {
   id: string;
@@ -918,7 +919,7 @@ export class MicrosoftSyncService implements OnModuleInit {
           sentAt: m.sentAt,
           receivedAt: m.receivedAt,
           size: m.size,
-          metadata: this.mergeEmailStatusMetadata(null, m.metadataStatus),
+          metadata: mergeEmailStatusMetadata(null, m.metadataStatus),
         })),
         skipDuplicates: true,
       });
@@ -930,7 +931,7 @@ export class MicrosoftSyncService implements OnModuleInit {
           const existingEmail = existingMap.get(m.externalId);
           if (!existingEmail) return;
 
-          const metadata = this.mergeEmailStatusMetadata(
+          const metadata = mergeEmailStatusMetadata(
             existingEmail.metadata as Record<string, any> | null,
             m.metadataStatus,
           );
@@ -1090,7 +1091,7 @@ export class MicrosoftSyncService implements OnModuleInit {
         },
         data: {
           isRead,
-          metadata: this.mergeEmailStatusMetadata(null, 'active'),
+          metadata: mergeEmailStatusMetadata(null, 'active'),
         },
       });
     }
@@ -1136,7 +1137,7 @@ export class MicrosoftSyncService implements OnModuleInit {
         },
         data: {
           folder: destinationFolderName ?? destinationFolderId,
-          metadata: this.mergeEmailStatusMetadata(null, 'active'),
+          metadata: mergeEmailStatusMetadata(null, 'active'),
         },
       });
     }
@@ -1162,22 +1163,6 @@ export class MicrosoftSyncService implements OnModuleInit {
       this.logger.error(`Failed to process Microsoft message ${messageId}: ${message}`);
       return false;
     }
-  }
-
-  private mergeEmailStatusMetadata(
-    existing: Record<string, any> | null | undefined,
-    status: 'deleted' | 'active',
-  ): Record<string, any> {
-    const metadata = { ...(existing ?? {}) };
-    metadata.status = status;
-    if (status === 'deleted') {
-      if (!metadata.deletedAt) {
-        metadata.deletedAt = new Date().toISOString();
-      }
-    } else if (metadata.deletedAt) {
-      delete metadata.deletedAt;
-    }
-    return metadata;
   }
 
   private async handleRemoteRemoval(
