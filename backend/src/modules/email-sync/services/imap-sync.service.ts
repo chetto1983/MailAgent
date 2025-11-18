@@ -681,36 +681,8 @@ export class ImapSyncService {
     reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
-    try {
-      // Emit WebSocket event
-      const eventPayload = {
-        providerId,
-        reason,
-        ...payload,
-      };
-
-      switch (reason) {
-        case 'message-processed':
-          this.realtimeEvents.emitEmailNew(tenantId, eventPayload);
-          break;
-        case 'labels-updated':
-          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
-          break;
-        case 'message-deleted':
-          this.realtimeEvents.emitEmailDelete(tenantId, eventPayload);
-          break;
-        case 'sync-complete':
-          this.realtimeEvents.emitSyncStatus(tenantId, {
-            providerId,
-            status: 'completed',
-          });
-          break;
-        default:
-          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.debug(`Failed to emit IMAP mailbox event: ${message}`);
-    }
+    // Delegate to centralized RealtimeEventsService method
+    // Note: IMAP doesn't use suppressMessageEvents
+    this.realtimeEvents.notifyMailboxChange(tenantId, providerId, reason, payload);
   }
 }

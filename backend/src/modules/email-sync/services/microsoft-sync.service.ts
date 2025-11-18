@@ -11,6 +11,7 @@ import { EmailEventReason } from '../../realtime/types/realtime.types';
 import { ConfigService } from '@nestjs/config';
 import { ProviderTokenService } from './provider-token.service';
 import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
+import { RetryService } from '../../../common/services/retry.service';
 
 interface MicrosoftMessage {
   id: string;
@@ -76,6 +77,7 @@ export class MicrosoftSyncService implements OnModuleInit {
     private realtimeEvents: RealtimeEventsService,
     private readonly config: ConfigService,
     private readonly providerTokenService: ProviderTokenService,
+    private retryService: RetryService,
   ) {}
 
   onModuleInit() {
@@ -1015,41 +1017,12 @@ export class MicrosoftSyncService implements OnModuleInit {
   }
 
   private async msRequestWithRetry<T>(fn: () => Promise<T>): Promise<T> {
-    let attempt = 0;
-    let lastError: any;
-
-    while (attempt < this.RETRY_MAX_ATTEMPTS) {
-      try {
-        return await fn();
-      } catch (error) {
-        lastError = error;
-        const status =
-          (error as any)?.response?.status ??
-          (error as any)?.response?.statusCode ??
-          (error as any)?.status ??
-          (error as any)?.statusCode;
-
-        attempt += 1;
-
-        if (status === 429) {
-          const delay = this.RETRY_ON_429_DELAY_MS * attempt;
-          this.logger.warn(`Graph 429 on attempt ${attempt}/${this.RETRY_MAX_ATTEMPTS}, retry in ${delay}ms`);
-          await new Promise((res) => setTimeout(res, delay));
-          continue;
-        }
-
-        if (status && status >= 500 && status < 600) {
-          const delay = this.RETRY_ON_5XX_DELAY_MS * attempt;
-          this.logger.warn(`Graph ${status} on attempt ${attempt}/${this.RETRY_MAX_ATTEMPTS}, retry in ${delay}ms`);
-          await new Promise((res) => setTimeout(res, delay));
-          continue;
-        }
-
-        throw error;
-      }
-    }
-
-    throw lastError;
+    return this.retryService.withRetry(fn, {
+      maxAttempts: this.RETRY_MAX_ATTEMPTS,
+      delay429Ms: this.RETRY_ON_429_DELAY_MS,
+      delay5xxMs: this.RETRY_ON_5XX_DELAY_MS,
+      loggerName: 'MicrosoftGraph',
+    });
   }
 
   /**
@@ -1355,43 +1328,10 @@ export class MicrosoftSyncService implements OnModuleInit {
     reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
-    try {
-      const eventPayload = {
-        providerId,
-        reason,
-        ...payload,
-      };
-
-      if (
-        this.suppressMessageEvents &&
-        (reason === 'message-processed' || reason === 'labels-updated' || reason === 'message-deleted')
-      ) {
-        return;
-      }
-
-      switch (reason) {
-        case 'message-processed':
-          this.realtimeEvents.emitEmailNew(tenantId, eventPayload);
-          break;
-        case 'labels-updated':
-          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
-          break;
-        case 'message-deleted':
-          this.realtimeEvents.emitEmailDelete(tenantId, eventPayload);
-          break;
-        case 'sync-complete':
-          this.realtimeEvents.emitSyncStatus(tenantId, {
-            providerId,
-            status: 'completed',
-          });
-          break;
-        default:
-          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.debug(`Failed to emit Microsoft mailbox event: ${message}`);
-    }
+    // Delegate to centralized RealtimeEventsService method
+    this.realtimeEvents.notifyMailboxChange(tenantId, providerId, reason, payload, {
+      suppressMessageEvents: this.suppressMessageEvents,
+    });
   }
 }
 

@@ -268,6 +268,69 @@ export class RealtimeEventsService {
   }
 
   /**
+   * MAILBOX CHANGE NOTIFICATIONS
+   */
+
+  /**
+   * Centralized method for notifying mailbox changes from sync services
+   * Replaces duplicate notifyMailboxChange methods in google-sync, microsoft-sync, and imap-sync services
+   *
+   * @param tenantId - The tenant ID
+   * @param providerId - The provider ID
+   * @param reason - The event reason (message-processed, labels-updated, message-deleted, sync-complete)
+   * @param payload - Optional payload with emailId, externalId, folder
+   * @param options - Optional configuration (suppressMessageEvents flag)
+   */
+  notifyMailboxChange(
+    tenantId: string,
+    providerId: string,
+    reason: EmailEventPayload['reason'],
+    payload?: { emailId?: string; externalId?: string; folder?: string },
+    options?: { suppressMessageEvents?: boolean },
+  ): void {
+    try {
+      const eventPayload: EmailEventPayload = {
+        providerId,
+        reason,
+        ...payload,
+      };
+
+      // Skip message events if suppression is enabled
+      if (
+        options?.suppressMessageEvents &&
+        (reason === 'message-processed' || reason === 'labels-updated' || reason === 'message-deleted')
+      ) {
+        return;
+      }
+
+      // Route to appropriate emit method based on reason
+      switch (reason) {
+        case 'message-processed':
+          this.emitEmailNew(tenantId, eventPayload);
+          break;
+        case 'labels-updated':
+          this.emitEmailUpdate(tenantId, eventPayload);
+          break;
+        case 'message-deleted':
+          this.emitEmailDelete(tenantId, eventPayload);
+          break;
+        case 'sync-complete':
+          this.emitSyncStatus(tenantId, {
+            providerId,
+            status: 'completed',
+          });
+          break;
+        default:
+          // Fallback for any unknown reasons
+          this.emitEmailUpdate(tenantId, eventPayload);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Failed to emit mailbox change event for ${tenantId}: ${message}`);
+    }
+  }
+
+  /**
    * GENERIC EMIT
    */
 

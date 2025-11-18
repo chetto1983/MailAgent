@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { QueueService } from '../services/queue.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { ImapSyncService } from '../services/imap-sync.service';
 import { SyncSchedulerService } from '../services/sync-scheduler.service';
 import { FolderSyncService } from '../services/folder-sync.service';
 import { SyncAuthService } from '../services/sync-auth.service';
@@ -35,7 +34,6 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     private configService: ConfigService,
     private prisma: PrismaService,
     private queueService: QueueService,
-    private imapSync: ImapSyncService, // Only IMAP still uses legacy service (fallback)
     @Inject(forwardRef(() => SyncSchedulerService))
     private syncScheduler: SyncSchedulerService,
     private folderSyncService: FolderSyncService,
@@ -128,50 +126,36 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
     let result: SyncJobResult;
 
     try {
-      // NEW: Try using ProviderFactory pattern first
-      // This is the new architecture that eliminates switch-case anti-pattern
-      try {
-        const provider = await this.createProvider(providerId, providerType);
+      // Use ProviderFactory pattern for all providers (Google, Microsoft, IMAP)
+      // All providers are now fully implemented
+      const provider = await this.createProvider(providerId, providerType);
 
-        // Prepare sync options from job data
-        const syncOptions = {
-          syncType: syncType === 'full' ? 'full' as const : 'incremental' as const,
-          maxMessages: this.configService.get<number>('SYNC_MAX_MESSAGES_PER_JOB', 200),
-          // Provider-specific sync tokens will be handled internally
-        };
+      // Prepare sync options from job data
+      const syncOptions = {
+        syncType: syncType === 'full' ? 'full' as const : 'incremental' as const,
+        maxMessages: this.configService.get<number>('SYNC_MAX_MESSAGES_PER_JOB', 200),
+        // Provider-specific sync tokens will be handled internally
+      };
 
-        const providerResult = await provider.syncEmails(syncOptions);
+      const providerResult = await provider.syncEmails(syncOptions);
 
-        // Convert provider result to SyncJobResult format
-        result = {
-          success: providerResult.success,
-          providerId,
-          email,
-          messagesProcessed: providerResult.emailsSynced,
-          newMessages: providerResult.newEmails,
-          errors: providerResult.errors?.map(e => e.message) || [],
-          lastSyncToken: providerResult.nextHistoryId || providerResult.nextDeltaLink,
-          metadata: {
-            updatedEmails: providerResult.updatedEmails,
-            deletedEmails: providerResult.deletedEmails,
-          },
-          syncDuration: 0, // Will be set at the end
-        };
+      // Convert provider result to SyncJobResult format
+      result = {
+        success: providerResult.success,
+        providerId,
+        email,
+        messagesProcessed: providerResult.emailsSynced,
+        newMessages: providerResult.newEmails,
+        errors: providerResult.errors?.map(e => e.message) || [],
+        lastSyncToken: providerResult.nextHistoryId || providerResult.nextDeltaLink,
+        metadata: {
+          updatedEmails: providerResult.updatedEmails,
+          deletedEmails: providerResult.deletedEmails,
+        },
+        syncDuration: 0, // Will be set at the end
+      };
 
-        this.logger.debug(`✅ Used ProviderFactory for ${providerType} sync`);
-      } catch (factoryError) {
-        // FALLBACK: Only for IMAP provider which is not yet fully implemented
-        // Google and Microsoft providers are complete and no longer need fallback
-        const errorMessage = factoryError instanceof Error ? factoryError.message : String(factoryError);
-
-        if (errorMessage.includes('NOT_IMPLEMENTED') && providerType === 'generic') {
-          this.logger.warn(`⚠️  IMAP provider not implemented, falling back to legacy ImapSyncService`);
-          result = await this.imapSync.syncProvider(job.data);
-        } else {
-          // Re-throw all other errors (including errors from complete providers)
-          throw factoryError;
-        }
-      }
+      this.logger.debug(`✅ Used ProviderFactory for ${providerType} sync`);
 
       // Update last synced timestamp in database
       const metadataUpdates: Record<string, any> = {

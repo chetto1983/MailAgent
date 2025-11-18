@@ -351,7 +351,7 @@ export class GoogleCalendarProvider implements ICalendarProvider {
 
   // ==================== Sync Operations ====================
 
-  async syncCalendars(options?: CalendarSyncOptions): Promise<CalendarSyncResult> {
+  async syncCalendars(_options?: CalendarSyncOptions): Promise<CalendarSyncResult> {
     return this.withErrorHandling('syncCalendars', async () => {
       try {
         return await this.googleCalendarSync.syncCalendar(this.config.providerId);

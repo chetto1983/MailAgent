@@ -11,6 +11,7 @@ import { EmailEventReason } from '../../realtime/types/realtime.types';
 import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
 import { ConfigService } from '@nestjs/config';
 import { ProviderTokenService } from './provider-token.service';
+import { RetryService } from '../../../common/services/retry.service';
 
 @Injectable()
 export class GoogleSyncService implements OnModuleInit {
@@ -32,6 +33,7 @@ export class GoogleSyncService implements OnModuleInit {
     private realtimeEvents: RealtimeEventsService,
     private config: ConfigService,
     private providerTokenService: ProviderTokenService,
+    private retryService: RetryService,
   ) {}
 
   onModuleInit() {
@@ -126,41 +128,12 @@ export class GoogleSyncService implements OnModuleInit {
   }
 
   private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
-    let attempt = 0;
-    let lastError: any;
-
-    while (attempt < this.RETRY_MAX_ATTEMPTS) {
-      try {
-        return await fn();
-      } catch (error) {
-        lastError = error;
-        const status =
-          (error as any)?.response?.status ??
-          (error as any)?.response?.statusCode ??
-          (error as any)?.code ??
-          (error as any)?.statusCode;
-
-        attempt += 1;
-
-        if (status === 429) {
-          const delay = this.RETRY_429_DELAY_MS * attempt;
-          this.logger.warn(`Gmail 429 on attempt ${attempt}/${this.RETRY_MAX_ATTEMPTS}, retry in ${delay}ms`);
-          await new Promise((res) => setTimeout(res, delay));
-          continue;
-        }
-
-        if (status && status >= 500 && status < 600) {
-          const delay = this.RETRY_5XX_DELAY_MS * attempt;
-          this.logger.warn(`Gmail ${status} on attempt ${attempt}/${this.RETRY_MAX_ATTEMPTS}, retry in ${delay}ms`);
-          await new Promise((res) => setTimeout(res, delay));
-          continue;
-        }
-
-        throw error;
-      }
-    }
-
-    throw lastError;
+    return this.retryService.withRetry(fn, {
+      maxAttempts: this.RETRY_MAX_ATTEMPTS,
+      delay429Ms: this.RETRY_429_DELAY_MS,
+      delay5xxMs: this.RETRY_5XX_DELAY_MS,
+      loggerName: 'Gmail',
+    });
   }
 
   /**
@@ -1221,40 +1194,9 @@ export class GoogleSyncService implements OnModuleInit {
     reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
-    try {
-      // Emit WebSocket event
-      const eventPayload = {
-        providerId,
-        reason,
-        ...payload,
-      };
-
-      if (this.suppressMessageEvents && (reason === 'message-processed' || reason === 'labels-updated' || reason === 'message-deleted')) {
-        return;
-      }
-
-      switch (reason) {
-        case 'message-processed':
-          this.realtimeEvents.emitEmailNew(tenantId, eventPayload);
-          break;
-        case 'labels-updated':
-          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
-          break;
-        case 'message-deleted':
-          this.realtimeEvents.emitEmailDelete(tenantId, eventPayload);
-          break;
-        case 'sync-complete':
-          this.realtimeEvents.emitSyncStatus(tenantId, {
-            providerId,
-            status: 'completed',
-          });
-          break;
-        default:
-          this.realtimeEvents.emitEmailUpdate(tenantId, eventPayload);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.debug(`Failed to emit mailbox event for ${tenantId}: ${message}`);
-    }
+    // Delegate to centralized RealtimeEventsService method
+    this.realtimeEvents.notifyMailboxChange(tenantId, providerId, reason, payload, {
+      suppressMessageEvents: this.suppressMessageEvents,
+    });
   }
 }
