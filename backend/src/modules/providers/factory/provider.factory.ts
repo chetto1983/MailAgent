@@ -161,7 +161,10 @@ export function isMicrosoftProvider(
   return provider.config.providerType === 'microsoft';
 }
 
-// TODO: Add IMAP provider when implemented
-// export function isImapProvider(provider: IEmailProvider): provider is ImapEmailProvider {
-//   return provider.config.providerType === 'imap';
-// }
+/**
+ * Type guard to check if a provider is an IMAP provider
+ * Note: IMAP provider not yet implemented, this is a placeholder
+ */
+export function isImapProvider(provider: IEmailProvider): provider is any {
+  return provider.config.providerType === 'imap';
+}

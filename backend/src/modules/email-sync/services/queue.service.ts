@@ -3,26 +3,23 @@ import { Queue, QueueEvents, JobType } from 'bullmq';
 import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 import { SyncJobData, SyncStatus } from '../interfaces/sync-job.interface';
-import { ProviderFactory } from '../../providers/factory/provider.factory';
-import { SyncOptions } from '../../providers/interfaces/email-provider.interface';
-import { ProviderTokenService } from './provider-token.service';
 
 // Extended interface for sync job processing
-interface ProcessableSyncJobData extends SyncJobData {
-  maxMessages?: number;
-  folder?: string;
-  historyId?: string;
-  deltaLink?: string;
-}
+// interface ProcessableSyncJobData extends SyncJobData {
+//   maxMessages?: number;
+//   folder?: string;
+//   historyId?: string;
+//   deltaLink?: string;
+// }
 
 // Provider data structure for processing
-interface ProviderWithTokens {
-  id: string;
-  providerType: 'google' | 'microsoft' | 'imap';
-  email: string;
-  decryptedAccessToken: string;
-  decryptedRefreshToken?: string;
-}
+// interface ProviderWithTokens {
+//   id: string;
+//   providerType: 'google' | 'microsoft' | 'imap';
+//   email: string;
+//   decryptedAccessToken: string;
+//   decryptedRefreshToken?: string;
+// }
 
 type QueuePriority = 'high' | 'normal' | 'low';
 

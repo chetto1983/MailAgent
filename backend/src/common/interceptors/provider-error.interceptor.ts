@@ -241,7 +241,7 @@ export class ProviderErrorInterceptor implements NestInterceptor {
   // ERROR HANDLING METHODS
   // ============================================================================
 
-  private async handleTokenExpired(providerId?: string, tenantId?: string): Promise<void> {
+  private async handleTokenExpired(providerId?: string, _tenantId?: string): Promise<void> {
     if (!providerId) {
       this.logger.warn('Provider ID not available for token cleanup');
       return;
@@ -321,7 +321,7 @@ export class ProviderErrorInterceptor implements NestInterceptor {
  * @deprecated Use ProviderErrorInterceptor instead
  */
 export class LegacyProviderErrorHandler {
-  static async handle(error: any, context: any): Promise<never> {
+  static async handle(error: any, _context: any): Promise<never> {
     const logger = new Logger('LegacyProviderErrorHandler');
 
     // For now, just re-throw - implement specific logic as needed

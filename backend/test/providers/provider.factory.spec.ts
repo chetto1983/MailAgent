@@ -1,4 +1,4 @@
-const { ProviderFactory } = require('../src/modules/providers/factory/provider.factory');
+import { ProviderFactory } from '../../src/modules/providers/factory/provider.factory';
 
 describe('ProviderFactory', () => {
   it('should create Google provider successfully', () => {

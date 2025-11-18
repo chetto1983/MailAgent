@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import { ProviderFactory } from '../../../src/modules/providers/factory/provider.factory';
 import { ProviderTokenService } from '../../../src/modules/email-sync/services/provider-token.service';
+import { IEmailProvider } from '../../../src/modules/providers/interfaces/email-provider.interface';
 
 describe('Provider Integration Tests', () => {
   let prisma: PrismaClient;
@@ -238,7 +239,7 @@ describe('Provider Integration Tests', () => {
       const invalidConfig = {
         userId: 'test-user',
         providerId: googleProvider.id,
-        providerType: 'google',
+        providerType: 'google' as const,
         email: googleProvider.email,
         accessToken: 'invalid-token-123',
         refreshToken: '',
@@ -288,7 +289,7 @@ describe('Provider Integration Tests', () => {
     // Get real access token using our token service
     if (!providerTokenService) {
       // Initialize token service if not available
-      const module: TestingModule = await Test.createTestingModule({
+      const _module: TestingModule = await Test.createTestingModule({
         providers: [],
       }).compile();
     }
@@ -307,7 +308,7 @@ describe('Provider Integration Tests', () => {
     const config = {
       userId: 'integration-test',
       providerId: providerData.id,
-      providerType: providerData.providerType,
+      providerType: providerData.providerType as 'google' | 'microsoft' | 'imap',
       email: providerData.email,
       accessToken: 'PLACEHOLDER_TOKEN', // Would be real decrypted token
       refreshToken: '', // Would be real decrypted refresh token

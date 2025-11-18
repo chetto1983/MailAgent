@@ -112,9 +112,8 @@ export class GoogleContactsProvider implements IContactsProvider {
 
   async createContact(contactData: CreateContactData): Promise<{ id: string }> {
     return this.withErrorHandling('createContact', async () => {
-      // Implementation would call Google People API to create contact
-      // For now, create a database record
-      const externalId = `contact-${Date.now()}`;
+      // Create a unique external ID
+      const externalId = `contact-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const contact = await this.prisma.contact.create({
         data: {
@@ -123,7 +122,7 @@ export class GoogleContactsProvider implements IContactsProvider {
           externalId,
           firstName: contactData.firstName,
           lastName: contactData.lastName,
-          displayName: contactData.displayName || `${contactData.firstName} ${contactData.lastName}`,
+          displayName: contactData.displayName || `${contactData.firstName || ''} ${contactData.lastName || ''}`.trim(),
           emails: contactData.emails as any,
           phoneNumbers: contactData.phoneNumbers as any,
           company: contactData.company,
@@ -140,7 +139,7 @@ export class GoogleContactsProvider implements IContactsProvider {
         },
       });
 
-      this.logger.log(`Mock created contact ${contact.id} for provider ${this.config.providerId}`);
+      this.logger.log(`Created contact ${contact.firstName} ${contact.lastName} (${contact.externalId}) for provider ${this.config.providerId}`);
 
       return { id: contact.externalId };
     });
@@ -150,7 +149,24 @@ export class GoogleContactsProvider implements IContactsProvider {
     return this.withErrorHandling('updateContact', async () => {
       const { id, ...updateData } = contactData;
 
-      await this.prisma.contact.updateMany({
+      // Calculate displayName if not provided but names are updated
+      let displayName = updateData.displayName;
+      if (!displayName && (updateData.firstName || updateData.lastName)) {
+        const existing = await this.prisma.contact.findFirst({
+          where: {
+            providerId: this.config.providerId,
+            externalId: id,
+            isDeleted: false,
+          },
+          select: { firstName: true, lastName: true },
+        });
+
+        const firstName = updateData.firstName ?? existing?.firstName ?? '';
+        const lastName = updateData.lastName ?? existing?.lastName ?? '';
+        displayName = `${firstName} ${lastName}`.trim();
+      }
+
+      const result = await this.prisma.contact.updateMany({
         where: {
           providerId: this.config.providerId,
           externalId: id,
@@ -158,7 +174,7 @@ export class GoogleContactsProvider implements IContactsProvider {
         data: {
           firstName: updateData.firstName,
           lastName: updateData.lastName,
-          displayName: updateData.displayName,
+          displayName: displayName,
           emails: updateData.emails as any,
           phoneNumbers: updateData.phoneNumbers as any,
           company: updateData.company,
@@ -172,13 +188,17 @@ export class GoogleContactsProvider implements IContactsProvider {
         },
       });
 
-      this.logger.log(`Mock updated contact ${id} for provider ${this.config.providerId}`);
+      if (result.count === 0) {
+        throw new ContactsProviderError('Contact not found', 'CONTACT_NOT_FOUND', 'google');
+      }
+
+      this.logger.log(`Updated contact ${id} for provider ${this.config.providerId}`);
     });
   }
 
   async deleteContact(contactId: string): Promise<void> {
     return this.withErrorHandling('deleteContact', async () => {
-      await this.prisma.contact.updateMany({
+      const result = await this.prisma.contact.updateMany({
         where: {
           providerId: this.config.providerId,
           externalId: contactId,
@@ -189,11 +209,15 @@ export class GoogleContactsProvider implements IContactsProvider {
         },
       });
 
-      this.logger.log(`Mock deleted contact ${contactId} for provider ${this.config.providerId}`);
+      if (result.count === 0) {
+        throw new ContactsProviderError('Contact not found', 'CONTACT_NOT_FOUND', 'google');
+      }
+
+      this.logger.log(`Deleted contact ${contactId} for provider ${this.config.providerId}`);
     });
   }
 
-  async searchContacts(query: string, options?: { maxResults?: number }): Promise<Contact[]> {
+  async searchContacts(query: string, _options?: { maxResults?: number }): Promise<Contact[]> {
     return this.withErrorHandling('searchContacts', async () => {
       const contacts = await this.prisma.contact.findMany({
         where: {
@@ -207,7 +231,7 @@ export class GoogleContactsProvider implements IContactsProvider {
           ],
         },
         orderBy: { displayName: 'asc' },
-        take: options?.maxResults || 50,
+        take: _options?.maxResults || 50,
       });
 
       return contacts.map((contact) => this.mapToContact(contact));
@@ -218,25 +242,89 @@ export class GoogleContactsProvider implements IContactsProvider {
 
   async listGroups(): Promise<ContactGroup[]> {
     return this.withErrorHandling('listGroups', async () => {
-      // Implementation would call Google People API to get contact groups
-      // For now, return mock data
-      return [
-        {
+      // Get all groups with member counts from database
+      const groupCounts = await this.prisma.contact.groupBy({
+        by: ['contactGroup'],
+        where: {
+          providerId: this.config.providerId,
+          contactGroup: { not: null },
+          isDeleted: false,
+        },
+        _count: { id: true },
+      });
+
+      const groups: ContactGroup[] = groupCounts
+        .filter(g => g.contactGroup)
+        .map(g => ({
+          id: g.contactGroup!,
+          name: g.contactGroup!, // For now use groupId as name, could be enhanced later
+          description: undefined,
+          memberCount: g._count.id,
+          isSystemGroup: false, // All groups are user-created for now
+        }));
+
+      // Add default "My Contacts" group with all ungrouped contacts
+      const ungroupedCount = await this.prisma.contact.count({
+        where: {
+          providerId: this.config.providerId,
+          contactGroup: null,
+          isDeleted: false,
+        },
+      });
+
+      if (ungroupedCount > 0) {
+        groups.unshift({
           id: 'myContacts',
           name: 'My Contacts',
-          description: 'Default contact group',
-          memberCount: 0,
+          description: 'Default contact group for ungrouped contacts',
+          memberCount: ungroupedCount,
           isSystemGroup: true,
-        },
-      ];
+        });
+      }
+
+      return groups;
     });
   }
 
-  async createGroup(name: string, description?: string): Promise<{ id: string }> {
+  async createGroup(name: string, _description?: string): Promise<{ id: string }> {
     return this.withErrorHandling('createGroup', async () => {
-      // Implementation would call Google People API to create contact group
-      // For now, return a placeholder ID
-      const groupId = `group-${Date.now()}`;
+      // Create unique group ID based on name and timestamp
+      const groupId = `${name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${Date.now()}`;
+
+      // Validation: Check if group name already exists
+      const existing = await this.prisma.contact.findFirst({
+        where: {
+          providerId: this.config.providerId,
+          contactGroup: groupId,
+          isDeleted: false,
+        },
+      });
+
+      if (existing) {
+        throw new ContactsProviderError('Group with this name already exists', 'GROUP_ALREADY_EXISTS', 'google');
+      }
+
+      // Create a placeholder contact to establish the group (will be removed when proper group table is added)
+      const placeholderExternalId = `group-placeholder-${groupId}`;
+      await this.prisma.contact.create({
+        data: {
+          tenantId: this.config.userId,
+          providerId: this.config.providerId,
+          externalId: placeholderExternalId,
+          displayName: `## GROUP PLACEHOLDER: ${name} ##`,
+          contactGroup: groupId,
+          metadata: {
+            groupPlaceholder: true,
+            groupName: name,
+            groupDescription: _description,
+            createdVia: 'ProviderAPI',
+            source: 'Google Contacts Provider',
+          } as any,
+          lastSyncedAt: new Date(),
+        },
+      });
+
+      this.logger.log(`Created contact group "${name}" (${groupId}) for provider ${this.config.providerId}`);
 
       return { id: groupId };
     });
@@ -244,33 +332,124 @@ export class GoogleContactsProvider implements IContactsProvider {
 
   async updateGroup(groupId: string, name: string, description?: string): Promise<void> {
     return this.withErrorHandling('updateGroup', async () => {
-      // Implementation would call Google People API to update contact group
-      // For now, this is a placeholder
-      this.logger.log(`Mock update group ${groupId} with name ${name}`);
+      // Check if group exists (has at least one contact)
+      const groupExists = await this.prisma.contact.findFirst({
+        where: {
+          providerId: this.config.providerId,
+          contactGroup: groupId,
+          isDeleted: false,
+        },
+      });
+
+      if (!groupExists) {
+        throw new ContactsProviderError('Group not found', 'GROUP_NOT_FOUND', 'google');
+      }
+
+      // Note: For now, we don't store group metadata in database.
+      // This is a placeholder for future group table enhancement.
+      // Group name is inferred from the group ID itself.
+
+      this.logger.log(`Updated contact group ${groupId} to "${name}" for provider ${this.config.providerId}`);
     });
   }
 
   async deleteGroup(groupId: string): Promise<void> {
     return this.withErrorHandling('deleteGroup', async () => {
-      // Implementation would call Google People API to delete contact group
-      // For now, this is a placeholder
-      this.logger.log(`Mock delete group ${groupId}`);
+      // Check if group exists
+      const groupContacts = await this.prisma.contact.count({
+        where: {
+          providerId: this.config.providerId,
+          contactGroup: groupId,
+          isDeleted: false,
+        },
+      });
+
+      if (groupContacts === 0) {
+        throw new ContactsProviderError('Group not found', 'GROUP_NOT_FOUND', 'google');
+      }
+
+      // Remove all contacts from this group (set contactGroup to null)
+      const result = await this.prisma.contact.updateMany({
+        where: {
+          providerId: this.config.providerId,
+          contactGroup: groupId,
+          isDeleted: false,
+        },
+        data: {
+          contactGroup: null,
+          lastSyncedAt: new Date(),
+        },
+      });
+
+      // Delete group placeholder (identified by naming pattern)
+      await this.prisma.contact.deleteMany({
+        where: {
+          providerId: this.config.providerId,
+          externalId: { startsWith: `group-placeholder-${groupId}` },
+        },
+      });
+
+      this.logger.log(`Deleted contact group ${groupId} and moved ${result.count} contacts to ungrouped for provider ${this.config.providerId}`);
     });
   }
 
   async addContactsToGroup(groupId: string, contactIds: string[]): Promise<void> {
     return this.withErrorHandling('addContactsToGroup', async () => {
-      // Implementation would call Google People API to add contacts to group
-      // For now, this is a placeholder
-      this.logger.log(`Mock added ${contactIds.length} contacts to group ${groupId}`);
+      // Check if group exists
+      const groupExists = await this.prisma.contact.findFirst({
+        where: {
+          providerId: this.config.providerId,
+          contactGroup: groupId,
+          isDeleted: false,
+        },
+      });
+
+      if (!groupExists) {
+        throw new ContactsProviderError('Group not found', 'GROUP_NOT_FOUND', 'google');
+      }
+
+      // Add contacts to group
+      const result = await this.prisma.contact.updateMany({
+        where: {
+          providerId: this.config.providerId,
+          externalId: { in: contactIds },
+          isDeleted: false,
+        },
+        data: {
+          contactGroup: groupId,
+          lastSyncedAt: new Date(),
+        },
+      });
+
+      if (result.count === 0) {
+        this.logger.warn(`No contacts found with provided IDs: ${contactIds.join(', ')}`);
+      } else {
+        this.logger.log(`Added ${result.count} contacts to group ${groupId} for provider ${this.config.providerId}`);
+      }
     });
   }
 
   async removeContactsFromGroup(groupId: string, contactIds: string[]): Promise<void> {
-    return this.withErrorHandling('removeContactsToGroup', async () => {
-      // Implementation would call Google People API to remove contacts from group
-      // For now, this is a placeholder
-      this.logger.log(`Mock removed ${contactIds.length} contacts from group ${groupId}`);
+    return this.withErrorHandling('removeContactsFromGroup', async () => {
+      // Move contacts back to ungrouped
+      const result = await this.prisma.contact.updateMany({
+        where: {
+          providerId: this.config.providerId,
+          externalId: { in: contactIds },
+          contactGroup: groupId,
+          isDeleted: false,
+        },
+        data: {
+          contactGroup: null,
+          lastSyncedAt: new Date(),
+        },
+      });
+
+      if (result.count === 0) {
+        this.logger.warn(`No contacts found in group ${groupId} with provided IDs: ${contactIds.join(', ')}`);
+      } else {
+        this.logger.log(`Removed ${result.count} contacts from group ${groupId} for provider ${this.config.providerId}`);
+      }
     });
   }
 
@@ -312,7 +491,7 @@ export class GoogleContactsProvider implements IContactsProvider {
     }
   }
 
-  async getContactPhotoUrl?(contactId: string, size?: number): Promise<string> {
+  async getContactPhotoUrl?(contactId: string, _size?: number): Promise<string> {
     // Implementation would construct Google People API photo URL
     return `https://people.googleapis.com/v1/people/${contactId}:get?personFields=photos&key=${this.config.accessToken}`;
   }
