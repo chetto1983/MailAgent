@@ -1,22 +1,28 @@
-/**
- * Contacts Provider Factory
- *
- * Factory pattern for creating contacts provider instances
- * Part of the unified provider pattern implementation
- */
-
 import { Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { IContactsProvider, ContactsProviderConfig } from '../providers/interfaces/contacts-provider.interface';
+import { GoogleContactsProvider } from './providers/google-contacts.provider';
+import { MicrosoftContactsProvider } from './providers/microsoft-contacts.provider';
+
+/**
+ * Supported contacts provider implementations
+ */
+const CONTACTS_PROVIDER_CLASSES = {
+  google: GoogleContactsProvider,
+  microsoft: MicrosoftContactsProvider,
+} as const;
 
 /**
  * ContactsProviderFactory - Factory for creating contacts provider instances
  *
- * Currently supports Google Contacts through wrapper around GoogleContactsSyncService.
- * In future releases, direct provider implementations will be added.
+ * Now supports Google and Microsoft Contacts providers through unified provider pattern.
+ * Part of the unified provider pattern implementation.
  */
 @Injectable()
 export class ContactsProviderFactory {
-  private static readonly logger = new Logger(ContactsProviderFactory.name);
+  private readonly logger = new Logger(ContactsProviderFactory.name);
+
+  constructor(private readonly moduleRef: ModuleRef) {}
 
   /**
    * Create a contacts provider instance
@@ -26,27 +32,88 @@ export class ContactsProviderFactory {
    * @returns Contacts provider instance
    * @throws Error if provider type is not supported
    */
-  static create(providerType: string, config: ContactsProviderConfig): IContactsProvider {
-    this.logger.debug(`Creating contacts provider instance: ${providerType}`);
+  async create(providerType: string, config: ContactsProviderConfig): Promise<IContactsProvider> {
+    this.logger.debug(`Creating contacts provider instance: ${providerType} for ${config.email}`);
 
-    // Currently only Google Contacts is fully implemented
-    if (providerType === 'google') {
-      // Use wrapper around existing GoogleContactsSyncService
-      throw new Error(
-        'Google Contacts provider not yet implemented. Use GoogleContactsSyncService directly.',
-      );
+    // Validate configuration
+    ContactsProviderFactory.validateConfig(config);
+
+    switch (providerType.toLowerCase()) {
+      case 'google':
+        return this.createGoogleProvider(config);
+
+      case 'microsoft':
+        return this.createMicrosoftProvider(config);
+
+      default:
+        throw new Error(
+          `Contacts provider "${providerType}" not supported. Supported providers: ${ContactsProviderFactory.getSupportedProviders().join(', ')}`,
+        );
     }
+  }
 
-    if (providerType === 'microsoft') {
-      // Use wrapper around existing MicrosoftContactsSyncService
-      throw new Error(
-        'Microsoft Contacts provider not yet implemented. Use MicrosoftContactsSyncService directly.',
+  /**
+   * Create Google Contacts provider instance
+   */
+  private async createGoogleProvider(config: ContactsProviderConfig): Promise<IContactsProvider> {
+    const providerClass = CONTACTS_PROVIDER_CLASSES.google;
+
+    try {
+      // Get dependencies from module container
+      const [prisma, crypto, googleOAuth, googleContactsSync] = await Promise.all([
+        this.moduleRef.get('PrismaService'),
+        this.moduleRef.get('CryptoService'),
+        this.moduleRef.get('GoogleOAuthService'),
+        this.moduleRef.get('GoogleContactsSyncService'),
+      ]);
+
+      // Create and return provider instance
+      const provider = new providerClass(
+        config,
+        prisma as any,
+        crypto as any,
+        googleOAuth as any,
+        googleContactsSync as any,
       );
-    }
 
-    throw new Error(
-      `Contacts provider "${providerType}" not supported. Supported providers: google, microsoft`,
-    );
+      this.logger.log(`Google Contacts provider created for ${config.email}`);
+      return provider;
+    } catch (error) {
+      this.logger.error(`Failed to create Google Contacts provider:`, error);
+      throw new Error('Google Contacts provider initialization failed');
+    }
+  }
+
+  /**
+   * Create Microsoft Contacts provider instance
+   */
+  private async createMicrosoftProvider(config: ContactsProviderConfig): Promise<IContactsProvider> {
+    const providerClass = CONTACTS_PROVIDER_CLASSES.microsoft;
+
+    try {
+      // Get dependencies from module container
+      const [prisma, crypto, microsoftOAuth, microsoftContactsSync] = await Promise.all([
+        this.moduleRef.get('PrismaService'),
+        this.moduleRef.get('CryptoService'),
+        this.moduleRef.get('MicrosoftOAuthService'),
+        this.moduleRef.get('MicrosoftContactsSyncService'),
+      ]);
+
+      // Create and return provider instance
+      const provider = new providerClass(
+        config,
+        prisma as any,
+        crypto as any,
+        microsoftOAuth as any,
+        microsoftContactsSync as any,
+      );
+
+      this.logger.log(`Microsoft Contacts provider created for ${config.email}`);
+      return provider;
+    } catch (error) {
+      this.logger.error(`Failed to create Microsoft Contacts provider:`, error);
+      throw new Error('Microsoft Contacts provider initialization failed');
+    }
   }
 
   /**
@@ -81,11 +148,6 @@ export class ContactsProviderFactory {
 }
 
 /**
- * Helper function to create contacts provider (functional style)
+ * Contacts providers can be created by injecting ContactsProviderFactory
+ * and calling factory.create(providerType, config)
  */
-export function createContactsProvider(
-  providerType: string,
-  config: ContactsProviderConfig,
-): IContactsProvider {
-  return ContactsProviderFactory.create(providerType, config);
-}

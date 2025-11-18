@@ -1,22 +1,28 @@
-/**
- * Calendar Provider Factory
- *
- * Factory pattern for creating calendar provider instances
- * Part of the unified provider pattern implementation
- */
-
 import { Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import type { ICalendarProvider, CalendarProviderConfig } from '../providers/interfaces/calendar-provider.interface';
+import { GoogleCalendarProvider } from './providers/google-calendar.provider';
+import { MicrosoftCalendarProvider } from './providers/microsoft-calendar.provider';
+
+/**
+ * Supported calendar provider implementations
+ */
+const CALENDAR_PROVIDER_CLASSES = {
+  google: GoogleCalendarProvider,
+  microsoft: MicrosoftCalendarProvider,
+} as const;
 
 /**
  * CalendarProviderFactory - Factory for creating calendar provider instances
  *
- * Currently supports Google Calendar through wrapper around GoogleCalendarSyncService.
- * In future releases, direct provider implementations will be added.
+ * Now supports Google and Microsoft Calendar providers through unified provider pattern.
+ * Part of the unified provider pattern implementation.
  */
 @Injectable()
 export class CalendarProviderFactory {
-  private static readonly logger = new Logger(CalendarProviderFactory.name);
+  private readonly logger = new Logger(CalendarProviderFactory.name);
+
+  constructor(private readonly moduleRef: ModuleRef) {}
 
   /**
    * Create a calendar provider instance
@@ -26,27 +32,88 @@ export class CalendarProviderFactory {
    * @returns Calendar provider instance
    * @throws Error if provider type is not supported
    */
-  static create(providerType: string, config: CalendarProviderConfig): ICalendarProvider {
-    this.logger.debug(`Creating calendar provider instance: ${providerType}`);
+  async create(providerType: string, config: CalendarProviderConfig): Promise<ICalendarProvider> {
+    this.logger.debug(`Creating calendar provider instance: ${providerType} for ${config.email}`);
 
-    // Currently only Google Calendar is fully implemented
-    if (providerType === 'google') {
-      // Use wrapper around existing GoogleCalendarSyncService
-      throw new Error(
-        'Google Calendar provider not yet implemented. Use GoogleCalendarSyncService directly.',
-      );
+    // Validate configuration
+    CalendarProviderFactory.validateConfig(config);
+
+    switch (providerType.toLowerCase()) {
+      case 'google':
+        return this.createGoogleProvider(config);
+
+      case 'microsoft':
+        return this.createMicrosoftProvider(config);
+
+      default:
+        throw new Error(
+          `Calendar provider "${providerType}" not supported. Supported providers: ${CalendarProviderFactory.getSupportedProviders().join(', ')}`,
+        );
     }
+  }
 
-    if (providerType === 'microsoft') {
-      // Use wrapper around existing MicrosoftCalendarSyncService
-      throw new Error(
-        'Microsoft Calendar provider not yet implemented. Use MicrosoftCalendarSyncService directly.',
+  /**
+   * Create Google Calendar provider instance
+   */
+  private async createGoogleProvider(config: CalendarProviderConfig): Promise<ICalendarProvider> {
+    const providerClass = CALENDAR_PROVIDER_CLASSES.google;
+
+    try {
+      // Get dependencies from module container
+      const [prisma, crypto, googleOAuth, googleCalendarSync] = await Promise.all([
+        this.moduleRef.get('PrismaService'),
+        this.moduleRef.get('CryptoService'),
+        this.moduleRef.get('GoogleOAuthService'),
+        this.moduleRef.get('GoogleCalendarSyncService'),
+      ]);
+
+      // Create and return provider instance
+      const provider = new providerClass(
+        config,
+        prisma as any,
+        crypto as any,
+        googleOAuth as any,
+        googleCalendarSync as any,
       );
-    }
 
-    throw new Error(
-      `Calendar provider "${providerType}" not supported. Supported providers: google, microsoft`,
-    );
+      this.logger.log(`Google Calendar provider created for ${config.email}`);
+      return provider;
+    } catch (error) {
+      this.logger.error(`Failed to create Google Calendar provider:`, error);
+      throw new Error('Google Calendar provider initialization failed');
+    }
+  }
+
+  /**
+   * Create Microsoft Calendar provider instance
+   */
+  private async createMicrosoftProvider(config: CalendarProviderConfig): Promise<ICalendarProvider> {
+    const providerClass = CALENDAR_PROVIDER_CLASSES.microsoft;
+
+    try {
+      // Get dependencies from module container
+      const [prisma, crypto, microsoftOAuth, microsoftCalendarSync] = await Promise.all([
+        this.moduleRef.get('PrismaService'),
+        this.moduleRef.get('CryptoService'),
+        this.moduleRef.get('MicrosoftOAuthService'),
+        this.moduleRef.get('MicrosoftCalendarSyncService'),
+      ]);
+
+      // Create and return provider instance
+      const provider = new providerClass(
+        config,
+        prisma as any,
+        crypto as any,
+        microsoftOAuth as any,
+        microsoftCalendarSync as any,
+      );
+
+      this.logger.log(`Microsoft Calendar provider created for ${config.email}`);
+      return provider;
+    } catch (error) {
+      this.logger.error(`Failed to create Microsoft Calendar provider:`, error);
+      throw new Error('Microsoft Calendar provider initialization failed');
+    }
   }
 
   /**
@@ -81,11 +148,6 @@ export class CalendarProviderFactory {
 }
 
 /**
- * Helper function to create calendar provider (functional style)
+ * Calendar providers can be created by injecting CalendarProviderFactory
+ * and calling factory.create(providerType, config)
  */
-export function createCalendarProvider(
-  providerType: string,
-  config: CalendarProviderConfig,
-): ICalendarProvider {
-  return CalendarProviderFactory.create(providerType, config);
-}
