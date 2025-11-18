@@ -1,11 +1,12 @@
 /**
  * Google Email Provider
  *
- * Implementation of IEmailProvider for Gmail
+ * Self-contained implementation of IEmailProvider for Gmail
  * Based on Gmail API and OAuth2
  */
 
 import { Logger } from '@nestjs/common';
+import { gmail_v1, google } from 'googleapis';
 import {
   IEmailProvider,
   ProviderConfig,
@@ -26,20 +27,42 @@ import {
 export class GoogleEmailProvider implements IEmailProvider {
   private readonly logger = new Logger(GoogleEmailProvider.name);
   readonly config: ProviderConfig;
+  private gmail: gmail_v1.Gmail;
 
   constructor(config: ProviderConfig) {
     this.config = config;
-    this.logger.log(`GoogleEmailProvider initialized for user ${config.userId}`);
+    this.gmail = this.createGmailClient(config.accessToken);
+    this.logger.log(`GoogleEmailProvider initialized for ${config.email}`);
+  }
+
+  /**
+   * Create Gmail API client with OAuth2 credentials
+   */
+  private createGmailClient(accessToken: string): gmail_v1.Gmail {
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    return google.gmail({ version: 'v1', auth: oauth2Client });
   }
 
   // ==================== User & Authentication ====================
 
   async getUserInfo(): Promise<UserInfo> {
-    throw new Error('Method not implemented yet.');
+    try {
+      const profile = await this.gmail.users.getProfile({ userId: 'me' });
+      return {
+        email: profile.data.emailAddress || this.config.email,
+        name: profile.data.emailAddress?.split('@')[0] || '',
+      };
+    } catch (error) {
+      this.logger.error('Failed to get user info:', error);
+      throw error;
+    }
   }
 
   async refreshToken(): Promise<{ accessToken: string; expiresAt: Date }> {
-    throw new Error('Method not implemented yet.');
+    // Token refresh requires OAuth service - not implemented in provider
+    // This should be handled by the worker using GoogleOAuthService
+    throw new Error('Token refresh must be handled by worker/service layer');
   }
 
   async revokeToken(): Promise<boolean> {
