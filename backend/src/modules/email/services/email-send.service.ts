@@ -2,12 +2,11 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { google } from 'googleapis';
 import axios from 'axios';
 import * as nodemailer from 'nodemailer';
-import { Prisma, ProviderConfig } from '@prisma/client';
+import { ProviderConfig } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
-import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
-import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import { AttachmentStorageService } from './attachment.storage';
+import { ProviderTokenService } from '../../email-sync/services/provider-token.service';
 
 export interface SendEmailDto {
   tenantId: string;
@@ -34,9 +33,8 @@ export class EmailSendService {
   constructor(
     private prisma: PrismaService,
     private crypto: CryptoService,
-    private googleOAuth: GoogleOAuthService,
-    private microsoftOAuth: MicrosoftOAuthService,
     private attachmentStorage: AttachmentStorageService,
+    private providerTokenService: ProviderTokenService,
   ) {}
 
   /**
@@ -71,28 +69,19 @@ export class EmailSendService {
             )
           : [];
 
-      const normalizedData: SendEmailDto = {
-        ...data,
-        attachments: uploadedAttachments.map((att) => ({
-          filename: att.filename,
-          content: Buffer.alloc(0), // content already uploaded; not reused here
-          contentType: att.mimeType,
-        })),
-      };
-
       switch (provider.providerType) {
         case 'google': {
           const accessToken = await this.getAccessToken(provider);
-          messageId = await this.sendViaGmail(accessToken, normalizedData);
+          messageId = await this.sendViaGmail(accessToken, data);
           break;
         }
         case 'microsoft': {
           const accessToken = await this.getAccessToken(provider);
-          messageId = await this.sendViaOutlook(accessToken, normalizedData);
+          messageId = await this.sendViaOutlook(accessToken, data);
           break;
         }
         case 'generic':
-          messageId = await this.sendViaSMTP(provider, normalizedData);
+          messageId = await this.sendViaSMTP(provider, data);
           break;
 
         default:
@@ -101,8 +90,7 @@ export class EmailSendService {
 
       this.logger.log(`Email sent successfully via ${provider.providerType}: ${messageId}`);
 
-      // Save sent email to database (with attachment storage info already embedded)
-      await this.saveSentEmail(data, messageId, provider.id);
+      await this.saveSentEmail(data, messageId, provider.id, uploadedAttachments);
 
       return { success: true, messageId };
     } catch (error) /* istanbul ignore next */ {
@@ -283,7 +271,18 @@ export class EmailSendService {
   /**
    * Save sent email to database
    */
-  private async saveSentEmail(data: SendEmailDto, messageId: string, providerId: string) {
+  private async saveSentEmail(
+    data: SendEmailDto,
+    messageId: string,
+    providerId: string,
+    uploadedAttachments: {
+      storageType: 's3';
+      storagePath: string;
+      size: number;
+      mimeType: string;
+      filename: string;
+    }[],
+  ) {
     await this.prisma.email.create({
       data: {
         tenantId: data.tenantId,
@@ -308,6 +307,19 @@ export class EmailSendService {
         receivedAt: new Date(),
         inReplyTo: data.inReplyTo,
         references: data.references,
+        attachments:
+          uploadedAttachments.length > 0
+            ? {
+                create: uploadedAttachments.map((att) => ({
+                  filename: att.filename,
+                  mimeType: att.mimeType,
+                  size: att.size,
+                  storageType: att.storageType,
+                  storagePath: att.storagePath,
+                  isInline: false,
+                })),
+              }
+            : undefined,
       },
     });
   }
@@ -316,104 +328,7 @@ export class EmailSendService {
    * Get decrypted access token from provider
    */
   private async getAccessToken(provider: ProviderConfig): Promise<string> {
-    if (!provider.accessToken || !provider.tokenEncryptionIv) {
-      throw new BadRequestException('Provider has no access token');
-    }
-
-    const needsRefresh =
-      !provider.tokenExpiresAt ||
-      provider.tokenExpiresAt.getTime() <= Date.now() + 60 * 1000;
-
-    switch (provider.providerType) {
-      case 'google':
-        return this.getGoogleAccessToken(provider, needsRefresh);
-      case 'microsoft':
-        return this.getMicrosoftAccessToken(provider, needsRefresh);
-      default:
-        return this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
-    }
-  }
-
-  private async getGoogleAccessToken(
-    provider: ProviderConfig,
-    needsRefresh: boolean,
-  ): Promise<string> {
-    let accessToken = this.crypto.decrypt(provider.accessToken!, provider.tokenEncryptionIv!);
-
-    if (!needsRefresh) {
-      return accessToken;
-    }
-
-    if (!provider.refreshToken || !provider.refreshTokenEncryptionIv) {
-      throw new BadRequestException('Google provider missing refresh token');
-    }
-
-    const refreshToken = this.crypto.decrypt(
-      provider.refreshToken,
-      provider.refreshTokenEncryptionIv,
-    );
-
-    const refreshed = await this.googleOAuth.refreshAccessToken(refreshToken);
-    accessToken = refreshed.accessToken;
-
-    const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-
-    const updateData: Prisma.ProviderConfigUpdateInput = {
-      accessToken: encryptedAccess.encrypted,
-      tokenEncryptionIv: encryptedAccess.iv,
-      tokenExpiresAt: refreshed.expiresAt,
-    };
-
-    await this.prisma.providerConfig.update({
-      where: { id: provider.id },
-      data: updateData,
-    });
-
-    return accessToken;
-  }
-
-  private async getMicrosoftAccessToken(
-    provider: ProviderConfig,
-    needsRefresh: boolean,
-  ): Promise<string> {
-    let accessToken = this.crypto.decrypt(provider.accessToken!, provider.tokenEncryptionIv!);
-
-    if (!needsRefresh) {
-      return accessToken;
-    }
-
-    if (!provider.refreshToken || !provider.refreshTokenEncryptionIv) {
-      throw new BadRequestException('Microsoft provider missing refresh token');
-    }
-
-    const refreshToken = this.crypto.decrypt(
-      provider.refreshToken,
-      provider.refreshTokenEncryptionIv,
-    );
-
-    const refreshed = await this.microsoftOAuth.refreshAccessToken(refreshToken);
-    accessToken = refreshed.accessToken;
-
-    const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-    const updateData: Prisma.ProviderConfigUpdateInput = {
-      accessToken: encryptedAccess.encrypted,
-      tokenEncryptionIv: encryptedAccess.iv,
-      tokenExpiresAt: refreshed.expiresAt,
-    };
-
-    if (refreshed.refreshToken) {
-      const encryptedRefresh = this.crypto.encrypt(refreshed.refreshToken);
-      Object.assign(updateData, {
-        refreshToken: encryptedRefresh.encrypted,
-        refreshTokenEncryptionIv: encryptedRefresh.iv,
-      });
-    }
-
-    await this.prisma.providerConfig.update({
-      where: { id: provider.id },
-      data: updateData,
-    });
-
+    const { accessToken } = await this.providerTokenService.getProviderWithToken(provider.id);
     return accessToken;
   }
 

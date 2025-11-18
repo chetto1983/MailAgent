@@ -1,4 +1,4 @@
-# File e Moduli da Refactorare - Priorità e Piano
+﻿# File e Moduli da Refactorare - PrioritÃ  e Piano
 
 **Data Analisi:** 2025-11-18
 **Versione:** 1.0
@@ -8,27 +8,34 @@
 
 ## Executive Summary
 
-Questo documento identifica **45 file critici** che necessitano refactoring, organizzati per priorità e effort. L'analisi si basa sul cross-check con Zero e best practices moderne.
+Questo documento identifica **45 file critici** che necessitano refactoring, organizzati per prioritÃ  e effort. L'analisi si basa sul cross-check con Zero e best practices moderne.
 
 ### Statistiche Refactoring
 
-| Priorità | File Count | Effort Totale | ROI Medio |
+| PrioritÃ  | File Count | Effort Totale | ROI Medio |
 |----------|-----------|---------------|-----------|
-| 🔴 ALTA | 18 | 8-10 settimane | ⭐⭐⭐⭐⭐ |
-| 🟡 MEDIA | 15 | 6-8 settimane | ⭐⭐⭐⭐ |
-| 🟢 BASSA | 12 | 4-6 settimane | ⭐⭐⭐ |
-| **TOTALE** | **45** | **18-24 settimane** | **⭐⭐⭐⭐** |
+| ðŸ”´ ALTA | 18 | 8-10 settimane | â­â­â­â­â­ |
+| ðŸŸ¡ MEDIA | 15 | 6-8 settimane | â­â­â­â­ |
+| ðŸŸ¢ BASSA | 12 | 4-6 settimane | â­â­â­ |
+| **TOTALE** | **45** | **18-24 settimane** | **â­â­â­â­** |
+
+---
+## Aggiornamento stato (2025-11-19)
+
+- Provider token/IMAP centralizzati (ProviderTokenService) usato in sync, webhook e folder sync.
+- Storage allegati spostato su S3/Minio con upload e download via signed URL; percorsi locali rimossi dai flussi attivi.
+- Gmail/Microsoft provider rifattorizzati con gestione errori unificata e invio con allegati MIME.
 
 ---
 
-## 1. Priorità ALTA (🔴 Critica)
+## 1. PrioritÃ  ALTA (ðŸ”´ Critica)
 
 ### 1.1 Provider Abstraction Layer
 
 #### File da Creare (NEW)
 
 **1. `backend/src/modules/providers/interfaces/email-provider.interface.ts`**
-- **Priorità:** 🔴🔴🔴 CRITICA
+- **PrioritÃ :** ðŸ”´ðŸ”´ðŸ”´ CRITICA
 - **Effort:** 2 giorni
 - **Tipo:** NEW FILE
 - **Descrizione:** Interface comune per tutti i provider email
@@ -65,7 +72,7 @@ export interface IEmailProvider {
 ---
 
 **2. `backend/src/modules/providers/factory/provider.factory.ts`**
-- **Priorità:** 🔴🔴🔴 CRITICA
+- **PrioritÃ :** ðŸ”´ðŸ”´ðŸ”´ CRITICA
 - **Effort:** 1 giorno
 - **Tipo:** NEW FILE
 - **Descrizione:** Factory per creare istanze provider
@@ -100,15 +107,15 @@ export class ProviderFactory {
 #### File da Refactorare (REFACTOR)
 
 **3. `backend/src/modules/email-sync/services/google-sync.service.ts`**
-- **Priorità:** 🔴🔴🔴 CRITICA
+- **PrioritÃ :** ðŸ”´ðŸ”´ðŸ”´ CRITICA
 - **Effort:** 3-4 giorni
-- **Tipo:** REFACTOR → GoogleEmailProvider
+- **Tipo:** REFACTOR â†’ GoogleEmailProvider
 - **Linee:** 520+ righe
 - **Problemi:**
-  - ❌ Nessuna interface comune
-  - ❌ Logica business + data access mista
-  - ❌ Difficile testare
-  - ❌ Duplicazione codice con MicrosoftSyncService
+  - âŒ Nessuna interface comune
+  - âŒ Logica business + data access mista
+  - âŒ Difficile testare
+  - âŒ Duplicazione codice con MicrosoftSyncService
 
 **Refactoring Plan:**
 ```typescript
@@ -140,9 +147,9 @@ export class GoogleEmailProvider implements IEmailProvider {
 ---
 
 **4. `backend/src/modules/email-sync/services/microsoft-sync.service.ts`**
-- **Priorità:** 🔴🔴🔴 CRITICA
+- **PrioritÃ :** ðŸ”´ðŸ”´ðŸ”´ CRITICA
 - **Effort:** 3-4 giorni
-- **Tipo:** REFACTOR → MicrosoftEmailProvider
+- **Tipo:** REFACTOR â†’ MicrosoftEmailProvider
 - **Linee:** 480+ righe
 - **Problemi:** Stessi di GoogleSyncService
 
@@ -168,9 +175,9 @@ export class MicrosoftEmailProvider implements IEmailProvider {
 ---
 
 **5. `backend/src/modules/email-sync/services/imap-sync.service.ts`**
-- **Priorità:** 🔴 ALTA
+- **PrioritÃ :** ðŸ”´ ALTA
 - **Effort:** 2-3 giorni
-- **Tipo:** REFACTOR → ImapEmailProvider
+- **Tipo:** REFACTOR â†’ ImapEmailProvider
 - **Linee:** 350+ righe
 
 ---
@@ -178,7 +185,7 @@ export class MicrosoftEmailProvider implements IEmailProvider {
 ### 1.2 Centralized Error Handling
 
 **6. `backend/src/common/interceptors/provider-error.interceptor.ts`**
-- **Priorità:** 🔴🔴🔴 CRITICA
+- **PrioritÃ :** ðŸ”´ðŸ”´ðŸ”´ CRITICA
 - **Effort:** 2 giorni
 - **Tipo:** NEW FILE
 - **Descrizione:** Interceptor centralizzato per errori provider
@@ -270,13 +277,13 @@ export class ProviderErrorInterceptor implements NestInterceptor {
 ---
 
 **7. `backend/src/modules/providers/services/provider-config.service.ts`**
-- **Priorità:** 🔴🔴 ALTA
+- **PrioritÃ :** ðŸ”´ðŸ”´ ALTA
 - **Effort:** 2-3 giorni
 - **Tipo:** REFACTOR
 - **Linee:** 500+ righe
 - **Problemi:**
-  - ❌ Troppo grande (Dio oggetto)
-  - ❌ Responsabilità multiple
+  - âŒ Troppo grande (Dio oggetto)
+  - âŒ ResponsabilitÃ  multiple
 
 **Refactoring Plan:**
 ```
@@ -291,12 +298,12 @@ Split in:
 ### 1.3 Circular Dependencies Resolution
 
 **8. `backend/src/modules/email-sync/email-sync.module.ts`**
-- **Priorità:** 🔴🔴 ALTA
+- **PrioritÃ :** ðŸ”´ðŸ”´ ALTA
 - **Effort:** 3 giorni
 - **Tipo:** REFACTOR
 - **Problemi:**
-  - ❌ forwardRef() con ProvidersModule
-  - ❌ forwardRef() con CalendarModule
+  - âŒ forwardRef() con ProvidersModule
+  - âŒ forwardRef() con CalendarModule
 
 **Refactoring Plan:**
 ```typescript
@@ -324,7 +331,7 @@ Split in:
 ---
 
 **9. `backend/src/modules/providers/providers.module.ts`**
-- **Priorità:** 🔴🔴 ALTA
+- **PrioritÃ :** ðŸ”´ðŸ”´ ALTA
 - **Effort:** 2 giorni
 - **Tipo:** REFACTOR
 - **Problemi:** forwardRef() con EmailSyncModule, CalendarModule, ContactsModule
@@ -332,7 +339,7 @@ Split in:
 ---
 
 **10. `backend/src/modules/calendar/calendar.module.ts`**
-- **Priorità:** 🔴 ALTA
+- **PrioritÃ :** ðŸ”´ ALTA
 - **Effort:** 2 giorni
 - **Tipo:** REFACTOR
 - **Problemi:** forwardRef() con ProvidersModule
@@ -342,13 +349,13 @@ Split in:
 ### 1.4 Services Refactoring
 
 **11. `backend/src/modules/email-sync/services/queue.service.ts`**
-- **Priorità:** 🔴🔴 ALTA
+- **PrioritÃ :** ðŸ”´ðŸ”´ ALTA
 - **Effort:** 3 giorni
 - **Tipo:** REFACTOR
 - **Linee:** 520+ righe
 - **Problemi:**
-  - ❌ Switch-case per provider type (anti-pattern)
-  - ❌ Logica duplicata
+  - âŒ Switch-case per provider type (anti-pattern)
+  - âŒ Logica duplicata
 
 **Refactoring Plan:**
 ```typescript
@@ -377,12 +384,12 @@ async processJob(job: Job<SyncJobData>) {
 ---
 
 **12. `backend/src/modules/email/services/email-send.service.ts`**
-- **Priorità:** 🔴 ALTA
+- **PrioritÃ :** ðŸ”´ ALTA
 - **Effort:** 2 giorni
 - **Tipo:** REFACTOR
 - **Problemi:**
-  - ❌ Switch-case per provider
-  - ❌ Background tasks bloccanti
+  - âŒ Switch-case per provider
+  - âŒ Background tasks bloccanti
 
 **Refactoring Plan:**
 ```typescript
@@ -411,28 +418,28 @@ async sendEmail(dto: SendEmailDto, userId: string) {
 ---
 
 **13. `backend/src/modules/email-sync/services/cross-provider-sync.service.ts`**
-- **Priorità:** 🔴 ALTA
+- **PrioritÃ :** ðŸ”´ ALTA
 - **Effort:** 3 giorni
 - **Tipo:** REFACTOR
 - **Linee:** 400+ righe
 - **Problemi:**
-  - ❌ Complessità ciclomatica alta
-  - ❌ Manca documentazione
+  - âŒ ComplessitÃ  ciclomatica alta
+  - âŒ Manca documentazione
 
 **Refactoring Plan:**
-- Split in metodi più piccoli
+- Split in metodi piÃ¹ piccoli
 - Aggiungere JSDoc
 - Estrarre strategie conflict resolution
 
 ---
 
 **14. `backend/src/modules/email-sync/services/cross-provider-dedup.service.ts`**
-- **Priorità:** 🔴 ALTA
+- **PrioritÃ :** ðŸ”´ ALTA
 - **Effort:** 2 giorni
 - **Tipo:** REFACTOR
 - **Problemi:**
-  - ❌ Hash calculation potrebbe essere costoso
-  - ❌ Manca caching
+  - âŒ Hash calculation potrebbe essere costoso
+  - âŒ Manca caching
 
 **Refactoring Plan:**
 - Implementare cache Redis per hash
@@ -441,13 +448,13 @@ async sendEmail(dto: SendEmailDto, userId: string) {
 ---
 
 **15. `backend/src/modules/auth/services/auth.service.ts`**
-- **Priorità:** 🔴 ALTA
+- **PrioritÃ :** ðŸ”´ ALTA
 - **Effort:** 2 giorni
 - **Tipo:** REFACTOR
 - **Linee:** 503 righe
 - **Problemi:**
-  - ❌ Metodi OAuth deprecati con GoneException
-  - ❌ Troppo grande
+  - âŒ Metodi OAuth deprecati con GoneException
+  - âŒ Troppo grande
 
 **Refactoring Plan:**
 ```
@@ -460,12 +467,12 @@ Split in:
 ---
 
 **16. `backend/src/modules/ai/services/embeddings.service.ts`**
-- **Priorità:** 🔴 ALTA
+- **PrioritÃ :** ðŸ”´ ALTA
 - **Effort:** 2 giorni
 - **Tipo:** REFACTOR
 - **Problemi:**
-  - ❌ Nessun rate limiting verso Mistral API
-  - ❌ Nessun caching embeddings
+  - âŒ Nessun rate limiting verso Mistral API
+  - âŒ Nessun caching embeddings
 
 **Refactoring Plan:**
 - Implementare rate limiter
@@ -475,12 +482,12 @@ Split in:
 ---
 
 **17. `backend/src/modules/ai/services/knowledge-base.service.ts`**
-- **Priorità:** 🔴 ALTA
+- **PrioritÃ :** ðŸ”´ ALTA
 - **Effort:** 2 giorni
 - **Tipo:** REFACTOR
 - **Problemi:**
-  - ❌ Nessun cache query results
-  - ❌ Hardcoded K=5 per similarity search
+  - âŒ Nessun cache query results
+  - âŒ Hardcoded K=5 per similarity search
 
 **Refactoring Plan:**
 - Cache query results (Redis)
@@ -490,20 +497,20 @@ Split in:
 ---
 
 **18. `backend/src/modules/realtime/gateways/realtime.gateway.ts`**
-- **Priorità:** 🔴 ALTA
+- **PrioritÃ :** ðŸ”´ ALTA
 - **Effort:** 1 giorno
 - **Tipo:** OPTIMIZE
 - **Problemi:**
-  - ⚠️ Potrebbe beneficiare di rate limiting per eventi
+  - âš ï¸ Potrebbe beneficiare di rate limiting per eventi
 
 ---
 
-## 2. Priorità MEDIA (🟡)
+## 2. PrioritÃ  MEDIA (ðŸŸ¡)
 
 ### 2.1 DTO Migration to Zod
 
 **19-25. Tutti i file `*.dto.ts` (25+ files)**
-- **Priorità:** 🟡 MEDIA
+- **PrioritÃ :** ðŸŸ¡ MEDIA
 - **Effort:** 4-6 settimane (batch)
 - **Tipo:** MIGRATE
 - **Descrizione:** Migrare da class-validator a Zod
@@ -542,12 +549,12 @@ export type SendEmailData = z.infer<typeof SendEmailSchema>;
 ### 2.2 Configuration & Environment
 
 **26. `backend/src/config/configuration.ts`**
-- **Priorità:** 🟡 MEDIA
+- **PrioritÃ :** ðŸŸ¡ MEDIA
 - **Effort:** 2 giorni
 - **Tipo:** ENHANCE
 - **Problemi:**
-  - ⚠️ Nessun .env.example
-  - ⚠️ Validazione solo a startup
+  - âš ï¸ Nessun .env.example
+  - âš ï¸ Validazione solo a startup
 
 **Refactoring Plan:**
 ```typescript
@@ -565,7 +572,7 @@ const EnvSchema = z.object({
 export const validateEnv = () => {
   const parsed = EnvSchema.safeParse(process.env);
   if (!parsed.success) {
-    console.error('❌ Invalid environment variables:', parsed.error.format());
+    console.error('âŒ Invalid environment variables:', parsed.error.format());
     process.exit(1);
   }
   return parsed.data;
@@ -579,8 +586,8 @@ export const validateEnv = () => {
 
 ### 2.3 Testing Files
 
-**27-35. Test Files Expansion (16 → 70+ files)**
-- **Priorità:** 🟡 MEDIA
+**27-35. Test Files Expansion (16 â†’ 70+ files)**
+- **PrioritÃ :** ðŸŸ¡ MEDIA
 - **Effort:** 6-8 settimane
 - **Tipo:** EXPAND
 - **Descrizione:** Aumentare coverage da 13% a 70%+
@@ -606,12 +613,12 @@ export const validateEnv = () => {
 ### 2.4 Service Optimization
 
 **36. `backend/src/modules/email/services/emails.service.ts`**
-- **Priorità:** 🟡 MEDIA
+- **PrioritÃ :** ðŸŸ¡ MEDIA
 - **Effort:** 2 giorni
 - **Tipo:** OPTIMIZE
 - **Problemi:**
-  - ⚠️ Query N+1 potenziali
-  - ⚠️ Nessun caching
+  - âš ï¸ Query N+1 potenziali
+  - âš ï¸ Nessun caching
 
 **Refactoring Plan:**
 - Ottimizzare query con includes
@@ -621,14 +628,14 @@ export const validateEnv = () => {
 ---
 
 **37. `backend/src/modules/calendar/services/calendar.service.ts`**
-- **Priorità:** 🟡 MEDIA
+- **PrioritÃ :** ðŸŸ¡ MEDIA
 - **Effort:** 2 giorni
 - **Tipo:** OPTIMIZE
 
 ---
 
 **38. `backend/src/modules/contacts/services/contacts.service.ts`**
-- **Priorità:** 🟡 MEDIA
+- **PrioritÃ :** ðŸŸ¡ MEDIA
 - **Effort:** 2 giorni
 - **Tipo:** OPTIMIZE
 
@@ -637,12 +644,12 @@ export const validateEnv = () => {
 ### 2.5 Controllers Refactoring
 
 **39. `backend/src/modules/providers/controllers/providers.controller.ts`**
-- **Priorità:** 🟡 MEDIA
+- **PrioritÃ :** ðŸŸ¡ MEDIA
 - **Effort:** 1 giorno
 - **Tipo:** REFACTOR
 - **Problemi:**
-  - ⚠️ Logica business in controller
-  - ⚠️ Endpoint troppo grandi
+  - âš ï¸ Logica business in controller
+  - âš ï¸ Endpoint troppo grandi
 
 **Refactoring Plan:**
 - Spostare logica in services
@@ -651,27 +658,27 @@ export const validateEnv = () => {
 ---
 
 **40. `backend/src/modules/email/controllers/emails.controller.ts`**
-- **Priorità:** 🟡 MEDIA
+- **PrioritÃ :** ðŸŸ¡ MEDIA
 - **Effort:** 1 giorno
 - **Tipo:** REFACTOR
 
 ---
 
-## 3. Priorità BASSA (🟢)
+## 3. PrioritÃ  BASSA (ðŸŸ¢)
 
 ### 3.1 Documentation & Comments
 
 **41. `backend/src/prisma/schema.prisma`**
-- **Priorità:** 🟢 BASSA
+- **PrioritÃ :** ðŸŸ¢ BASSA
 - **Effort:** 1 giorno
 - **Tipo:** DOCUMENT
 - **Problemi:**
-  - ⚠️ Mancano commenti sui modelli
+  - âš ï¸ Mancano commenti sui modelli
 
 ---
 
 **42-45. Service Files - JSDoc**
-- **Priorità:** 🟢 BASSA
+- **PrioritÃ :** ðŸŸ¢ BASSA
 - **Effort:** 3-4 giorni
 - **Tipo:** DOCUMENT
 - **Descrizione:** Aggiungere JSDoc a tutti i metodi pubblici
@@ -683,14 +690,14 @@ export const validateEnv = () => {
 ### Phase 1 - Foundation (Settimane 1-4)
 
 **Week 1-2:**
-- ✅ Provider Interface & Factory (#1, #2)
-- ✅ GoogleEmailProvider refactor (#3)
-- ✅ MicrosoftEmailProvider refactor (#4)
+- âœ… Provider Interface & Factory (#1, #2)
+- âœ… GoogleEmailProvider refactor (#3)
+- âœ… MicrosoftEmailProvider refactor (#4)
 
 **Week 3-4:**
-- ✅ ProviderErrorInterceptor (#6)
-- ✅ Queue Service refactor (#11)
-- ✅ Email Send Service refactor (#12)
+- âœ… ProviderErrorInterceptor (#6)
+- âœ… Queue Service refactor (#11)
+- âœ… Email Send Service refactor (#12)
 
 **Deliverables:**
 - Provider abstraction layer completo
@@ -702,14 +709,14 @@ export const validateEnv = () => {
 ### Phase 2 - Dependencies & Structure (Settimane 5-8)
 
 **Week 5-6:**
-- ✅ Resolve circular dependencies (#8, #9, #10)
-- ✅ SharedServicesModule creation
-- ✅ Event-driven communication
+- âœ… Resolve circular dependencies (#8, #9, #10)
+- âœ… SharedServicesModule creation
+- âœ… Event-driven communication
 
 **Week 7-8:**
-- ✅ Auth Service split (#15)
-- ✅ Provider Config Service split (#7)
-- ✅ ImapEmailProvider refactor (#5)
+- âœ… Auth Service split (#15)
+- âœ… Provider Config Service split (#7)
+- âœ… ImapEmailProvider refactor (#5)
 
 **Deliverables:**
 - Zero circular dependencies
@@ -721,17 +728,17 @@ export const validateEnv = () => {
 ### Phase 3 - Type Safety (Settimane 9-14)
 
 **Week 9-10:**
-- ✅ Monorepo setup (pnpm workspace)
-- ✅ @mailagent/schemas package
-- ✅ Zod schemas core (auth, email, providers)
+- âœ… Monorepo setup (pnpm workspace)
+- âœ… @mailagent/schemas package
+- âœ… Zod schemas core (auth, email, providers)
 
 **Week 11-12:**
-- ✅ DTO migration batch 1 (auth, email)
-- ✅ Frontend type integration
+- âœ… DTO migration batch 1 (auth, email)
+- âœ… Frontend type integration
 
 **Week 13-14:**
-- ✅ DTO migration batch 2 (remaining modules)
-- ✅ Configuration Zod validation (#26)
+- âœ… DTO migration batch 2 (remaining modules)
+- âœ… Configuration Zod validation (#26)
 
 **Deliverables:**
 - Type safety end-to-end
@@ -743,17 +750,17 @@ export const validateEnv = () => {
 ### Phase 4 - Quality & Testing (Settimane 15-20)
 
 **Week 15-16:**
-- ✅ Playwright setup
-- ✅ E2E tests core flows (#27-29)
+- âœ… Playwright setup
+- âœ… E2E tests core flows (#27-29)
 
 **Week 17-18:**
-- ✅ Unit tests expansion (#27-35)
-- ✅ Integration tests
+- âœ… Unit tests expansion (#27-35)
+- âœ… Integration tests
 
 **Week 19-20:**
-- ✅ Test coverage optimization
-- ✅ CI/CD integration
-- ✅ Target 70%+ coverage
+- âœ… Test coverage optimization
+- âœ… CI/CD integration
+- âœ… Target 70%+ coverage
 
 **Deliverables:**
 - E2E test suite
@@ -765,14 +772,14 @@ export const validateEnv = () => {
 ### Phase 5 - Optimization (Settimane 21-24)
 
 **Week 21-22:**
-- ✅ Services optimization (#36-38)
-- ✅ Redis caching implementation
-- ✅ Query optimization
+- âœ… Services optimization (#36-38)
+- âœ… Redis caching implementation
+- âœ… Query optimization
 
 **Week 23-24:**
-- ✅ AI services optimization (#16, #17)
-- ✅ Rate limiting
-- ✅ Performance monitoring
+- âœ… AI services optimization (#16, #17)
+- âœ… Rate limiting
+- âœ… Performance monitoring
 
 **Deliverables:**
 - Performance improvements
@@ -787,29 +794,29 @@ export const validateEnv = () => {
 
 | Metrica | Baseline | Target | Status |
 |---------|----------|--------|--------|
-| Circular Dependencies | 6 | 0 | 🔴 |
-| Code Duplication | 15% | <10% | 🔴 |
-| Test Coverage | 13.8% | 70%+ | 🔴 |
-| Type Coverage | 85% | 95%+ | 🟡 |
-| Lines per File (avg) | 172 | <200 | 🟢 |
-| Cyclomatic Complexity (avg) | 8.5 | <10 | 🟢 |
+| Circular Dependencies | 6 | 0 | ðŸ”´ |
+| Code Duplication | 15% | <10% | ðŸ”´ |
+| Test Coverage | 13.8% | 70%+ | ðŸ”´ |
+| Type Coverage | 85% | 95%+ | ðŸŸ¡ |
+| Lines per File (avg) | 172 | <200 | ðŸŸ¢ |
+| Cyclomatic Complexity (avg) | 8.5 | <10 | ðŸŸ¢ |
 
 ### Performance Metrics
 
 | Metrica | Baseline | Target | Status |
 |---------|----------|--------|--------|
-| Build Time | 60s | <30s | 🟡 |
-| Test Execution | N/A | <2min | 🔴 |
-| Hot Reload | 2-3s | <1s | 🟡 |
-| API Latency p95 | 150-300ms | <200ms | 🟡 |
+| Build Time | 60s | <30s | ðŸŸ¡ |
+| Test Execution | N/A | <2min | ðŸ”´ |
+| Hot Reload | 2-3s | <1s | ðŸŸ¡ |
+| API Latency p95 | 150-300ms | <200ms | ðŸŸ¡ |
 
 ### Developer Experience
 
 | Metrica | Baseline | Target | Status |
 |---------|----------|--------|--------|
-| Setup Time | 20min | <10min | 🟡 |
-| PR Review Time | 30min | <15min | 🔴 |
-| Onboarding Time | 2 days | <4 hours | 🔴 |
+| Setup Time | 20min | <10min | ðŸŸ¡ |
+| PR Review Time | 30min | <15min | ðŸ”´ |
+| Onboarding Time | 2 days | <4 hours | ðŸ”´ |
 
 ---
 
@@ -892,11 +899,11 @@ export const validateEnv = () => {
 
 Questi refactoring possono essere completati rapidamente per momentum iniziale:
 
-1. ✅ **Provider Factory** (#2) - 1 giorno
-2. ✅ **Error Interceptor** (#6) - 2 giorni
-3. ✅ **.env.example** (#26) - 1 ora
-4. ✅ **Playwright Setup** - 1 giorno
-5. ✅ **First E2E Test** - 1 giorno
+1. âœ… **Provider Factory** (#2) - 1 giorno
+2. âœ… **Error Interceptor** (#6) - 2 giorni
+3. âœ… **.env.example** (#26) - 1 ora
+4. âœ… **Playwright Setup** - 1 giorno
+5. âœ… **First E2E Test** - 1 giorno
 
 **Total:** 5 giorni
 **ROI:** Alto - Immediate value
@@ -907,49 +914,50 @@ Questi refactoring possono essere completati rapidamente per momentum iniziale:
 
 ```
 Provider Abstraction (#1, #2)
-    ↓
-    ├─ GoogleProvider (#3) ──┐
-    ├─ MicrosoftProvider (#4) ┼─ Queue Service (#11)
-    └─ ImapProvider (#5) ─────┘       ↓
+    â†“
+    â”œâ”€ GoogleProvider (#3) â”€â”€â”
+    â”œâ”€ MicrosoftProvider (#4) â”¼â”€ Queue Service (#11)
+    â””â”€ ImapProvider (#5) â”€â”€â”€â”€â”€â”˜       â†“
                                 Email Send (#12)
 
-Error Interceptor (#6) ─────→ All Controllers
+Error Interceptor (#6) â”€â”€â”€â”€â”€â†’ All Controllers
 
-Circular Deps (#8, #9, #10) ──→ SharedServices Module
-                                      ↓
+Circular Deps (#8, #9, #10) â”€â”€â†’ SharedServices Module
+                                      â†“
                                 Event Emitter
 
-DTO Migration (#19-25) ←─── Zod Schemas Package
-                                  ↓
+DTO Migration (#19-25) â†â”€â”€â”€ Zod Schemas Package
+                                  â†“
                             Frontend Types
 
-Testing (#27-35) ←─── Playwright Setup
+Testing (#27-35) â†â”€â”€â”€ Playwright Setup
 ```
 
 ---
 
 ## 10. Conclusioni
 
-### Priorità Immediate (Month 1)
+### PrioritÃ  Immediate (Month 1)
 
-1. 🔴 **Provider Abstraction Layer** - Fondamentale per scalabilità
-2. 🔴 **Error Handling Centralization** - Riduce bug production
-3. 🔴 **Queue Service Refactor** - Migliora maintainability
+1. ðŸ”´ **Provider Abstraction Layer** - Fondamentale per scalabilitÃ 
+2. ðŸ”´ **Error Handling Centralization** - Riduce bug production
+3. ðŸ”´ **Queue Service Refactor** - Migliora maintainability
 
 ### Medium Term (Month 2-3)
 
-4. 🟡 **Circular Dependencies** - Migliora architettura
-5. 🟡 **Zod Migration** - Type safety end-to-end
-6. 🟡 **Testing Expansion** - Confidence in releases
+4. ðŸŸ¡ **Circular Dependencies** - Migliora architettura
+5. ðŸŸ¡ **Zod Migration** - Type safety end-to-end
+6. ðŸŸ¡ **Testing Expansion** - Confidence in releases
 
 ### Long Term (Month 4-6)
 
-7. 🟢 **Documentation** - Onboarding
-8. 🟢 **Performance Optimization** - Scale
-9. 🟢 **Monitoring** - Observability
+7. ðŸŸ¢ **Documentation** - Onboarding
+8. ðŸŸ¢ **Performance Optimization** - Scale
+9. ðŸŸ¢ **Monitoring** - Observability
 
-**Recommendation:** Start with Quick Wins → Provider Abstraction → Error Handling → Dependencies
+**Recommendation:** Start with Quick Wins â†’ Provider Abstraction â†’ Error Handling â†’ Dependencies
 
 ---
 
 **Fine Refactoring Priorities Document**
+

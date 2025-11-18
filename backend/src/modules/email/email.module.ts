@@ -15,6 +15,7 @@ import { FoldersController } from './controllers/folders.controller';
 import { EmailSyncModule } from '../email-sync/email-sync.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { StorageService } from './services/storage.service';
+import { ProviderTokenService } from '../email-sync/services/provider-token.service';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { StorageService } from './services/storage.service';
     EmailCleanupService,
     AttachmentStorageService,
     StorageService,
+    ProviderTokenService,
   ],
   controllers: [EmailsController, FoldersController],
   exports: [
