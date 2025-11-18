@@ -255,7 +255,7 @@ export function PmSyncMailbox() {
 
         // Drafts
         if (normalized === 'bozze' || normalized === 'draft' || normalized === 'drafts')
-          return 'DRAFT';
+          return 'DRAFTS';
 
         // Spam / Junk
         if (
@@ -265,7 +265,7 @@ export function PmSyncMailbox() {
           normalized === 'junk email' ||
           normalized === 'post indiserata'
         )
-          return 'SPAM';
+          return 'JUNK';
 
         // Archive / All Mail
         if (
