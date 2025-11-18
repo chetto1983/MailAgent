@@ -25,6 +25,7 @@ import { CrossProviderDedupService } from './services/cross-provider-dedup.servi
 import { CrossProviderConflictService } from './services/cross-provider-conflict.service';
 import { CrossProviderSyncService } from './services/cross-provider-sync.service';
 import { SyncAuthService } from './services/sync-auth.service';
+import { ProviderTokenService } from './services/provider-token.service';
 
 // Workers
 import { SyncWorker } from './workers/sync.worker';
@@ -65,6 +66,7 @@ import { WebhookController } from './controllers/webhook.controller';
     MicrosoftWebhookService,
     WebhookLifecycleService,
     SyncAuthService,
+    ProviderTokenService,
 
     // Cross-Provider Sync services
     CrossProviderDedupService,

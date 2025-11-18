@@ -10,8 +10,7 @@ import {
 } from '../interfaces/webhook.interface';
 import { SyncJobData } from '../interfaces/sync-job.interface';
 import axios from 'axios';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
+import { ProviderTokenService } from './provider-token.service';
 import type { ProviderConfig } from '@prisma/client';
 
 export const MICROSOFT_MAIL_RESOURCE = '/me/mailFolders/inbox/messages';
@@ -28,8 +27,7 @@ export class MicrosoftWebhookService {
     private prisma: PrismaService,
     private queueService: QueueService,
     private configService: ConfigService,
-    private cryptoService: CryptoService,
-    private microsoftOAuthService: MicrosoftOAuthService,
+    private providerTokenService: ProviderTokenService,
   ) {}
 
   /**
@@ -422,52 +420,13 @@ export class MicrosoftWebhookService {
    * Ensure we have a decrypted, non-expired Microsoft access token
    */
   private async getFreshAccessToken(provider: ProviderConfig): Promise<string> {
-    if (!provider.accessToken || !provider.tokenEncryptionIv) {
-      throw new Error('Provider has no stored access token');
-    }
-
-    let accessToken = this.cryptoService.decrypt(
-      provider.accessToken,
-      provider.tokenEncryptionIv,
+    const { provider: fullProvider, accessToken } = await this.providerTokenService.getProviderWithToken(
+      provider.id,
     );
 
-    const expiresSoon =
-      !provider.tokenExpiresAt ||
-      provider.tokenExpiresAt.getTime() <= Date.now() + 60 * 1000;
-
-    if (!expiresSoon) {
-      return accessToken;
+    if (fullProvider.providerType !== 'microsoft') {
+      throw new Error('Invalid Microsoft provider');
     }
-
-    if (!provider.refreshToken || !provider.refreshTokenEncryptionIv) {
-      throw new Error('Access token expired and no refresh token is available');
-    }
-
-    const refreshToken = this.cryptoService.decrypt(
-      provider.refreshToken,
-      provider.refreshTokenEncryptionIv,
-    );
-
-    const refreshed = await this.microsoftOAuthService.refreshAccessToken(refreshToken);
-    accessToken = refreshed.accessToken;
-
-    const encryptedAccess = this.cryptoService.encrypt(refreshed.accessToken);
-    const updateData: Record<string, any> = {
-      accessToken: encryptedAccess.encrypted,
-      tokenEncryptionIv: encryptedAccess.iv,
-      tokenExpiresAt: refreshed.expiresAt,
-    };
-
-    if (refreshed.refreshToken) {
-      const encryptedRefresh = this.cryptoService.encrypt(refreshed.refreshToken);
-      updateData.refreshToken = encryptedRefresh.encrypted;
-      updateData.refreshTokenEncryptionIv = encryptedRefresh.iv;
-    }
-
-    await this.prisma.providerConfig.update({
-      where: { id: provider.id },
-      data: updateData,
-    });
 
     return accessToken;
   }

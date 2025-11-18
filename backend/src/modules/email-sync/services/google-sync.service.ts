@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { gmail_v1, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
-import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingJob, EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
@@ -11,6 +10,7 @@ import { RealtimeEventsService } from '../../realtime/services/realtime-events.s
 import { EmailEventReason } from '../../realtime/types/realtime.types';
 import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
 import { ConfigService } from '@nestjs/config';
+import { ProviderTokenService } from './provider-token.service';
 
 @Injectable()
 export class GoogleSyncService implements OnModuleInit {
@@ -26,12 +26,12 @@ export class GoogleSyncService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private crypto: CryptoService,
-    private googleOAuth: GoogleOAuthService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
     private knowledgeBaseService: KnowledgeBaseService,
     private realtimeEvents: RealtimeEventsService,
     private config: ConfigService,
+    private providerTokenService: ProviderTokenService,
   ) {}
 
   onModuleInit() {
@@ -50,69 +50,9 @@ export class GoogleSyncService implements OnModuleInit {
     this.logger.log(`Starting ${syncType} Gmail sync for ${email}`);
 
     try {
-      // Get provider config with tokens
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
-
-      if (!provider) {
-        throw new Error('Provider not found');
-      }
-
-      // Check if token is expired and needs refresh
-      const now = new Date();
-      const isExpired = provider.tokenExpiresAt && now > new Date(provider.tokenExpiresAt);
-
-      let accessToken: string;
-
-      if (isExpired && provider.refreshToken && provider.refreshTokenEncryptionIv) {
-        // Token expired - refresh it using GoogleOAuthService
-        this.logger.log(`🔄 Access token expired for ${email}, refreshing...`);
-
-        try {
-          const refreshToken = this.crypto.decrypt(
-            provider.refreshToken,
-            provider.refreshTokenEncryptionIv,
-          );
-
-          const refreshed = await this.googleOAuth.refreshAccessToken(refreshToken);
-          accessToken = refreshed.accessToken;
-
-          this.logger.log(`✅ Token refreshed successfully, new expiry: ${refreshed.expiresAt}`);
-
-          // Save new token to database
-          const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-          await this.prisma.providerConfig.update({
-            where: { id: providerId },
-            data: {
-              accessToken: encryptedAccess.encrypted,
-              tokenEncryptionIv: encryptedAccess.iv,
-              tokenExpiresAt: refreshed.expiresAt,
-            },
-          });
-
-          this.logger.log(`💾 Updated token saved to database`);
-        } catch (refreshError) {
-          this.logger.error(`❌ Failed to refresh token for ${email}:`, refreshError);
-          throw new Error(
-            'Access token expired and refresh failed. User needs to re-authenticate.'
-          );
-        }
-      } else if (!provider.accessToken || !provider.tokenEncryptionIv) {
-        throw new Error('Provider missing access token');
-      } else {
-        // Token is still valid, use it
-        accessToken = this.crypto.decrypt(
-          provider.accessToken,
-          provider.tokenEncryptionIv,
-        );
-
-        if (isExpired) {
-          this.logger.warn(`⚠️ Token expired but no refresh token available for ${email}`);
-        } else {
-          this.logger.debug(`✓ Using existing valid access token for ${email}`);
-        }
-      }
+      const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+        providerId,
+      );
 
       // Create Gmail client
       const gmail = this.createGmailClient(accessToken);

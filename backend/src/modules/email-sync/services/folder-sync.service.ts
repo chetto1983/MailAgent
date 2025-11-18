@@ -1,12 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ImapService } from '../../providers/services/imap.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
 import { Folder } from '@prisma/client';
 import axios from 'axios';
 import { google } from 'googleapis';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
+import { ProviderTokenService } from './provider-token.service';
 
 export interface FolderInfo {
   path: string;
@@ -26,9 +25,8 @@ export class FolderSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly imapService: ImapService,
-    private readonly crypto: CryptoService,
-    private readonly googleOAuth: GoogleOAuthService,
     private readonly realtimeEvents: RealtimeEventsService,
+    private readonly providerTokenService: ProviderTokenService,
   ) {}
 
   /**
@@ -82,23 +80,15 @@ export class FolderSyncService {
       }
 
       // Decrypt IMAP credentials
-      if (!provider.imapHost || !provider.imapPort || !provider.imapUsername ||
-          !provider.imapPassword || !provider.imapEncryptionIv) {
-        throw new Error('Provider missing IMAP configuration');
-      }
-
-      const imapPassword = this.crypto.decrypt(
-        provider.imapPassword,
-        provider.imapEncryptionIv,
-      );
+      const imapCreds = this.providerTokenService.getImapCredentials(provider);
 
       // List folders from IMAP server
       const imapFolders = await this.imapService.listFolders({
-        host: provider.imapHost,
-        port: provider.imapPort,
-        username: provider.imapUsername,
-        password: imapPassword,
-        useTls: provider.imapUseTls,
+        host: imapCreds.host,
+        port: imapCreds.port,
+        username: imapCreds.username,
+        password: imapCreds.password,
+        useTls: imapCreds.useTls,
       });
 
       this.logger.log(
@@ -352,51 +342,7 @@ export class FolderSyncService {
     this.logger.log(`Starting Gmail folder (labels) sync for provider ${providerId}`);
 
     try {
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
-
-      if (!provider || !provider.accessToken || !provider.tokenEncryptionIv) {
-        throw new Error('Provider not found or missing access token');
-      }
-
-      // Get access token and refresh if needed
-      let accessToken = this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
-
-      const needsRefresh =
-        !provider.tokenExpiresAt ||
-        provider.tokenExpiresAt.getTime() <= Date.now() + 60 * 1000;
-
-      if (needsRefresh && provider.refreshToken && provider.refreshTokenEncryptionIv) {
-        try {
-          this.logger.log(`Refreshing expired access token for provider ${providerId}`);
-          const refreshToken = this.crypto.decrypt(
-            provider.refreshToken,
-            provider.refreshTokenEncryptionIv,
-          );
-
-          const refreshed = await this.googleOAuth.refreshAccessToken(refreshToken);
-          accessToken = refreshed.accessToken;
-
-          const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-
-          await this.prisma.providerConfig.update({
-            where: { id: provider.id },
-            data: {
-              accessToken: encryptedAccess.encrypted,
-              tokenEncryptionIv: encryptedAccess.iv,
-              tokenExpiresAt: refreshed.expiresAt,
-            },
-          });
-
-          this.logger.log(`Successfully refreshed access token for provider ${providerId}`);
-        } catch (error) {
-          this.logger.error(
-            `Failed to refresh Google access token for provider ${provider.id}: ${error instanceof Error ? error.message : error}`,
-          );
-          throw new Error('Failed to refresh access token. Please reconnect your Google account.');
-        }
-      }
+      const { accessToken } = await this.providerTokenService.getProviderWithToken(providerId);
 
       // Create OAuth2 client with access token
       const oauth2Client = new google.auth.OAuth2();
@@ -481,15 +427,7 @@ export class FolderSyncService {
     this.logger.log(`Starting Microsoft folder sync for provider ${providerId}`);
 
     try {
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
-
-      if (!provider || !provider.accessToken || !provider.tokenEncryptionIv) {
-        throw new Error('Provider not found or missing access token');
-      }
-
-      const accessToken = this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
+      const { accessToken } = await this.providerTokenService.getProviderWithToken(providerId);
 
       const url = `${this.GRAPH_API_BASE}/me/mailFolders`;
       const response = await axios.get(url, {

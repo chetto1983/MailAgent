@@ -1,0 +1,120 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { CryptoService } from '../../../common/services/crypto.service';
+import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
+import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
+import type { ProviderConfig as ProviderEntity } from '@prisma/client';
+
+type ProviderWithToken = {
+  provider: ProviderEntity;
+  accessToken: string;
+};
+
+/**
+ * Centralizza recupero/refresh token provider per i servizi di sync.
+ * Rimuove duplicazioni tra Google/Microsoft e IMAP.
+ */
+@Injectable()
+export class ProviderTokenService {
+  private readonly logger = new Logger(ProviderTokenService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly crypto: CryptoService,
+    private readonly googleOAuth: GoogleOAuthService,
+    private readonly microsoftOAuth: MicrosoftOAuthService,
+    private readonly config: ConfigService,
+  ) {}
+
+  async getProviderWithToken(providerId: string): Promise<ProviderWithToken> {
+    const provider = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+    });
+
+    if (!provider) {
+      throw new Error('Provider not found');
+    }
+
+    switch (provider.providerType) {
+      case 'google':
+        return { provider, accessToken: await this.getGoogleToken(provider) };
+      case 'microsoft':
+        return { provider, accessToken: await this.microsoftOAuth.getTokenOrRefresh(provider) };
+      case 'imap':
+        return { provider, accessToken: await this.getImapToken(provider) };
+      default:
+        throw new Error(`Unsupported provider type: ${provider.providerType}`);
+    }
+  }
+
+  private async getGoogleToken(provider: ProviderEntity): Promise<string> {
+    const now = new Date();
+    const isExpired = provider.tokenExpiresAt && now > new Date(provider.tokenExpiresAt);
+
+    if (isExpired && provider.refreshToken && provider.refreshTokenEncryptionIv) {
+      this.logger.log(`Access token expired for ${provider.email}, refreshing...`);
+
+      const refreshToken = this.crypto.decrypt(
+        provider.refreshToken,
+        provider.refreshTokenEncryptionIv,
+      );
+
+      const refreshed = await this.googleOAuth.refreshAccessToken(refreshToken);
+      const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
+
+      await this.prisma.providerConfig.update({
+        where: { id: provider.id },
+        data: {
+          accessToken: encryptedAccess.encrypted,
+          tokenEncryptionIv: encryptedAccess.iv,
+          tokenExpiresAt: refreshed.expiresAt,
+        },
+      });
+
+      this.logger.log(`Token refreshed successfully for ${provider.email}`);
+      return refreshed.accessToken;
+    }
+
+    if (!provider.accessToken || !provider.tokenEncryptionIv) {
+      throw new Error('Provider missing access token');
+    }
+
+    return this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
+  }
+
+  private async getImapToken(provider: ProviderEntity): Promise<string> {
+    if (!provider.accessToken || !provider.tokenEncryptionIv) {
+      return '';
+    }
+    return this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
+  }
+
+  /**
+   * IMAP credentials helper (uses provider values or env defaults).
+   */
+  getImapCredentials(provider: ProviderEntity): {
+    host: string;
+    port: number;
+    useTls: boolean;
+    username: string;
+    password: string;
+  } {
+    const host = provider.imapHost || this.config.get<string>('IMAP_HOST', 'imap.local');
+    const port = provider.imapPort || this.config.get<number>('IMAP_PORT', 993);
+    const useTls = typeof provider.imapUseTls === 'boolean'
+      ? provider.imapUseTls
+      : this.config.get<boolean>('IMAP_SECURE', true);
+    const username =
+      provider.imapUsername || this.config.get<string>('IMAP_USER', '');
+
+    let password = '';
+    if (provider.imapPassword && provider.imapEncryptionIv) {
+      password = this.crypto.decrypt(provider.imapPassword, provider.imapEncryptionIv);
+    } else {
+      password = this.config.get<string>('IMAP_PASSWORD', '');
+    }
+
+    return { host, port, useTls, username, password };
+  }
+}

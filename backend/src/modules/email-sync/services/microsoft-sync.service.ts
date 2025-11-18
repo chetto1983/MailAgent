@@ -3,13 +3,13 @@ import axios, { AxiosResponse } from 'axios';
 import { URLSearchParams } from 'url';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
-import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { EmailEmbeddingJob, EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { EmailEventReason } from '../../realtime/types/realtime.types';
 import { ConfigService } from '@nestjs/config';
+import { ProviderTokenService } from './provider-token.service';
 
 interface MicrosoftMessage {
   id: string;
@@ -70,11 +70,11 @@ export class MicrosoftSyncService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private crypto: CryptoService,
-    private microsoftOAuth: MicrosoftOAuthService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
     private realtimeEvents: RealtimeEventsService,
     private readonly config: ConfigService,
+    private readonly providerTokenService: ProviderTokenService,
   ) {}
 
   onModuleInit() {
@@ -92,17 +92,9 @@ export class MicrosoftSyncService implements OnModuleInit {
     this.logger.log(`Starting ${syncType} Microsoft sync for ${email}`);
 
     try {
-      // Get provider config
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
-
-      if (!provider) {
-        throw new Error('Provider not found');
-      }
-
-      // Get valid access token (refresh + persist if needed)
-      const accessToken = await this.microsoftOAuth.getTokenOrRefresh(provider);
+      const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+        providerId,
+      );
 
       // Get tracking metadata
       const metadata = (provider.metadata as any) || {};

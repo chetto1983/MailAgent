@@ -1,4 +1,5 @@
 import { gmail_v1, google } from 'googleapis';
+import MailComposer from 'nodemailer/lib/mail-composer';
 import { BaseEmailProvider } from '../base/base-email-provider';
 import {
   EmailAttachment,
@@ -152,17 +153,8 @@ export class GoogleEmailProvider extends BaseEmailProvider implements IEmailProv
   }
 
   async sendEmail(data: SendEmailData): Promise<{ id: string }> {
-    if (data.attachments && data.attachments.length > 0) {
-      // Attachment support rich MIME boundaries; defer to worker when needed.
-      throw new ProviderError(
-        'Attachments not supported in lightweight provider send; use worker pipeline',
-        'ATTACHMENTS_NOT_SUPPORTED',
-        'google',
-      );
-    }
-
     return this.withErrorHandling('sendEmail', async () => {
-      const raw = this.buildMimeMessage(data);
+      const raw = await this.buildMimeMessage(data);
       const response = await this.gmail.users.messages.send({
         userId: 'me',
         requestBody: {
@@ -179,7 +171,7 @@ export class GoogleEmailProvider extends BaseEmailProvider implements IEmailProv
 
   async createDraft(data: DraftData): Promise<{ id: string }> {
     return this.withErrorHandling('createDraft', async () => {
-      const raw = this.buildMimeMessage({
+      const raw = await this.buildMimeMessage({
         to: data.to || [],
         cc: data.cc,
         bcc: data.bcc,
@@ -227,7 +219,7 @@ export class GoogleEmailProvider extends BaseEmailProvider implements IEmailProv
 
   async updateDraft(draftId: string, data: DraftData): Promise<void> {
     return this.withErrorHandling('updateDraft', async () => {
-      const raw = this.buildMimeMessage({
+      const raw = await this.buildMimeMessage({
         to: data.to || [],
         cc: data.cc,
         bcc: data.bcc,
@@ -656,29 +648,32 @@ export class GoogleEmailProvider extends BaseEmailProvider implements IEmailProv
     return value.split(',').map((addr) => this.parseAddress(addr.trim()));
   }
 
-  private buildMimeMessage(data: SendEmailData): string {
-    const headers = [
-      `From: ${this.formatAddress(this.config.email)}`,
-      `To: ${data.to.map((a) => this.formatAddress(a.email, a.name)).join(', ')}`,
-    ];
+  private async buildMimeMessage(data: SendEmailData): Promise<string> {
+    const composer = new MailComposer({
+      from: this.formatAddress(this.config.email),
+      to: data.to.map((a) => this.formatAddress(a.email, a.name)).join(', '),
+      cc: data.cc?.map((a) => this.formatAddress(a.email, a.name)).join(', '),
+      bcc: data.bcc?.map((a) => this.formatAddress(a.email, a.name)).join(', '),
+      subject: data.subject,
+      text: data.bodyText,
+      html: data.bodyHtml,
+      attachments: data.attachments?.map((att) => ({
+        filename: att.filename,
+        content: att.data ? Buffer.from(att.data, 'base64') : undefined,
+        contentType: att.mimeType,
+      })),
+      headers: [
+        data.inReplyTo ? { key: 'In-Reply-To', value: data.inReplyTo } : undefined,
+        data.references ? { key: 'References', value: data.references } : undefined,
+      ].filter(Boolean) as Array<{ key: string; value: string }>,
+    });
 
-    if (data.cc?.length) {
-      headers.push(`Cc: ${data.cc.map((a) => this.formatAddress(a.email, a.name)).join(', ')}`);
-    }
-
-    if (data.bcc?.length) {
-      headers.push(`Bcc: ${data.bcc.map((a) => this.formatAddress(a.email, a.name)).join(', ')}`);
-    }
-
-    headers.push(`Subject: ${data.subject}`);
-    headers.push('Content-Type: text/plain; charset="UTF-8"');
-    headers.push('MIME-Version: 1.0');
-    headers.push('');
-
-    const body = data.bodyText || '';
-    const message = `${headers.join('\r\n')}\r\n${body}`;
-
-    return Buffer.from(message, 'utf-8').toString('base64url');
+    const rawBuffer = await composer.compile().build();
+    return rawBuffer
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
   }
 
   private formatAddress(email: string, name?: string): string {
