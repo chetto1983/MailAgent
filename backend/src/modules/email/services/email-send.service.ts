@@ -1,12 +1,12 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { google } from 'googleapis';
-import axios from 'axios';
-import * as nodemailer from 'nodemailer';
 import { ProviderConfig } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { AttachmentStorageService } from './attachment.storage';
 import { ProviderTokenService } from '../../email-sync/services/provider-token.service';
+import { ProviderFactory } from '../../providers/factory/provider.factory';
+import type { ProviderConfig as ProviderConfigType } from '../../providers/interfaces/email-provider.interface';
+import type { SendEmailData } from '../../providers/interfaces/email-provider.interface';
 
 export interface SendEmailDto {
   tenantId: string;
@@ -38,7 +38,7 @@ export class EmailSendService {
   ) {}
 
   /**
-   * Send email via the appropriate provider
+   * Send email via Provider Factory (Zero-inspired pattern)
    */
   async sendEmail(data: SendEmailDto): Promise<{ success: boolean; messageId: string }> {
     const provider = await this.prisma.providerConfig.findFirst({
@@ -53,9 +53,8 @@ export class EmailSendService {
       throw new NotFoundException('Provider not found or inactive');
     }
 
-    let messageId: string;
-
     try {
+      // Process attachments first
       const uploadedAttachments =
         data.attachments && data.attachments.length > 0
           ? await Promise.all(
@@ -69,30 +68,50 @@ export class EmailSendService {
             )
           : [];
 
-      switch (provider.providerType) {
-        case 'google': {
-          const accessToken = await this.getAccessToken(provider);
-          messageId = await this.sendViaGmail(accessToken, data);
-          break;
-        }
-        case 'microsoft': {
-          const accessToken = await this.getAccessToken(provider);
-          messageId = await this.sendViaOutlook(accessToken, data);
-          break;
-        }
-        case 'generic':
-          messageId = await this.sendViaSMTP(provider, data);
-          break;
+      // Create provider factory config (Zero createDriver pattern)
+      const providerConfig: ProviderConfigType = {
+        userId: data.tenantId,
+        providerId: provider.id,
+        providerType: provider.providerType as 'google' | 'microsoft' | 'imap',
+        email: provider.email,
+        accessToken: await this.getAccessToken(provider),
+        refreshToken: '', // Token refresh is delegated to OAuth service layer
+      };
 
-        default:
-          throw new BadRequestException(`Unsupported provider type: ${provider.providerType}`);
+      // Use Provider Factory to create provider instance
+      const emailProvider = ProviderFactory.create(provider.providerType, providerConfig);
+
+      // Prepare data for provider interface
+      const sendData: SendEmailData = {
+        to: data.to.map(email => ({ email })),
+        cc: data.cc?.map(email => ({ email })),
+        bcc: data.bcc?.map(email => ({ email })),
+        subject: data.subject,
+        bodyHtml: data.bodyHtml,
+        bodyText: data.bodyText,
+        attachments: uploadedAttachments.map(att => ({
+          id: '', // Will be generated
+          filename: att.filename,
+          mimeType: att.mimeType,
+          size: att.size,
+          data: att.storagePath, // Send storage path instead of buffer
+        })),
+      };
+
+      if (data.inReplyTo) {
+        sendData.inReplyTo = data.inReplyTo;
+        sendData.references = data.references;
       }
 
-      this.logger.log(`Email sent successfully via ${provider.providerType}: ${messageId}`);
+      // Send via provider interface
+      const result = await emailProvider.sendEmail(sendData);
 
-      await this.saveSentEmail(data, messageId, provider.id, uploadedAttachments);
+      this.logger.log(`Email sent successfully via ${provider.providerType}: ${result.id}`);
 
-      return { success: true, messageId };
+      // Save to database
+      await this.saveSentEmail(data, result.id, provider.id, uploadedAttachments);
+
+      return { success: true, messageId: result.id };
     } catch (error) /* istanbul ignore next */ {
       const message = error instanceof Error ? error.message : 'Unknown error';
       const stack = error instanceof Error ? error.stack : undefined;
@@ -101,172 +120,7 @@ export class EmailSendService {
     }
   }
 
-  /**
-   * Send email via Gmail API
-   */
-  private async sendViaGmail(accessToken: string, data: SendEmailDto): Promise<string> {
-    const oauth2 = new google.auth.OAuth2();
-    oauth2.setCredentials({ access_token: accessToken });
-    const gmail = google.gmail({ version: 'v1', auth: oauth2 });
 
-    // Create RFC 2822 formatted message
-    const message = this.createRFC2822Message(data);
-    const encodedMessage = Buffer.from(message)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-
-    const response = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw: encodedMessage,
-      },
-    });
-
-    return response.data.id!;
-  }
-
-  /**
-   * Send email via Microsoft Graph API
-   */
-  private async sendViaOutlook(accessToken: string, data: SendEmailDto): Promise<string> {
-    const message = {
-      subject: data.subject,
-      body: {
-        contentType: 'HTML',
-        content: data.bodyHtml,
-      },
-      toRecipients: data.to.map(email => ({
-        emailAddress: { address: email },
-      })),
-      ccRecipients: data.cc?.map(email => ({
-        emailAddress: { address: email },
-      })) || [],
-      bccRecipients: data.bcc?.map(email => ({
-        emailAddress: { address: email },
-      })) || [],
-      ...(data.inReplyTo && {
-        inferenceClassification: 'focused',
-        internetMessageHeaders: [
-          { name: 'In-Reply-To', value: data.inReplyTo },
-          { name: 'References', value: data.references || data.inReplyTo },
-        ],
-      }),
-    };
-
-    await axios.post(
-      'https://graph.microsoft.com/v1.0/me/sendMail',
-      {
-        message,
-        saveToSentItems: true,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    // Microsoft doesn't return messageId immediately, generate temp ID
-    return `microsoft-${Date.now()}`;
-  }
-
-  /**
-   * Send email via SMTP (generic provider)
-   */
-  private async sendViaSMTP(
-    config: ProviderConfig,
-    data: SendEmailDto,
-  ): Promise<string> {
-    if (
-      !config.smtpHost ||
-      !config.smtpPort ||
-      !config.smtpUsername ||
-      !config.smtpPassword ||
-      !config.smtpEncryptionIv
-    ) {
-      throw new BadRequestException('SMTP provider missing configuration');
-    }
-
-    const smtpPassword = this.crypto.decrypt(config.smtpPassword, config.smtpEncryptionIv);
-
-    const transporter = nodemailer.createTransport({
-      host: config.smtpHost,
-      port: config.smtpPort,
-      secure: config.smtpUseTls ?? true,
-      auth: {
-        user: config.smtpUsername,
-        pass: smtpPassword,
-      },
-    });
-
-    const mailOptions = {
-      from: config.email || config.smtpUsername,
-      to: data.to.join(', '),
-      cc: data.cc?.join(', '),
-      bcc: data.bcc?.join(', '),
-      subject: data.subject,
-      text: data.bodyText,
-      html: data.bodyHtml,
-      inReplyTo: data.inReplyTo,
-      references: data.references,
-      attachments: data.attachments?.map(att => ({
-        filename: att.filename,
-        content: att.content,
-        contentType: att.contentType,
-      })),
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    return info.messageId;
-  }
-
-  /**
-   * Create RFC 2822 formatted email message for Gmail
-   */
-  private createRFC2822Message(data: SendEmailDto): string {
-    const boundary = `boundary_${Date.now()}`;
-    let message = '';
-
-    // Headers
-    message += `To: ${data.to.join(', ')}\r\n`;
-    if (data.cc && data.cc.length > 0) {
-      message += `Cc: ${data.cc.join(', ')}\r\n`;
-    }
-    if (data.bcc && data.bcc.length > 0) {
-      message += `Bcc: ${data.bcc.join(', ')}\r\n`;
-    }
-    message += `Subject: ${data.subject}\r\n`;
-    if (data.inReplyTo) {
-      message += `In-Reply-To: ${data.inReplyTo}\r\n`;
-    }
-    if (data.references) {
-      message += `References: ${data.references}\r\n`;
-    }
-    message += `MIME-Version: 1.0\r\n`;
-    message += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n`;
-    message += `\r\n`;
-
-    // Plain text part
-    message += `--${boundary}\r\n`;
-    message += `Content-Type: text/plain; charset="UTF-8"\r\n`;
-    message += `\r\n`;
-    message += `${data.bodyText}\r\n`;
-    message += `\r\n`;
-
-    // HTML part
-    message += `--${boundary}\r\n`;
-    message += `Content-Type: text/html; charset="UTF-8"\r\n`;
-    message += `\r\n`;
-    message += `${data.bodyHtml}\r\n`;
-    message += `\r\n`;
-
-    message += `--${boundary}--`;
-
-    return message;
-  }
 
   /**
    * Save sent email to database

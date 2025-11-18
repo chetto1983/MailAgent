@@ -6,6 +6,7 @@ import { GoogleContactsSyncService } from './services/google-contacts-sync.servi
 import { MicrosoftContactsSyncService } from './services/microsoft-contacts-sync.service';
 import { GoogleContactsWebhookService } from './services/google-contacts-webhook.service';
 import { MicrosoftContactsWebhookService } from './services/microsoft-contacts-webhook.service';
+import { ContactsProviderFactory } from './contacts-provider.factory';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { RealtimeModule } from '../realtime/realtime.module';
@@ -33,6 +34,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
     MicrosoftContactsSyncService,
     GoogleContactsWebhookService,
     MicrosoftContactsWebhookService,
+    ContactsProviderFactory,
   ],
 })
 export class ContactsModule {}

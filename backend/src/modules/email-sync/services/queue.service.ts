@@ -3,6 +3,26 @@ import { Queue, QueueEvents, JobType } from 'bullmq';
 import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 import { SyncJobData, SyncStatus } from '../interfaces/sync-job.interface';
+import { ProviderFactory } from '../../providers/factory/provider.factory';
+import { SyncOptions } from '../../providers/interfaces/email-provider.interface';
+import { ProviderTokenService } from './provider-token.service';
+
+// Extended interface for sync job processing
+interface ProcessableSyncJobData extends SyncJobData {
+  maxMessages?: number;
+  folder?: string;
+  historyId?: string;
+  deltaLink?: string;
+}
+
+// Provider data structure for processing
+interface ProviderWithTokens {
+  id: string;
+  providerType: 'google' | 'microsoft' | 'imap';
+  email: string;
+  decryptedAccessToken: string;
+  decryptedRefreshToken?: string;
+}
 
 type QueuePriority = 'high' | 'normal' | 'low';
 
@@ -492,6 +512,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
         return true;
     }
   }
+
   private async hasPendingJob(providerId: string, tenantId?: string): Promise<boolean> {
     const queues = [this.highQueue, this.normalQueue, this.lowQueue];
     const states: JobType[] = ['waiting', 'active', 'delayed', 'paused', 'waiting-children'];
@@ -517,4 +538,5 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       (k) => k.includes(providerId) && (!tenantId || k.includes(tenantId)),
     );
   }
+
 }

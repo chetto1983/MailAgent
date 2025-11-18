@@ -246,7 +246,8 @@ export class MicrosoftCalendarSyncService {
     let eventsProcessed = 0;
     let newEvents = 0;
     let updatedEvents = 0;
-    const deletedEvents = 0;
+    let deletedEvents = 0;
+    const currentExternalIds = new Set<string>();
 
     const params = new URLSearchParams({
       startDateTime,
@@ -266,6 +267,8 @@ export class MicrosoftCalendarSyncService {
 
       for (const event of events) {
         try {
+          currentExternalIds.add(event.id);
+
           const result = await this.processCalendarEvent(
             event,
             calendarId,
@@ -290,7 +293,14 @@ export class MicrosoftCalendarSyncService {
       eventsUrl = eventsResponse.data['@odata.nextLink'];
     }
 
-    // TODO: Handle deleted events (compare with database)
+    // Handle deleted events (compare with database)
+    deletedEvents = await this.handleDeletedEvents(
+      providerId,
+      calendarId,
+      currentExternalIds,
+      startDateTime,
+      endDateTime,
+    );
 
     return {
       eventsProcessed,
@@ -409,6 +419,58 @@ export class MicrosoftCalendarSyncService {
       default:
         return 'default';
     }
+  }
+
+  /**
+   * Handle deleted events by marking events that were in the database but not in the sync as deleted
+   */
+  private async handleDeletedEvents(
+    providerId: string,
+    calendarId: string,
+    currentExternalIds: Set<string>,
+    startDateTime: string,
+    endDateTime: string,
+  ): Promise<number> {
+    // Find events in the database that are within the sync range and not seen in current sync
+    const existingEvents = await this.prisma.calendarEvent.findMany({
+      where: {
+        providerId,
+        calendarId,
+        startTime: {
+          gte: new Date(startDateTime),
+          lte: new Date(endDateTime),
+        },
+        isDeleted: false, // Only consider events that aren't already marked as deleted
+      },
+      select: {
+        id: true,
+        externalId: true,
+      },
+    });
+
+    // Filter to events not seen in current sync
+    const deletedEventIds = existingEvents
+      .filter((event) => !currentExternalIds.has(event.externalId))
+      .map((event) => event.id);
+
+    if (deletedEventIds.length > 0) {
+      // Mark as deleted
+      await this.prisma.calendarEvent.updateMany({
+        where: {
+          id: { in: deletedEventIds },
+        },
+        data: {
+          isDeleted: true,
+          lastSyncedAt: new Date(),
+        },
+      });
+
+      this.logger.debug(
+        `Marked ${deletedEventIds.length} events as deleted in calendar ${calendarId}`,
+      );
+    }
+
+    return deletedEventIds.length;
   }
 
   /**

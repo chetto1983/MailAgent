@@ -140,7 +140,7 @@ export class SyncWorker implements OnModuleInit, OnModuleDestroy {
         // Prepare sync options from job data
         const syncOptions = {
           syncType: syncType === 'full' ? 'full' as const : 'incremental' as const,
-          maxMessages: 200, // TODO: make configurable
+          maxMessages: this.configService.get<number>('SYNC_MAX_MESSAGES_PER_JOB', 200),
           // Provider-specific sync tokens will be handled internally
         };
 
