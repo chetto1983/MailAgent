@@ -914,7 +914,10 @@ export class GoogleSyncService extends BaseEmailSyncService {
   }
 
   /**
-   * Process and store attachments for an email
+   * Process and store attachments for an email using intelligent strategy:
+   * - Inline images: skip (already in HTML)
+   * - Small PDFs (<5MB): download + store + queue for embeddings
+   * - Everything else: metadata-only (on-demand download)
    */
   private async processEmailAttachments(
     gmail: gmail_v1.Gmail,
@@ -934,51 +937,107 @@ export class GoogleSyncService extends BaseEmailSyncService {
         where: { emailId },
       });
 
-      // Process each attachment
+      // Process each attachment with intelligent strategy
       for (const attachment of attachments) {
         try {
-          // Download attachment data
-          const data = await this.downloadGmailAttachment(
-            gmail,
-            externalId,
-            attachment.attachmentId,
-          );
+          // Convert to provider-agnostic metadata
+          const metadata = {
+            filename: attachment.filename,
+            mimeType: attachment.mimeType,
+            size: attachment.size,
+            isInline: attachment.isInline,
+            contentId: attachment.contentId,
+            externalId: attachment.attachmentId,
+            externalMessageId: externalId,
+          };
 
-          if (!data) {
-            this.logger.warn(
-              `Skipping attachment ${attachment.filename} for email ${emailId} - download failed`,
+          // Determine processing strategy
+          const strategy = this.attachmentStorage.getProcessingStrategy(metadata);
+
+          if (strategy === 'skip') {
+            this.logger.debug(
+              `Skipping inline image ${attachment.filename} for email ${emailId}`,
             );
             continue;
           }
 
-          // Upload to S3/MinIO
-          const uploaded = await this.attachmentStorage.uploadAttachment(
-            tenantId,
-            providerId,
-            {
+          if (strategy === 'embeddings') {
+            // Small PDF: download + store + queue for embeddings
+            const data = await this.downloadGmailAttachment(
+              gmail,
+              externalId,
+              attachment.attachmentId,
+            );
+
+            if (!data) {
+              this.logger.warn(
+                `Failed to download PDF ${attachment.filename}, storing metadata only`,
+              );
+              // Fall back to metadata-only
+              const stored = this.attachmentStorage.storeAttachmentMetadata(providerId, metadata);
+              await this.prisma.emailAttachment.create({
+                data: {
+                  emailId,
+                  filename: stored.filename,
+                  mimeType: stored.mimeType,
+                  size: stored.size,
+                  contentId: stored.contentId,
+                  storageType: stored.storageType,
+                  storagePath: stored.storagePath,
+                  isInline: stored.isInline,
+                },
+              });
+              continue;
+            }
+
+            // Upload to S3/MinIO
+            const uploaded = await this.attachmentStorage.uploadAttachment(tenantId, providerId, {
               filename: attachment.filename,
               content: data,
               contentType: attachment.mimeType,
-            },
-          );
+            });
 
-          // Save attachment metadata to database
-          await this.prisma.emailAttachment.create({
-            data: {
-              emailId,
-              filename: uploaded.filename,
-              mimeType: uploaded.mimeType,
-              size: uploaded.size,
-              contentId: attachment.contentId,
-              storageType: uploaded.storageType,
-              storagePath: uploaded.storagePath,
-              isInline: attachment.isInline,
-            },
-          });
+            // Save to database with s3 storage
+            await this.prisma.emailAttachment.create({
+              data: {
+                emailId,
+                filename: uploaded.filename,
+                mimeType: uploaded.mimeType,
+                size: uploaded.size,
+                contentId: attachment.contentId,
+                storageType: uploaded.storageType,
+                storagePath: uploaded.storagePath,
+                isInline: uploaded.isInline,
+              },
+            });
 
-          this.logger.debug(
-            `Stored attachment ${attachment.filename} (${attachment.size} bytes) for email ${emailId}`,
-          );
+            this.logger.debug(
+              `Downloaded document ${attachment.filename} (${(attachment.size / 1024 / 1024).toFixed(2)}MB) for embeddings`,
+            );
+
+            // Embeddings will be processed automatically by KnowledgeBaseService
+            // which extracts text from PDF/Office files via AttachmentContentExtractorService
+          } else {
+            // metadata-only: save reference for on-demand download
+            const stored = this.attachmentStorage.storeAttachmentMetadata(providerId, metadata);
+
+            await this.prisma.emailAttachment.create({
+              data: {
+                emailId,
+                filename: stored.filename,
+                mimeType: stored.mimeType,
+                size: stored.size,
+                contentId: stored.contentId,
+                storageType: stored.storageType,
+                storagePath: stored.storagePath,
+                isInline: stored.isInline,
+              },
+            });
+
+            this.logger.debug(
+              `Stored metadata-only for ${attachment.filename} (${(attachment.size / 1024 / 1024).toFixed(2)}MB)`,
+            );
+          }
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err));
           this.logger.error(
