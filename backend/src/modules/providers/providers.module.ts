@@ -22,7 +22,7 @@ import { OAuthCallbackController } from './controllers/oauth-callback.controller
   imports: [
     PrismaModule,
     forwardRef(() => EmailSyncModule),
-    AiModule,
+    forwardRef(() => AiModule),
     forwardRef(() => CalendarModule),
     forwardRef(() => ContactsModule),
   ],
