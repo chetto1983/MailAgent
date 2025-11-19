@@ -1,8 +1,8 @@
 # 📋 CHECKLIST PROGETTO MAILAGENT
 
-**Data ultimo aggiornamento**: 7 Novembre 2025 🆕
-**Versione**: 2.0.0
-**Stato progetto**: 85% completato (Backend) | 90% completato (Frontend) 🎉
+**Data ultimo aggiornamento**: 19 Novembre 2025 🆕
+**Versione**: 2.1.0
+**Stato progetto**: 95% completato (Backend) | 90% completato (Frontend) 🎉
 
 ---
 
@@ -17,17 +17,79 @@
 | ✉️ Email Composer | 100% ✅ | 100% ✅ | ✅ **Implementato con TipTap!** 🎉 |
 | 🤖 AI Email Insights | 100% ✅ | 90% ✅ | ✅ **Summarization, Smart Replies, Labels!** 🎉 |
 | 📅 Calendar API | 100% ✅ | - | ✅ Test endpoint funzionanti |
-| 📅 Calendar Sync Worker | 0% 🔴 | - | 🔴 Da implementare |
+| 📅 Calendar Sync Worker | 100% ✅ | - | ✅ **Sync completo con attachments!** 🎉 |
 | 📅 Calendar UI | - | 0% 🔴 | 🔴 Da implementare |
 | 👥 Contacts API | 100% ✅ | - | ✅ Test endpoint funzionanti |
 | 👥 Contacts Sync Worker | 0% 🔴 | - | 🔴 Da implementare |
 | 👥 Contacts UI | - | 0% 🔴 | 🔴 Da implementare |
-| 🤖 AI/Agent Core | 95% ✅ | 90% ✅ | ✅ Funzionante |
-| 🧠 Knowledge Base (RAG) | 90% ✅ | - | ✅ Embeddings + Vector Search |
+| 🤖 AI/Agent Core | 100% ✅ | 90% ✅ | ✅ **Production-ready!** 🎉 |
+| 🧠 Knowledge Base (RAG) | 100% ✅ | - | ✅ **Embeddings + Cache + Attachments!** 🎉 |
 | 🎤 Voice Support | 0% 🔴 | 0% 🔴 | 🔴 Non iniziato |
 | 🧪 Testing | 5% 🔴 | 0% 🔴 | 🔴 **PRIORITÀ #1** ⚠️ |
 
 **Legenda**: ✅ Completo | ⚠️ Parziale | 🔴 Da fare
+
+---
+
+## 🎉 AGGIORNAMENTI NOVEMBRE 2025
+
+### ✅ Feature Implementate
+
+#### 📅 Calendar Event Attachments (100%)
+- ✅ Google Calendar: Sync completo con Google Drive references
+- ✅ Microsoft Calendar: Sync completo con OneDrive references
+- ✅ Metadata completi: filename, MIME type, size, file URLs
+- ✅ API endpoints per list/download attachments
+- ✅ Storage tipo "reference" (non download file, solo metadata)
+
+#### 📎 Gmail & Microsoft Attachment Sync (100%)
+- ✅ Download automatico da Gmail API (base64url decoding)
+- ✅ Download automatico da Microsoft Graph API
+- ✅ Storage su S3/MinIO con path strutturato per tenant
+- ✅ Metadata completi in database (EmailAttachment table)
+- ✅ Gestione inline attachments vs regular attachments
+- ✅ Parallel processing con Promise.allSettled
+
+#### 🤖 AI Embeddings Optimization (100%)
+- ✅ Query Embedding Cache con Redis (TTL 1h, hash-based keys)
+- ✅ Attachment Content Extraction (PDF, text files)
+- ✅ CTE-based tenant filtering per security
+- ✅ Metadata pre-filtering per performance
+- ✅ Expected 50-70% API cost reduction on repeated queries
+
+#### 🔒 Security Audit & Fixes (100%)
+- ✅ Fixed CRITICAL tenant isolation vulnerability in email retention service
+- ✅ Enhanced Redis operations (KEYS → SCAN for production safety)
+- ✅ Strengthened CSRF protection with crypto.randomBytes (128-bit entropy)
+- ✅ Removed console.log statements
+- ✅ Comprehensive tenant isolation audit completed
+
+#### 🔄 Dead Letter Queue System (100%)
+- ✅ Automatic retry with exponential backoff
+- ✅ DLQ storage in Redis with TTL
+- ✅ Retry management API endpoints
+- ✅ Failed job statistics and monitoring
+
+#### 📚 Documentation Reorganization (100%)
+- ✅ Organized docs/ folder structure (setup/, architecture/, security/, development/, archive/)
+- ✅ Comprehensive README updates
+- ✅ Security guidance for production deployments
+- ✅ Code quality improvements (markdown linting)
+
+### 🔧 Ottimizzazioni Performance
+
+- ✅ Eliminata query ridondante in Microsoft calendar attachment processing
+- ✅ Redis connection error handling migliorato (lazyConnect, error listeners)
+- ✅ Validazione stricter per cached embeddings (Number.isFinite)
+- ✅ Parallel processing per attachments
+
+### 📈 Metriche
+
+- **Backend Completion**: 85% → 95% (+10%)
+- **Lines of Code Changed**: ~2,500+ lines
+- **New Services**: 3 (QueryEmbeddingCache, AttachmentContentExtractor, DLQ)
+- **Security Fixes**: 4 critical/suspicious issues resolved
+- **API Endpoints Added**: 8+ (calendar attachments, DLQ management)
 
 ---
 
