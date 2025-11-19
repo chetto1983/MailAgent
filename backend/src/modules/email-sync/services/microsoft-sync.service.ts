@@ -568,7 +568,7 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
       this.logger.debug('Initialized Microsoft delta link after full sync');
     } catch (error) {
       mode = 'timestamp';
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = this.extractErrorMessage(error);
 
       if (this.isDeltaUnsupportedError(error)) {
         this.logger.warn(
@@ -781,9 +781,7 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
         });
       } catch (error) {
         this.logger.warn(
-          `Microsoft batch fetch failed for ${slice.length} ids, fallback to sequential: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          `Microsoft batch fetch failed for ${slice.length} ids, fallback to sequential: ${this.extractErrorMessage(error)}`,
         );
         const sequential = await Promise.all(
           slice.map((id) =>
@@ -847,7 +845,7 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
     const bodyText = message.body?.contentType === 'text' ? message.body.content : '';
     const bodyHtml =
       message.body?.contentType === 'html' ? message.body.content : message.body?.content || '';
-    const snippet = message.bodyPreview || bodyText.substring(0, 200);
+    const snippet = message.bodyPreview || this.truncateText(bodyText, 200);
     const sentAt = message.sentDateTime ? new Date(message.sentDateTime) : new Date();
     const receivedAt = message.receivedDateTime ? new Date(message.receivedDateTime) : new Date();
     const labels = message.categories || [];
@@ -1334,7 +1332,7 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
       const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
       return result.processed > 0;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.error(`Failed to process Microsoft message ${messageId}: ${message}`);
       return false;
     }
@@ -1472,7 +1470,7 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
 
       this.logger.log(`Synced ${folders.length} Microsoft folders for provider ${providerId}`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = this.extractErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
         `Error syncing Microsoft folders for provider ${providerId}: ${errorMessage}`,

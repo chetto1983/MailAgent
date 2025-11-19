@@ -275,7 +275,7 @@ export class ImapSyncService extends BaseEmailSyncService {
             });
             updates += 1;
           } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
+            const message = this.extractErrorMessage(error);
             this.logger.warn(
               `Failed to update flagged IMAP email ${email.id} as deleted: ${message}`,
             );
@@ -314,14 +314,14 @@ export class ImapSyncService extends BaseEmailSyncService {
           });
           updates += 1;
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = this.extractErrorMessage(error);
           this.logger.warn(`Failed to mark IMAP email ${email.id} as deleted: ${message}`);
         }
       }
 
       return updates;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(
         `Failed to reconcile IMAP deletions for provider ${providerId} (tenant ${tenantId}): ${message}`,
       );
@@ -507,7 +507,7 @@ export class ImapSyncService extends BaseEmailSyncService {
 
       // Create snippet from body or subject
       const snippetSource = bodyText || this.extractPlainText(bodyHtml) || subject;
-      const snippet = snippetSource.substring(0, 200);
+      const snippet = this.truncateText(snippetSource, 200);
 
       // Extract flags
       const flags = message.flags || new Set();
@@ -646,7 +646,7 @@ export class ImapSyncService extends BaseEmailSyncService {
         ),
       ]);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = this.extractErrorMessage(error);
       this.logger.warn(`Could not download body for UID ${uid}: ${msg}`);
       return null;
     }
@@ -675,7 +675,7 @@ export class ImapSyncService extends BaseEmailSyncService {
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(`Failed to update metadata for IMAP email ${emailId}: ${message}`);
     }
   }

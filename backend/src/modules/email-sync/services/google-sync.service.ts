@@ -477,7 +477,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
           externalId: messageId,
         });
       } else {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = this.extractErrorMessage(error);
         this.logger.warn(`Failed to refresh Gmail message ${messageId}: ${message}`);
       }
     }
@@ -544,7 +544,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
       if (this.isNotFoundError(error)) {
         await this.enforceTrashState(existing, tenantId);
       } else {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = this.extractErrorMessage(error);
         this.logger.warn(`Error while handling Gmail deletion for ${messageId}: ${message}`);
       }
     }
@@ -584,7 +584,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(
         `Failed to soft-delete Gmail message ${existing.id} locally: ${message}`,
       );
@@ -595,7 +595,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
     try {
       await this.knowledgeBaseService.deleteEmbeddingsForEmail(tenantId, emailId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(
         `Failed to delete embeddings for email ${emailId} during hard-delete: ${message}`,
       );
@@ -606,7 +606,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
         where: { id: emailId },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(`Failed to remove email ${emailId} from database: ${message}`);
     }
   }
@@ -682,7 +682,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(`Failed to update metadata for email ${emailId}: ${message}`);
     }
   }
@@ -748,9 +748,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
           );
       } catch (error) {
         this.logger.warn(
-          `Gmail batchGet failed, falling back to parallel gets: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          `Gmail batchGet failed, falling back to parallel gets: ${this.extractErrorMessage(error)}`,
         );
       }
     }
@@ -844,7 +842,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
       extractBody(message.payload);
     }
 
-    const snippet = message.snippet || bodyText.substring(0, 200);
+    const snippet = message.snippet || this.truncateText(bodyText, 200);
     const sentAt = dateStr ? new Date(dateStr) : new Date(message.internalDate ? parseInt(message.internalDate) : Date.now());
     const labelIds = message.labelIds ?? [];
     const folder = this.determineFolderFromLabels(labelIds);
@@ -1333,7 +1331,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
 
       this.logger.log(`Synced ${labels.length} Gmail labels as folders for provider ${providerId}`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = this.extractErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
         `Error syncing Gmail folders for provider ${providerId}: ${errorMessage}`,

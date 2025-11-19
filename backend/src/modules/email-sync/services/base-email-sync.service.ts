@@ -183,9 +183,7 @@ export abstract class BaseEmailSyncService implements OnModuleInit {
           break;
       }
     } catch (error) {
-      this.logger.warn(
-        `Failed to notify mailbox change: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`Failed to notify mailbox change: ${this.extractErrorMessage(error)}`);
     }
   }
 
@@ -297,7 +295,7 @@ export abstract class BaseEmailSyncService implements OnModuleInit {
     } catch (error) {
       // Fallback to basic regex if cheerio fails
       this.logger.warn(
-        `Failed to parse HTML with cheerio, using fallback: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to parse HTML with cheerio, using fallback: ${this.extractErrorMessage(error)}`,
       );
 
       let text = html.replace(/<[^>]*>/g, ' ');
