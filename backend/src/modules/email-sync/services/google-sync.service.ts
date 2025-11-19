@@ -3,7 +3,7 @@ import { gmail_v1, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { EmailEmbeddingJob, EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
+import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
@@ -16,7 +16,8 @@ import { AttachmentStorageService } from '../../email/services/attachment.storag
 import { BaseEmailSyncService } from './base-email-sync.service';
 import { GmailAttachmentHandler } from './gmail/gmail-attachment-handler';
 import { GmailFolderService } from './gmail/gmail-folder.service';
-import { GmailMessageParser, ParsedGmailMessage } from './gmail/gmail-message-parser';
+import { GmailMessageParser } from './gmail/gmail-message-parser';
+import { GmailBatchProcessor } from './gmail/gmail-batch-processor';
 
 @Injectable()
 export class GoogleSyncService extends BaseEmailSyncService {
@@ -38,6 +39,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
     private gmailAttachmentHandler: GmailAttachmentHandler,
     private gmailFolderService: GmailFolderService,
     private gmailMessageParser: GmailMessageParser,
+    private gmailBatchProcessor: GmailBatchProcessor,
   ) {
     super(prisma, realtimeEvents, config);
   }
@@ -283,7 +285,13 @@ export class GoogleSyncService extends BaseEmailSyncService {
         }
 
         if (fullMessages.length) {
-          const batchResult = await this.processMessagesBatch(fullMessages, providerId, tenantId);
+          const batchResult = await this.gmailBatchProcessor.processMessagesBatch(
+            fullMessages,
+            providerId,
+            tenantId,
+            this.truncateText.bind(this),
+            this.createGmailClient.bind(this),
+          );
           messagesProcessed += batchResult.processed;
           newMessages += batchResult.created;
         }
@@ -372,10 +380,22 @@ export class GoogleSyncService extends BaseEmailSyncService {
         const chunkIds = messages.slice(i, i + this.batchSize).map((m) => m.id!).filter(Boolean);
         if (!chunkIds.length) continue;
 
-        const fullMessages = await this.fetchMessagesBatch(gmail, chunkIds, 'full');
+        const fullMessages = await this.gmailBatchProcessor.fetchMessagesBatch(
+          gmail,
+          chunkIds,
+          'full',
+          this.withRetry.bind(this),
+          this.extractErrorMessage.bind(this),
+        );
 
         if (fullMessages.length) {
-          const batchResult = await this.processMessagesBatch(fullMessages, providerId, tenantId);
+          const batchResult = await this.gmailBatchProcessor.processMessagesBatch(
+            fullMessages,
+            providerId,
+            tenantId,
+            this.truncateText.bind(this),
+            this.createGmailClient.bind(this),
+          );
           messagesProcessed += batchResult.processed;
           newMessages += batchResult.created;
         }
@@ -645,10 +665,22 @@ export class GoogleSyncService extends BaseEmailSyncService {
     tenantId: string,
   ): Promise<boolean> {
     try {
-      const messages = await this.fetchMessagesBatch(gmail, [messageId], 'full');
+      const messages = await this.gmailBatchProcessor.fetchMessagesBatch(
+        gmail,
+        [messageId],
+        'full',
+        this.withRetry.bind(this),
+        this.extractErrorMessage.bind(this),
+      );
       if (!messages.length) return false;
 
-      const result = await this.processMessagesBatch(messages, providerId, tenantId);
+      const result = await this.gmailBatchProcessor.processMessagesBatch(
+        messages,
+        providerId,
+        tenantId,
+        this.truncateText.bind(this),
+        this.createGmailClient.bind(this),
+      );
       return result.processed > 0;
     } catch (error) {
       if (this.isNotFoundError(error)) {
@@ -662,256 +694,6 @@ export class GoogleSyncService extends BaseEmailSyncService {
       this.logger.error(`Failed to process message ${messageId}:`, error);
       return false;
     }
-  }
-
-  /**
-   * Fetch Gmail messages in batch (batchGet if available, otherwise parallel get).
-   */
-  private async fetchMessagesBatch(
-    gmail: gmail_v1.Gmail,
-    ids: string[],
-    format: gmail_v1.Params$Resource$Users$Messages$Get['format'] = 'full',
-  ): Promise<gmail_v1.Schema$Message[]> {
-    if (!ids.length) return [];
-
-    const batchGet = (gmail.users.messages as any)?.batchGet;
-    if (typeof batchGet === 'function') {
-      try {
-        const batchResponse = await this.withRetry<any>(() =>
-          batchGet.call(gmail.users.messages, {
-            userId: 'me',
-            ids,
-            format,
-          }),
-        );
-
-        const responses = batchResponse.data.responses || [];
-        return responses
-          .map((r: { message?: gmail_v1.Schema$Message }) => r.message)
-          .filter(
-            (msg: gmail_v1.Schema$Message | undefined | null): msg is gmail_v1.Schema$Message =>
-              !!msg?.id,
-          );
-      } catch (error) {
-        this.logger.warn(
-          `Gmail batchGet failed, falling back to parallel gets: ${this.extractErrorMessage(error)}`,
-        );
-      }
-    }
-
-    const chunkResponses = await Promise.all(
-      ids.map((id) =>
-        this.withRetry(() =>
-          gmail.users.messages
-            .get({ userId: 'me', id, format })
-            .then((res) => res.data)
-            .catch(() => null),
-        ),
-      ),
-    );
-    return chunkResponses.filter((msg): msg is gmail_v1.Schema$Message => !!msg?.id);
-  }
-
-  private async processParsedMessagesBatch(
-    mapped: ParsedGmailMessage[],
-    providerId: string,
-    tenantId: string,
-  ): Promise<{ processed: number; created: number }> {
-    if (!mapped.length) {
-      return { processed: 0, created: 0 };
-    }
-
-    const safeMapped = mapped;
-
-    const externalIds = safeMapped.map((m) => m.externalId);
-    const existing = await this.prisma.email.findMany({
-      where: {
-        providerId,
-        externalId: { in: externalIds },
-      },
-      select: {
-        id: true,
-        externalId: true,
-        metadata: true,
-      },
-    });
-    const existingMap = new Map(existing.map((e) => [e.externalId, e]));
-
-    const creates = safeMapped.filter((m) => !existingMap.has(m.externalId));
-    const updates = safeMapped.filter((m) => existingMap.has(m.externalId));
-
-    if (creates.length) {
-      await this.prisma.email.createMany({
-        data: creates.map((m) => ({
-          tenantId,
-          providerId,
-          externalId: m.externalId,
-          threadId: m.threadId,
-          messageId: m.messageIdHeader,
-          inReplyTo: m.inReplyTo,
-          references: m.references,
-          from: m.from,
-          to: m.to,
-          cc: m.cc,
-          bcc: m.bcc,
-          subject: m.subject,
-          bodyText: m.bodyText,
-          bodyHtml: m.bodyHtml,
-          snippet: m.snippet,
-          folder: m.folder,
-          labels: m.labels,
-          isRead: m.isRead,
-          isStarred: m.isStarred,
-          isDeleted: m.isDeleted,
-          sentAt: m.sentAt,
-          receivedAt: m.receivedAt,
-          size: m.size,
-          headers: m.headers,
-          metadata: mergeEmailStatusMetadata(null, m.metadataStatus),
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    if (updates.length) {
-      await Promise.all(
-        updates.map(async (m) => {
-          const existingEmail = existingMap.get(m.externalId);
-          if (!existingEmail) return;
-
-          const metadata = mergeEmailStatusMetadata(
-            existingEmail.metadata as Record<string, any> | null,
-            m.metadataStatus,
-          );
-
-          await this.prisma.email.update({
-            where: { id: existingEmail.id },
-            data: {
-              labels: m.labels,
-              folder: m.folder,
-              isRead: m.isRead,
-              isStarred: m.isStarred,
-              isDeleted: m.isDeleted,
-              metadata,
-            },
-          });
-        }),
-      );
-    }
-
-    // Fetch persisted records to drive embedding enqueue and attachment processing
-    const persisted = await this.prisma.email.findMany({
-      where: {
-        providerId,
-        externalId: { in: externalIds },
-      },
-      select: {
-        id: true,
-        externalId: true,
-        receivedAt: true,
-      },
-    });
-    const persistedMap = new Map(persisted.map((p) => [p.externalId, p]));
-
-    // Get Gmail client for attachment downloads (if there are any attachments)
-    const hasAttachments = mapped.some((m) => m.attachments.length > 0);
-    let gmail: gmail_v1.Gmail | null = null;
-
-    if (hasAttachments) {
-      try {
-        const provider = await this.prisma.providerConfig.findUnique({
-          where: { id: providerId },
-        });
-
-        if (provider?.accessToken && provider.tokenEncryptionIv) {
-          const accessToken = this.crypto.decrypt(
-            provider.accessToken,
-            provider.tokenEncryptionIv,
-          );
-          gmail = this.createGmailClient(accessToken);
-        }
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        this.logger.error(
-          `Failed to create Gmail client for attachments: ${error.message}`,
-        );
-      }
-    }
-
-    const embeddingJobs: EmailEmbeddingJob[] = [];
-    const attachmentPromises: Promise<void>[] = [];
-
-    for (const m of mapped) {
-      const persistedEmail = persistedMap.get(m.externalId);
-      if (!persistedEmail) continue;
-
-      // Enqueue embedding job
-      const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(
-        tenantId,
-        persistedEmail.id,
-      );
-      if (!alreadyEmbedded) {
-        embeddingJobs.push({
-          tenantId,
-          providerId,
-          emailId: persistedEmail.id,
-          subject: m.subject,
-          snippet: m.snippet,
-          bodyText: m.bodyText,
-          bodyHtml: m.bodyHtml,
-          from: m.from,
-          receivedAt: persistedEmail.receivedAt,
-        });
-      }
-
-      // Process attachments if any
-      if (m.attachments.length > 0 && gmail) {
-        attachmentPromises.push(
-          this.gmailAttachmentHandler.processEmailAttachments(
-            gmail,
-            persistedEmail.id,
-            m.externalId,
-            m.attachments,
-            tenantId,
-            providerId,
-          ),
-        );
-      }
-    }
-
-    // Process attachments and embeddings in parallel
-    const results = await Promise.allSettled([
-      ...attachmentPromises,
-      embeddingJobs.length > 0
-        ? this.emailEmbeddingQueue.enqueueMany(embeddingJobs)
-        : Promise.resolve(),
-    ]);
-
-    // Log any failures
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        this.logger.error(
-          `Failed to process attachment or embedding (index ${index}): ${result.reason}`,
-        );
-      }
-    });
-
-    return {
-      processed: mapped.length,
-      created: creates.length,
-    };
-  }
-
-  private async processMessagesBatch(
-    messages: gmail_v1.Schema$Message[],
-    providerId: string,
-    tenantId: string,
-  ): Promise<{ processed: number; created: number }> {
-    const parsed = messages
-      .map((m) => this.gmailMessageParser.parseGmailMessage(m, this.truncateText.bind(this)))
-      .filter((m): m is NonNullable<typeof m> => !!m);
-
-    return this.processParsedMessagesBatch(parsed, providerId, tenantId);
   }
 
   private async handleMissingRemoteMessage(

@@ -21,6 +21,7 @@ import { EmailEmbeddingCleanupService } from './services/email-embedding-cleanup
 import { GmailAttachmentHandler } from './services/gmail/gmail-attachment-handler';
 import { GmailFolderService } from './services/gmail/gmail-folder.service';
 import { GmailMessageParser } from './services/gmail/gmail-message-parser';
+import { GmailBatchProcessor } from './services/gmail/gmail-batch-processor';
 
 // Webhook Services (Strategy 2: Real-time Sync)
 import { GmailWebhookService } from './services/gmail-webhook.service';
@@ -73,6 +74,7 @@ import { WebhookController } from './controllers/webhook.controller';
     GmailAttachmentHandler,
     GmailFolderService,
     GmailMessageParser,
+    GmailBatchProcessor,
 
     // Webhook services (Strategy 2: Real-time)
     GmailWebhookService,
