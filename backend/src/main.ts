@@ -8,6 +8,11 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { getConfiguration } from './config/configuration';
 
+/**
+ * Bootstraps and starts the NestJS HTTP server with configured middleware, docs, legacy-route handling, and graceful shutdown.
+ *
+ * Configures proxy trust, Helmet security, CORS (allowlist, regex, or allow-all), global validation and exception filters, and Swagger when not in production. Mounts a legacy watchdog for /email-configs that responds 410, enables shutdown hooks, starts listening on the configured port, logs startup details (URL, Swagger, database, Redis), and registers SIGTERM/SIGINT handlers that attempt a graceful shutdown before exiting.
+ */
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');

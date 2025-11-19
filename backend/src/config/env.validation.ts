@@ -154,10 +154,11 @@ export class EnvironmentVariables {
 }
 
 /**
- * Validate environment variables
+ * Validate and coerce raw environment key-value pairs into an EnvironmentVariables instance.
  *
- * Called by ConfigModule to validate config at startup.
- * Throws an error if validation fails, preventing app start.
+ * @param config - Raw environment key-value pairs to validate and coerce
+ * @returns The validated EnvironmentVariables instance
+ * @throws Error - If validation fails; the error message lists each property and its constraint violations
  */
 export function validate(config: Record<string, unknown>): EnvironmentVariables {
   // Convert numbers from string to number
