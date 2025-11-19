@@ -506,7 +506,7 @@ export class ImapSyncService extends BaseEmailSyncService {
       }
 
       // Create snippet from body or subject
-      const snippetSource = bodyText || this.stripHtml(bodyHtml) || subject;
+      const snippetSource = bodyText || this.extractPlainText(bodyHtml) || subject;
       const snippet = snippetSource.substring(0, 200);
 
       // Extract flags
@@ -678,10 +678,6 @@ export class ImapSyncService extends BaseEmailSyncService {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Failed to update metadata for IMAP email ${emailId}: ${message}`);
     }
-  }
-
-  private stripHtml(html: string): string {
-    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
   private notifyImapMailboxChange(
