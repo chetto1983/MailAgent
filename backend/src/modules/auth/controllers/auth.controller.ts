@@ -6,7 +6,6 @@ import {
   UseGuards,
   Request,
   Req,
-  BadRequestException,
   GoneException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -15,6 +14,11 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthenticatedRequest } from '../../../common/types/request.types';
 import { RegisterDto } from '../dtos/register.dto';
+import { LoginDto } from '../dtos/login.dto';
+import { VerifyOtpDto } from '../dtos/verify-otp.dto';
+import { ResetPasswordDto } from '../dtos/reset-password.dto';
+import { ForgotPasswordDto } from '../dtos/forgot-password.dto';
+import { SendOtpDto } from '../dtos/send-otp.dto';
 import { Request as ExpressRequest } from 'express';
 
 @ApiTags('Authentication')
@@ -38,10 +42,7 @@ export class AuthController {
    */
   @Post('send-otp')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async sendOtp(@Body() body: { email: string; tenantSlug?: string }) {
-    if (!body.email) {
-      throw new BadRequestException('Email is required');
-    }
+  async sendOtp(@Body() body: SendOtpDto) {
     return this.authService.sendOtpCode(body.email, body.tenantSlug);
   }
 
@@ -53,12 +54,9 @@ export class AuthController {
   @Post('verify-otp')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async verifyOtp(
-    @Body() body: { email: string; code: string; tenantSlug?: string },
+    @Body() body: VerifyOtpDto,
     @Req() req: ExpressRequest,
   ) {
-    if (!body.email || !body.code) {
-      throw new BadRequestException('Email and code are required');
-    }
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
     return this.authService.verifyOtpCode(body.email, body.code, body.tenantSlug, ipAddress, userAgent);
@@ -72,12 +70,9 @@ export class AuthController {
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async login(
-    @Body() body: { email: string; password: string; tenantSlug?: string },
+    @Body() body: LoginDto,
     @Req() req: ExpressRequest,
   ) {
-    if (!body.email || !body.password) {
-      throw new BadRequestException('Email and password are required');
-    }
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
     return this.authService.login(body.email, body.password, body.tenantSlug, ipAddress, userAgent);
@@ -90,10 +85,7 @@ export class AuthController {
    */
   @Post('forgot-password')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  async forgotPassword(@Body() body: { email: string; tenantSlug?: string }) {
-    if (!body.email) {
-      throw new BadRequestException('Email is required');
-    }
+  async forgotPassword(@Body() body: ForgotPasswordDto) {
     return this.authService.requestPasswordReset(body.email, body.tenantSlug);
   }
 
@@ -102,11 +94,8 @@ export class AuthController {
    * POST /auth/reset-password
    */
   @Post('reset-password')
-  async resetPassword(@Body() body: { token: string; newPassword: string; tenantSlug?: string }) {
-    if (!body.token || !body.newPassword) {
-      throw new BadRequestException('Token and newPassword are required');
-    }
-    return this.authService.resetPassword(body.token, body.newPassword, body.tenantSlug);
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(body.token, body.newPassword);
   }
 
   /**

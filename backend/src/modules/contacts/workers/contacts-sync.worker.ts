@@ -16,19 +16,6 @@ export class ContactsSyncWorker implements OnModuleInit, OnModuleDestroy {
   private redisConnection: Redis;
   private workers: Worker[] = [];
 
-  // Worker configuration
-  private readonly WORKER_CONFIG = {
-    high: {
-      concurrency: 5, // 5 jobs simultaneously
-    },
-    normal: {
-      concurrency: 3, // 3 jobs simultaneously
-    },
-    low: {
-      concurrency: 2, // 2 jobs simultaneously
-    },
-  };
-
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
@@ -58,10 +45,10 @@ export class ContactsSyncWorker implements OnModuleInit, OnModuleDestroy {
       enableReadyCheck: false,
     });
 
-    // Start workers for each priority queue
-    this.startWorker('high', this.WORKER_CONFIG.high.concurrency);
-    this.startWorker('normal', this.WORKER_CONFIG.normal.concurrency);
-    this.startWorker('low', this.WORKER_CONFIG.low.concurrency);
+    // Start workers for each priority queue with env-based concurrency
+    this.startWorker('high', this.getConcurrency('HIGH'));
+    this.startWorker('normal', this.getConcurrency('NORMAL'));
+    this.startWorker('low', this.getConcurrency('LOW'));
 
     this.logger.log('Contacts sync workers started successfully');
   }
@@ -216,5 +203,31 @@ export class ContactsSyncWorker implements OnModuleInit, OnModuleDestroy {
     await this.redisConnection.quit();
 
     this.logger.log('Contacts sync workers stopped');
+  }
+
+  /**
+   * Get worker concurrency from environment variables
+   */
+  private getConcurrency(level: 'HIGH' | 'NORMAL' | 'LOW'): number {
+    switch (level) {
+      case 'HIGH':
+        return this.getNumber('CONTACTS_WORKER_HIGH_CONCURRENCY', 5);
+      case 'NORMAL':
+        return this.getNumber('CONTACTS_WORKER_NORMAL_CONCURRENCY', 3);
+      case 'LOW':
+        return this.getNumber('CONTACTS_WORKER_LOW_CONCURRENCY', 2);
+      default:
+        return 2;
+    }
+  }
+
+  private getNumber(envKey: string, defaultValue: number): number {
+    const raw = this.configService.get<string | number>(envKey);
+    if (raw === undefined || raw === null || raw === '') {
+      return defaultValue;
+    }
+
+    const parsed = typeof raw === 'number' ? raw : Number(raw);
+    return Number.isFinite(parsed) ? parsed : defaultValue;
   }
 }

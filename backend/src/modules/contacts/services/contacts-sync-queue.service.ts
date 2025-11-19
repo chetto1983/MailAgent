@@ -99,15 +99,10 @@ export class ContactsSyncQueueService implements OnModuleInit, OnModuleDestroy {
     this.highQueue = new Queue<ContactsSyncJobData>('contacts-sync-high', {
       connection: this.redisConnection,
       defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000, // 5s, 10s, 20s
-        },
-        removeOnComplete: {
-          count: 100, // Keep last 100 completed jobs
-        },
-        removeOnFail: false, // Keep failed jobs for debugging
+        attempts: this.getAttempts('HIGH'),
+        backoff: this.getBackoff('HIGH'),
+        removeOnComplete: this.getRemoveOnComplete('HIGH'),
+        removeOnFail: this.getRemoveOnFail('HIGH'),
       },
     });
 
@@ -115,15 +110,10 @@ export class ContactsSyncQueueService implements OnModuleInit, OnModuleDestroy {
     this.normalQueue = new Queue<ContactsSyncJobData>('contacts-sync-normal', {
       connection: this.redisConnection,
       defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-        removeOnComplete: {
-          count: 100,
-        },
-        removeOnFail: false,
+        attempts: this.getAttempts('NORMAL'),
+        backoff: this.getBackoff('NORMAL'),
+        removeOnComplete: this.getRemoveOnComplete('NORMAL'),
+        removeOnFail: this.getRemoveOnFail('NORMAL'),
       },
     });
 
@@ -131,15 +121,10 @@ export class ContactsSyncQueueService implements OnModuleInit, OnModuleDestroy {
     this.lowQueue = new Queue<ContactsSyncJobData>('contacts-sync-low', {
       connection: this.redisConnection,
       defaultJobOptions: {
-        attempts: 2,
-        backoff: {
-          type: 'exponential',
-          delay: 10000, // 10s, 20s
-        },
-        removeOnComplete: {
-          count: 50,
-        },
-        removeOnFail: false,
+        attempts: this.getAttempts('LOW'),
+        backoff: this.getBackoff('LOW'),
+        removeOnComplete: this.getRemoveOnComplete('LOW'),
+        removeOnFail: this.getRemoveOnFail('LOW'),
       },
     });
 
@@ -214,11 +199,26 @@ export class ContactsSyncQueueService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Add a single sync job to the appropriate queue
+   * Uses consistent jobId for deduplication - prevents duplicate jobs for same provider
    */
   async addSyncJob(jobData: ContactsSyncJobData): Promise<void> {
     const queue = this.getQueue(jobData.priority);
+    const jobId = `${jobData.providerId}-contacts`;
+
+    // Check if job already exists in any state (waiting, active, delayed)
+    const existingJob = await queue.getJob(jobId);
+    if (existingJob) {
+      const state = await existingJob.getState();
+      if (['waiting', 'active', 'delayed'].includes(state)) {
+        this.logger.debug(
+          `Skipping duplicate contacts sync job for ${jobData.email} (state: ${state})`,
+        );
+        return;
+      }
+    }
+
     await queue.add(`sync-${jobData.providerId}`, jobData, {
-      jobId: `contacts-sync-${jobData.providerId}-${Date.now()}`,
+      jobId,
     });
 
     this.logger.debug(`Added contacts sync job for ${jobData.email} to ${jobData.priority} queue`);
@@ -247,7 +247,7 @@ export class ContactsSyncQueueService implements OnModuleInit, OnModuleDestroy {
             name: `sync-${job.providerId}`,
             data: job,
             opts: {
-              jobId: `contacts-sync-${job.providerId}-${Date.now()}`,
+              jobId: `${job.providerId}-contacts`,
             },
           })),
         ),
@@ -261,7 +261,7 @@ export class ContactsSyncQueueService implements OnModuleInit, OnModuleDestroy {
             name: `sync-${job.providerId}`,
             data: job,
             opts: {
-              jobId: `contacts-sync-${job.providerId}-${Date.now()}`,
+              jobId: `${job.providerId}-contacts`,
             },
           })),
         ),
@@ -275,7 +275,7 @@ export class ContactsSyncQueueService implements OnModuleInit, OnModuleDestroy {
             name: `sync-${job.providerId}`,
             data: job,
             opts: {
-              jobId: `contacts-sync-${job.providerId}-${Date.now()}`,
+              jobId: `${job.providerId}-contacts`,
             },
           })),
         ),
@@ -358,5 +358,93 @@ export class ContactsSyncQueueService implements OnModuleInit, OnModuleDestroy {
       this.getMetricsSummary('normal'),
       this.getMetricsSummary('low'),
     ];
+  }
+
+  /**
+   * Environment-based configuration helpers
+   */
+  private getAttempts(level: 'HIGH' | 'NORMAL' | 'LOW'): number {
+    switch (level) {
+      case 'HIGH':
+        return this.getNumber('CONTACTS_QUEUE_HIGH_ATTEMPTS', 3);
+      case 'NORMAL':
+        return this.getNumber('CONTACTS_QUEUE_NORMAL_ATTEMPTS', 3);
+      case 'LOW':
+        return this.getNumber('CONTACTS_QUEUE_LOW_ATTEMPTS', 2);
+      default:
+        return 2;
+    }
+  }
+
+  private getBackoff(level: 'HIGH' | 'NORMAL' | 'LOW'):
+    | { type: 'exponential'; delay: number }
+    | undefined {
+    switch (level) {
+      case 'HIGH':
+        return {
+          type: 'exponential',
+          delay: this.getNumber('CONTACTS_QUEUE_HIGH_BACKOFF_MS', 5000),
+        };
+      case 'NORMAL':
+        return {
+          type: 'exponential',
+          delay: this.getNumber('CONTACTS_QUEUE_NORMAL_BACKOFF_MS', 5000),
+        };
+      case 'LOW':
+        return {
+          type: 'exponential',
+          delay: this.getNumber('CONTACTS_QUEUE_LOW_BACKOFF_MS', 10000),
+        };
+      default:
+        return undefined;
+    }
+  }
+
+  private getRemoveOnComplete(level: 'HIGH' | 'NORMAL' | 'LOW'): boolean | { count?: number } {
+    switch (level) {
+      case 'HIGH':
+        return {
+          count: this.getNumber('CONTACTS_QUEUE_HIGH_REMOVE_ON_COMPLETE_COUNT', 100),
+        };
+      case 'NORMAL':
+        return {
+          count: this.getNumber('CONTACTS_QUEUE_NORMAL_REMOVE_ON_COMPLETE_COUNT', 100),
+        };
+      case 'LOW':
+        return {
+          count: this.getNumber('CONTACTS_QUEUE_LOW_REMOVE_ON_COMPLETE_COUNT', 50),
+        };
+      default:
+        return true;
+    }
+  }
+
+  private getRemoveOnFail(level: 'HIGH' | 'NORMAL' | 'LOW'): boolean | { count?: number } {
+    switch (level) {
+      case 'HIGH':
+        return {
+          count: this.getNumber('CONTACTS_QUEUE_HIGH_REMOVE_ON_FAIL_COUNT', 100),
+        };
+      case 'NORMAL':
+        return {
+          count: this.getNumber('CONTACTS_QUEUE_NORMAL_REMOVE_ON_FAIL_COUNT', 100),
+        };
+      case 'LOW':
+        return {
+          count: this.getNumber('CONTACTS_QUEUE_LOW_REMOVE_ON_FAIL_COUNT', 50),
+        };
+      default:
+        return false;
+    }
+  }
+
+  private getNumber(envKey: string, defaultValue: number): number {
+    const raw = this.configService.get<string | number>(envKey);
+    if (raw === undefined || raw === null || raw === '') {
+      return defaultValue;
+    }
+
+    const parsed = typeof raw === 'number' ? raw : Number(raw);
+    return Number.isFinite(parsed) ? parsed : defaultValue;
   }
 }
