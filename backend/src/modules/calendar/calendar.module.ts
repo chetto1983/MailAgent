@@ -10,12 +10,14 @@ import { CalendarProviderFactory } from './calendar-provider.factory';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { EmailSyncModule } from '../email-sync/email-sync.module'; // Import for SyncAuthService
 
 @Module({
   imports: [
     PrismaModule,
     forwardRef(() => ProvidersModule),
     RealtimeModule, // WebSocket events
+    EmailSyncModule, // Import for SyncAuthService (webhook authentication)
   ],
   controllers: [
     CalendarController,

@@ -238,12 +238,12 @@ export function PmSyncMailboxRefactored() {
     loadFolderMetadata();
   }, [loadFolderMetadata]);
 
-  // Load emails when folder changes
+  // Load emails when folder ID changes (not activeFolder object to avoid unnecessary re-renders)
   useEffect(() => {
-    if (activeFolder) {
+    if (selectedFolderId) {
       loadData();
     }
-  }, [activeFolder, loadData]);
+  }, [selectedFolderId, loadData]);
 
   // Keyboard navigation
   useKeyboardNavigation({
