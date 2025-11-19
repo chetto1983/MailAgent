@@ -20,6 +20,14 @@ const queueOptions = { connection };
 
 const aiQueue = new Queue('ai-processing', queueOptions);
 
+/**
+ * Start and run the AI processing worker that consumes jobs from the "ai-processing" queue.
+ *
+ * Initializes a NestJS application context, obtains required services, creates a BullMQ worker
+ * that generates AI responses for incoming jobs, registers completion and failure handlers,
+ * and installs graceful shutdown logic that closes the worker, queue, database connection,
+ * and application context on SIGTERM/SIGINT.
+ */
 async function bootstrap() {
   const logger = new Logger('AIWorker');
 
