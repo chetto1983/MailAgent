@@ -3,7 +3,13 @@ import { QueueService } from './queue.service';
 type QueueMock = ReturnType<typeof createQueueMock>;
 
 const createQueueMock = (name: string) => {
-  const mockJob = { remove: jest.fn() };
+  const mockJob = { remove: jest.fn(), data: {} };
+  const mockExistingJob = {
+    processedOn: Date.now() - 1000,
+    finishedOn: Date.now(),
+    getState: jest.fn().mockResolvedValue('completed'),
+    remove: jest.fn(),
+  };
 
   return {
     name: `email-sync-${name}`,
@@ -20,11 +26,9 @@ const createQueueMock = (name: string) => {
     resume: jest.fn(),
     obliterate: jest.fn(),
     getJobs: jest.fn().mockResolvedValue([mockJob]),
-    getJob: jest.fn().mockResolvedValue({
-      processedOn: Date.now() - 1000,
-      finishedOn: Date.now(),
-    }),
+    getJob: jest.fn().mockResolvedValue(mockExistingJob),
     mockJob,
+    mockExistingJob,
   };
 };
 
@@ -44,6 +48,10 @@ describe('QueueService', () => {
     service['highQueue'] = highQueue as any;
     service['normalQueue'] = normalQueue as any;
     service['lowQueue'] = lowQueue as any;
+    service['redisConnection'] = {
+      keys: jest.fn().mockResolvedValue([]),
+      quit: jest.fn(),
+    } as any;
   });
 
   describe('addSyncJob', () => {

@@ -8,6 +8,7 @@ describe('EmailRetentionService', () => {
       count: jest.Mock;
     };
   };
+  let config: { get: jest.Mock };
   let service: EmailRetentionService;
 
   beforeEach(() => {
@@ -19,7 +20,11 @@ describe('EmailRetentionService', () => {
       },
     };
 
-    service = new EmailRetentionService(prisma as any);
+    config = {
+      get: jest.fn().mockReturnValue('true'),
+    };
+
+    service = new EmailRetentionService(prisma as any, config as any);
   });
 
   describe('archiveOldEmails', () => {
