@@ -8,9 +8,11 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { GoogleCalendarWebhookService } from '../services/google-calendar-webhook.service';
 import { MicrosoftCalendarWebhookService, MicrosoftCalendarNotification } from '../services/microsoft-calendar-webhook.service';
+import { SyncAuthService } from '../../email-sync/services/sync-auth.service';
 
 @Controller('webhooks/calendar')
 export class CalendarWebhookController {
@@ -19,6 +21,7 @@ export class CalendarWebhookController {
   constructor(
     private readonly googleCalendarWebhook: GoogleCalendarWebhookService,
     private readonly microsoftCalendarWebhook: MicrosoftCalendarWebhookService,
+    private readonly syncAuth: SyncAuthService,
   ) {}
 
   /**
@@ -27,9 +30,23 @@ export class CalendarWebhookController {
    */
   @Post('google/push')
   @HttpCode(HttpStatus.OK)
-  async handleGoogleCalendarPush(@Headers() headers: Record<string, string>) {
+  async handleGoogleCalendarPush(
+    @Headers() headers: Record<string, string>,
+    @Headers('x-webhook-token') webhookToken?: string,
+  ) {
     try {
+      // Validate webhook authentication
+      this.syncAuth.validateWebhookToken(webhookToken);
+
       this.logger.log('Received Google Calendar push notification');
+
+      // Validate Google-specific headers
+      const channelId = headers['x-goog-channel-id'];
+      const resourceId = headers['x-goog-resource-id'];
+
+      if (!channelId || !resourceId) {
+        throw new UnauthorizedException('Missing required Google webhook headers');
+      }
 
       // Process the notification
       await this.googleCalendarWebhook.handleNotification(headers);
@@ -37,7 +54,11 @@ export class CalendarWebhookController {
       return { success: true };
     } catch (error) {
       this.logger.error('Error handling Google Calendar webhook:', error);
-      // Return 200 anyway to prevent retries
+      // Return 200 anyway to prevent retries for transient errors
+      // But throw for authentication errors
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       return { success: false, error: 'Processing failed' };
     }
   }
@@ -52,6 +73,8 @@ export class CalendarWebhookController {
   async handleMicrosoftCalendarNotification(
     @Body() payload: { value?: MicrosoftCalendarNotification[] },
     @Query('validationToken') validationToken?: string,
+    @Query('token') token?: string,
+    @Headers('x-webhook-token') webhookToken?: string,
   ) {
     try {
       // Handle subscription validation (initial setup)
@@ -60,6 +83,9 @@ export class CalendarWebhookController {
         // Return the validation token in plain text
         return validationToken;
       }
+
+      // Validate webhook authentication for actual notifications
+      this.syncAuth.validateWebhookToken(webhookToken, token);
 
       // Handle notification
       this.logger.log(
