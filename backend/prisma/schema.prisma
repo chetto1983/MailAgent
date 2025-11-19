@@ -27,6 +27,7 @@ model Tenant {
   providerConfigs      ProviderConfig[]
   users                User[]
   webhookSubscriptions WebhookSubscription[]
+  userLabels           UserLabel[]
 
   @@map("tenants")
 }
@@ -194,6 +195,7 @@ model Email {
   metadata            Json?
   crossProviderLinkId String?
   attachments         EmailAttachment[]
+  emailLabels         EmailLabel[]
   crossProviderLink   EmailCrossProviderLink? @relation(fields: [crossProviderLinkId], references: [id])
   provider            ProviderConfig          @relation(fields: [providerId], references: [id], onDelete: Cascade)
   tenant              Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -243,6 +245,52 @@ model Folder {
   @@index([providerId, parentId])
   @@index([lastSyncedAt])
   @@map("folders")
+}
+
+enum LabelType {
+  SYSTEM
+  USER
+}
+
+model UserLabel {
+  id          String       @id @default(cuid())
+  tenantId    String
+  name        String
+  slug        String
+  type        LabelType    @default(USER)
+  color       Json?
+  icon        String?
+  parentId    String?
+  level       Int          @default(0)
+  orderIndex  Int          @default(0)
+  isArchived  Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  parent      UserLabel?   @relation("LabelHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    UserLabel[]  @relation("LabelHierarchy")
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  emailLabels EmailLabel[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, type])
+  @@index([tenantId, parentId])
+  @@index([tenantId, orderIndex])
+  @@map("user_labels")
+}
+
+model EmailLabel {
+  id        String    @id @default(cuid())
+  emailId   String
+  labelId   String
+  createdAt DateTime  @default(now())
+  email     Email     @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  label     UserLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([emailId, labelId])
+  @@index([emailId])
+  @@index([labelId])
+  @@index([createdAt])
+  @@map("email_labels")
 }
 
 model EmailAttachment {

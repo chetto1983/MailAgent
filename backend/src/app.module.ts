@@ -17,6 +17,7 @@ import { ComplianceModule } from './modules/compliance/compliance.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
+import { LabelsModule } from './modules/labels/labels.module';
 
 const config = getConfiguration();
 
@@ -47,6 +48,7 @@ const config = getConfiguration();
     CalendarModule,
     ContactsModule,
     RealtimeModule, // WebSocket Gateway per eventi realtime multi-tenant
+    LabelsModule,
   ],
   providers: [
     // Apply throttler globally to all routes
