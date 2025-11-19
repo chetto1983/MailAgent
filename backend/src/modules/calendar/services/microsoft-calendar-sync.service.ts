@@ -285,6 +285,7 @@ export class MicrosoftCalendarSyncService {
             providerId,
             tenantId,
             calendarName ?? calendarId,
+            accessToken,
           );
 
           eventsProcessed++;
@@ -329,6 +330,7 @@ export class MicrosoftCalendarSyncService {
     providerId: string,
     tenantId: string,
     calendarName: string,
+    accessToken: string,
   ): Promise<'created' | 'updated'> {
     const eventId = event.id;
 
@@ -422,7 +424,7 @@ export class MicrosoftCalendarSyncService {
     // Process attachments (OneDrive/SharePoint files or inline attachments)
     // Note: Microsoft Graph API requires a separate call to get attachments
     try {
-      await this.processEventAttachments(dbEventId, eventId, providerId);
+      await this.processEventAttachments(dbEventId, eventId, accessToken);
     } catch (attachmentError) {
       this.logger.warn(
         `Failed to process attachments for event ${eventId}: ${attachmentError instanceof Error ? attachmentError.message : String(attachmentError)}`,
@@ -439,21 +441,9 @@ export class MicrosoftCalendarSyncService {
   private async processEventAttachments(
     dbEventId: string,
     msEventId: string,
-    providerId: string,
+    accessToken: string,
   ): Promise<void> {
     try {
-      // Get access token
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
-
-      if (!provider || !provider.accessToken || !provider.tokenEncryptionIv) {
-        this.logger.warn(`Cannot fetch attachments: provider ${providerId} missing token`);
-        return;
-      }
-
-      const accessToken = this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
-
       // Fetch attachments from Microsoft Graph API
       const attachmentsUrl = `${this.GRAPH_API_BASE}/me/events/${msEventId}/attachments`;
       const response = await axios.get<{ value: MicrosoftEventAttachment[] }>(attachmentsUrl, {
@@ -484,14 +474,12 @@ export class MicrosoftCalendarSyncService {
               filename: attachment.name || 'Untitled',
               mimeType: attachment.contentType || 'application/octet-stream',
               size,
-              storageType: isOneDrive ? 'reference' : 's3',
+              storageType: 'reference', // All attachments stored as references for now
               fileUrl,
               fileId: null,
               iconLink: null,
               isGoogleDrive: false,
               isOneDrive,
-              // Note: File attachments could be downloaded and stored in S3/MinIO
-              // For now, we're storing references only
               storagePath: null,
             },
           });

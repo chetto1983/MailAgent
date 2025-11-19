@@ -27,10 +27,23 @@ export class QueryEmbeddingCacheService implements OnModuleDestroy {
       password: this.config.get<string>('REDIS_PASSWORD'),
       // Separate DB for query cache (optional, keeps it isolated)
       db: this.config.get<number>('REDIS_QUERY_CACHE_DB', 0),
+      lazyConnect: true, // Don't connect immediately, allow error handling
+    });
+
+    // Handle connection errors gracefully
+    this.redis.on('error', (error) => {
+      this.logger.error(`Redis connection error: ${error.message}`);
     });
 
     // TTL: 1 hour by default (configurable)
     this.CACHE_TTL = this.config.get<number>('QUERY_EMBEDDING_CACHE_TTL', 3600);
+
+    // Attempt initial connection
+    this.redis.connect().catch((error) => {
+      this.logger.warn(
+        `Failed to connect to Redis on startup: ${error.message}. Cache will be unavailable.`,
+      );
+    });
 
     this.logger.log(
       `Query embedding cache initialized with TTL=${this.CACHE_TTL}s, prefix=${this.CACHE_PREFIX}`,
@@ -60,17 +73,17 @@ export class QueryEmbeddingCacheService implements OnModuleDestroy {
       if (cached) {
         const parsed = JSON.parse(cached);
 
-        // Validate that parsed value is an array of numbers
+        // Validate that parsed value is an array of finite numbers
         if (
           Array.isArray(parsed) &&
           parsed.length > 0 &&
-          parsed.every((item) => typeof item === 'number')
+          parsed.every((item) => typeof item === 'number' && Number.isFinite(item))
         ) {
           this.logger.debug(`Query embedding cache HIT for key: ${cacheKey}`);
           return parsed;
         } else {
           this.logger.warn(
-            `Invalid cached embedding format for key ${cacheKey} - expected number[], got ${typeof parsed}. Deleting corrupted cache entry.`,
+            `Invalid cached embedding format for key ${cacheKey} - expected finite number[], got ${typeof parsed}. Deleting corrupted cache entry.`,
           );
           await this.redis.del(cacheKey);
           return null;
@@ -91,6 +104,12 @@ export class QueryEmbeddingCacheService implements OnModuleDestroy {
    * Cache embedding for query text
    */
   async setCachedEmbedding(queryText: string, embedding: number[]): Promise<void> {
+    // Validate embedding before caching
+    if (!embedding || embedding.length === 0 || !embedding.every(Number.isFinite)) {
+      this.logger.warn('Attempted to cache invalid embedding - skipping');
+      return;
+    }
+
     const cacheKey = this.getCacheKey(queryText);
 
     try {
