@@ -23,37 +23,48 @@ This document outlines the strategy for splitting the large email-sync service f
 
 ## Foundation Completed ✅
 
-### BaseEmailSyncService
+### BaseEmailSyncService (Updated 2025-11-19)
 **File**: `backend/src/modules/email-sync/services/base-email-sync.service.ts`
 
 **Provides**:
 1. **Abstract syncProvider()** - Must be implemented by each provider
-2. **normalizeFolderName()** - Standardizes folder names (inbox, sent, drafts, etc.)
+2. **normalizeFolderName()** - Standardizes folder names with i18n support (INBOX, SENT, DRAFTS, etc.)
 3. **isSystemFolder()** - Identifies system vs custom folders
 4. **notifyMailboxChange()** - WebSocket/SSE notifications
 5. **calculateSyncStats()** - Before/after statistics
-6. **isNotFoundError()** - 404 error detection
-7. **extractPlainText()** - HTML to plain text conversion
-8. **truncateText()** - Text length limiting
+6. **isNotFoundError()** - 404/410 error detection
+7. **isRateLimitError()** - 429 error detection
+8. **isServerError()** - 5xx error detection
+9. **extractPlainText()** - Robust HTML to plain text conversion (using cheerio + he)
+10. **truncateText()** - Text length limiting
+11. **validateEmailAddress()** - RFC 5322 email validation
+12. **formatTimestamp()** - ISO 8601 date formatting
+13. **sleep()** - Async sleep utility for retries
+14. **extractErrorMessage()** - Consistent error message extraction
+15. **OnModuleInit** - Configuration from environment variables
 
 **Benefits**:
 - Single source of truth for common logic
 - Type-safe notification system
-- Consistent folder handling across providers
-- Reusable utility methods
+- Consistent folder handling across providers (UPPERCASE, i18n support)
+- Robust HTML parsing with proper entity decoding
+- Reusable error detection utilities
+- Configuration management built-in
 
 ## Next Steps (Not Yet Implemented)
 
 ### Phase 2: Extract Specialized Services
 
-#### 1. AttachmentHandlerService (8h)
-Extract attachment processing logic:
-- Download attachments
-- Store in database
-- Handle inline images
-- Manage attachment metadata
+#### 1. Enhance AttachmentStorageService (4h)
+**Status**: Service already exists at `backend/src/modules/email/services/attachment.storage.ts`
 
-**Impact**: -77 duplicate lines
+**Enhancement Tasks**:
+- Consolidate duplicate attachment logic from Google/Microsoft sync services
+- Ensure consistent handling of inline images vs attachments
+- Standardize attachment metadata extraction
+- Add provider-agnostic download method
+
+**Impact**: -77 duplicate lines across sync services
 
 #### 2. MessageParserService (8h)
 Extract message parsing logic:
@@ -116,19 +127,36 @@ cd backend && npx tsc --noEmit
 ```typescript
 @Injectable()
 export class GoogleSyncService extends BaseEmailSyncService {
+  protected readonly logger = new Logger(GoogleSyncService.name);
+
   constructor(
     prisma: PrismaService,
     realtimeEvents: RealtimeEventsService,
-    private attachmentHandler: AttachmentHandlerService,
-    private messageParser: MessageParserService,
+    config: ConfigService,
+    // Provider-specific services
+    private crypto: CryptoService,
+    private providerToken: ProviderTokenService,
+    private attachmentStorage: AttachmentStorageService,
+    private emailEmbeddingQueue: EmailEmbeddingQueueService,
+    private retryService: RetryService,
   ) {
-    super(prisma, realtimeEvents);
+    super(prisma, realtimeEvents, config);
+  }
+
+  // Override to add Gmail-specific configuration
+  onModuleInit() {
+    super.onModuleInit(); // Load base configuration
+    this.batchSize = this.config.get('GMAIL_BATCH_GET_SIZE', 100);
+    this.fullSyncMaxMessages = this.config.get('GMAIL_FULL_MAX_MESSAGES', 200);
   }
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
-    // Use this.normalizeFolderName()
-    // Use this.notifyMailboxChange()
-    // Use this.extractPlainText()
+    // Use base class utilities:
+    // - this.normalizeFolderName()
+    // - this.notifyMailboxChange()
+    // - this.extractPlainText()
+    // - this.isRateLimitError()
+    // - this.sleep()
     // etc.
   }
 }
@@ -164,12 +192,280 @@ export class GoogleSyncService extends BaseEmailSyncService {
 
 | Task | Hours | Priority |
 |------|-------|----------|
-| AttachmentHandlerService | 8h | High |
+| Enhance AttachmentStorageService | 4h | High |
 | MessageParserService | 8h | High |
 | Google Sync Refactor | 32h | Critical |
 | Microsoft Sync Refactor | 32h | Critical |
 | Testing & Documentation | 16h | High |
-| **Total** | **96h** | |
+| **Total** | **92h** | |
+
+## Testing Strategy
+
+### Unit Testing BaseEmailSyncService
+
+**Test File**: `backend/src/modules/email-sync/services/base-email-sync.service.spec.ts`
+
+```typescript
+import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
+
+// Concrete implementation for testing
+class TestEmailSyncService extends BaseEmailSyncService {
+  readonly logger = new Logger('TestService');
+
+  async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
+    return { success: true, messagesProcessed: 0 };
+  }
+}
+
+describe('BaseEmailSyncService', () => {
+  let service: TestEmailSyncService;
+  let mockPrisma: jest.Mocked<PrismaService>;
+  let mockRealtimeEvents: jest.Mocked<RealtimeEventsService>;
+  let mockConfig: jest.Mocked<ConfigService>;
+
+  beforeEach(async () => {
+    mockPrisma = { /* mock implementation */ } as any;
+    mockRealtimeEvents = {
+      emitEmailNew: jest.fn(),
+      emitSyncStatus: jest.fn(),
+    } as any;
+    mockConfig = {
+      get: jest.fn((key, defaultValue) => defaultValue),
+    } as any;
+
+    service = new TestEmailSyncService(mockPrisma, mockRealtimeEvents, mockConfig);
+    service.onModuleInit();
+  });
+
+  describe('normalizeFolderName', () => {
+    it('should normalize "inbox" to "INBOX"', () => {
+      expect(service['normalizeFolderName']('inbox')).toBe('INBOX');
+      expect(service['normalizeFolderName']('Inbox')).toBe('INBOX');
+      expect(service['normalizeFolderName']('INBOX')).toBe('INBOX');
+    });
+
+    it('should handle Italian folder names', () => {
+      expect(service['normalizeFolderName']('Posta in arrivo')).toBe('INBOX');
+      expect(service['normalizeFolderName']('Posta Inviata')).toBe('SENT');
+      expect(service['normalizeFolderName']('Cestino')).toBe('TRASH');
+    });
+
+    it('should handle custom folder names', () => {
+      expect(service['normalizeFolderName']('My Custom Folder')).toBe('MY CUSTOM FOLDER');
+    });
+  });
+
+  describe('extractPlainText', () => {
+    it('should extract text from HTML', () => {
+      const html = '<p>Hello <strong>world</strong>!</p>';
+      expect(service['extractPlainText'](html)).toBe('Hello world!');
+    });
+
+    it('should decode HTML entities', () => {
+      const html = 'Hello &amp; goodbye &mdash; test &rsquo;quote&rsquo;';
+      const result = service['extractPlainText'](html);
+      expect(result).toContain('&');
+      expect(result).toContain('—');
+      expect(result).toContain(''');
+    });
+
+    it('should remove script and style tags', () => {
+      const html = '<p>Content</p><script>alert("bad")</script><style>.red{color:red}</style>';
+      expect(service['extractPlainText'](html)).toBe('Content');
+    });
+  });
+
+  describe('isRateLimitError', () => {
+    it('should detect 429 status code', () => {
+      const error = { response: { status: 429 } };
+      expect(service['isRateLimitError'](error)).toBe(true);
+    });
+
+    it('should detect rate limit in message', () => {
+      const error = new Error('Rate limit exceeded');
+      expect(service['isRateLimitError'](error)).toBe(true);
+    });
+  });
+
+  describe('validateEmailAddress', () => {
+    it('should validate correct emails', () => {
+      expect(service['validateEmailAddress']('test@example.com')).toBe(true);
+      expect(service['validateEmailAddress']('user+tag@domain.co.uk')).toBe(true);
+    });
+
+    it('should reject invalid emails', () => {
+      expect(service['validateEmailAddress']('not-an-email')).toBe(false);
+      expect(service['validateEmailAddress']('missing@domain')).toBe(false);
+      expect(service['validateEmailAddress']('')).toBe(false);
+    });
+  });
+});
+```
+
+### Integration Testing Migration Example
+
+**Before Migration** (Google Sync Service):
+```typescript
+describe('GoogleSyncService', () => {
+  // Mock Gmail API client
+  // Mock PrismaService
+  // Mock all 9 dependencies
+  // Test syncProvider() with real API calls (mocked)
+});
+```
+
+**After Migration** (Using BaseEmailSyncService):
+```typescript
+describe('GoogleSyncService', () => {
+  it('should use base class folder normalization', async () => {
+    // Can test that Gmail-specific logic delegates to base class
+    const spy = jest.spyOn(service as any, 'normalizeFolderName');
+    await service.syncProvider(mockJobData);
+    expect(spy).toHaveBeenCalledWith('[Gmail]/Sent Mail');
+  });
+
+  it('should use base class HTML extraction', async () => {
+    // Test that Gmail message body processing uses extractPlainText
+    const spy = jest.spyOn(service as any, 'extractPlainText');
+    await service.syncProvider(mockJobData);
+    expect(spy).toHaveBeenCalled();
+  });
+});
+```
+
+### Test Coverage Goals
+
+| Component | Target Coverage | Current |
+|-----------|----------------|---------|
+| BaseEmailSyncService | 90% | N/A (new) |
+| GoogleSyncService | 65% | 10% |
+| MicrosoftSyncService | 65% | 10% |
+| AttachmentStorageService | 70% | Unknown |
+| MessageParserService | 80% | N/A (new) |
+
+### Testing Commands
+
+```bash
+# Run all email-sync tests
+cd backend && npm test -- email-sync
+
+# Run with coverage
+npm test -- --coverage email-sync
+
+# Watch mode during development
+npm test -- --watch email-sync/services/base-email-sync.service.spec.ts
+```
+
+## Migration Guide
+
+### Step-by-Step Migration for Existing Services
+
+#### Step 1: Update Imports
+```typescript
+// Add to existing imports
+import { BaseEmailSyncService } from './base-email-sync.service';
+```
+
+#### Step 2: Extend Base Class
+```typescript
+// OLD
+@Injectable()
+export class GoogleSyncService implements OnModuleInit {
+  private readonly logger = new Logger(GoogleSyncService.name);
+
+// NEW
+@Injectable()
+export class GoogleSyncService extends BaseEmailSyncService {
+  protected readonly logger = new Logger(GoogleSyncService.name);
+```
+
+#### Step 3: Update Constructor
+```typescript
+// OLD
+constructor(
+  private prisma: PrismaService,
+  private crypto: CryptoService,
+  // ... 7 more services
+) {}
+
+// NEW
+constructor(
+  prisma: PrismaService,           // Pass to super
+  realtimeEvents: RealtimeEventsService,  // Pass to super
+  config: ConfigService,           // Pass to super
+  private crypto: CryptoService,   // Keep as private
+  // ... other services
+) {
+  super(prisma, realtimeEvents, config);
+}
+```
+
+#### Step 4: Update onModuleInit
+```typescript
+// OLD
+onModuleInit() {
+  this.GMAIL_BATCH_GET_SIZE = this.config.get('GMAIL_BATCH_GET_SIZE', 100);
+  this.RETRY_MAX_ATTEMPTS = this.config.get('RETRY_MAX_ATTEMPTS', 3);
+  // ... 5 more config loads
+}
+
+// NEW
+onModuleInit() {
+  super.onModuleInit(); // Loads common config
+  this.batchSize = this.config.get('GMAIL_BATCH_GET_SIZE', 100); // Provider-specific override
+}
+```
+
+#### Step 5: Replace Duplicate Methods
+```typescript
+// DELETE these methods from child class:
+private normalizeFolderName(name: string): string { /* ... */ }
+private extractPlainText(html: string): string { /* ... */ }
+private isNotFoundError(error: any): boolean { /* ... */ }
+
+// REPLACE calls with:
+this.normalizeFolderName(folderName)
+this.extractPlainText(htmlContent)
+this.isNotFoundError(error)
+```
+
+#### Step 6: Test Compilation
+```bash
+cd backend && npx tsc --noEmit
+```
+
+#### Step 7: Run Tests
+```bash
+npm test -- google-sync.service.spec.ts
+```
+
+### Rollback Plan
+
+If issues arise during migration:
+
+1. **Immediate Rollback**: Git revert to last working commit
+   ```bash
+   git revert HEAD
+   ```
+
+2. **Partial Rollback**: Remove `extends BaseEmailSyncService`, keep methods inline
+   ```typescript
+   export class GoogleSyncService implements OnModuleInit {
+     // Revert to original implementation
+   }
+   ```
+
+3. **Feature Flag**: Add config flag to toggle new vs old implementation
+   ```typescript
+   if (this.config.get('USE_BASE_SYNC_SERVICE', false)) {
+     return this.normalizeFolderName(name); // Base class
+   } else {
+     return this.legacyNormalizeFolderName(name); // Old code
+   }
+   ```
 
 ## Notes
 
