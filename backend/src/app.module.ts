@@ -6,6 +6,7 @@ import { getConfiguration } from './config/configuration';
 import { validate } from './config/env.validation';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { ResponseTimeInterceptor } from './common/interceptors/response-time.interceptor';
+import { CacheModule } from './common/services/cache.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -37,6 +38,7 @@ const config = getConfiguration();
         limit: config.rateLimit.limit,
       },
     ]),
+    CacheModule, // Redis-based caching for horizontal scaling
     PrismaModule,
     AuthModule,
     UsersModule,

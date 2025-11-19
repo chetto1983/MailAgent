@@ -1,0 +1,452 @@
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createClient, RedisClientType } from 'redis';
+
+/**
+ * Cache namespace prefixes for different data types
+ * This prevents key collisions and makes cache invalidation easier
+ */
+export enum CacheNamespace {
+  PROVIDER_TOKEN = 'provider:token',
+  PROVIDER_METADATA = 'provider:meta',
+  FOLDER_STRUCTURE = 'folder:struct',
+  EMAIL_METADATA = 'email:meta',
+  USER_SESSION = 'user:session',
+  WEBHOOK_NONCE = 'webhook:nonce',
+  RATE_LIMIT = 'ratelimit',
+}
+
+/**
+ * Cache options for set operations
+ */
+export interface CacheSetOptions {
+  /** Time to live in seconds */
+  ttl?: number;
+  /** Namespace for the key */
+  namespace?: CacheNamespace;
+}
+
+/**
+ * Cache statistics
+ */
+export interface CacheStats {
+  hits: number;
+  misses: number;
+  sets: number;
+  deletes: number;
+  errors: number;
+}
+
+/**
+ * Redis-based CacheService
+ *
+ * Provides a type-safe, namespaced caching layer using Redis.
+ * Designed to support horizontal scaling by replacing in-memory caches.
+ *
+ * Features:
+ * - Automatic JSON serialization/deserialization
+ * - Namespace support for logical grouping
+ * - Configurable TTLs per operation
+ * - Graceful degradation on Redis errors
+ * - Cache statistics tracking
+ * - Bulk operations support
+ *
+ * Usage:
+ * ```typescript
+ * // Set with TTL
+ * await cache.set('user:123', userData, { ttl: 3600, namespace: CacheNamespace.USER_SESSION });
+ *
+ * // Get with automatic deserialization
+ * const user = await cache.get<User>('user:123', { namespace: CacheNamespace.USER_SESSION });
+ *
+ * // Delete
+ * await cache.del('user:123', { namespace: CacheNamespace.USER_SESSION });
+ *
+ * // Invalidate entire namespace
+ * await cache.invalidateNamespace(CacheNamespace.USER_SESSION);
+ * ```
+ */
+@Injectable()
+export class CacheService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(CacheService.name);
+  private client: RedisClientType;
+  private isConnected = false;
+  private stats: CacheStats = {
+    hits: 0,
+    misses: 0,
+    sets: 0,
+    deletes: 0,
+    errors: 0,
+  };
+
+  constructor(private readonly config: ConfigService) {}
+
+  async onModuleInit() {
+    const redisHost = this.config.get<string>('REDIS_HOST', 'localhost');
+    const redisPort = this.config.get<number>('REDIS_PORT', 6379);
+    const redisPassword = this.config.get<string>('REDIS_PASSWORD');
+    const redisDb = this.config.get<number>('REDIS_DB', 0);
+
+    this.logger.log(`Connecting to Redis at ${redisHost}:${redisPort}...`);
+
+    try {
+      this.client = createClient({
+        socket: {
+          host: redisHost,
+          port: redisPort,
+        },
+        password: redisPassword,
+        database: redisDb,
+      }) as RedisClientType;
+
+      this.client.on('error', (err) => {
+        this.logger.error('Redis client error:', err);
+        this.stats.errors++;
+        this.isConnected = false;
+      });
+
+      this.client.on('connect', () => {
+        this.logger.log('Redis client connected');
+        this.isConnected = true;
+      });
+
+      this.client.on('ready', () => {
+        this.logger.log('Redis client ready');
+        this.isConnected = true;
+      });
+
+      this.client.on('reconnecting', () => {
+        this.logger.warn('Redis client reconnecting...');
+        this.isConnected = false;
+      });
+
+      await this.client.connect();
+      this.logger.log('✅ Redis cache service initialized');
+    } catch (error) {
+      this.logger.error('Failed to connect to Redis:', error);
+      this.isConnected = false;
+      // Don't throw - allow app to start without Redis (graceful degradation)
+    }
+  }
+
+  async onModuleDestroy() {
+    if (this.client && this.isConnected) {
+      this.logger.log('Disconnecting Redis client...');
+      await this.client.quit();
+      this.logger.log('Redis client disconnected');
+    }
+  }
+
+  /**
+   * Build a namespaced key
+   */
+  private buildKey(key: string, namespace?: CacheNamespace): string {
+    return namespace ? `${namespace}:${key}` : key;
+  }
+
+  /**
+   * Get a value from cache
+   * @returns The cached value or null if not found/error
+   */
+  async get<T = any>(key: string, options?: { namespace?: CacheNamespace }): Promise<T | null> {
+    if (!this.isConnected) {
+      this.logger.warn('Redis not connected, cache miss');
+      this.stats.misses++;
+      return null;
+    }
+
+    try {
+      const fullKey = this.buildKey(key, options?.namespace);
+      const value = await this.client.get(fullKey);
+
+      if (value === null) {
+        this.stats.misses++;
+        return null;
+      }
+
+      this.stats.hits++;
+      return JSON.parse(value) as T;
+    } catch (error) {
+      this.logger.error(`Cache get error for key ${key}:`, error);
+      this.stats.errors++;
+      return null;
+    }
+  }
+
+  /**
+   * Set a value in cache with optional TTL
+   */
+  async set(key: string, value: any, options?: CacheSetOptions): Promise<boolean> {
+    if (!this.isConnected) {
+      this.logger.warn('Redis not connected, skipping cache set');
+      return false;
+    }
+
+    try {
+      const fullKey = this.buildKey(key, options?.namespace);
+      const serialized = JSON.stringify(value);
+
+      if (options?.ttl) {
+        await this.client.setEx(fullKey, options.ttl, serialized);
+      } else {
+        await this.client.set(fullKey, serialized);
+      }
+
+      this.stats.sets++;
+      return true;
+    } catch (error) {
+      this.logger.error(`Cache set error for key ${key}:`, error);
+      this.stats.errors++;
+      return false;
+    }
+  }
+
+  /**
+   * Delete a value from cache
+   */
+  async del(key: string, options?: { namespace?: CacheNamespace }): Promise<boolean> {
+    if (!this.isConnected) {
+      return false;
+    }
+
+    try {
+      const fullKey = this.buildKey(key, options?.namespace);
+      await this.client.del(fullKey);
+      this.stats.deletes++;
+      return true;
+    } catch (error) {
+      this.logger.error(`Cache delete error for key ${key}:`, error);
+      this.stats.errors++;
+      return false;
+    }
+  }
+
+  /**
+   * Check if a key exists in cache
+   */
+  async exists(key: string, options?: { namespace?: CacheNamespace }): Promise<boolean> {
+    if (!this.isConnected) {
+      return false;
+    }
+
+    try {
+      const fullKey = this.buildKey(key, options?.namespace);
+      const result = await this.client.exists(fullKey);
+      return result === 1;
+    } catch (error) {
+      this.logger.error(`Cache exists error for key ${key}:`, error);
+      this.stats.errors++;
+      return false;
+    }
+  }
+
+  /**
+   * Get time to live for a key in seconds
+   * @returns TTL in seconds, -1 if no expiry, -2 if key doesn't exist
+   */
+  async ttl(key: string, options?: { namespace?: CacheNamespace }): Promise<number> {
+    if (!this.isConnected) {
+      return -2;
+    }
+
+    try {
+      const fullKey = this.buildKey(key, options?.namespace);
+      return await this.client.ttl(fullKey);
+    } catch (error) {
+      this.logger.error(`Cache TTL error for key ${key}:`, error);
+      this.stats.errors++;
+      return -2;
+    }
+  }
+
+  /**
+   * Invalidate all keys in a namespace
+   */
+  async invalidateNamespace(namespace: CacheNamespace): Promise<number> {
+    if (!this.isConnected) {
+      return 0;
+    }
+
+    try {
+      const pattern = `${namespace}:*`;
+      const keys = await this.client.keys(pattern);
+
+      if (keys.length === 0) {
+        return 0;
+      }
+
+      await this.client.del(keys);
+      this.stats.deletes += keys.length;
+      this.logger.log(`Invalidated ${keys.length} keys in namespace ${namespace}`);
+      return keys.length;
+    } catch (error) {
+      this.logger.error(`Cache invalidateNamespace error for ${namespace}:`, error);
+      this.stats.errors++;
+      return 0;
+    }
+  }
+
+  /**
+   * Get multiple values at once
+   */
+  async mget<T = any>(
+    keys: string[],
+    options?: { namespace?: CacheNamespace },
+  ): Promise<(T | null)[]> {
+    if (!this.isConnected || keys.length === 0) {
+      return keys.map(() => null);
+    }
+
+    try {
+      const fullKeys = keys.map((key) => this.buildKey(key, options?.namespace));
+      const values = await this.client.mGet(fullKeys);
+
+      return values.map((value) => {
+        if (value === null) {
+          this.stats.misses++;
+          return null;
+        }
+        this.stats.hits++;
+        return JSON.parse(value) as T;
+      });
+    } catch (error) {
+      this.logger.error('Cache mget error:', error);
+      this.stats.errors++;
+      return keys.map(() => null);
+    }
+  }
+
+  /**
+   * Set multiple values at once
+   */
+  async mset(
+    entries: Array<{ key: string; value: any }>,
+    options?: CacheSetOptions,
+  ): Promise<boolean> {
+    if (!this.isConnected || entries.length === 0) {
+      return false;
+    }
+
+    try {
+      const pipeline = this.client.multi();
+
+      for (const entry of entries) {
+        const fullKey = this.buildKey(entry.key, options?.namespace);
+        const serialized = JSON.stringify(entry.value);
+
+        if (options?.ttl) {
+          pipeline.setEx(fullKey, options.ttl, serialized);
+        } else {
+          pipeline.set(fullKey, serialized);
+        }
+      }
+
+      await pipeline.exec();
+      this.stats.sets += entries.length;
+      return true;
+    } catch (error) {
+      this.logger.error('Cache mset error:', error);
+      this.stats.errors++;
+      return false;
+    }
+  }
+
+  /**
+   * Increment a numeric value
+   */
+  async incr(key: string, options?: { namespace?: CacheNamespace }): Promise<number> {
+    if (!this.isConnected) {
+      return 0;
+    }
+
+    try {
+      const fullKey = this.buildKey(key, options?.namespace);
+      return await this.client.incr(fullKey);
+    } catch (error) {
+      this.logger.error(`Cache incr error for key ${key}:`, error);
+      this.stats.errors++;
+      return 0;
+    }
+  }
+
+  /**
+   * Decrement a numeric value
+   */
+  async decr(key: string, options?: { namespace?: CacheNamespace }): Promise<number> {
+    if (!this.isConnected) {
+      return 0;
+    }
+
+    try {
+      const fullKey = this.buildKey(key, options?.namespace);
+      return await this.client.decr(fullKey);
+    } catch (error) {
+      this.logger.error(`Cache decr error for key ${key}:`, error);
+      this.stats.errors++;
+      return 0;
+    }
+  }
+
+  /**
+   * Flush all keys in the current database (USE WITH CAUTION!)
+   */
+  async flushDb(): Promise<boolean> {
+    if (!this.isConnected) {
+      return false;
+    }
+
+    try {
+      this.logger.warn('⚠️ Flushing entire Redis database!');
+      await this.client.flushDb();
+      return true;
+    } catch (error) {
+      this.logger.error('Cache flushDb error:', error);
+      this.stats.errors++;
+      return false;
+    }
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getStats(): CacheStats {
+    return { ...this.stats };
+  }
+
+  /**
+   * Reset cache statistics
+   */
+  resetStats(): void {
+    this.stats = {
+      hits: 0,
+      misses: 0,
+      sets: 0,
+      deletes: 0,
+      errors: 0,
+    };
+  }
+
+  /**
+   * Check if Redis is connected
+   */
+  isHealthy(): boolean {
+    return this.isConnected;
+  }
+
+  /**
+   * Ping Redis to check connectivity
+   */
+  async ping(): Promise<boolean> {
+    if (!this.isConnected) {
+      return false;
+    }
+
+    try {
+      const result = await this.client.ping();
+      return result === 'PONG';
+    } catch (error) {
+      this.logger.error('Cache ping error:', error);
+      return false;
+    }
+  }
+}
