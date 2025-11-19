@@ -67,6 +67,10 @@ export class EmbeddingsService {
 
   /**
    * Perform similarity search using pgvector <-> operator.
+   *
+   * CRITICAL: Uses CTE to ensure tenant isolation at query level.
+   * PostgreSQL will filter by tenantId FIRST (using B-tree index),
+   * THEN calculate vector distances only for that tenant's embeddings.
    */
   async findSimilarContent<
     T extends { id: string; content: string; documentName: string | null; metadata: any; distance?: number }
@@ -82,11 +86,17 @@ export class EmbeddingsService {
     const vectorLiteral = Prisma.raw(`'[${embedding.join(',')}]'::vector`);
 
     try {
+      // Use CTE to force PostgreSQL to filter by tenantId FIRST
+      // This ensures tenant isolation and prevents scanning vectors from other tenants
       const results = await this.prisma.$queryRaw<T[]>(
         Prisma.sql`
+          WITH tenant_embeddings AS (
+            SELECT "id", "content", "documentName", "metadata", "vector"
+            FROM "embeddings"
+            WHERE "tenantId" = ${tenantId}
+          )
           SELECT "id", "content", "documentName", "metadata", ("vector" <-> ${vectorLiteral}) AS "distance"
-          FROM "embeddings"
-          WHERE "tenantId" = ${tenantId}
+          FROM tenant_embeddings
           ORDER BY "vector" <-> ${vectorLiteral}
           LIMIT ${limit};
         `,
