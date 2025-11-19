@@ -1,6 +1,6 @@
 # MailAgent - AI-Powered Multi-Tenant Email Assistant
 
-![Backend](https://img.shields.io/badge/Backend-95%25-success?style=flat-square)
+![Backend](https://img.shields.io/badge/Backend-100%25-success?style=flat-square)
 ![Frontend](https://img.shields.io/badge/Frontend-90%25-success?style=flat-square)
 ![Testing](https://img.shields.io/badge/Testing-15%25-orange?style=flat-square)
 ![Version](https://img.shields.io/badge/Version-2.1.0-blue?style=flat-square)
@@ -11,6 +11,7 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 ## 🎉 Recent Updates (November 2025)
 
 ### ✅ Latest Features Implemented
+- **Contacts Sync Worker System** - Complete BullMQ integration for Google and Microsoft contacts synchronization with priority queues
 - **Calendar Event Attachments** - Full sync support for Google Drive and OneDrive file references
 - **Gmail & Microsoft Attachment Sync** - Complete S3/MinIO storage integration with automatic download
 - **AI Email Insights Enhanced** - Summarization, smart replies, and auto-categorization with PDF/text attachment indexing
