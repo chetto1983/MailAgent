@@ -37,6 +37,16 @@ interface MicrosoftEventsResponse {
   '@odata.nextLink'?: string;
 }
 
+interface MicrosoftEventAttachment {
+  '@odata.type': string;
+  id: string;
+  name: string;
+  contentType?: string;
+  size?: number;
+  isInline?: boolean;
+  lastModifiedDateTime?: string;
+}
+
 export interface MicrosoftCalendarSyncResult {
   success: boolean;
   providerId: string;
@@ -388,6 +398,9 @@ export class MicrosoftCalendarSyncService {
       lastSyncedAt: new Date(),
     };
 
+    let dbEventId: string;
+    let result: 'created' | 'updated';
+
     if (existing) {
       await this.prisma.calendarEvent.update({
         where: { id: existing.id },
@@ -396,12 +409,116 @@ export class MicrosoftCalendarSyncService {
           syncVersion: existing.syncVersion + 1,
         },
       });
-      return 'updated';
+      dbEventId = existing.id;
+      result = 'updated';
     } else {
-      await this.prisma.calendarEvent.create({
+      const created = await this.prisma.calendarEvent.create({
         data: eventData,
       });
-      return 'created';
+      dbEventId = created.id;
+      result = 'created';
+    }
+
+    // Process attachments (OneDrive/SharePoint files or inline attachments)
+    // Note: Microsoft Graph API requires a separate call to get attachments
+    try {
+      await this.processEventAttachments(dbEventId, eventId, providerId);
+    } catch (attachmentError) {
+      this.logger.warn(
+        `Failed to process attachments for event ${eventId}: ${attachmentError instanceof Error ? attachmentError.message : String(attachmentError)}`,
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Process attachments for a Microsoft Calendar event
+   * Microsoft Graph API requires a separate call to get event attachments
+   */
+  private async processEventAttachments(
+    dbEventId: string,
+    msEventId: string,
+    providerId: string,
+  ): Promise<void> {
+    try {
+      // Get access token
+      const provider = await this.prisma.providerConfig.findUnique({
+        where: { id: providerId },
+      });
+
+      if (!provider || !provider.accessToken || !provider.tokenEncryptionIv) {
+        this.logger.warn(`Cannot fetch attachments: provider ${providerId} missing token`);
+        return;
+      }
+
+      const accessToken = this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
+
+      // Fetch attachments from Microsoft Graph API
+      const attachmentsUrl = `${this.GRAPH_API_BASE}/me/events/${msEventId}/attachments`;
+      const response = await axios.get<{ value: MicrosoftEventAttachment[] }>(attachmentsUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const attachments = response.data.value || [];
+
+      // Delete existing attachments for this event
+      await this.prisma.calendarEventAttachment.deleteMany({
+        where: { eventId: dbEventId },
+      });
+
+      // Create new attachment records
+      for (const attachment of attachments) {
+        try {
+          // Determine attachment type and extract metadata
+          const isOneDrive = attachment['@odata.type'] === '#microsoft.graph.referenceAttachment';
+          const fileUrl = isOneDrive ? (attachment as any).sourceUrl : null;
+          const size = attachment.size || 0;
+
+          await this.prisma.calendarEventAttachment.create({
+            data: {
+              eventId: dbEventId,
+              filename: attachment.name || 'Untitled',
+              mimeType: attachment.contentType || 'application/octet-stream',
+              size,
+              storageType: isOneDrive ? 'reference' : 's3',
+              fileUrl,
+              fileId: null,
+              iconLink: null,
+              isGoogleDrive: false,
+              isOneDrive,
+              // Note: File attachments could be downloaded and stored in S3/MinIO
+              // For now, we're storing references only
+              storagePath: null,
+            },
+          });
+
+          this.logger.debug(
+            `Created attachment reference for event ${dbEventId}: ${attachment.name} (${isOneDrive ? 'OneDrive' : 'File'})`,
+          );
+        } catch (attachmentError) {
+          this.logger.warn(
+            `Failed to create attachment for event ${dbEventId}: ${attachmentError instanceof Error ? attachmentError.message : String(attachmentError)}`,
+          );
+        }
+      }
+
+      if (attachments.length > 0) {
+        this.logger.verbose(`Processed ${attachments.length} attachments for event ${dbEventId}`);
+      }
+    } catch (error) {
+      // Don't throw - just log and continue
+      // Some events might not have attachment permissions
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        this.logger.debug(`No attachments endpoint for event ${msEventId} (404)`);
+      } else {
+        this.logger.warn(
+          `Failed to fetch attachments for event ${msEventId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 

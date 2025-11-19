@@ -38,7 +38,14 @@ export class QueryEmbeddingCacheService implements OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await this.redis.quit();
+    try {
+      await this.redis.quit();
+      this.logger.debug('Redis connection closed gracefully');
+    } catch (error) {
+      this.logger.warn(
+        `Failed to close Redis connection during shutdown: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**
@@ -51,8 +58,23 @@ export class QueryEmbeddingCacheService implements OnModuleDestroy {
       const cached = await this.redis.get(cacheKey);
 
       if (cached) {
-        this.logger.debug(`Query embedding cache HIT for key: ${cacheKey}`);
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+
+        // Validate that parsed value is an array of numbers
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed.every((item) => typeof item === 'number')
+        ) {
+          this.logger.debug(`Query embedding cache HIT for key: ${cacheKey}`);
+          return parsed;
+        } else {
+          this.logger.warn(
+            `Invalid cached embedding format for key ${cacheKey} - expected number[], got ${typeof parsed}. Deleting corrupted cache entry.`,
+          );
+          await this.redis.del(cacheKey);
+          return null;
+        }
       }
 
       this.logger.debug(`Query embedding cache MISS for key: ${cacheKey}`);

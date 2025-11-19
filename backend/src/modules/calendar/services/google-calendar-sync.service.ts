@@ -382,6 +382,9 @@ export class GoogleCalendarSyncService {
       lastSyncedAt: new Date(),
     };
 
+    let dbEventId: string;
+    let result: 'created' | 'updated';
+
     if (existing) {
       await this.prisma.calendarEvent.update({
         where: { id: existing.id },
@@ -390,12 +393,78 @@ export class GoogleCalendarSyncService {
           syncVersion: existing.syncVersion + 1,
         },
       });
-      return 'updated';
+      dbEventId = existing.id;
+      result = 'updated';
     } else {
-      await this.prisma.calendarEvent.create({
+      const created = await this.prisma.calendarEvent.create({
         data: eventData,
       });
-      return 'created';
+      dbEventId = created.id;
+      result = 'created';
+    }
+
+    // Process attachments (Google Drive files attached to calendar events)
+    if (event.attachments && event.attachments.length > 0) {
+      await this.processEventAttachments(dbEventId, event.attachments);
+    }
+
+    return result;
+  }
+
+  /**
+   * Process attachments for a calendar event
+   * Google Calendar attachments are references to Google Drive files
+   */
+  private async processEventAttachments(
+    eventId: string,
+    attachments: calendar_v3.Schema$EventAttachment[],
+  ): Promise<void> {
+    try {
+      // Delete existing attachments for this event
+      await this.prisma.calendarEventAttachment.deleteMany({
+        where: { eventId },
+      });
+
+      // Create new attachment records
+      for (const attachment of attachments) {
+        if (!attachment.fileUrl) {
+          this.logger.warn(`Skipping attachment without fileUrl for event ${eventId}`);
+          continue;
+        }
+
+        try {
+          await this.prisma.calendarEventAttachment.create({
+            data: {
+              eventId,
+              filename: attachment.title || 'Untitled',
+              mimeType: attachment.mimeType || 'application/octet-stream',
+              size: 0, // Google Calendar API doesn't provide size
+              storageType: 'reference', // These are Google Drive references, not stored locally
+              fileUrl: attachment.fileUrl,
+              fileId: attachment.fileId || null,
+              iconLink: attachment.iconLink || null,
+              isGoogleDrive: true,
+              isOneDrive: false,
+            },
+          });
+
+          this.logger.debug(
+            `Created attachment reference for event ${eventId}: ${attachment.title} (Google Drive)`,
+          );
+        } catch (attachmentError) {
+          this.logger.warn(
+            `Failed to create attachment for event ${eventId}: ${attachmentError instanceof Error ? attachmentError.message : String(attachmentError)}`,
+          );
+        }
+      }
+
+      this.logger.verbose(
+        `Processed ${attachments.length} attachments for event ${eventId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to process attachments for event ${eventId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

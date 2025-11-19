@@ -170,7 +170,20 @@ export class KnowledgeBaseService {
 
     // First, compose content and chunk all emails
     for (const options of emailOptions) {
+      // Check if embedding already exists BEFORE doing expensive work (attachment extraction)
+      if (
+        options.emailId &&
+        (await this.embeddingsService.hasEmbeddingForEmail(options.tenantId, options.emailId))
+      ) {
+        this.logger.verbose(
+          `Embedding already exists for email ${options.emailId} (tenant ${options.tenantId}), skipping.`,
+        );
+        results.push({ emailId: options.emailId, success: false, error: 'Already exists' });
+        continue;
+      }
+
       // 🆕 Use new async method that includes attachment content extraction
+      // (Only extract if we actually need to generate embeddings)
       const content = await this.composeEmailEmbeddingContentWithAttachments(
         {
           id: options.emailId,
@@ -187,18 +200,6 @@ export class KnowledgeBaseService {
           `Skipping embedding for email ${options.emailId} (tenant ${options.tenantId}): empty content`,
         );
         results.push({ emailId: options.emailId, success: false, error: 'Empty content' });
-        continue;
-      }
-
-      // Check if embedding already exists
-      if (
-        options.emailId &&
-        (await this.embeddingsService.hasEmbeddingForEmail(options.tenantId, options.emailId))
-      ) {
-        this.logger.verbose(
-          `Embedding already exists for email ${options.emailId} (tenant ${options.tenantId}), skipping.`,
-        );
-        results.push({ emailId: options.emailId, success: false, error: 'Already exists' });
         continue;
       }
 
@@ -301,7 +302,19 @@ export class KnowledgeBaseService {
   }
 
   async createEmbeddingForEmail(options: CreateEmailEmbeddingOptions): Promise<boolean> {
+    // Check if embedding already exists BEFORE doing expensive work (attachment extraction)
+    if (
+      options.emailId &&
+      (await this.embeddingsService.hasEmbeddingForEmail(options.tenantId, options.emailId))
+    ) {
+      this.logger.verbose(
+        `Embedding already exists for email ${options.emailId} (tenant ${options.tenantId}), skipping.`,
+      );
+      return false;
+    }
+
     // 🆕 Use new async method that includes attachment content extraction
+    // (Only extract if we actually need to generate embeddings)
     const content = await this.composeEmailEmbeddingContentWithAttachments(
       {
         id: options.emailId,
@@ -316,16 +329,6 @@ export class KnowledgeBaseService {
     if (!content) {
       this.logger.debug(
         `Skipping embedding for email ${options.emailId} (tenant ${options.tenantId}): empty content`,
-      );
-      return false;
-    }
-
-    if (
-      options.emailId &&
-      (await this.embeddingsService.hasEmbeddingForEmail(options.tenantId, options.emailId))
-    ) {
-      this.logger.verbose(
-        `Embedding already exists for email ${options.emailId} (tenant ${options.tenantId}), skipping.`,
       );
       return false;
     }

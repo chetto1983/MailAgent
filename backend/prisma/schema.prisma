@@ -338,7 +338,7 @@ model Embedding {
 }
 
 model CalendarEvent {
-  id               String         @id @default(cuid())
+  id               String                    @id @default(cuid())
   tenantId         String
   providerId       String
   externalId       String
@@ -351,30 +351,51 @@ model CalendarEvent {
   attendees        Json?
   startTime        DateTime
   endTime          DateTime
-  isAllDay         Boolean        @default(false)
-  timeZone         String         @default("UTC")
-  recurrence       String[]       @default([])
+  isAllDay         Boolean                   @default(false)
+  timeZone         String                    @default("UTC")
+  recurrence       String[]                  @default([])
   recurringEventId String?
-  status           String         @default("confirmed")
-  visibility       String         @default("default")
-  isDeleted        Boolean        @default(false)
-  isCancelled      Boolean        @default(false)
+  status           String                    @default("confirmed")
+  visibility       String                    @default("default")
+  isDeleted        Boolean                   @default(false)
+  isCancelled      Boolean                   @default(false)
   reminders        Json?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
   metadata         Json?
   htmlLink         String?
-  lastSyncedAt     DateTime       @default(now())
-  syncVersion      Int            @default(1)
+  lastSyncedAt     DateTime                  @default(now())
+  syncVersion      Int                       @default(1)
   calendarName     String?
-  provider         ProviderConfig @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider         ProviderConfig            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  tenant           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  attachments      CalendarEventAttachment[]
 
   @@unique([providerId, externalId])
   @@index([tenantId, startTime])
   @@index([tenantId, calendarId, startTime])
   @@index([iCalUID])
   @@map("calendar_events")
+}
+
+model CalendarEventAttachment {
+  id               String        @id @default(cuid())
+  eventId          String
+  filename         String
+  mimeType         String
+  size             Int
+  storageType      String        @default("s3")
+  storagePath      String?
+  fileUrl          String?
+  fileId           String?
+  iconLink         String?
+  isGoogleDrive    Boolean       @default(false)
+  isOneDrive       Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  event            CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@map("calendar_event_attachments")
 }
 
 model Contact {

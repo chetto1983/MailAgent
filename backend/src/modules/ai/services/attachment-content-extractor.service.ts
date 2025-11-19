@@ -42,9 +42,14 @@ export class AttachmentContentExtractorService {
     filename: string,
   ): Promise<string | null> {
     try {
+      // Normalize MIME type (remove parameters like "; charset=utf-8")
+      const normalizedMimeType = this.normalizeMimeType(mimeType);
+
       // Only extract from supported types
-      if (!this.isSupportedMimeType(mimeType)) {
-        this.logger.debug(`Unsupported MIME type for extraction: ${mimeType} (${filename})`);
+      if (!this.isSupportedMimeType(normalizedMimeType)) {
+        this.logger.debug(
+          `Unsupported MIME type for extraction: ${mimeType} (normalized: ${normalizedMimeType}) (${filename})`,
+        );
         return null;
       }
 
@@ -64,19 +69,20 @@ export class AttachmentContentExtractorService {
       // Extract based on type
       let extractedText: string | null = null;
 
-      if (mimeType === 'application/pdf') {
+      if (normalizedMimeType === 'application/pdf') {
         extractedText = await this.extractFromPDF(buffer, filename);
-      } else if (this.isTextMimeType(mimeType)) {
+      } else if (this.isTextMimeType(normalizedMimeType)) {
         extractedText = await this.extractFromText(buffer, filename);
       }
 
-      // Truncate if too long
+      // Truncate if too long (ensure final length doesn't exceed MAX_ATTACHMENT_TEXT)
       if (extractedText && extractedText.length > this.MAX_ATTACHMENT_TEXT) {
+        const suffix = '\n... [truncated]';
+        const limit = this.MAX_ATTACHMENT_TEXT - suffix.length;
         this.logger.debug(
           `Truncating attachment text from ${extractedText.length} to ${this.MAX_ATTACHMENT_TEXT} chars (${filename})`,
         );
-        extractedText =
-          extractedText.substring(0, this.MAX_ATTACHMENT_TEXT) + '\n... [truncated]';
+        extractedText = extractedText.substring(0, limit) + suffix;
       }
 
       if (extractedText) {
@@ -139,7 +145,15 @@ export class AttachmentContentExtractorService {
   }
 
   /**
+   * Normalize MIME type by removing parameters (e.g., "text/html; charset=utf-8" → "text/html")
+   */
+  private normalizeMimeType(mimeType: string): string {
+    return mimeType.split(';')[0].trim().toLowerCase();
+  }
+
+  /**
    * Check if MIME type is supported for extraction
+   * Note: mimeType should be normalized before calling this
    */
   private isSupportedMimeType(mimeType: string): boolean {
     const supported = [
@@ -159,6 +173,7 @@ export class AttachmentContentExtractorService {
 
   /**
    * Check if MIME type is text-based
+   * Note: mimeType should be normalized before calling this
    */
   private isTextMimeType(mimeType: string): boolean {
     return (
@@ -207,8 +222,9 @@ export class AttachmentContentExtractorService {
   }
 
   private getExtractionMethod(mimeType: string): 'pdf-parse' | 'text' | 'unsupported' {
-    if (mimeType === 'application/pdf') return 'pdf-parse';
-    if (this.isTextMimeType(mimeType)) return 'text';
+    const normalizedMimeType = this.normalizeMimeType(mimeType);
+    if (normalizedMimeType === 'application/pdf') return 'pdf-parse';
+    if (this.isTextMimeType(normalizedMimeType)) return 'text';
     return 'unsupported';
   }
 }
