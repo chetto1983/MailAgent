@@ -29,7 +29,8 @@
       "Bash(test:*)",
       "Bash(mkdir:*)",
       "Bash(npm test:*)",
-      "Bash(npm run lint:win:*)"
+      "Bash(npm run lint:win:*)",
+      "Bash(git -C d:/MailAgent branch:*)"
     ],
     "deny": [],
     "ask": []

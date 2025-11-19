@@ -22,11 +22,44 @@ export interface Email {
   references?: string[];
 }
 
+/**
+ * Email filter options
+ */
+export interface EmailFilter {
+  folderId?: string;
+  isRead?: boolean;
+  isStarred?: boolean;
+  hasAttachments?: boolean;
+  searchQuery?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+/**
+ * Pagination state
+ */
+export interface PaginationState {
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
+}
+
 interface EmailState {
   emails: Email[];
   unreadCount: number;
   selectedEmail: Email | null;
   isLoading: boolean;
+
+  // Filtering and search
+  filters: EmailFilter;
+  searchQuery: string;
+
+  // Pagination
+  pagination: PaginationState;
+
+  // Multi-selection
+  selectedIds: Set<string>;
 
   // Actions
   setEmails: (emails: Email[]) => void;
@@ -37,9 +70,26 @@ interface EmailState {
   setUnreadCount: (count: number) => void;
   setLoading: (loading: boolean) => void;
 
+  // Filtering and search
+  setFilters: (filters: EmailFilter) => void;
+  setSearchQuery: (query: string) => void;
+  clearFilters: () => void;
+
+  // Pagination
+  setPagination: (pagination: Partial<PaginationState>) => void;
+  loadMore: () => void;
+
+  // Multi-selection
+  toggleSelection: (id: string) => void;
+  selectAll: () => void;
+  clearSelection: () => void;
+  setSelectedIds: (ids: Set<string>) => void;
+
   // Bulk actions
   markAsRead: (ids: string[]) => void;
   markAsStarred: (ids: string[], starred: boolean) => void;
+  bulkDelete: (ids: string[]) => void;
+  moveToFolder: (ids: string[], folderId: string) => void;
 
   // Reset
   reset: () => void;
@@ -50,6 +100,15 @@ export const useEmailStore = create<EmailState>((set) => ({
   unreadCount: 0,
   selectedEmail: null,
   isLoading: false,
+  filters: {},
+  searchQuery: '',
+  pagination: {
+    page: 1,
+    pageSize: 50,
+    total: 0,
+    hasMore: false,
+  },
+  selectedIds: new Set<string>(),
 
   setEmails: (emails) => set({ emails }),
 
@@ -106,17 +165,86 @@ export const useEmailStore = create<EmailState>((set) => ({
 
   setLoading: (loading) => set({ isLoading: loading }),
 
-  markAsRead: (ids) =>
+  // Filtering and search
+  setFilters: (filters) => set({ filters }),
+
+  setSearchQuery: (query) => set({ searchQuery: query }),
+
+  clearFilters: () => set({ filters: {}, searchQuery: '' }),
+
+  // Pagination
+  setPagination: (pagination) =>
     set((state) => ({
-      emails: state.emails.map((email) =>
-        ids.includes(email.id) ? { ...email, isRead: true } : email
-      ),
+      pagination: { ...state.pagination, ...pagination },
     })),
+
+  loadMore: () =>
+    set((state) => ({
+      pagination: { ...state.pagination, page: state.pagination.page + 1 },
+    })),
+
+  // Multi-selection
+  toggleSelection: (id) =>
+    set((state) => {
+      const newSelectedIds = new Set(state.selectedIds);
+      if (newSelectedIds.has(id)) {
+        newSelectedIds.delete(id);
+      } else {
+        newSelectedIds.add(id);
+      }
+      return { selectedIds: newSelectedIds };
+    }),
+
+  selectAll: () =>
+    set((state) => ({
+      selectedIds: new Set(state.emails.map((e) => e.id)),
+    })),
+
+  clearSelection: () => set({ selectedIds: new Set<string>() }),
+
+  setSelectedIds: (ids) => set({ selectedIds: ids }),
+
+  // Bulk actions
+  markAsRead: (ids) =>
+    set((state) => {
+      const updatedEmails = state.emails.map((email) =>
+        ids.includes(email.id) ? { ...email, isRead: true } : email
+      );
+
+      // Recalculate unread count
+      const unreadCount = updatedEmails.filter((e) => !e.isRead).length;
+
+      return {
+        emails: updatedEmails,
+        unreadCount,
+      };
+    }),
 
   markAsStarred: (ids, starred) =>
     set((state) => ({
       emails: state.emails.map((email) =>
         ids.includes(email.id) ? { ...email, isStarred: starred } : email
+      ),
+    })),
+
+  bulkDelete: (ids) =>
+    set((state) => {
+      const deletedEmails = state.emails.filter((e) => ids.includes(e.id));
+      const deletedUnreadCount = deletedEmails.filter((e) => !e.isRead).length;
+
+      return {
+        emails: state.emails.filter((e) => !ids.includes(e.id)),
+        unreadCount: Math.max(0, state.unreadCount - deletedUnreadCount),
+        selectedEmail: state.selectedEmail && ids.includes(state.selectedEmail.id)
+          ? null
+          : state.selectedEmail,
+      };
+    }),
+
+  moveToFolder: (ids, folderId) =>
+    set((state) => ({
+      emails: state.emails.map((email) =>
+        ids.includes(email.id) ? { ...email, folder: folderId } : email
       ),
     })),
 
@@ -126,5 +254,14 @@ export const useEmailStore = create<EmailState>((set) => ({
       unreadCount: 0,
       selectedEmail: null,
       isLoading: false,
+      filters: {},
+      searchQuery: '',
+      pagination: {
+        page: 1,
+        pageSize: 50,
+        total: 0,
+        hasMore: false,
+      },
+      selectedIds: new Set<string>(),
     }),
 }));
