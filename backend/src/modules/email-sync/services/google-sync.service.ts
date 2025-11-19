@@ -12,6 +12,19 @@ import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
 import { ConfigService } from '@nestjs/config';
 import { ProviderTokenService } from './provider-token.service';
 import { RetryService } from '../../../common/services/retry.service';
+import { AttachmentStorageService } from '../../email/services/attachment.storage';
+
+/**
+ * Attachment metadata from Gmail message
+ */
+interface GmailAttachmentMeta {
+  filename: string;
+  mimeType: string;
+  size: number;
+  attachmentId: string;
+  contentId?: string;
+  isInline: boolean;
+}
 
 @Injectable()
 export class GoogleSyncService implements OnModuleInit {
@@ -34,6 +47,7 @@ export class GoogleSyncService implements OnModuleInit {
     private config: ConfigService,
     private providerTokenService: ProviderTokenService,
     private retryService: RetryService,
+    private attachmentStorage: AttachmentStorageService,
   ) {}
 
   onModuleInit() {
@@ -793,6 +807,7 @@ export class GoogleSyncService implements OnModuleInit {
     size?: number | null;
     headers: Record<string, any>;
     metadataStatus: 'active' | 'deleted';
+    attachments: GmailAttachmentMeta[];
   } | null {
     const headers = message.payload?.headers || [];
     const from = headers.find((h) => h.name === 'From')?.value || '';
@@ -807,13 +822,33 @@ export class GoogleSyncService implements OnModuleInit {
 
     let bodyText = '';
     let bodyHtml = '';
+    const attachments: GmailAttachmentMeta[] = [];
 
     const extractBody = (part: any) => {
       if (part.mimeType === 'text/plain' && part.body?.data) {
         bodyText = Buffer.from(part.body.data, 'base64').toString('utf8');
       } else if (part.mimeType === 'text/html' && part.body?.data) {
         bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf8');
-      } else if (part.parts) {
+      }
+
+      // Extract attachment metadata
+      if (part.filename && part.body?.attachmentId) {
+        const contentId = part.headers?.find((h: any) => h.name === 'Content-ID')?.value;
+        const isInline = part.headers?.some((h: any) =>
+          h.name === 'Content-Disposition' && h.value?.startsWith('inline')
+        ) || false;
+
+        attachments.push({
+          filename: part.filename,
+          mimeType: part.mimeType || 'application/octet-stream',
+          size: part.body.size || 0,
+          attachmentId: part.body.attachmentId,
+          contentId: contentId?.replace(/[<>]/g, ''),
+          isInline,
+        });
+      }
+
+      if (part.parts) {
         part.parts.forEach(extractBody);
       }
     };
@@ -859,7 +894,120 @@ export class GoogleSyncService implements OnModuleInit {
       size: message.sizeEstimate,
       headers: headers.reduce((acc, h) => ({ ...acc, [h.name || '']: h.value }), {} as Record<string, any>),
       metadataStatus: isDeleted ? 'deleted' : 'active',
+      attachments,
     };
+  }
+
+  /**
+   * Download attachment data from Gmail API
+   */
+  private async downloadGmailAttachment(
+    gmail: gmail_v1.Gmail,
+    messageId: string,
+    attachmentId: string,
+  ): Promise<Buffer | null> {
+    try {
+      const response = await gmail.users.messages.attachments.get({
+        userId: 'me',
+        messageId,
+        id: attachmentId,
+      });
+
+      if (!response.data.data) {
+        return null;
+      }
+
+      // Gmail returns base64url-encoded data, need to convert to Buffer
+      return Buffer.from(response.data.data, 'base64');
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `Failed to download attachment ${attachmentId} for message ${messageId}: ${err.message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Process and store attachments for an email
+   */
+  private async processEmailAttachments(
+    gmail: gmail_v1.Gmail,
+    emailId: string,
+    externalId: string,
+    attachments: GmailAttachmentMeta[],
+    tenantId: string,
+    providerId: string,
+  ): Promise<void> {
+    if (!attachments.length) {
+      return;
+    }
+
+    try {
+      // Delete existing attachments for this email (in case of re-sync)
+      await this.prisma.emailAttachment.deleteMany({
+        where: { emailId },
+      });
+
+      // Process each attachment
+      for (const attachment of attachments) {
+        try {
+          // Download attachment data
+          const data = await this.downloadGmailAttachment(
+            gmail,
+            externalId,
+            attachment.attachmentId,
+          );
+
+          if (!data) {
+            this.logger.warn(
+              `Skipping attachment ${attachment.filename} for email ${emailId} - download failed`,
+            );
+            continue;
+          }
+
+          // Upload to S3/MinIO
+          const uploaded = await this.attachmentStorage.uploadAttachment(
+            tenantId,
+            providerId,
+            {
+              filename: attachment.filename,
+              content: data,
+              contentType: attachment.mimeType,
+            },
+          );
+
+          // Save attachment metadata to database
+          await this.prisma.emailAttachment.create({
+            data: {
+              emailId,
+              filename: uploaded.filename,
+              mimeType: uploaded.mimeType,
+              size: uploaded.size,
+              contentId: attachment.contentId,
+              storageType: uploaded.storageType,
+              storagePath: uploaded.storagePath,
+              isInline: attachment.isInline,
+            },
+          });
+
+          this.logger.debug(
+            `Stored attachment ${attachment.filename} (${attachment.size} bytes) for email ${emailId}`,
+          );
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          this.logger.error(
+            `Failed to process attachment ${attachment.filename} for email ${emailId}: ${error.message}`,
+          );
+          // Continue processing other attachments
+        }
+      }
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error(
+        `Failed to process attachments for email ${emailId}: ${error.message}`,
+      );
+    }
   }
 
   private async processParsedMessagesBatch(
@@ -949,7 +1097,7 @@ export class GoogleSyncService implements OnModuleInit {
       );
     }
 
-    // Fetch persisted records to drive embedding enqueue (jobId uniqueness avoids duplicates)
+    // Fetch persisted records to drive embedding enqueue and attachment processing
     const persisted = await this.prisma.email.findMany({
       where: {
         providerId,
@@ -963,35 +1111,88 @@ export class GoogleSyncService implements OnModuleInit {
     });
     const persistedMap = new Map(persisted.map((p) => [p.externalId, p]));
 
+    // Get Gmail client for attachment downloads (if there are any attachments)
+    const hasAttachments = mapped.some((m) => m.attachments.length > 0);
+    let gmail: gmail_v1.Gmail | null = null;
+
+    if (hasAttachments) {
+      try {
+        const provider = await this.prisma.providerConfig.findUnique({
+          where: { id: providerId },
+        });
+
+        if (provider?.accessToken && provider.tokenEncryptionIv) {
+          const accessToken = this.crypto.decrypt(
+            provider.accessToken,
+            provider.tokenEncryptionIv,
+          );
+          gmail = this.createGmailClient(accessToken);
+        }
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        this.logger.error(
+          `Failed to create Gmail client for attachments: ${error.message}`,
+        );
+      }
+    }
+
     const embeddingJobs: EmailEmbeddingJob[] = [];
+    const attachmentPromises: Promise<void>[] = [];
+
     for (const m of mapped) {
       const persistedEmail = persistedMap.get(m.externalId);
       if (!persistedEmail) continue;
 
+      // Enqueue embedding job
       const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(
         tenantId,
         persistedEmail.id,
       );
-      if (alreadyEmbedded) {
-        continue;
+      if (!alreadyEmbedded) {
+        embeddingJobs.push({
+          tenantId,
+          providerId,
+          emailId: persistedEmail.id,
+          subject: m.subject,
+          snippet: m.snippet,
+          bodyText: m.bodyText,
+          bodyHtml: m.bodyHtml,
+          from: m.from,
+          receivedAt: persistedEmail.receivedAt,
+        });
       }
 
-      embeddingJobs.push({
-        tenantId,
-        providerId,
-        emailId: persistedEmail.id,
-        subject: m.subject,
-        snippet: m.snippet,
-        bodyText: m.bodyText,
-        bodyHtml: m.bodyHtml,
-        from: m.from,
-        receivedAt: persistedEmail.receivedAt,
-      });
+      // Process attachments if any
+      if (m.attachments.length > 0 && gmail) {
+        attachmentPromises.push(
+          this.processEmailAttachments(
+            gmail,
+            persistedEmail.id,
+            m.externalId,
+            m.attachments,
+            tenantId,
+            providerId,
+          ),
+        );
+      }
     }
 
-    if (embeddingJobs.length) {
-      await this.emailEmbeddingQueue.enqueueMany(embeddingJobs);
-    }
+    // Process attachments and embeddings in parallel
+    const results = await Promise.allSettled([
+      ...attachmentPromises,
+      embeddingJobs.length > 0
+        ? this.emailEmbeddingQueue.enqueueMany(embeddingJobs)
+        : Promise.resolve(),
+    ]);
+
+    // Log any failures
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          `Failed to process attachment or embedding (index ${index}): ${result.reason}`,
+        );
+      }
+    });
 
     return {
       processed: mapped.length,

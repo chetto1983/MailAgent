@@ -1,8 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { getConfiguration } from './config/configuration';
+import { validate } from './config/env.validation';
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { ResponseTimeInterceptor } from './common/interceptors/response-time.interceptor';
+import { CacheModule } from './common/services/cache.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -26,6 +30,7 @@ const config = getConfiguration();
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '../.env', '../../.env'],
+      validate, // Validate environment variables at startup
     }),
     // Rate limiting: configurable defaults to keep protection but avoid false positives
     ThrottlerModule.forRoot([
@@ -34,6 +39,7 @@ const config = getConfiguration();
         limit: config.rateLimit.limit,
       },
     ]),
+    CacheModule, // Redis-based caching for horizontal scaling
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -56,6 +62,16 @@ const config = getConfiguration();
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    // Apply response time logging globally
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseTimeInterceptor,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply request ID middleware to all routes
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}

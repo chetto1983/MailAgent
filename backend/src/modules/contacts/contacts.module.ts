@@ -6,6 +6,9 @@ import { GoogleContactsSyncService } from './services/google-contacts-sync.servi
 import { MicrosoftContactsSyncService } from './services/microsoft-contacts-sync.service';
 import { GoogleContactsWebhookService } from './services/google-contacts-webhook.service';
 import { MicrosoftContactsWebhookService } from './services/microsoft-contacts-webhook.service';
+import { ContactsSyncQueueService } from './services/contacts-sync-queue.service';
+import { ContactsSyncSchedulerService } from './services/contacts-sync-scheduler.service';
+import { ContactsSyncWorker } from './workers/contacts-sync.worker';
 import { ContactsProviderFactory } from './contacts-provider.factory';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
@@ -29,6 +32,9 @@ import { EmailSyncModule } from '../email-sync/email-sync.module'; // Import for
     MicrosoftContactsSyncService,
     GoogleContactsWebhookService,
     MicrosoftContactsWebhookService,
+    ContactsSyncQueueService, // Queue service for contacts sync
+    ContactsSyncSchedulerService, // Scheduler for periodic sync
+    ContactsSyncWorker, // Worker to process sync jobs
     ContactsProviderFactory,
   ],
   exports: [
@@ -37,6 +43,8 @@ import { EmailSyncModule } from '../email-sync/email-sync.module'; // Import for
     MicrosoftContactsSyncService,
     GoogleContactsWebhookService,
     MicrosoftContactsWebhookService,
+    ContactsSyncQueueService,
+    ContactsSyncSchedulerService,
     ContactsProviderFactory,
   ],
 })

@@ -188,9 +188,10 @@ export class EmailsService {
 
     // Emit unread count update if isRead changed
     if (data.isRead !== undefined || data.folder) {
-      // Current/target folder
+      // Current/target folder (TENANT-SCOPED)
       const unreadCountTarget = await this.prisma.email.count({
         where: {
+          tenantId, // ✅ CRITICAL: Tenant isolation
           providerId: email.providerId,
           folder: targetFolder,
           isRead: false,
@@ -202,10 +203,11 @@ export class EmailsService {
         providerId: email.providerId,
       });
 
-      // If folder changed, update source folder as well
+      // If folder changed, update source folder as well (TENANT-SCOPED)
       if (data.folder && data.folder !== email.folder) {
         const unreadCountSource = await this.prisma.email.count({
           where: {
+            tenantId, // ✅ CRITICAL: Tenant isolation
             providerId: email.providerId,
             folder: email.folder,
             isRead: false,

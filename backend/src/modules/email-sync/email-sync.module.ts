@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
+import { EmailModule } from '../email/email.module';
 import { AiModule } from '../ai/ai.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { RetryService } from '../../common/services/retry.service';
@@ -41,6 +42,7 @@ import { WebhookController } from './controllers/webhook.controller';
     ScheduleModule.forRoot(),
     PrismaModule,
     forwardRef(() => ProvidersModule), // For OAuth services and crypto
+    forwardRef(() => EmailModule), // For AttachmentStorageService
     AiModule,
     RealtimeModule, // WebSocket events
   ],
@@ -86,6 +88,7 @@ import { WebhookController } from './controllers/webhook.controller';
     MicrosoftWebhookService,
     WebhookLifecycleService,
     CrossProviderSyncService,
+    ProviderTokenService, // Export for use in calendar and contacts modules
   ],
 })
 export class EmailSyncModule {}

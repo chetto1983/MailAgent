@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { calendar_v3, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
+import { ProviderTokenService } from '../../email-sync/services/provider-token.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -23,8 +22,7 @@ export class GoogleCalendarSyncService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly crypto: CryptoService,
-    private readonly googleOAuth: GoogleOAuthService,
+    private readonly providerTokenService: ProviderTokenService,
     private readonly realtimeEvents: RealtimeEventsService,
     private readonly configService: ConfigService,
   ) {
@@ -58,49 +56,13 @@ export class GoogleCalendarSyncService {
     this.logger.log(`Starting Google Calendar sync for provider ${providerId}`);
 
     try {
-      // Get provider config
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
+      // Get provider and access token (handles refresh automatically)
+      const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+        providerId,
+      );
 
-      if (!provider || !provider.supportsCalendar) {
-        throw new Error('Provider not found or does not support calendar');
-      }
-
-      // Check if token is expired and needs refresh
-      const now = new Date();
-      const isExpired = provider.tokenExpiresAt && now > new Date(provider.tokenExpiresAt);
-
-      let accessToken: string;
-
-      if (isExpired && provider.refreshToken && provider.refreshTokenEncryptionIv) {
-        this.logger.log(`Access token expired for provider ${providerId}, refreshing...`);
-
-        const refreshToken = this.crypto.decrypt(
-          provider.refreshToken,
-          provider.refreshTokenEncryptionIv,
-        );
-
-        const refreshed = await this.googleOAuth.refreshAccessToken(refreshToken);
-        accessToken = refreshed.accessToken;
-
-        // Save new token to database
-        const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-        await this.prisma.providerConfig.update({
-          where: { id: providerId },
-          data: {
-            accessToken: encryptedAccess.encrypted,
-            tokenEncryptionIv: encryptedAccess.iv,
-            tokenExpiresAt: refreshed.expiresAt,
-          },
-        });
-      } else if (!provider.accessToken || !provider.tokenEncryptionIv) {
-        throw new Error('Provider missing access token');
-      } else {
-        accessToken = this.crypto.decrypt(
-          provider.accessToken,
-          provider.tokenEncryptionIv,
-        );
+      if (!provider.supportsCalendar) {
+        throw new Error('Provider does not support calendar');
       }
 
       // Create Google Calendar client
@@ -382,6 +344,9 @@ export class GoogleCalendarSyncService {
       lastSyncedAt: new Date(),
     };
 
+    let dbEventId: string;
+    let result: 'created' | 'updated';
+
     if (existing) {
       await this.prisma.calendarEvent.update({
         where: { id: existing.id },
@@ -390,12 +355,78 @@ export class GoogleCalendarSyncService {
           syncVersion: existing.syncVersion + 1,
         },
       });
-      return 'updated';
+      dbEventId = existing.id;
+      result = 'updated';
     } else {
-      await this.prisma.calendarEvent.create({
+      const created = await this.prisma.calendarEvent.create({
         data: eventData,
       });
-      return 'created';
+      dbEventId = created.id;
+      result = 'created';
+    }
+
+    // Process attachments (Google Drive files attached to calendar events)
+    if (event.attachments && event.attachments.length > 0) {
+      await this.processEventAttachments(dbEventId, event.attachments);
+    }
+
+    return result;
+  }
+
+  /**
+   * Process attachments for a calendar event
+   * Google Calendar attachments are references to Google Drive files
+   */
+  private async processEventAttachments(
+    eventId: string,
+    attachments: calendar_v3.Schema$EventAttachment[],
+  ): Promise<void> {
+    try {
+      // Delete existing attachments for this event
+      await this.prisma.calendarEventAttachment.deleteMany({
+        where: { eventId },
+      });
+
+      // Create new attachment records
+      for (const attachment of attachments) {
+        if (!attachment.fileUrl) {
+          this.logger.warn(`Skipping attachment without fileUrl for event ${eventId}`);
+          continue;
+        }
+
+        try {
+          await this.prisma.calendarEventAttachment.create({
+            data: {
+              eventId,
+              filename: attachment.title || 'Untitled',
+              mimeType: attachment.mimeType || 'application/octet-stream',
+              size: 0, // Google Calendar API doesn't provide size
+              storageType: 'reference', // These are Google Drive references, not stored locally
+              fileUrl: attachment.fileUrl,
+              fileId: attachment.fileId || null,
+              iconLink: attachment.iconLink || null,
+              isGoogleDrive: true,
+              isOneDrive: false,
+            },
+          });
+
+          this.logger.debug(
+            `Created attachment reference for event ${eventId}: ${attachment.title} (Google Drive)`,
+          );
+        } catch (attachmentError) {
+          this.logger.warn(
+            `Failed to create attachment for event ${eventId}: ${attachmentError instanceof Error ? attachmentError.message : String(attachmentError)}`,
+          );
+        }
+      }
+
+      this.logger.verbose(
+        `Processed ${attachments.length} attachments for event ${eventId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to process attachments for event ${eventId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

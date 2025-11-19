@@ -635,4 +635,60 @@ export class CalendarService {
         throw new BadRequestException('Calendar sync is not supported for this provider type');
     }
   }
+
+  /**
+   * List attachments for a calendar event
+   */
+  async listEventAttachments(tenantId: string, eventId: string) {
+    // Verify event belongs to tenant
+    const event = await this.prisma.calendarEvent.findUnique({
+      where: { id: eventId },
+      select: { tenantId: true },
+    });
+
+    if (!event || event.tenantId !== tenantId) {
+      throw new NotFoundException('Calendar event not found');
+    }
+
+    // Fetch attachments
+    const attachments = await this.prisma.calendarEventAttachment.findMany({
+      where: { eventId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return {
+      eventId,
+      total: attachments.length,
+      attachments,
+    };
+  }
+
+  /**
+   * Get a specific attachment for a calendar event
+   */
+  async getEventAttachment(tenantId: string, eventId: string, attachmentId: string) {
+    // Verify event belongs to tenant
+    const event = await this.prisma.calendarEvent.findUnique({
+      where: { id: eventId },
+      select: { tenantId: true },
+    });
+
+    if (!event || event.tenantId !== tenantId) {
+      throw new NotFoundException('Calendar event not found');
+    }
+
+    // Fetch attachment
+    const attachment = await this.prisma.calendarEventAttachment.findFirst({
+      where: {
+        id: attachmentId,
+        eventId,
+      },
+    });
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    return attachment;
+  }
 }

@@ -546,9 +546,32 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Hard guard: check in Redis keys for any job referencing providerId
+    // Use SCAN instead of KEYS to prevent blocking Redis in production
     const keyPattern = `bull:*:jobs:*`;
-    const keys = await this.redisConnection.keys(keyPattern);
-    return keys.some(
+    let cursor = '0';
+    const matchedKeys: string[] = [];
+
+    do {
+      const result = await this.redisConnection.scan(
+        cursor,
+        'MATCH',
+        keyPattern,
+        'COUNT',
+        100,
+      );
+      cursor = result[0];
+      matchedKeys.push(...result[1]);
+
+      // Early exit if we find a matching key
+      const hasMatch = result[1].some(
+        (k) => k.includes(providerId) && (!tenantId || k.includes(tenantId)),
+      );
+      if (hasMatch) {
+        return true;
+      }
+    } while (cursor !== '0');
+
+    return matchedKeys.some(
       (k) => k.includes(providerId) && (!tenantId || k.includes(tenantId)),
     );
   }

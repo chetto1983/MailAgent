@@ -1,170 +1,256 @@
-# MailAgent - Documentazione
+# MailAgent - Documentation Index
 
-Benvenuto nella documentazione di MailAgent! Questa cartella contiene tutta la documentazione organizzata per categoria.
+Welcome to the MailAgent documentation. This index provides organized access to all project documentation.
 
----
+## 📚 Documentation Structure
 
-## 📚 Indice per Categoria
+### 🚀 [Setup & Getting Started](setup/)
 
-### 🚀 [Setup](./setup/)
-Guide per configurare e avviare il progetto
+Getting started guides and configuration instructions:
 
-- [CONFIGURATION.md](./setup/CONFIGURATION.md) - Configurazione sistema
-- [LOCAL_DEV_SETUP.md](./setup/LOCAL_DEV_SETUP.md) - Setup ambiente locale
-- [QUICK_START.md](./setup/QUICK_START.md) - Guida rapida
-- [SETUP_GUIDE.md](./setup/SETUP_GUIDE.md) - Guida setup completa
-- [SETUP_COMPLETE.md](./setup/SETUP_COMPLETE.md) - Checklist setup
-- [GETTING_STARTED_CHECKLIST.md](./setup/GETTING_STARTED_CHECKLIST.md) - Checklist iniziale
+- **[OAuth Complete Guide](setup/oauth-complete-guide.md)** - Comprehensive OAuth2 setup for Google and Microsoft
+- **[OAuth Vercel Deployment](setup/oauth-vercel.md)** - Production OAuth configuration for Vercel
 
-### 🔐 [OAuth](./oauth/)
-Configurazione provider OAuth (Gmail, Microsoft)
+### 🏗️ [Architecture & Design](architecture/)
 
-- [OAUTH_GMAIL_SETUP.md](./oauth/OAUTH_GMAIL_SETUP.md) - Setup OAuth Gmail
-- [OAUTH_MICROSOFT_SETUP.md](./oauth/OAUTH_MICROSOFT_SETUP.md) - Setup OAuth Microsoft
-- [OAUTH_SETUP_GUIDE.md](./oauth/OAUTH_SETUP_GUIDE.md) - Guida generale OAuth
-- [OAUTH_SETUP_INDEX.md](./oauth/OAUTH_SETUP_INDEX.md) - Indice setup OAuth
-- [FIX_MICROSOFT_TOKEN_REFRESH.md](./oauth/FIX_MICROSOFT_TOKEN_REFRESH.md) - Fix token refresh Microsoft
+System architecture, design patterns, and optimization strategies:
 
-### 💻 [Implementation](./implementation/)
-Dettagli implementazione e architettura
+- **[AI Embeddings Optimization](architecture/ai-embeddings-optimization.md)** - Comprehensive analysis and optimization proposals
+  - Query embedding caching (50-70% cost reduction)
+  - Attachment content extraction (PDF, text files)
+  - CTE-based tenant isolation
+  - Metadata pre-filtering
 
-- [EMAIL_SYNC_STRATEGY.md](./implementation/EMAIL_SYNC_STRATEGY.md) - Strategia sincronizzazione
-- [EMAIL_SYNC_USAGE.md](./implementation/EMAIL_SYNC_USAGE.md) - Uso sistema sync
-- [EMAIL_SYNC_FIX_PLAN.md](./implementation/EMAIL_SYNC_FIX_PLAN.md) - Piano fix sync
-- [PROVIDER_INTEGRATION_GUIDE.md](./implementation/PROVIDER_INTEGRATION_GUIDE.md) - Guida integrazione provider
-- [IMPLEMENTATION_SUMMARY.md](./implementation/IMPLEMENTATION_SUMMARY.md) - Riepilogo implementazione
-- [CURRENT_STATUS.md](./implementation/CURRENT_STATUS.md) - Stato attuale sistema
-- [DOCUMENTATION_INDEX.md](./implementation/DOCUMENTATION_INDEX.md) - Indice documentazione
-- [QUICK_REFERENCE.md](./implementation/QUICK_REFERENCE.md) - Riferimento rapido
-- [PROBLEM_DIAGNOSIS.md](./implementation/PROBLEM_DIAGNOSIS.md) - Diagnosi problemi
-- [GOOGLE_AUTO_REFRESH_IMPLEMENTATION.md](./implementation/GOOGLE_AUTO_REFRESH_IMPLEMENTATION.md) - Auto-refresh Google
-- [MICROSOFT_AUTO_REFRESH_IMPLEMENTATION.md](./implementation/MICROSOFT_AUTO_REFRESH_IMPLEMENTATION.md) - Auto-refresh Microsoft
+- **[Email Frontend Refactor](architecture/email-frontend-refactor.md)** - Frontend architecture analysis
+  - Component structure optimization
+  - State management patterns
+  - Performance improvements
 
-### 🧪 [Testing](./testing/)
-Risultati test e sessioni
+### 🔐 [Security](security/)
 
-- [TEST_RESULTS_2025-10-30_SESSION2.md](./testing/TEST_RESULTS_2025-10-30_SESSION2.md)
-- [TEST_RESULTS_2025-11-02_EMAIL_SYNC_SUCCESS.md](./testing/TEST_RESULTS_2025-11-02_EMAIL_SYNC_SUCCESS.md)
-- [TEST_RESULTS_TOKEN_REFRESH.md](./testing/TEST_RESULTS_TOKEN_REFRESH.md)
-- [EMAIL_SYNC_TEST_RESULTS.md](./testing/EMAIL_SYNC_TEST_RESULTS.md)
-- [SESSION_SUMMARY_2025-10-30.md](./testing/SESSION_SUMMARY_2025-10-30.md)
+Security audits, vulnerability fixes, and compliance documentation:
 
-### 📈 [Scalability](./scalability/)
-Analisi e ottimizzazioni scalabilità
+- **[Tenant Isolation Audit (Nov 2025)](security/tenant-isolation-audit-2025-11-19.md)** - Critical security findings
+  - 1 CRITICAL vulnerability (email retention service)
+  - 2 SUSPICIOUS issues (unread counts, update patterns)
+  - Remediation instructions
+  - GDPR/CCPA/SOC2 compliance notes
 
-- [SCALABILITY_ANALYSIS.md](./scalability/SCALABILITY_ANALYSIS.md) - Analisi completa
-- [PLAN_B_IMPLEMENTATION.md](./scalability/PLAN_B_IMPLEMENTATION.md) - Piano B implementato
-- [PLAN_B_TEST_RESULTS.md](./scalability/PLAN_B_TEST_RESULTS.md) - Risultati test Piano B
+- **[XSS Fix Guide](security/xss-fix-dompurify.md)** - XSS vulnerability remediation
+  - DOMPurify implementation
+  - HTML sanitization best practices
 
----
+### 💻 [Development](development/)
 
-## 🔧 Script Utili
+Development guides, implementation plans, and project status:
 
-### Test API
-Localizzazione: [`../scripts/test/`](../scripts/test/)
+- **[Project Status](development/PROJECT_STATUS.md)** - Current implementation state and roadmap
+  - Feature completion tracking (95% backend / 90% frontend)
+  - Testing status (15%)
+  - Upcoming features
 
-- `test-google-apis.js` - Test API Google
-- `test-microsoft-apis.js` - Test API Microsoft
-- `test-imap-provider.js` - Test provider IMAP
-- `test-email-storage.js` - Test storage email
+- **[Recent Implementation Summary](development/recent-implementation-summary.md)** - Latest session work
+  - Calendar event attachments
+  - Security fixes (Redis KEYS→SCAN, crypto.randomBytes)
+  - AI optimizations
+  - Gmail/Microsoft attachment sync
 
-### Diagnostica
-Localizzazione: [`../scripts/diagnostics/`](../scripts/diagnostics/)
+- **[Labels Implementation Plan](development/labels-implementation-plan.md)** - Advanced email categorization
+  - Label architecture
+  - UI/UX design
+  - AI-powered auto-labeling
 
-- `check-db.js` - Verifica database
-- `check-providers.js` - Verifica provider
-- `check-microsoft-provider.js` - Verifica provider Microsoft
-- `check-microsoft-sync.js` - Verifica sync Microsoft
-- `test-database-direct.js` - Test database diretto
+- **[Provider Migration Phase 2](development/provider-migration-phase2.md)** - Multi-provider refactoring
+  - Unified provider pattern
+  - Migration completion report
 
-### Scalability
-Localizzazione: [`../scripts/scalability/`](../scripts/scalability/)
+- **[Folder Management Roadmap](development/folder-management-roadmap.md)** - Email folder management
+  - Custom folder creation
+  - Folder hierarchy
+  - Sync strategies
 
-- `test-scalability.js` - Test completo scalabilità
-- `test-scalability-simple.js` - Test scalabilità semplificato
+### 📦 [Archive](archive/)
 
----
+Historical documentation and test reports:
 
-## 📖 Documentazione Root
+- **[Implementation Analysis](archive/implementation-analysis/)** - Historical refactoring docs
+  - Roadmap master plan
+  - Cross-check analysis
+  - Refactoring priorities
 
-File principali nella root del progetto:
+- **[Testing Reports](archive/testing/)** - Previous test session results
+  - Email sync test results
+  - Token refresh tests
 
-- [README.md](../README.md) - Documentazione principale progetto
-- [PROJECT_CHECKLIST.md](../PROJECT_CHECKLIST.md) - Checklist stato progetto
-- [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) - Guida risoluzione problemi
-- [PRIVACY.md](../PRIVACY.md) - Informativa privacy
+- **[Phase Reports](archive/)** - Development phase documentation
+  - Phase 1: Cleanup
+  - Phase 2: Validation
+  - Phase 3: Refactoring
+  - Phase 4A: IMAP Provider
 
 ---
 
-## 🎯 Quick Links per Task Comuni
+## 🎯 Quick Links by Role
 
-### Primo Setup
-1. [Quick Start](./setup/QUICK_START.md) - Avvio rapido
-2. [Local Dev Setup](./setup/LOCAL_DEV_SETUP.md) - Setup completo
-3. [OAuth Setup](./oauth/OAUTH_SETUP_INDEX.md) - Configurazione OAuth
+### For New Developers
+1. Start with [Project Status](development/PROJECT_STATUS.md)
+2. Read [OAuth Setup Guide](setup/oauth-complete-guide.md)
+3. Review [Architecture Overview](../README.md#architettura)
+4. Check [Recent Implementation](development/recent-implementation-summary.md)
 
-### Sviluppo
-1. [Implementation Summary](./implementation/IMPLEMENTATION_SUMMARY.md) - Panoramica codice
-2. [Provider Integration](./implementation/PROVIDER_INTEGRATION_GUIDE.md) - Integrare nuovo provider
-3. [Email Sync Strategy](./implementation/EMAIL_SYNC_STRATEGY.md) - Capire sync
+### For Contributors
+1. Review [Project Status](development/PROJECT_STATUS.md)
+2. Check [Security Audit](security/tenant-isolation-audit-2025-11-19.md)
+3. Read [Provider Pattern](../backend/src/modules/providers/README.md)
+4. Follow development guides in [development/](development/)
 
-### Troubleshooting
-1. [Troubleshooting Guide](../TROUBLESHOOTING.md) - Problemi comuni
-2. [Problem Diagnosis](./implementation/PROBLEM_DIAGNOSIS.md) - Diagnosticare problemi
-3. Script diagnostici in [`../scripts/diagnostics/`](../scripts/diagnostics/)
+### For DevOps/Security
+1. Review [Security Audit](security/tenant-isolation-audit-2025-11-19.md)
+2. Check [AI Optimization](architecture/ai-embeddings-optimization.md)
+3. Review [Production Deployment](../README.md#production-deployment)
 
-### Performance & Scalabilità
-1. [Scalability Analysis](./scalability/SCALABILITY_ANALYSIS.md) - Analisi capacità
-2. [Plan B Implementation](./scalability/PLAN_B_IMPLEMENTATION.md) - Ottimizzazioni
-3. Test scalabilità in [`../scripts/scalability/`](../scripts/scalability/)
+### For Product Managers
+1. Check [Project Status](development/PROJECT_STATUS.md)
+2. Review [Folder Management Roadmap](development/folder-management-roadmap.md)
+3. See [Labels Implementation Plan](development/labels-implementation-plan.md)
 
 ---
 
-## 📊 Stato Attuale Sistema
+## 📖 Documentation by Feature
 
-### ✅ Features Implementate
-- ✅ Email sync multi-provider (Gmail, Microsoft, IMAP)
-- ✅ Auto-refresh token OAuth (Google + Microsoft)
-- ✅ Sync incrementale e full
-- ✅ Queue system con priorità (BullMQ + Redis)
-- ✅ Database PostgreSQL + Prisma
-- ✅ Frontend Next.js
-- ✅ Backend NestJS
+### Email System
+- **Setup**: [OAuth Guide](setup/oauth-complete-guide.md)
+- **Architecture**: [Frontend Refactor](architecture/email-frontend-refactor.md)
+- **Development**: [Provider Migration](development/provider-migration-phase2.md)
+- **Attachments**: [Recent Summary](development/recent-implementation-summary.md)
 
-### 🚀 Capacità
-- **Configurazione attuale**: 1,020-1,530 tenant attivi
+### AI & Knowledge Base
+- **Architecture**: [AI Embeddings Optimization](architecture/ai-embeddings-optimization.md)
+- **Implementation**: [Recent Summary](development/recent-implementation-summary.md)
+- **Performance**: Query caching, attachment indexing
+
+### Calendar & Contacts
+- **Status**: [Project Status](development/PROJECT_STATUS.md)
+- **Implementation**: [Recent Summary](development/recent-implementation-summary.md)
+- **Attachments**: Google Drive, OneDrive integration
+
+### Security & Compliance
+- **Audit**: [Tenant Isolation](security/tenant-isolation-audit-2025-11-19.md)
+- **XSS**: [DOMPurify Fix](security/xss-fix-dompurify.md)
+- **GDPR**: [PRIVACY.md](../PRIVACY.md)
+
+---
+
+## 🔧 Script Utilities
+
+### Test Scripts
+Location: [`../scripts/test/`](../scripts/test/)
+
+- `test-google-apis.js` - Google APIs testing
+- `test-microsoft-apis.js` - Microsoft APIs testing
+- `test-imap-provider.js` - IMAP provider testing
+
+### Diagnostic Scripts
+Location: [`../scripts/diagnostics/`](../scripts/diagnostics/)
+
+- `check-db.js` - Database verification
+- `check-providers.js` - Provider verification
+- `check-microsoft-sync.js` - Microsoft sync check
+
+**📚 [Complete Script Documentation →](../scripts/README.md)**
+
+---
+
+## 📊 Current System Status
+
+### ✅ Implemented Features
+- ✅ Multi-provider email sync (Gmail, Microsoft, IMAP)
+- ✅ Auto-refresh OAuth tokens
+- ✅ Calendar & Contacts integration
+- ✅ Attachment sync with S3/MinIO storage
+- ✅ AI email insights (summarization, smart replies)
+- ✅ Semantic search with pgvector embeddings
+- ✅ Dead Letter Queue system
+
+### 🚀 System Capacity
+- **Current Configuration**: 1,020-1,530 active tenants
 - **Workers**: 34 concurrent (17 high + 10 normal + 7 low)
-- **Throughput**: 204 provider/minuto
-- **Batch size**: 200 provider/ciclo
+- **Throughput**: 204 providers/minute
+- **Batch Size**: 200 providers/cycle
 
 ### 📈 Performance
-- Database query: < 30ms
-- Token auto-refresh: Funzionante
-- Email sincronizzate: 300 (100 per provider × 3 provider)
+- Database queries: < 30ms
+- Token auto-refresh: ✅ Functional
+- Email sync: Production-ready
 
 ---
 
-## 🤝 Contributing
+## 🔍 Search Documentation
 
-Per contribuire al progetto:
+Use your editor's search functionality:
 
-1. Leggi [PROJECT_CHECKLIST.md](../PROJECT_CHECKLIST.md) per stato attuale
-2. Consulta documentazione implementazione in [implementation/](./implementation/)
-3. Esegui test con script in [`../scripts/`](../scripts/)
-4. Aggiorna documentazione dopo modifiche
+```bash
+# Search all documentation
+grep -r "search term" docs/
+
+# Search specific category
+grep -r "search term" docs/development/
+```
+
+---
+
+## 📝 Documentation Standards
+
+When adding new documentation:
+
+1. **Placement**: Choose appropriate folder
+   - `setup/` - Installation and configuration
+   - `architecture/` - System design
+   - `security/` - Security audits, compliance
+   - `development/` - Implementation guides
+   - `archive/` - Historical documentation
+
+2. **Formatting**: Use clear Markdown
+   - H1 for document title
+   - H2 for main sections
+   - H3 for subsections
+   - Code blocks with language identifiers
+
+3. **Linking**: Use relative links
+   ```markdown
+   [Related Doc](../setup/oauth-guide.md)
+   ```
+
+4. **Updates**: Keep docs in sync with code
+   - Update after major changes
+   - Add date stamps
+   - Move outdated docs to `archive/`
+
+---
+
+## 🤝 Contributing to Documentation
+
+Improvements are welcome! When contributing:
+
+1. Check existing docs to avoid duplication
+2. Follow folder structure guidelines
+3. Use clear, concise language
+4. Include code examples
+5. Add your document to this index
+6. Update related documentation links
 
 ---
 
 ## 📞 Support
 
-Per problemi o domande:
-
-1. Consulta [TROUBLESHOOTING.md](../TROUBLESHOOTING.md)
-2. Verifica [Testing Results](./testing/) per problemi noti
-3. Esegui script diagnostici in [`../scripts/diagnostics/`](../scripts/diagnostics/)
+- **Issues**: Create a GitHub issue
+- **Questions**: Use GitHub Discussions
+- **Updates**: Submit a PR
 
 ---
 
-**Ultima revisione**: 2025-11-02
-**Versione documentazione**: 1.0
-**Stato**: ✅ Produzione-ready
+**Last Updated**: November 2025
+**Documentation Version**: 2.1.0
+**Project Status**: ✅ Production-Ready
+
+[**Main README**](../README.md) | [**PRIVACY**](../PRIVACY.md) | [**Scripts**](../scripts/README.md)

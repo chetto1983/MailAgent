@@ -12,6 +12,19 @@ import { ConfigService } from '@nestjs/config';
 import { ProviderTokenService } from './provider-token.service';
 import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
 import { RetryService } from '../../../common/services/retry.service';
+import { AttachmentStorageService } from '../../email/services/attachment.storage';
+
+/**
+ * Microsoft Graph API attachment metadata
+ */
+interface MicrosoftAttachmentMeta {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  isInline: boolean;
+  contentId?: string;
+}
 
 interface MicrosoftMessage {
   id: string;
@@ -20,6 +33,7 @@ interface MicrosoftMessage {
   toRecipients: { emailAddress: { address: string; name: string } }[];
   receivedDateTime: string;
   isRead: boolean;
+  hasAttachments?: boolean;
 }
 
 interface MicrosoftDeltaResponse<T = Partial<MicrosoftMessage>> {
@@ -78,6 +92,7 @@ export class MicrosoftSyncService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly providerTokenService: ProviderTokenService,
     private retryService: RetryService,
+    private attachmentStorage: AttachmentStorageService,
   ) {}
 
   onModuleInit() {
@@ -326,7 +341,7 @@ export class MicrosoftSyncService implements OnModuleInit {
             const chunk = toProcessIds.slice(i, i + this.BATCH_FETCH_SIZE);
             const messages = await this.fetchMessagesBatch(accessToken, chunk);
             if (!messages.length) continue;
-            const result = await this.processMessagesBatch(messages, providerId, tenantId);
+            const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
             messagesProcessed += result.processed;
             newMessages += result.created;
           }
@@ -432,7 +447,7 @@ export class MicrosoftSyncService implements OnModuleInit {
         const chunk = toProcessIds.slice(i, i + this.BATCH_FETCH_SIZE);
         const messages = await this.fetchMessagesBatch(accessToken, chunk);
         if (!messages.length) continue;
-        const result = await this.processMessagesBatch(messages, providerId, tenantId);
+        const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
         messagesProcessed += result.processed;
         newMessages += result.created;
       }
@@ -511,7 +526,7 @@ export class MicrosoftSyncService implements OnModuleInit {
         const messages = await this.fetchMessagesBatch(accessToken, chunk);
         if (!messages.length) continue;
 
-        const result = await this.processMessagesBatch(messages, providerId, tenantId);
+        const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
         messagesProcessed += result.processed;
         newMessages += result.created;
       }
@@ -808,6 +823,8 @@ export class MicrosoftSyncService implements OnModuleInit {
     receivedAt: Date;
     size?: number | null;
     metadataStatus: 'active' | 'deleted';
+    hasAttachments: boolean;
+    attachmentIds: string[];
   } | null> {
     const externalId = message.id;
     if (!externalId) return null;
@@ -839,6 +856,13 @@ export class MicrosoftSyncService implements OnModuleInit {
       message.isDraft || false,
     );
     const isDeleted = folder === 'TRASH';
+    const hasAttachments = !!message.hasAttachments;
+
+    // Extract attachment IDs if present (attachments are provided as @odata.type objects)
+    const attachmentIds: string[] = [];
+    if (hasAttachments && message.attachments && Array.isArray(message.attachments)) {
+      attachmentIds.push(...message.attachments.map((a: any) => a.id).filter(Boolean));
+    }
 
     return {
       externalId,
@@ -861,13 +885,165 @@ export class MicrosoftSyncService implements OnModuleInit {
       receivedAt,
       size: message.size,
       metadataStatus: isDeleted ? 'deleted' : 'active',
+      hasAttachments,
+      attachmentIds,
     };
+  }
+
+  /**
+   * Fetch attachment metadata from Microsoft Graph API
+   */
+  private async fetchMicrosoftAttachments(
+    accessToken: string,
+    messageId: string,
+  ): Promise<MicrosoftAttachmentMeta[]> {
+    try {
+      const response = await this.msRequestWithRetry(() =>
+        axios.get(
+          `${this.GRAPH_API_BASE}/me/messages/${messageId}/attachments`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            params: { $select: 'id,name,contentType,size,isInline,contentId' },
+          },
+        ),
+      );
+
+      const attachments = response.data?.value || [];
+      return attachments.map((att: any) => ({
+        id: att.id,
+        name: att.name || 'unnamed',
+        contentType: att.contentType || 'application/octet-stream',
+        size: att.size || 0,
+        isInline: !!att.isInline,
+        contentId: att.contentId,
+      }));
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `Failed to fetch attachments for message ${messageId}: ${err.message}`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Download attachment data from Microsoft Graph API
+   */
+  private async downloadMicrosoftAttachment(
+    accessToken: string,
+    messageId: string,
+    attachmentId: string,
+  ): Promise<Buffer | null> {
+    try {
+      const response = await this.msRequestWithRetry(() =>
+        axios.get(
+          `${this.GRAPH_API_BASE}/me/messages/${messageId}/attachments/${attachmentId}/$value`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            responseType: 'arraybuffer',
+          },
+        ),
+      );
+
+      return Buffer.from(response.data);
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `Failed to download attachment ${attachmentId} for message ${messageId}: ${err.message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Process and store attachments for a Microsoft email
+   */
+  private async processEmailAttachments(
+    accessToken: string,
+    emailId: string,
+    externalId: string,
+    tenantId: string,
+    providerId: string,
+  ): Promise<void> {
+    try {
+      // Fetch attachment metadata
+      const attachments = await this.fetchMicrosoftAttachments(accessToken, externalId);
+
+      if (!attachments.length) {
+        return;
+      }
+
+      // Delete existing attachments for this email (in case of re-sync)
+      await this.prisma.emailAttachment.deleteMany({
+        where: { emailId },
+      });
+
+      // Process each attachment
+      for (const attachment of attachments) {
+        try {
+          // Download attachment data
+          const data = await this.downloadMicrosoftAttachment(
+            accessToken,
+            externalId,
+            attachment.id,
+          );
+
+          if (!data) {
+            this.logger.warn(
+              `Skipping attachment ${attachment.name} for email ${emailId} - download failed`,
+            );
+            continue;
+          }
+
+          // Upload to S3/MinIO
+          const uploaded = await this.attachmentStorage.uploadAttachment(
+            tenantId,
+            providerId,
+            {
+              filename: attachment.name,
+              content: data,
+              contentType: attachment.contentType,
+            },
+          );
+
+          // Save attachment metadata to database
+          await this.prisma.emailAttachment.create({
+            data: {
+              emailId,
+              filename: uploaded.filename,
+              mimeType: uploaded.mimeType,
+              size: uploaded.size,
+              contentId: attachment.contentId,
+              storageType: uploaded.storageType,
+              storagePath: uploaded.storagePath,
+              isInline: attachment.isInline,
+            },
+          });
+
+          this.logger.debug(
+            `Stored attachment ${attachment.name} (${attachment.size} bytes) for email ${emailId}`,
+          );
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          this.logger.error(
+            `Failed to process attachment ${attachment.name} for email ${emailId}: ${error.message}`,
+          );
+          // Continue processing other attachments
+        }
+      }
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error(
+        `Failed to process attachments for email ${emailId}: ${error.message}`,
+      );
+    }
   }
 
   private async processParsedMessagesBatch(
     mapped: Array<NonNullable<Awaited<ReturnType<MicrosoftSyncService['parseMicrosoftMessage']>>>>,
     providerId: string,
     tenantId: string,
+    accessToken?: string,
   ): Promise<{ processed: number; created: number }> {
     if (!mapped.length) return { processed: 0, created: 0 };
 
@@ -945,6 +1121,7 @@ export class MicrosoftSyncService implements OnModuleInit {
       );
     }
 
+    // Fetch persisted records to drive embedding enqueue and attachment processing
     const persisted = await this.prisma.email.findMany({
       where: {
         providerId,
@@ -959,32 +1136,61 @@ export class MicrosoftSyncService implements OnModuleInit {
     const persistedMap = new Map(persisted.map((p) => [p.externalId, p]));
 
     const embeddingJobs: EmailEmbeddingJob[] = [];
+    const attachmentPromises: Promise<void>[] = [];
+
     for (const m of mapped) {
       const persistedEmail = persistedMap.get(m.externalId);
       if (!persistedEmail) continue;
 
+      // Enqueue embedding job
       const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(
         tenantId,
         persistedEmail.id,
       );
-      if (alreadyEmbedded) continue;
+      if (!alreadyEmbedded) {
+        embeddingJobs.push({
+          tenantId,
+          providerId,
+          emailId: persistedEmail.id,
+          subject: m.subject,
+          snippet: m.snippet,
+          bodyText: m.bodyText,
+          bodyHtml: m.bodyHtml,
+          from: m.from,
+          receivedAt: persistedEmail.receivedAt,
+        });
+      }
 
-      embeddingJobs.push({
-        tenantId,
-        providerId,
-        emailId: persistedEmail.id,
-        subject: m.subject,
-        snippet: m.snippet,
-        bodyText: m.bodyText,
-        bodyHtml: m.bodyHtml,
-        from: m.from,
-        receivedAt: persistedEmail.receivedAt,
-      });
+      // Process attachments if any and accessToken is available
+      if (m.hasAttachments && accessToken) {
+        attachmentPromises.push(
+          this.processEmailAttachments(
+            accessToken,
+            persistedEmail.id,
+            m.externalId,
+            tenantId,
+            providerId,
+          ),
+        );
+      }
     }
 
-    if (embeddingJobs.length) {
-      await this.emailEmbeddingQueue.enqueueMany(embeddingJobs);
-    }
+    // Process attachments and embeddings in parallel
+    const results = await Promise.allSettled([
+      ...attachmentPromises,
+      embeddingJobs.length > 0
+        ? this.emailEmbeddingQueue.enqueueMany(embeddingJobs)
+        : Promise.resolve(),
+    ]);
+
+    // Log any failures
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          `Failed to process attachment or embedding (index ${index}): ${result.reason}`,
+        );
+      }
+    });
 
     return { processed: mapped.length, created: creates.length };
   }
@@ -993,6 +1199,7 @@ export class MicrosoftSyncService implements OnModuleInit {
     messages: any[],
     providerId: string,
     tenantId: string,
+    accessToken?: string,
   ): Promise<{ processed: number; created: number }> {
     const parsed: Array<
       NonNullable<Awaited<ReturnType<MicrosoftSyncService['parseMicrosoftMessage']>>>
@@ -1005,7 +1212,7 @@ export class MicrosoftSyncService implements OnModuleInit {
       }
     }
 
-    return this.processParsedMessagesBatch(parsed, providerId, tenantId);
+    return this.processParsedMessagesBatch(parsed, providerId, tenantId, accessToken);
   }
 
   private async msRequestWithRetry<T>(fn: () => Promise<T>): Promise<T> {
@@ -1121,7 +1328,7 @@ export class MicrosoftSyncService implements OnModuleInit {
       const messages = await this.fetchMessagesBatch(accessToken, [messageId]);
       if (!messages.length) return false;
 
-      const result = await this.processMessagesBatch(messages, providerId, tenantId);
+      const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
       return result.processed > 0;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

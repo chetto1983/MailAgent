@@ -10,7 +10,6 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmailService } from '../../email/services/email.service';
-import { CryptoService } from '../../../common/services/crypto.service';
 import { nanoid } from 'nanoid';
 
 @Injectable()
@@ -21,7 +20,6 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
-    private cryptoService: CryptoService,
   ) {}
 
   /**

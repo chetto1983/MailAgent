@@ -343,19 +343,37 @@ export class EmailsController {
   }
 
   /**
-   * GET /emails/retention/stats - Get retention statistics
+   * GET /emails/retention/stats - Get retention statistics for current tenant
+   * SECURITY: Requires admin role, returns stats for user's tenant only
    */
   @Get('retention/stats')
-  async getRetentionStats() {
-    return this.retentionService.getRetentionStats();
+  async getRetentionStats(@Req() req: any) {
+    const tenantId = req.user.tenantId;
+
+    // Require admin or super-admin role
+    if (req.user.role !== 'admin' && req.user.role !== 'super-admin') {
+      throw new ForbiddenException('Administrator access required for retention statistics');
+    }
+
+    return this.retentionService.getRetentionStats(tenantId);
   }
 
   /**
    * POST /emails/retention/run - Manually run retention policy
+   * SECURITY: SUPER-ADMIN ONLY - Archives old emails for current tenant
    */
   @Post('retention/run')
-  async runRetentionPolicy(@Body() data?: { retentionDays?: number }) {
-    return this.retentionService.runManualRetention(data?.retentionDays);
+  async runRetentionPolicy(@Req() req: any, @Body() data?: { retentionDays?: number }) {
+    const tenantId = req.user.tenantId;
+
+    // CRITICAL: Only super-admin can trigger retention policy
+    if (req.user.role !== 'super-admin') {
+      throw new ForbiddenException(
+        'Super administrator access required to run retention policy',
+      );
+    }
+
+    return this.retentionService.runManualRetention(tenantId, data?.retentionDays);
   }
 
   /**

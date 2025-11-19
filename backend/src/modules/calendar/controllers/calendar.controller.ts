@@ -106,4 +106,31 @@ export class CalendarController {
     const tenantId = req.user.tenantId;
     return this.calendarService.syncProvider(tenantId, providerId);
   }
+
+  /**
+   * List attachments for a calendar event
+   * GET /api/calendar/events/:eventId/attachments
+   */
+  @Get('events/:eventId/attachments')
+  @SkipThrottle()
+  async listEventAttachments(@Req() req: any, @Param('eventId') eventId: string) {
+    const tenantId = req.user.tenantId;
+    return this.calendarService.listEventAttachments(tenantId, eventId);
+  }
+
+  /**
+   * Get a specific attachment for a calendar event
+   * Returns attachment metadata and download URL (if available)
+   * GET /api/calendar/events/:eventId/attachments/:attachmentId
+   */
+  @Get('events/:eventId/attachments/:attachmentId')
+  @SkipThrottle()
+  async getEventAttachment(
+    @Req() req: any,
+    @Param('eventId') eventId: string,
+    @Param('attachmentId') attachmentId: string,
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.calendarService.getEventAttachment(tenantId, eventId, attachmentId);
+  }
 }

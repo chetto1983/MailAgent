@@ -22,27 +22,68 @@ export class EmailRetentionService {
   }
 
   /**
-   * Run retention policy daily at 2 AM
+   * Run retention policy daily at 2 AM for ALL tenants
    * Archives emails older than 30 days
+   *
+   * SECURITY NOTE: This cron job iterates over ALL tenants
+   * Each tenant's emails are processed separately with proper isolation
    */
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async runRetentionPolicy() {
     if (!this.jobsEnabled) {
       return;
     }
-    this.logger.log('Starting email retention policy...');
+    this.logger.log('Starting email retention policy for all tenants...');
 
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - this.RETENTION_DAYS);
 
-      const result = await this.archiveOldEmails(cutoffDate);
+      // Get all active tenants
+      const tenants = await this.prisma.tenant.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true },
+      });
+
+      this.logger.log(`Processing retention for ${tenants.length} tenants`);
+
+      let totalArchived = 0;
+      const results: Array<{ tenantId: string; tenantName: string; count: number }> = [];
+
+      // Process each tenant separately (proper tenant isolation)
+      for (const tenant of tenants) {
+        try {
+          const result = await this.archiveOldEmails(tenant.id, cutoffDate);
+          totalArchived += result.count;
+
+          if (result.count > 0) {
+            results.push({
+              tenantId: tenant.id,
+              tenantName: tenant.name,
+              count: result.count,
+            });
+            this.logger.log(
+              `Tenant ${tenant.name} (${tenant.id}): Archived ${result.count} emails`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `Failed to run retention for tenant ${tenant.name} (${tenant.id}):`,
+            error,
+          );
+          // Continue with other tenants even if one fails
+        }
+      }
 
       this.logger.log(
-        `Retention policy completed. Archived ${result.count} emails older than ${cutoffDate.toISOString()}`,
+        `Retention policy completed. Archived ${totalArchived} emails across ${results.length} tenants`,
       );
 
-      return result;
+      return {
+        totalArchived,
+        tenantsProcessed: tenants.length,
+        results,
+      };
     } catch (error) {
       this.logger.error('Failed to run retention policy:', error);
       throw error;
@@ -50,16 +91,21 @@ export class EmailRetentionService {
   }
 
   /**
-   * Archive emails older than the given date
+   * Archive emails older than the given date FOR A SPECIFIC TENANT
    * Keeps: ID, metadata, subject, from, to, snippet, embeddings
    * Removes: bodyText, bodyHtml, headers (to save space)
+   *
+   * SECURITY: Requires tenantId to prevent cross-tenant operations
    */
-  async archiveOldEmails(cutoffDate: Date) {
-    this.logger.debug(`Archiving emails older than ${cutoffDate.toISOString()}...`);
+  async archiveOldEmails(tenantId: string, cutoffDate: Date) {
+    this.logger.debug(
+      `Archiving emails for tenant ${tenantId} older than ${cutoffDate.toISOString()}...`,
+    );
 
-    // Find emails that should be archived
+    // Find emails that should be archived (TENANT-SCOPED)
     const emailsToArchive = await this.prisma.email.findMany({
       where: {
+        tenantId, // ✅ CRITICAL: Tenant isolation
         receivedAt: {
           lt: cutoffDate,
         },
@@ -74,15 +120,16 @@ export class EmailRetentionService {
     });
 
     if (emailsToArchive.length === 0) {
-      this.logger.debug('No emails to archive');
+      this.logger.debug(`No emails to archive for tenant ${tenantId}`);
       return { count: 0, emailIds: [] };
     }
 
-    this.logger.log(`Found ${emailsToArchive.length} emails to archive`);
+    this.logger.log(`Found ${emailsToArchive.length} emails to archive for tenant ${tenantId}`);
 
-    // Archive emails by removing body content
+    // Archive emails by removing body content (TENANT-SCOPED via ID list)
     const result = await this.prisma.email.updateMany({
       where: {
+        tenantId, // ✅ CRITICAL: Double-check tenant isolation
         id: {
           in: emailsToArchive.map((e) => e.id),
         },
@@ -97,7 +144,7 @@ export class EmailRetentionService {
 
     const archivedIds = emailsToArchive.map((e) => e.id);
 
-    this.logger.log(`Successfully archived ${result.count} emails`);
+    this.logger.log(`Successfully archived ${result.count} emails for tenant ${tenantId}`);
 
     return {
       count: result.count,
@@ -106,26 +153,34 @@ export class EmailRetentionService {
   }
 
   /**
-   * Manually trigger retention policy (for testing or admin use)
+   * Manually trigger retention policy for a specific tenant
+   * SECURITY: Should only be called by admin/super-admin (enforced at controller level)
    */
-  async runManualRetention(retentionDays: number = this.RETENTION_DAYS) {
+  async runManualRetention(tenantId: string, retentionDays: number = this.RETENTION_DAYS) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
-    return this.archiveOldEmails(cutoffDate);
+    return this.archiveOldEmails(tenantId, cutoffDate);
   }
 
   /**
-   * Get retention statistics
+   * Get retention statistics FOR A SPECIFIC TENANT
+   * SECURITY: Requires tenantId to prevent information disclosure
    */
-  async getRetentionStats() {
+  async getRetentionStats(tenantId: string) {
     const [totalEmails, archivedEmails, recentEmails, oldUnarchived] = await Promise.all([
-      this.prisma.email.count(),
       this.prisma.email.count({
-        where: { isArchived: true },
+        where: { tenantId }, // ✅ CRITICAL: Tenant isolation
       }),
       this.prisma.email.count({
         where: {
+          tenantId, // ✅ CRITICAL: Tenant isolation
+          isArchived: true,
+        },
+      }),
+      this.prisma.email.count({
+        where: {
+          tenantId, // ✅ CRITICAL: Tenant isolation
           receivedAt: {
             gte: new Date(Date.now() - this.RETENTION_DAYS * 24 * 60 * 60 * 1000),
           },
@@ -133,6 +188,7 @@ export class EmailRetentionService {
       }),
       this.prisma.email.count({
         where: {
+          tenantId, // ✅ CRITICAL: Tenant isolation
           receivedAt: {
             lt: new Date(Date.now() - this.RETENTION_DAYS * 24 * 60 * 60 * 1000),
           },
@@ -147,6 +203,7 @@ export class EmailRetentionService {
     const spaceSavedMB = Math.round((archivedEmails * avgBodySize) / (1024 * 1024));
 
     return {
+      tenantId, // Include tenantId in response for clarity
       totalEmails,
       archivedEmails,
       recentEmails,

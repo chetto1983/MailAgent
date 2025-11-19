@@ -8,6 +8,11 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { getConfiguration } from './config/configuration';
 
+/**
+ * Bootstraps and starts the NestJS HTTP server with configured middleware, docs, legacy-route handling, and graceful shutdown.
+ *
+ * Configures proxy trust, Helmet security, CORS (allowlist, regex, or allow-all), global validation and exception filters, and Swagger when not in production. Mounts a legacy watchdog for /email-configs that responds 410, enables shutdown hooks, starts listening on the configured port, logs startup details (URL, Swagger, database, Redis), and registers SIGTERM/SIGINT handlers that attempt a graceful shutdown before exiting.
+ */
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');
@@ -98,14 +103,34 @@ async function bootstrap() {
     });
   }
 
+  // Enable graceful shutdown
+  app.enableShutdownHooks();
+
   await app.listen(config.api.port);
   logger.log(`🚀 Application is running on ${config.api.url}`);
   logger.log(`📊 Swagger docs available at ${config.api.url}/api/docs`);
   logger.log(`🗄️ Database: ${config.database.host}:${config.database.port}/${config.database.database}`);
   logger.log(`⚡ Redis: ${config.redis.host}:${config.redis.port}`);
+
+  // Graceful shutdown handlers
+  const gracefulShutdown = async (signal: string) => {
+    logger.log(`\n🛑 Received ${signal}, starting graceful shutdown...`);
+    try {
+      await app.close();
+      logger.log('✅ Application closed gracefully');
+      process.exit(0);
+    } catch (error) {
+      logger.error('❌ Error during shutdown:', error);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
+const bootstrapLogger = new Logger('Bootstrap');
 bootstrap().catch((err) => {
-  console.error('Failed to start application:', err);
+  bootstrapLogger.error('Failed to start application:', err);
   process.exit(1);
 });

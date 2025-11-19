@@ -3,8 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios, { AxiosResponse } from 'axios';
 import { URLSearchParams } from 'url';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
+import { ProviderTokenService } from '../../email-sync/services/provider-token.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 interface MicrosoftEvent {
@@ -37,6 +36,16 @@ interface MicrosoftEventsResponse {
   '@odata.nextLink'?: string;
 }
 
+interface MicrosoftEventAttachment {
+  '@odata.type': string;
+  id: string;
+  name: string;
+  contentType?: string;
+  size?: number;
+  isInline?: boolean;
+  lastModifiedDateTime?: string;
+}
+
 export interface MicrosoftCalendarSyncResult {
   success: boolean;
   providerId: string;
@@ -55,8 +64,7 @@ export class MicrosoftCalendarSyncService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly crypto: CryptoService,
-    private readonly microsoftOAuth: MicrosoftOAuthService,
+    private readonly providerTokenService: ProviderTokenService,
     private readonly realtimeEvents: RealtimeEventsService,
     private readonly configService: ConfigService,
   ) {
@@ -90,57 +98,13 @@ export class MicrosoftCalendarSyncService {
     this.logger.log(`Starting Microsoft Calendar sync for provider ${providerId}`);
 
     try {
-      // Get provider config
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
+      // Get provider and access token (handles refresh automatically)
+      const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+        providerId,
+      );
 
-      if (!provider || !provider.supportsCalendar) {
-        throw new Error('Provider not found or does not support calendar');
-      }
-
-      // Check if token is expired and needs refresh
-      const now = new Date();
-      const isExpired = provider.tokenExpiresAt && now > new Date(provider.tokenExpiresAt);
-
-      let accessToken: string;
-
-      if (isExpired && provider.refreshToken && provider.refreshTokenEncryptionIv) {
-        this.logger.log(`Access token expired for provider ${providerId}, refreshing...`);
-
-        const refreshToken = this.crypto.decrypt(
-          provider.refreshToken,
-          provider.refreshTokenEncryptionIv,
-        );
-
-        const refreshed = await this.microsoftOAuth.refreshAccessToken(refreshToken);
-        accessToken = refreshed.accessToken;
-
-        // Save new token to database
-        const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-        const updateData: any = {
-          accessToken: encryptedAccess.encrypted,
-          tokenEncryptionIv: encryptedAccess.iv,
-          tokenExpiresAt: refreshed.expiresAt,
-        };
-
-        if (refreshed.refreshToken) {
-          const encryptedRefresh = this.crypto.encrypt(refreshed.refreshToken);
-          updateData.refreshToken = encryptedRefresh.encrypted;
-          updateData.refreshTokenEncryptionIv = encryptedRefresh.iv;
-        }
-
-        await this.prisma.providerConfig.update({
-          where: { id: providerId },
-          data: updateData,
-        });
-      } else if (!provider.accessToken || !provider.tokenEncryptionIv) {
-        throw new Error('Provider missing access token');
-      } else {
-        accessToken = this.crypto.decrypt(
-          provider.accessToken,
-          provider.tokenEncryptionIv,
-        );
+      if (!provider.supportsCalendar) {
+        throw new Error('Provider does not support calendar');
       }
 
       // Calculate time range: last 60 days to next 60 days
@@ -275,6 +239,7 @@ export class MicrosoftCalendarSyncService {
             providerId,
             tenantId,
             calendarName ?? calendarId,
+            accessToken,
           );
 
           eventsProcessed++;
@@ -319,6 +284,7 @@ export class MicrosoftCalendarSyncService {
     providerId: string,
     tenantId: string,
     calendarName: string,
+    accessToken: string,
   ): Promise<'created' | 'updated'> {
     const eventId = event.id;
 
@@ -388,6 +354,9 @@ export class MicrosoftCalendarSyncService {
       lastSyncedAt: new Date(),
     };
 
+    let dbEventId: string;
+    let result: 'created' | 'updated';
+
     if (existing) {
       await this.prisma.calendarEvent.update({
         where: { id: existing.id },
@@ -396,12 +365,102 @@ export class MicrosoftCalendarSyncService {
           syncVersion: existing.syncVersion + 1,
         },
       });
-      return 'updated';
+      dbEventId = existing.id;
+      result = 'updated';
     } else {
-      await this.prisma.calendarEvent.create({
+      const created = await this.prisma.calendarEvent.create({
         data: eventData,
       });
-      return 'created';
+      dbEventId = created.id;
+      result = 'created';
+    }
+
+    // Process attachments (OneDrive/SharePoint files or inline attachments)
+    // Note: Microsoft Graph API requires a separate call to get attachments
+    try {
+      await this.processEventAttachments(dbEventId, eventId, accessToken);
+    } catch (attachmentError) {
+      this.logger.warn(
+        `Failed to process attachments for event ${eventId}: ${attachmentError instanceof Error ? attachmentError.message : String(attachmentError)}`,
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Process attachments for a Microsoft Calendar event
+   * Microsoft Graph API requires a separate call to get event attachments
+   */
+  private async processEventAttachments(
+    dbEventId: string,
+    msEventId: string,
+    accessToken: string,
+  ): Promise<void> {
+    try {
+      // Fetch attachments from Microsoft Graph API
+      const attachmentsUrl = `${this.GRAPH_API_BASE}/me/events/${msEventId}/attachments`;
+      const response = await axios.get<{ value: MicrosoftEventAttachment[] }>(attachmentsUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const attachments = response.data.value || [];
+
+      // Delete existing attachments for this event
+      await this.prisma.calendarEventAttachment.deleteMany({
+        where: { eventId: dbEventId },
+      });
+
+      // Create new attachment records
+      for (const attachment of attachments) {
+        try {
+          // Determine attachment type and extract metadata
+          const isOneDrive = attachment['@odata.type'] === '#microsoft.graph.referenceAttachment';
+          const fileUrl = isOneDrive ? (attachment as any).sourceUrl : null;
+          const size = attachment.size || 0;
+
+          await this.prisma.calendarEventAttachment.create({
+            data: {
+              eventId: dbEventId,
+              filename: attachment.name || 'Untitled',
+              mimeType: attachment.contentType || 'application/octet-stream',
+              size,
+              storageType: 'reference', // All attachments stored as references for now
+              fileUrl,
+              fileId: null,
+              iconLink: null,
+              isGoogleDrive: false,
+              isOneDrive,
+              storagePath: null,
+            },
+          });
+
+          this.logger.debug(
+            `Created attachment reference for event ${dbEventId}: ${attachment.name} (${isOneDrive ? 'OneDrive' : 'File'})`,
+          );
+        } catch (attachmentError) {
+          this.logger.warn(
+            `Failed to create attachment for event ${dbEventId}: ${attachmentError instanceof Error ? attachmentError.message : String(attachmentError)}`,
+          );
+        }
+      }
+
+      if (attachments.length > 0) {
+        this.logger.verbose(`Processed ${attachments.length} attachments for event ${dbEventId}`);
+      }
+    } catch (error) {
+      // Don't throw - just log and continue
+      // Some events might not have attachment permissions
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        this.logger.debug(`No attachments endpoint for event ${msEventId} (404)`);
+      } else {
+        this.logger.warn(
+          `Failed to fetch attachments for event ${msEventId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 
