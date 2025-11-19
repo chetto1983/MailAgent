@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { gmail_v1, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import { ProviderTokenService } from './provider-token.service';
 import { RetryService } from '../../../common/services/retry.service';
 import { AttachmentStorageService } from '../../email/services/attachment.storage';
+import { BaseEmailSyncService } from './base-email-sync.service';
 
 /**
  * Attachment metadata from Gmail message
@@ -27,37 +28,39 @@ interface GmailAttachmentMeta {
 }
 
 @Injectable()
-export class GoogleSyncService implements OnModuleInit {
-  private readonly logger = new Logger(GoogleSyncService.name);
-  private GMAIL_BATCH_GET_SIZE: number;
+export class GoogleSyncService extends BaseEmailSyncService {
+  protected readonly logger = new Logger(GoogleSyncService.name);
   private GMAIL_HISTORY_MAX_PAGES: number;
-  private GMAIL_FULL_MAX_MESSAGES: number;
   private suppressMessageEvents = false;
-  private RETRY_MAX_ATTEMPTS = 3;
-  private RETRY_429_DELAY_MS = 2000;
-  private RETRY_5XX_DELAY_MS = 2000;
 
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
+    realtimeEvents: RealtimeEventsService,
+    config: ConfigService,
     private crypto: CryptoService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
     private knowledgeBaseService: KnowledgeBaseService,
-    private realtimeEvents: RealtimeEventsService,
-    private config: ConfigService,
     private providerTokenService: ProviderTokenService,
     private retryService: RetryService,
     private attachmentStorage: AttachmentStorageService,
-  ) {}
+  ) {
+    super(prisma, realtimeEvents, config);
+  }
 
   onModuleInit() {
-    this.GMAIL_BATCH_GET_SIZE = this.config.get<number>('GMAIL_BATCH_GET_SIZE', 100);
+    super.onModuleInit(); // Load base configuration
+
+    // Gmail-specific configuration overrides
+    this.batchSize = this.config.get<number>('GMAIL_BATCH_GET_SIZE', 100);
+    this.fullSyncMaxMessages = this.config.get<number>('GMAIL_FULL_MAX_MESSAGES', 200);
+    this.retryMaxAttempts = this.config.get<number>('GMAIL_RETRY_MAX_ATTEMPTS', 3);
+    this.retry429DelayMs = this.config.get<number>('GMAIL_RETRY_429_DELAY_MS', 2000);
+    this.retry5xxDelayMs = this.config.get<number>('GMAIL_RETRY_5XX_DELAY_MS', 2000);
+
+    // Gmail-only configuration
     this.GMAIL_HISTORY_MAX_PAGES = this.config.get<number>('GMAIL_HISTORY_MAX_PAGES', 25);
-    this.GMAIL_FULL_MAX_MESSAGES = this.config.get<number>('GMAIL_FULL_MAX_MESSAGES', 200);
     this.suppressMessageEvents = this.config.get<boolean>('REALTIME_SUPPRESS_MESSAGE_EVENTS', false);
-    this.RETRY_MAX_ATTEMPTS = this.config.get<number>('GMAIL_RETRY_MAX_ATTEMPTS', 3);
-    this.RETRY_429_DELAY_MS = this.config.get<number>('GMAIL_RETRY_429_DELAY_MS', 2000);
-    this.RETRY_5XX_DELAY_MS = this.config.get<number>('GMAIL_RETRY_5XX_DELAY_MS', 2000);
   }
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -143,9 +146,9 @@ export class GoogleSyncService implements OnModuleInit {
 
   private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
     return this.retryService.withRetry(fn, {
-      maxAttempts: this.RETRY_MAX_ATTEMPTS,
-      delay429Ms: this.RETRY_429_DELAY_MS,
-      delay5xxMs: this.RETRY_5XX_DELAY_MS,
+      maxAttempts: this.retryMaxAttempts,
+      delay429Ms: this.retry429DelayMs,
+      delay5xxMs: this.retry5xxDelayMs,
       loggerName: 'Gmail',
     });
   }
@@ -252,8 +255,8 @@ export class GoogleSyncService implements OnModuleInit {
 
       // Process added messages in batches
       const addedIds = Array.from(addedMessageIds);
-      for (let i = 0; i < addedIds.length; i += this.GMAIL_BATCH_GET_SIZE) {
-        const chunkIds = addedIds.slice(i, i + this.GMAIL_BATCH_GET_SIZE);
+      for (let i = 0; i < addedIds.length; i += this.batchSize) {
+        const chunkIds = addedIds.slice(i, i + this.batchSize);
         if (!chunkIds.length) continue;
 
         const batchGet = (gmail.users.messages as any)?.batchGet;
@@ -333,7 +336,7 @@ export class GoogleSyncService implements OnModuleInit {
     newMessages: number;
     historyId: string;
   }> {
-    this.logger.debug(`Full sync - fetching latest Gmail messages (limit ${this.GMAIL_FULL_MAX_MESSAGES})`);
+    this.logger.debug(`Full sync - fetching latest Gmail messages (limit ${this.fullSyncMaxMessages})`);
 
     try {
       // Get profile for historyId
@@ -341,7 +344,7 @@ export class GoogleSyncService implements OnModuleInit {
       const historyId = profile.data.historyId!;
 
       // List newest messages (all folders) up to the configured cap
-      const remaining = this.GMAIL_FULL_MAX_MESSAGES;
+      const remaining = this.fullSyncMaxMessages;
       const messagesResponse = await gmail.users.messages.list({
         userId: 'me',
         maxResults: Math.min(500, remaining), // Gmail API max per request
@@ -351,17 +354,17 @@ export class GoogleSyncService implements OnModuleInit {
       let pageToken = messagesResponse.data.nextPageToken;
 
       // Fetch additional pages if needed (up to configured total)
-      while (pageToken && messages.length < this.GMAIL_FULL_MAX_MESSAGES) {
+      while (pageToken && messages.length < this.fullSyncMaxMessages) {
         const nextResponse = await gmail.users.messages.list({
           userId: 'me',
-          maxResults: Math.min(500, this.GMAIL_FULL_MAX_MESSAGES - messages.length),
+          maxResults: Math.min(500, this.fullSyncMaxMessages - messages.length),
           pageToken,
         });
 
         messages = [...messages, ...(nextResponse.data.messages || [])];
         pageToken = nextResponse.data.nextPageToken;
 
-        if (!pageToken || messages.length >= this.GMAIL_FULL_MAX_MESSAGES) {
+        if (!pageToken || messages.length >= this.fullSyncMaxMessages) {
           break;
         }
       }
@@ -371,8 +374,8 @@ export class GoogleSyncService implements OnModuleInit {
       let messagesProcessed = 0;
       let newMessages = 0;
 
-      for (let i = 0; i < messages.length; i += this.GMAIL_BATCH_GET_SIZE) {
-        const chunkIds = messages.slice(i, i + this.GMAIL_BATCH_GET_SIZE).map((m) => m.id!).filter(Boolean);
+      for (let i = 0; i < messages.length; i += this.batchSize) {
+        const chunkIds = messages.slice(i, i + this.batchSize).map((m) => m.id!).filter(Boolean);
         if (!chunkIds.length) continue;
 
         const fullMessages = await this.fetchMessagesBatch(gmail, chunkIds, 'full');
@@ -454,7 +457,7 @@ export class GoogleSyncService implements OnModuleInit {
           },
         });
 
-        this.notifyMailboxChange(tenantId, providerId, 'labels-updated', {
+        this.notifyGmailMailboxChange(tenantId, providerId, 'labels-updated', {
           emailId: existing.id,
           externalId: messageId,
           folder,
@@ -469,7 +472,7 @@ export class GoogleSyncService implements OnModuleInit {
       if (this.isNotFoundError(error)) {
         await this.enforceTrashState(existing, tenantId);
 
-        this.notifyMailboxChange(tenantId, providerId, 'message-deleted', {
+        this.notifyGmailMailboxChange(tenantId, providerId, 'message-deleted', {
           emailId: existing.id,
           externalId: messageId,
         });
@@ -684,22 +687,6 @@ export class GoogleSyncService implements OnModuleInit {
     }
   }
 
-  private isNotFoundError(error: unknown): boolean {
-    if (!error) {
-      return false;
-    }
-
-    const anyError = error as any;
-
-    const status =
-      anyError?.status ??
-      anyError?.statusCode ??
-      anyError?.code ??
-      anyError?.response?.status ??
-      anyError?.response?.statusCode;
-
-    return status === 404;
-  }
 
   /**
    * Process a single Gmail message and persist it locally.
@@ -1239,7 +1226,7 @@ export class GoogleSyncService implements OnModuleInit {
 
     await this.enforceTrashState(existing, tenantId, true);
 
-    this.notifyMailboxChange(tenantId, providerId, 'message-deleted', {
+    this.notifyGmailMailboxChange(tenantId, providerId, 'message-deleted', {
       emailId: existing.id,
       externalId: messageId,
     });
@@ -1379,13 +1366,13 @@ export class GoogleSyncService implements OnModuleInit {
     return labelMap[labelId];
   }
 
-  private notifyMailboxChange(
+  private notifyGmailMailboxChange(
     tenantId: string,
     providerId: string,
     reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
-    // Delegate to centralized RealtimeEventsService method
+    // Gmail-specific wrapper with suppressMessageEvents support
     this.realtimeEvents.notifyMailboxChange(tenantId, providerId, reason, payload, {
       suppressMessageEvents: this.suppressMessageEvents,
     });

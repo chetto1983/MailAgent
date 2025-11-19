@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
 import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
@@ -9,21 +10,29 @@ import { EmbeddingsService } from '../../ai/services/embeddings.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { EmailEventReason } from '../../realtime/types/realtime.types';
 import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
+import { BaseEmailSyncService } from './base-email-sync.service';
 
 const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
 const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 
 @Injectable()
-export class ImapSyncService {
-  private readonly logger = new Logger(ImapSyncService.name);
+export class ImapSyncService extends BaseEmailSyncService {
+  protected readonly logger = new Logger(ImapSyncService.name);
 
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
+    realtimeEvents: RealtimeEventsService,
+    config: ConfigService,
     private crypto: CryptoService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
-    private realtimeEvents: RealtimeEventsService,
-  ) {}
+  ) {
+    super(prisma, realtimeEvents, config);
+  }
+
+  onModuleInit() {
+    super.onModuleInit(); // Load base configuration (IMAP-specific overrides can be added here if needed)
+  }
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
     const { providerId, email, syncType } = jobData;
@@ -560,7 +569,7 @@ export class ImapSyncService {
 
       this.logger.debug(`Saved email UID ${message.uid}: ${subject} from ${from}`);
 
-      this.notifyMailboxChange(
+      this.notifyImapMailboxChange(
         tenantId,
         providerId,
         isDeleted ? 'message-deleted' : 'message-processed',
@@ -675,14 +684,13 @@ export class ImapSyncService {
     return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  private notifyMailboxChange(
+  private notifyImapMailboxChange(
     tenantId: string,
     providerId: string,
     reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
-    // Delegate to centralized RealtimeEventsService method
-    // Note: IMAP doesn't use suppressMessageEvents
+    // IMAP-specific wrapper (doesn't use suppressMessageEvents like Google/Microsoft)
     this.realtimeEvents.notifyMailboxChange(tenantId, providerId, reason, payload);
   }
 }

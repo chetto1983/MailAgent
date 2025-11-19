@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosResponse } from 'axios';
 import { URLSearchParams } from 'url';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -13,6 +13,7 @@ import { ProviderTokenService } from './provider-token.service';
 import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
 import { RetryService } from '../../../common/services/retry.service';
 import { AttachmentStorageService } from '../../email/services/attachment.storage';
+import { BaseEmailSyncService } from './base-email-sync.service';
 
 /**
  * Microsoft Graph API attachment metadata
@@ -73,35 +74,37 @@ interface MicrosoftFullSyncInitResult {
 }
 
 @Injectable()
-export class MicrosoftSyncService implements OnModuleInit {
-  private readonly logger = new Logger(MicrosoftSyncService.name);
+export class MicrosoftSyncService extends BaseEmailSyncService {
+  protected readonly logger = new Logger(MicrosoftSyncService.name);
   private readonly GRAPH_API_BASE = 'https://graph.microsoft.com/v1.0';
-  private BATCH_FETCH_SIZE = 20;
   private suppressMessageEvents = false;
-  private RETRY_ON_429_DELAY_MS = 2000;
-  private RETRY_ON_5XX_DELAY_MS = 2000;
-  private RETRY_MAX_ATTEMPTS = 3;
-  private FULL_MAX_MESSAGES = 200;
 
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
+    realtimeEvents: RealtimeEventsService,
+    config: ConfigService,
     private crypto: CryptoService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
-    private realtimeEvents: RealtimeEventsService,
-    private readonly config: ConfigService,
     private readonly providerTokenService: ProviderTokenService,
     private retryService: RetryService,
     private attachmentStorage: AttachmentStorageService,
-  ) {}
+  ) {
+    super(prisma, realtimeEvents, config);
+  }
 
   onModuleInit() {
-    this.BATCH_FETCH_SIZE = this.config.get<number>('MS_BATCH_FETCH_SIZE', 20);
+    super.onModuleInit(); // Load base configuration
+
+    // Microsoft-specific configuration overrides
+    this.batchSize = this.config.get<number>('MS_BATCH_FETCH_SIZE', 20);
+    this.fullSyncMaxMessages = this.config.get<number>('MS_FULL_MAX_MESSAGES', 200);
+    this.retryMaxAttempts = this.config.get<number>('MS_RETRY_MAX_ATTEMPTS', 3);
+    this.retry429DelayMs = this.config.get<number>('MS_RETRY_429_DELAY_MS', 2000);
+    this.retry5xxDelayMs = this.config.get<number>('MS_RETRY_5XX_DELAY_MS', 2000);
+
+    // Microsoft-only configuration
     this.suppressMessageEvents = this.config.get<boolean>('REALTIME_SUPPRESS_MESSAGE_EVENTS', false);
-    this.RETRY_ON_429_DELAY_MS = this.config.get<number>('MS_RETRY_429_DELAY_MS', 2000);
-    this.RETRY_ON_5XX_DELAY_MS = this.config.get<number>('MS_RETRY_5XX_DELAY_MS', 2000);
-    this.RETRY_MAX_ATTEMPTS = this.config.get<number>('MS_RETRY_MAX_ATTEMPTS', 3);
-    this.FULL_MAX_MESSAGES = this.config.get<number>('MS_FULL_MAX_MESSAGES', 200);
   }
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -337,8 +340,8 @@ export class MicrosoftSyncService implements OnModuleInit {
         }
 
         if (toProcessIds.length) {
-          for (let i = 0; i < toProcessIds.length; i += this.BATCH_FETCH_SIZE) {
-            const chunk = toProcessIds.slice(i, i + this.BATCH_FETCH_SIZE);
+          for (let i = 0; i < toProcessIds.length; i += this.batchSize) {
+            const chunk = toProcessIds.slice(i, i + this.batchSize);
             const messages = await this.fetchMessagesBatch(accessToken, chunk);
             if (!messages.length) continue;
             const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
@@ -443,8 +446,8 @@ export class MicrosoftSyncService implements OnModuleInit {
     }
 
     if (toProcessIds.length) {
-      for (let i = 0; i < toProcessIds.length; i += this.BATCH_FETCH_SIZE) {
-        const chunk = toProcessIds.slice(i, i + this.BATCH_FETCH_SIZE);
+      for (let i = 0; i < toProcessIds.length; i += this.batchSize) {
+        const chunk = toProcessIds.slice(i, i + this.batchSize);
         const messages = await this.fetchMessagesBatch(accessToken, chunk);
         if (!messages.length) continue;
         const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
@@ -477,7 +480,7 @@ export class MicrosoftSyncService implements OnModuleInit {
     newMessages: number;
     latestReceivedDate?: string;
   }> {
-    this.logger.debug(`Full sync - fetching latest Microsoft messages (limit ${this.FULL_MAX_MESSAGES})`);
+    this.logger.debug(`Full sync - fetching latest Microsoft messages (limit ${this.fullSyncMaxMessages})`);
 
     try {
       // Fetch newest messages with pagination until FULL_MAX_MESSAGES
@@ -492,7 +495,7 @@ export class MicrosoftSyncService implements OnModuleInit {
       const maxPages = 10; // safety guard
 
       // Fetch all pages up to limit
-      while (messagesUrl && page < maxPages && allMessages.length < this.FULL_MAX_MESSAGES) {
+      while (messagesUrl && page < maxPages && allMessages.length < this.fullSyncMaxMessages) {
         const messagesResponse: AxiosResponse<MicrosoftDeltaResponse<MicrosoftMessage>> = await axios.get(messagesUrl, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -508,7 +511,7 @@ export class MicrosoftSyncService implements OnModuleInit {
         messagesUrl = messagesResponse.data['@odata.nextLink'];
         page++;
 
-        if (allMessages.length >= this.FULL_MAX_MESSAGES) {
+        if (allMessages.length >= this.fullSyncMaxMessages) {
           break;
         }
       }
@@ -519,8 +522,8 @@ export class MicrosoftSyncService implements OnModuleInit {
       let newMessages = 0;
 
       const ids = allMessages.map((m) => m.id).filter((id): id is string => !!id);
-      for (let i = 0; i < ids.length; i += this.BATCH_FETCH_SIZE) {
-        const chunk = ids.slice(i, i + this.BATCH_FETCH_SIZE);
+      for (let i = 0; i < ids.length; i += this.batchSize) {
+        const chunk = ids.slice(i, i + this.batchSize);
         if (!chunk.length) continue;
 
         const messages = await this.fetchMessagesBatch(accessToken, chunk);
@@ -749,8 +752,8 @@ export class MicrosoftSyncService implements OnModuleInit {
     if (!ids.length) return [];
 
     const results: any[] = [];
-    for (let i = 0; i < ids.length; i += this.BATCH_FETCH_SIZE) {
-      const slice = ids.slice(i, i + this.BATCH_FETCH_SIZE);
+    for (let i = 0; i < ids.length; i += this.batchSize) {
+      const slice = ids.slice(i, i + this.batchSize);
       const requests = slice.map((id, idx) => ({
         id: `${idx}`,
         method: 'GET',
@@ -1217,9 +1220,9 @@ export class MicrosoftSyncService implements OnModuleInit {
 
   private async msRequestWithRetry<T>(fn: () => Promise<T>): Promise<T> {
     return this.retryService.withRetry(fn, {
-      maxAttempts: this.RETRY_MAX_ATTEMPTS,
-      delay429Ms: this.RETRY_ON_429_DELAY_MS,
-      delay5xxMs: this.RETRY_ON_5XX_DELAY_MS,
+      maxAttempts: this.retryMaxAttempts,
+      delay429Ms: this.retry429DelayMs,
+      delay5xxMs: this.retry5xxDelayMs,
       loggerName: 'MicrosoftGraph',
     });
   }
@@ -1236,7 +1239,7 @@ export class MicrosoftSyncService implements OnModuleInit {
   ): Promise<void> {
     if (!messageIds.length) return;
 
-    const chunkSize = Math.min(this.BATCH_FETCH_SIZE, 20);
+    const chunkSize = Math.min(this.batchSize, 20);
     for (let i = 0; i < messageIds.length; i += chunkSize) {
       const slice = messageIds.slice(i, i + chunkSize);
       const requests = slice.map((id, idx) => ({
@@ -1282,7 +1285,7 @@ export class MicrosoftSyncService implements OnModuleInit {
   ): Promise<void> {
     if (!messageIds.length || !destinationFolderId) return;
 
-    const chunkSize = Math.min(this.BATCH_FETCH_SIZE, 20);
+    const chunkSize = Math.min(this.batchSize, 20);
     for (let i = 0; i < messageIds.length; i += chunkSize) {
       const slice = messageIds.slice(i, i + chunkSize);
       const requests = slice.map((id, idx) => ({
@@ -1368,7 +1371,7 @@ export class MicrosoftSyncService implements OnModuleInit {
     });
 
     for (const record of affected) {
-      this.notifyMailboxChange(tenantId, providerId, 'message-deleted', {
+      this.notifyMicrosoftMailboxChange(tenantId, providerId, 'message-deleted', {
         emailId: record.id,
         externalId,
       });
@@ -1521,13 +1524,13 @@ export class MicrosoftSyncService implements OnModuleInit {
     return undefined;
   }
 
-  private notifyMailboxChange(
+  private notifyMicrosoftMailboxChange(
     tenantId: string,
     providerId: string,
     reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
-    // Delegate to centralized RealtimeEventsService method
+    // Microsoft-specific wrapper with suppressMessageEvents support
     this.realtimeEvents.notifyMailboxChange(tenantId, providerId, reason, payload, {
       suppressMessageEvents: this.suppressMessageEvents,
     });
