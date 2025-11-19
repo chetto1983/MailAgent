@@ -23,6 +23,9 @@ import { GmailFolderService } from './services/gmail/gmail-folder.service';
 import { GmailMessageParser } from './services/gmail/gmail-message-parser';
 import { GmailBatchProcessor } from './services/gmail/gmail-batch-processor';
 
+// Microsoft-specific services (pluggable adapters)
+import { MicrosoftAttachmentHandler } from './services/microsoft/microsoft-attachment-handler';
+
 // Webhook Services (Strategy 2: Real-time Sync)
 import { GmailWebhookService } from './services/gmail-webhook.service';
 import { MicrosoftWebhookService } from './services/microsoft-webhook.service';
@@ -75,6 +78,9 @@ import { WebhookController } from './controllers/webhook.controller';
     GmailFolderService,
     GmailMessageParser,
     GmailBatchProcessor,
+
+    // Microsoft-specific services (pluggable adapters)
+    MicrosoftAttachmentHandler,
 
     // Webhook services (Strategy 2: Real-time)
     GmailWebhookService,
