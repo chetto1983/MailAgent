@@ -17,6 +17,7 @@ import { BaseEmailSyncService } from './base-email-sync.service';
 import { MicrosoftAttachmentHandler } from './microsoft/microsoft-attachment-handler';
 import { MicrosoftFolderService } from './microsoft/microsoft-folder.service';
 import { MicrosoftMessageParser, ParsedMicrosoftMessage } from './microsoft/microsoft-message-parser';
+import { MicrosoftBatchProcessor } from './microsoft/microsoft-batch-processor';
 
 /**
  * Microsoft Graph API attachment metadata
@@ -95,6 +96,7 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
     private microsoftAttachmentHandler: MicrosoftAttachmentHandler,
     private microsoftFolderService: MicrosoftFolderService,
     private microsoftMessageParser: MicrosoftMessageParser,
+    private microsoftBatchProcessor: MicrosoftBatchProcessor,
   ) {
     super(prisma, realtimeEvents, config);
   }
@@ -348,9 +350,21 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
         if (toProcessIds.length) {
           for (let i = 0; i < toProcessIds.length; i += this.batchSize) {
             const chunk = toProcessIds.slice(i, i + this.batchSize);
-            const messages = await this.fetchMessagesBatch(accessToken, chunk);
+            const messages = await this.microsoftBatchProcessor.fetchMessagesBatch(
+              accessToken,
+              chunk,
+              this.batchSize,
+              this.msRequestWithRetry.bind(this),
+              this.extractErrorMessage.bind(this),
+            );
             if (!messages.length) continue;
-            const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
+            const result = await this.microsoftBatchProcessor.processMessagesBatch(
+              messages,
+              providerId,
+              tenantId,
+              accessToken,
+              this.truncateText.bind(this),
+            );
             messagesProcessed += result.processed;
             newMessages += result.created;
           }
@@ -454,9 +468,21 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
     if (toProcessIds.length) {
       for (let i = 0; i < toProcessIds.length; i += this.batchSize) {
         const chunk = toProcessIds.slice(i, i + this.batchSize);
-        const messages = await this.fetchMessagesBatch(accessToken, chunk);
+        const messages = await this.microsoftBatchProcessor.fetchMessagesBatch(
+          accessToken,
+          chunk,
+          this.batchSize,
+          this.msRequestWithRetry.bind(this),
+          this.extractErrorMessage.bind(this),
+        );
         if (!messages.length) continue;
-        const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
+        const result = await this.microsoftBatchProcessor.processMessagesBatch(
+          messages,
+          providerId,
+          tenantId,
+          accessToken,
+          this.truncateText.bind(this),
+        );
         messagesProcessed += result.processed;
         newMessages += result.created;
       }
@@ -532,10 +558,22 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
         const chunk = ids.slice(i, i + this.batchSize);
         if (!chunk.length) continue;
 
-        const messages = await this.fetchMessagesBatch(accessToken, chunk);
+        const messages = await this.microsoftBatchProcessor.fetchMessagesBatch(
+          accessToken,
+          chunk,
+          this.batchSize,
+          this.msRequestWithRetry.bind(this),
+          this.extractErrorMessage.bind(this),
+        );
         if (!messages.length) continue;
 
-        const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
+        const result = await this.microsoftBatchProcessor.processMessagesBatch(
+          messages,
+          providerId,
+          tenantId,
+          accessToken,
+          this.truncateText.bind(this),
+        );
         messagesProcessed += result.processed;
         newMessages += result.created;
       }
@@ -667,239 +705,6 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
     }
   }
 
-  private async fetchMessagesBatch(
-    accessToken: string,
-    ids: string[],
-  ): Promise<any[]> {
-    if (!ids.length) return [];
-
-    const results: any[] = [];
-    for (let i = 0; i < ids.length; i += this.batchSize) {
-      const slice = ids.slice(i, i + this.batchSize);
-      const requests = slice.map((id, idx) => ({
-        id: `${idx}`,
-        method: 'GET',
-        url: `/me/messages/${id}`,
-        headers: { 'Content-Type': 'application/json' },
-      }));
-
-      try {
-        const resp = await this.msRequestWithRetry(() =>
-          axios.post(
-            `${this.GRAPH_API_BASE}/$batch`,
-            { requests },
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-              },
-            },
-          ),
-        );
-        const responses = resp.data?.responses ?? [];
-        responses.forEach((r: any) => {
-          if (r?.status === 200 && r.body?.id) {
-            results.push(r.body);
-          }
-        });
-      } catch (error) {
-        this.logger.warn(
-          `Microsoft batch fetch failed for ${slice.length} ids, fallback to sequential: ${this.extractErrorMessage(error)}`,
-        );
-        const sequential = await Promise.all(
-          slice.map((id) =>
-            axios
-              .get(`${this.GRAPH_API_BASE}/me/messages/${id}`, {
-                headers: { Authorization: `Bearer ${accessToken}` },
-              })
-              .then((res) => res.data)
-              .catch(() => null),
-          ),
-        );
-        sequential.filter(Boolean).forEach((m) => results.push(m));
-      }
-    }
-
-    return results;
-  }
-
-  private async processParsedMessagesBatch(
-    mapped: ParsedMicrosoftMessage[],
-    providerId: string,
-    tenantId: string,
-    accessToken?: string,
-  ): Promise<{ processed: number; created: number }> {
-    if (!mapped.length) return { processed: 0, created: 0 };
-
-    const externalIds = mapped.map((m) => m.externalId);
-    const existing = await this.prisma.email.findMany({
-      where: {
-        providerId,
-        externalId: { in: externalIds },
-      },
-      select: {
-        id: true,
-        externalId: true,
-        metadata: true,
-      },
-    });
-    const existingMap = new Map(existing.map((e) => [e.externalId, e]));
-    const creates = mapped.filter((m) => !existingMap.has(m.externalId));
-    const updates = mapped.filter((m) => existingMap.has(m.externalId));
-
-    if (creates.length) {
-      await this.prisma.email.createMany({
-        data: creates.map((m) => ({
-          tenantId,
-          providerId,
-          externalId: m.externalId,
-          threadId: m.threadId,
-          messageId: m.messageIdHeader ?? undefined,
-          inReplyTo: null,
-          references: null,
-          from: m.from,
-          to: m.to,
-          cc: m.cc,
-          bcc: m.bcc,
-          subject: m.subject,
-          bodyText: m.bodyText,
-          bodyHtml: m.bodyHtml,
-          snippet: m.snippet,
-          folder: m.folder,
-          labels: m.labels,
-          isRead: m.isRead,
-          isStarred: m.isStarred,
-          isDeleted: m.isDeleted,
-          sentAt: m.sentAt,
-          receivedAt: m.receivedAt,
-          size: m.size,
-          metadata: mergeEmailStatusMetadata(null, m.metadataStatus),
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    if (updates.length) {
-      await Promise.all(
-        updates.map(async (m) => {
-          const existingEmail = existingMap.get(m.externalId);
-          if (!existingEmail) return;
-
-          const metadata = mergeEmailStatusMetadata(
-            existingEmail.metadata as Record<string, any> | null,
-            m.metadataStatus,
-          );
-
-          await this.prisma.email.update({
-            where: { id: existingEmail.id },
-            data: {
-              labels: m.labels,
-              folder: m.folder,
-              isRead: m.isRead,
-              isStarred: m.isStarred,
-              isDeleted: m.isDeleted,
-              metadata,
-            },
-          });
-        }),
-      );
-    }
-
-    // Fetch persisted records to drive embedding enqueue and attachment processing
-    const persisted = await this.prisma.email.findMany({
-      where: {
-        providerId,
-        externalId: { in: externalIds },
-      },
-      select: {
-        id: true,
-        externalId: true,
-        receivedAt: true,
-      },
-    });
-    const persistedMap = new Map(persisted.map((p) => [p.externalId, p]));
-
-    const embeddingJobs: EmailEmbeddingJob[] = [];
-    const attachmentPromises: Promise<void>[] = [];
-
-    for (const m of mapped) {
-      const persistedEmail = persistedMap.get(m.externalId);
-      if (!persistedEmail) continue;
-
-      // Enqueue embedding job
-      const alreadyEmbedded = await this.embeddingsService.hasEmbeddingForEmail(
-        tenantId,
-        persistedEmail.id,
-      );
-      if (!alreadyEmbedded) {
-        embeddingJobs.push({
-          tenantId,
-          providerId,
-          emailId: persistedEmail.id,
-          subject: m.subject,
-          snippet: m.snippet,
-          bodyText: m.bodyText,
-          bodyHtml: m.bodyHtml,
-          from: m.from,
-          receivedAt: persistedEmail.receivedAt,
-        });
-      }
-
-      // Process attachments if any and accessToken is available
-      if (m.hasAttachments && accessToken) {
-        attachmentPromises.push(
-          this.microsoftAttachmentHandler.processEmailAttachments(
-            accessToken,
-            persistedEmail.id,
-            m.externalId,
-            tenantId,
-            providerId,
-            this.msRequestWithRetry.bind(this),
-          ),
-        );
-      }
-    }
-
-    // Process attachments and embeddings in parallel
-    const results = await Promise.allSettled([
-      ...attachmentPromises,
-      embeddingJobs.length > 0
-        ? this.emailEmbeddingQueue.enqueueMany(embeddingJobs)
-        : Promise.resolve(),
-    ]);
-
-    // Log any failures
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        this.logger.error(
-          `Failed to process attachment or embedding (index ${index}): ${result.reason}`,
-        );
-      }
-    });
-
-    return { processed: mapped.length, created: creates.length };
-  }
-
-  private async processMessagesBatch(
-    messages: any[],
-    providerId: string,
-    tenantId: string,
-    accessToken?: string,
-  ): Promise<{ processed: number; created: number }> {
-    const parsed: ParsedMicrosoftMessage[] = [];
-
-    for (const msg of messages) {
-      const mapped = await this.microsoftMessageParser.parseMicrosoftMessage(
-        msg,
-        providerId,
-        this.truncateText.bind(this),
-      );
-      if (mapped) {
-        parsed.push(mapped);
-      }
-    }
-
-    return this.processParsedMessagesBatch(parsed, providerId, tenantId, accessToken);
-  }
 
   private async msRequestWithRetry<T>(fn: () => Promise<T>): Promise<T> {
     return this.retryService.withRetry(fn, {
@@ -1011,10 +816,22 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
     tenantId: string,
   ): Promise<boolean> {
     try {
-      const messages = await this.fetchMessagesBatch(accessToken, [messageId]);
+      const messages = await this.microsoftBatchProcessor.fetchMessagesBatch(
+        accessToken,
+        [messageId],
+        this.batchSize,
+        this.msRequestWithRetry.bind(this),
+        this.extractErrorMessage.bind(this),
+      );
       if (!messages.length) return false;
 
-      const result = await this.processMessagesBatch(messages, providerId, tenantId, accessToken);
+      const result = await this.microsoftBatchProcessor.processMessagesBatch(
+        messages,
+        providerId,
+        tenantId,
+        accessToken,
+        this.truncateText.bind(this),
+      );
       return result.processed > 0;
     } catch (error) {
       const message = this.extractErrorMessage(error);
