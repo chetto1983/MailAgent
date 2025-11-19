@@ -597,6 +597,11 @@ await this.prisma.email.updateMany({
 
 **Create**: `/backend/test/integration/tenant-isolation.spec.ts`
 
+> **Note**: These tests require implementation of test helper functions:
+> - `createTestUser(tenantId)` - Creates test user with authentication token
+> - `createTestEmail(tenantId, options?, count?)` - Creates test emails
+> - Helper functions should be implemented in `/backend/test/helpers/` or `/backend/test/utils/`
+
 ```typescript
 describe('Tenant Isolation Security Tests', () => {
   it('should not allow cross-tenant email access', async () => {

@@ -308,38 +308,42 @@ async findSimilarContent<
 
   const vectorLiteral = Prisma.raw(`'[${embedding.join(',')}]'::vector`);
 
-  // 🆕 Build WHERE conditions
-  const conditions: string[] = [`"tenantId" = '${tenantId}'`];
+  // 🆕 Build WHERE conditions using Prisma parameterization (SQL injection safe)
+  const whereConditions = [];
+  whereConditions.push(Prisma.sql`"tenantId" = ${tenantId}`);
 
   if (filters?.dateFrom) {
-    conditions.push(`metadata->>'receivedAt' >= '${filters.dateFrom.toISOString()}'`);
+    whereConditions.push(Prisma.sql`metadata->>'receivedAt' >= ${filters.dateFrom.toISOString()}`);
   }
 
   if (filters?.dateTo) {
-    conditions.push(`metadata->>'receivedAt' <= '${filters.dateTo.toISOString()}'`);
+    whereConditions.push(Prisma.sql`metadata->>'receivedAt' <= ${filters.dateTo.toISOString()}`);
   }
 
   if (filters?.sender) {
-    conditions.push(`metadata->>'from' ILIKE '%${filters.sender}%'`);
+    // ILIKE pattern with parameterization
+    const pattern = `%${filters.sender}%`;
+    whereConditions.push(Prisma.sql`metadata->>'from' ILIKE ${pattern}`);
   }
 
   if (filters?.source) {
-    conditions.push(`metadata->>'source' = '${filters.source}'`);
+    whereConditions.push(Prisma.sql`metadata->>'source' = ${filters.source}`);
   }
 
   if (filters?.emailIds && filters.emailIds.length > 0) {
-    const emailIdList = filters.emailIds.map(id => `'${id}'`).join(',');
-    conditions.push(`metadata->>'emailId' IN (${emailIdList})`);
+    // Use Prisma.join for safe array handling
+    whereConditions.push(Prisma.sql`metadata->>'emailId' IN (${Prisma.join(filters.emailIds)})`);
   }
 
-  const whereClause = conditions.join(' AND ');
+  // Combine conditions with AND
+  const combinedWhere = Prisma.sql`${Prisma.join(whereConditions, ' AND ')}`;
 
   try {
     const results = await this.prisma.$queryRaw<T[]>(
       Prisma.sql`
         SELECT "id", "content", "documentName", "metadata", ("vector" <-> ${vectorLiteral}) AS "distance"
         FROM "embeddings"
-        WHERE ${Prisma.raw(whereClause)}
+        WHERE ${combinedWhere}
         ORDER BY "vector" <-> ${vectorLiteral}
         LIMIT ${limit};
       `,
@@ -803,6 +807,9 @@ async hybridSearch(
   const keywordWeight = options.keywordWeight ?? 0.3;
 
   const vectorLiteral = Prisma.raw(`'[${embedding.join(',')}]'::vector`);
+
+  // SECURITY: buildTsQuery sanitizes input (removes all non-alphanumeric except spaces)
+  // Then Prisma.sql parameterizes it safely for PostgreSQL
   const tsQuery = this.buildTsQuery(queryText);
 
   const results = await this.prisma.$queryRaw<
@@ -839,6 +846,10 @@ async hybridSearch(
 
 /**
  * Build PostgreSQL tsquery from user query
+ * SECURITY: Sanitizes input to prevent SQL injection
+ * - Removes all non-alphanumeric characters
+ * - Filters short terms (< 3 chars)
+ * - Returns only [a-z0-9] and '|' separator (safe for SQL)
  */
 private buildTsQuery(queryText: string): string {
   // Split into terms, handle phrases in quotes
@@ -846,14 +857,15 @@ private buildTsQuery(queryText: string): string {
     .toLowerCase()
     .split(/\s+/)
     .filter((t) => t.length > 2) // Ignore very short terms
-    .map((t) => t.replace(/[^a-z0-9]/g, '')) // Clean
+    .map((t) => t.replace(/[^a-z0-9]/g, '')) // CRITICAL: Remove all special chars
     .filter((t) => t.length > 0);
 
   if (terms.length === 0) {
-    return 'empty'; // Fallback
+    return 'empty'; // Fallback for empty query
   }
 
   // Join with OR for more lenient matching
+  // Result: "term1 | term2 | term3" (only alphanumeric + pipe)
   return terms.join(' | ');
 }
 ```
