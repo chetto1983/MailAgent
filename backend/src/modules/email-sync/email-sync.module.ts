@@ -17,6 +17,9 @@ import { ImapSyncService } from './services/imap-sync.service';
 import { FolderSyncService } from './services/folder-sync.service';
 import { EmailEmbeddingCleanupService } from './services/email-embedding-cleanup.service';
 
+// Gmail-specific services (pluggable adapters)
+import { GmailAttachmentHandler } from './services/gmail/gmail-attachment-handler';
+
 // Webhook Services (Strategy 2: Real-time Sync)
 import { GmailWebhookService } from './services/gmail-webhook.service';
 import { MicrosoftWebhookService } from './services/microsoft-webhook.service';
@@ -63,6 +66,9 @@ import { WebhookController } from './controllers/webhook.controller';
     ImapSyncService,
     FolderSyncService,
     EmailEmbeddingCleanupService,
+
+    // Gmail-specific services (pluggable adapters)
+    GmailAttachmentHandler,
 
     // Webhook services (Strategy 2: Real-time)
     GmailWebhookService,
