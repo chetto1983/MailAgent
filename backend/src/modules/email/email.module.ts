@@ -46,6 +46,8 @@ import { ProviderTokenService } from '../email-sync/services/provider-token.serv
     EmailSendService,
     EmailSyncBackService,
     EmailCleanupService,
+    AttachmentStorageService,
+    StorageService,
   ],
 })
 export class EmailModule {}
