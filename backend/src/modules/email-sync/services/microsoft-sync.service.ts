@@ -16,6 +16,7 @@ import { AttachmentStorageService } from '../../email/services/attachment.storag
 import { BaseEmailSyncService } from './base-email-sync.service';
 import { MicrosoftAttachmentHandler } from './microsoft/microsoft-attachment-handler';
 import { MicrosoftFolderService } from './microsoft/microsoft-folder.service';
+import { MicrosoftMessageParser, ParsedMicrosoftMessage } from './microsoft/microsoft-message-parser';
 
 /**
  * Microsoft Graph API attachment metadata
@@ -93,6 +94,7 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
     private attachmentStorage: AttachmentStorageService,
     private microsoftAttachmentHandler: MicrosoftAttachmentHandler,
     private microsoftFolderService: MicrosoftFolderService,
+    private microsoftMessageParser: MicrosoftMessageParser,
   ) {
     super(prisma, realtimeEvents, config);
   }
@@ -720,99 +722,8 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
     return results;
   }
 
-  private async parseMicrosoftMessage(
-    message: any,
-    providerId: string,
-  ): Promise<{
-    externalId: string;
-    threadId?: string | null;
-    messageIdHeader?: string | null;
-    from: string;
-    to: string[];
-    cc: string[];
-    bcc: string[];
-    subject: string;
-    bodyText: string;
-    bodyHtml: string;
-    snippet: string;
-    folder: string;
-    labels: string[];
-    isRead: boolean;
-    isStarred: boolean;
-    isDeleted: boolean;
-    sentAt: Date;
-    receivedAt: Date;
-    size?: number | null;
-    metadataStatus: 'active' | 'deleted';
-    hasAttachments: boolean;
-    attachmentIds: string[];
-  } | null> {
-    const externalId = message.id;
-    if (!externalId) return null;
-
-    const from = message.from?.emailAddress?.address || '';
-    const to = (message.toRecipients || [])
-      .map((r: any) => r.emailAddress?.address)
-      .filter(Boolean);
-    const cc = (message.ccRecipients || [])
-      .map((r: any) => r.emailAddress?.address)
-      .filter(Boolean);
-    const bcc = (message.bccRecipients || [])
-      .map((r: any) => r.emailAddress?.address)
-      .filter(Boolean);
-
-    const subject = message.subject || '(No Subject)';
-    const bodyText = message.body?.contentType === 'text' ? message.body.content : '';
-    const bodyHtml =
-      message.body?.contentType === 'html' ? message.body.content : message.body?.content || '';
-    const snippet = message.bodyPreview || this.truncateText(bodyText, 200);
-    const sentAt = message.sentDateTime ? new Date(message.sentDateTime) : new Date();
-    const receivedAt = message.receivedDateTime ? new Date(message.receivedDateTime) : new Date();
-    const labels = message.categories || [];
-    const isRead = !!message.isRead;
-    const isStarred = message.flag?.flagStatus === 'flagged';
-    const folder = await this.microsoftFolderService.determineFolderFromParentId(
-      message.parentFolderId,
-      providerId,
-      message.isDraft || false,
-    );
-    const isDeleted = folder === 'TRASH';
-    const hasAttachments = !!message.hasAttachments;
-
-    // Extract attachment IDs if present (attachments are provided as @odata.type objects)
-    const attachmentIds: string[] = [];
-    if (hasAttachments && message.attachments && Array.isArray(message.attachments)) {
-      attachmentIds.push(...message.attachments.map((a: any) => a.id).filter(Boolean));
-    }
-
-    return {
-      externalId,
-      threadId: message.conversationId,
-      messageIdHeader: message.internetMessageId,
-      from,
-      to,
-      cc,
-      bcc,
-      subject,
-      bodyText,
-      bodyHtml,
-      snippet,
-      folder,
-      labels,
-      isRead,
-      isStarred,
-      isDeleted,
-      sentAt,
-      receivedAt,
-      size: message.size,
-      metadataStatus: isDeleted ? 'deleted' : 'active',
-      hasAttachments,
-      attachmentIds,
-    };
-  }
-
   private async processParsedMessagesBatch(
-    mapped: Array<NonNullable<Awaited<ReturnType<MicrosoftSyncService['parseMicrosoftMessage']>>>>,
+    mapped: ParsedMicrosoftMessage[],
     providerId: string,
     tenantId: string,
     accessToken?: string,
@@ -974,12 +885,14 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
     tenantId: string,
     accessToken?: string,
   ): Promise<{ processed: number; created: number }> {
-    const parsed: Array<
-      NonNullable<Awaited<ReturnType<MicrosoftSyncService['parseMicrosoftMessage']>>>
-    > = [];
+    const parsed: ParsedMicrosoftMessage[] = [];
 
     for (const msg of messages) {
-      const mapped = await this.parseMicrosoftMessage(msg, providerId);
+      const mapped = await this.microsoftMessageParser.parseMicrosoftMessage(
+        msg,
+        providerId,
+        this.truncateText.bind(this),
+      );
       if (mapped) {
         parsed.push(mapped);
       }

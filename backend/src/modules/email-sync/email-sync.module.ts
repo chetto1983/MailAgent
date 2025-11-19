@@ -26,6 +26,7 @@ import { GmailBatchProcessor } from './services/gmail/gmail-batch-processor';
 // Microsoft-specific services (pluggable adapters)
 import { MicrosoftAttachmentHandler } from './services/microsoft/microsoft-attachment-handler';
 import { MicrosoftFolderService } from './services/microsoft/microsoft-folder.service';
+import { MicrosoftMessageParser } from './services/microsoft/microsoft-message-parser';
 
 // Webhook Services (Strategy 2: Real-time Sync)
 import { GmailWebhookService } from './services/gmail-webhook.service';
@@ -83,6 +84,7 @@ import { WebhookController } from './controllers/webhook.controller';
     // Microsoft-specific services (pluggable adapters)
     MicrosoftAttachmentHandler,
     MicrosoftFolderService,
+    MicrosoftMessageParser,
 
     // Webhook services (Strategy 2: Real-time)
     GmailWebhookService,
