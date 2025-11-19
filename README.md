@@ -15,7 +15,7 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 - **Gmail & Microsoft Attachment Sync** - Complete S3/MinIO storage integration with automatic download
 - **AI Email Insights Enhanced** - Summarization, smart replies, and auto-categorization with PDF/text attachment indexing
 - **Security Audit Completed** - Comprehensive tenant isolation review with critical fixes applied
-- **AI Embeddings Optimization** - Query caching (50-70% cost reduction), attachment content extraction
+- **AI Embeddings Optimization** - Query caching with Redis (expected 50-70% API cost reduction on repeated queries), PDF/text attachment content extraction
 - **Dead Letter Queue System** - Automatic retry with exponential backoff for failed sync jobs
 
 ### 🔒 Security Improvements
@@ -60,7 +60,7 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 
 ## Architettura
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                        Frontend (Next.js)                    │
 │         React + TailwindCSS + ShadCN UI + Next.js            │
@@ -407,11 +407,20 @@ docker-compose restart nginx
 ```
 
 ### MinIO Storage Issues
+
+⚠️ **Development Only** - These default credentials should NEVER be used in production!
+
 ```bash
-# Access MinIO console
+# Access MinIO console (DEVELOPMENT ONLY)
 open http://localhost:9001
-# Default credentials: minioadmin / minioadmin
+# Default credentials: minioadmin / minioadmin123
 ```
+
+**Production Security**:
+- Generate strong credentials (minimum 16 characters)
+- Use IAM authentication instead of access keys
+- Enable TLS/HTTPS for MinIO API
+- Restrict network access to MinIO ports (9000, 9001)
 
 ## Production Deployment
 

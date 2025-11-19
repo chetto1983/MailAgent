@@ -76,7 +76,7 @@ catch (err) {
 ### Architecture
 Complete end-to-end attachment handling for Gmail sync:
 
-```
+```text
 Gmail API → Download → S3/MinIO → Database Metadata
 ```
 
@@ -115,7 +115,7 @@ async processEmailAttachments(gmail, emailId, externalId, attachments, tenantId,
 - Proper error logging for debugging
 
 ### Storage Structure
-```
+```text
 S3/MinIO Path: tenants/{tenantId}/providers/{providerId}/attachments/{uuid}-{filename}
 Database: EmailAttachment table with full metadata
 ```
@@ -200,6 +200,14 @@ Database: EmailAttachment table with consistent schema
 | **Inline Detection** | Content-Disposition header | isInline property |
 
 ## 🐳 MinIO/S3 Storage Configuration
+
+⚠️ **Security Warning**: The default credentials below are suitable ONLY for local development.
+
+**For production deployments**:
+- Generate strong credentials (minimum 16 characters, mixed case + symbols)
+- Use IAM authentication instead of access keys where possible
+- Enable TLS/HTTPS for MinIO API
+- Restrict network access to MinIO ports (9000, 9001)
 
 ### Docker Setup (docker-compose.yml)
 ```yaml

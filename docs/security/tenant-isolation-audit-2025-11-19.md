@@ -86,7 +86,7 @@ async runRetentionPolicy(@Body() data?: { retentionDays?: number }) {
    - Email retention metrics for all tenants combined
 
 2. **System Manipulation**: An authenticated user can trigger email archival/removal for ALL tenants simultaneously:
-   ```
+   ```http
    POST /emails/retention/run
    { "retentionDays": 1 }  // Archives ALL tenant emails older than 1 day!
    ```
@@ -183,7 +183,7 @@ While this is SUSPICIOUS, the actual risk depends on provider ID uniqueness:
 - **Defense in depth principle**: Should ALWAYS explicitly include tenantId (BEST PRACTICE)
 
 **Attack Scenario**:
-```
+```text
 1. Tenant A has provider "google-tenant-a" with 100 unread emails in INBOX
 2. Tenant B has provider "google-tenant-b" with 50 unread emails in INBOX
 3. If provider IDs happen to collide or be reused, count includes both!

@@ -7,7 +7,7 @@ Analysis of the current AI/Embeddings implementation reveals a well-architected 
 ## Current Implementation Analysis
 
 ### Architecture Overview
-```
+```text
 Email → Content Extraction → Chunking (12K) → Bulk Embeddings (Mistral) → pgvector → Search
 ```
 
@@ -372,7 +372,7 @@ We just implemented attachment sync for Gmail/Microsoft, but **attachment conten
 ### Solution: Extract Text from Attachments, Include in Email Embeddings
 
 **Architecture**:
-```
+```text
 Attachment Download → Content Extraction → Append to Email Content → Embedding
 ```
 
