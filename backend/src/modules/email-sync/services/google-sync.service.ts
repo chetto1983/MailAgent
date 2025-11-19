@@ -14,8 +14,9 @@ import { ProviderTokenService } from './provider-token.service';
 import { RetryService } from '../../../common/services/retry.service';
 import { AttachmentStorageService } from '../../email/services/attachment.storage';
 import { BaseEmailSyncService } from './base-email-sync.service';
-import { GmailAttachmentHandler, GmailAttachmentMeta } from './gmail/gmail-attachment-handler';
+import { GmailAttachmentHandler } from './gmail/gmail-attachment-handler';
 import { GmailFolderService } from './gmail/gmail-folder.service';
+import { GmailMessageParser, ParsedGmailMessage } from './gmail/gmail-message-parser';
 
 @Injectable()
 export class GoogleSyncService extends BaseEmailSyncService {
@@ -36,6 +37,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
     private attachmentStorage: AttachmentStorageService,
     private gmailAttachmentHandler: GmailAttachmentHandler,
     private gmailFolderService: GmailFolderService,
+    private gmailMessageParser: GmailMessageParser,
   ) {
     super(prisma, realtimeEvents, config);
   }
@@ -710,125 +712,8 @@ export class GoogleSyncService extends BaseEmailSyncService {
     return chunkResponses.filter((msg): msg is gmail_v1.Schema$Message => !!msg?.id);
   }
 
-  private parseGmailMessage(
-    message: gmail_v1.Schema$Message,
-  ): {
-    externalId: string;
-    threadId?: string | null;
-    messageIdHeader?: string | undefined;
-    inReplyTo?: string | undefined;
-    references?: string | undefined;
-    from: string;
-    to: string[];
-    cc: string[];
-    bcc: string[];
-    subject: string;
-    bodyText: string;
-    bodyHtml: string;
-    snippet: string;
-    folder: string | undefined;
-    labels: string[];
-    isRead: boolean;
-    isStarred: boolean;
-    isDeleted: boolean;
-    sentAt: Date;
-    receivedAt: Date;
-    size?: number | null;
-    headers: Record<string, any>;
-    metadataStatus: 'active' | 'deleted';
-    attachments: GmailAttachmentMeta[];
-  } | null {
-    const headers = message.payload?.headers || [];
-    const from = headers.find((h) => h.name === 'From')?.value || '';
-    const to = headers.find((h) => h.name === 'To')?.value?.split(',').map((e) => e.trim()) || [];
-    const cc = headers.find((h) => h.name === 'Cc')?.value?.split(',').map((e) => e.trim()) || [];
-    const bcc = headers.find((h) => h.name === 'Bcc')?.value?.split(',').map((e) => e.trim()) || [];
-    const subject = headers.find((h) => h.name === 'Subject')?.value || '(No Subject)';
-    const dateStr = headers.find((h) => h.name === 'Date')?.value;
-    const messageIdHeader = headers.find((h) => h.name === 'Message-ID')?.value || undefined;
-    const inReplyTo = headers.find((h) => h.name === 'In-Reply-To')?.value || undefined;
-    const references = headers.find((h) => h.name === 'References')?.value || undefined;
-
-    let bodyText = '';
-    let bodyHtml = '';
-    const attachments: GmailAttachmentMeta[] = [];
-
-    const extractBody = (part: any) => {
-      if (part.mimeType === 'text/plain' && part.body?.data) {
-        bodyText = Buffer.from(part.body.data, 'base64').toString('utf8');
-      } else if (part.mimeType === 'text/html' && part.body?.data) {
-        bodyHtml = Buffer.from(part.body.data, 'base64').toString('utf8');
-      }
-
-      // Extract attachment metadata
-      if (part.filename && part.body?.attachmentId) {
-        const contentId = part.headers?.find((h: any) => h.name === 'Content-ID')?.value;
-        const isInline = part.headers?.some((h: any) =>
-          h.name === 'Content-Disposition' && h.value?.startsWith('inline')
-        ) || false;
-
-        attachments.push({
-          filename: part.filename,
-          mimeType: part.mimeType || 'application/octet-stream',
-          size: part.body.size || 0,
-          attachmentId: part.body.attachmentId,
-          contentId: contentId?.replace(/[<>]/g, ''),
-          isInline,
-        });
-      }
-
-      if (part.parts) {
-        part.parts.forEach(extractBody);
-      }
-    };
-
-    if (message.payload) {
-      extractBody(message.payload);
-    }
-
-    const snippet = message.snippet || this.truncateText(bodyText, 200);
-    const sentAt = dateStr ? new Date(dateStr) : new Date(message.internalDate ? parseInt(message.internalDate) : Date.now());
-    const labelIds = message.labelIds ?? [];
-    const folder = this.gmailFolderService.determineFolderFromLabels(labelIds);
-    const isRead = !labelIds.includes('UNREAD');
-    const isStarred = labelIds.includes('STARRED');
-    const isDeleted = labelIds.includes('TRASH');
-    const externalId = message.id;
-
-    if (!externalId) {
-      return null;
-    }
-
-    return {
-      externalId,
-      threadId: message.threadId,
-      messageIdHeader,
-      inReplyTo,
-      references,
-      from,
-      to,
-      cc,
-      bcc,
-      subject,
-      bodyText,
-      bodyHtml,
-      snippet,
-      folder,
-      labels: labelIds,
-      isRead,
-      isStarred,
-      isDeleted,
-      sentAt,
-      receivedAt: new Date(parseInt(message.internalDate || Date.now().toString())),
-      size: message.sizeEstimate,
-      headers: headers.reduce((acc, h) => ({ ...acc, [h.name || '']: h.value }), {} as Record<string, any>),
-      metadataStatus: isDeleted ? 'deleted' : 'active',
-      attachments,
-    };
-  }
-
   private async processParsedMessagesBatch(
-    mapped: Array<NonNullable<ReturnType<GoogleSyncService['parseGmailMessage']>>>,
+    mapped: ParsedGmailMessage[],
     providerId: string,
     tenantId: string,
   ): Promise<{ processed: number; created: number }> {
@@ -1023,7 +908,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
     tenantId: string,
   ): Promise<{ processed: number; created: number }> {
     const parsed = messages
-      .map((m) => this.parseGmailMessage(m))
+      .map((m) => this.gmailMessageParser.parseGmailMessage(m, this.truncateText.bind(this)))
       .filter((m): m is NonNullable<typeof m> => !!m);
 
     return this.processParsedMessagesBatch(parsed, providerId, tenantId);
