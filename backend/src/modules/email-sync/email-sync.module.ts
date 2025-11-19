@@ -88,6 +88,7 @@ import { WebhookController } from './controllers/webhook.controller';
     MicrosoftWebhookService,
     WebhookLifecycleService,
     CrossProviderSyncService,
+    ProviderTokenService, // Export for use in calendar and contacts modules
   ],
 })
 export class EmailSyncModule {}

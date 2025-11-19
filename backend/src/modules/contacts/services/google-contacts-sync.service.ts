@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google, people_v1 } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
+import { ProviderTokenService } from '../../email-sync/services/provider-token.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 export type ContactRealtimeReason =
@@ -29,8 +28,7 @@ export class GoogleContactsSyncService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly crypto: CryptoService,
-    private readonly googleOAuth: GoogleOAuthService,
+    private readonly providerTokenService: ProviderTokenService,
     private realtimeEvents: RealtimeEventsService,
     private readonly configService: ConfigService,
   ) {
@@ -53,15 +51,15 @@ export class GoogleContactsSyncService {
     this.logger.log(`Starting Google Contacts sync for provider ${providerId}`);
 
     try {
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
+      // Get provider and access token (handles refresh automatically)
+      const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+        providerId,
+      );
 
-      if (!provider || !provider.supportsContacts) {
-        throw new Error('Provider not found or does not support contacts');
+      if (!provider.supportsContacts) {
+        throw new Error('Provider does not support contacts');
       }
 
-      const accessToken = await this.getAccessToken(provider);
       const peopleService = this.createPeopleClient(accessToken);
 
       let contactsProcessed = 0;
@@ -228,15 +226,9 @@ export class GoogleContactsSyncService {
    * Create a new contact in Google
    */
   async createContact(providerId: string, data: any): Promise<{ id: string }> {
-    const provider = await this.prisma.providerConfig.findUnique({
-      where: { id: providerId },
-    });
-
-    if (!provider) {
-      throw new Error('Provider not found');
-    }
-
-    const accessToken = await this.getAccessToken(provider);
+    const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+      providerId,
+    );
     const peopleService = this.createPeopleClient(accessToken);
 
     const person: people_v1.Schema$Person = {
@@ -277,15 +269,9 @@ export class GoogleContactsSyncService {
    * Update a contact in Google
    */
   async updateContact(providerId: string, externalId: string, data: any): Promise<void> {
-    const provider = await this.prisma.providerConfig.findUnique({
-      where: { id: providerId },
-    });
-
-    if (!provider) {
-      throw new Error('Provider not found');
-    }
-
-    const accessToken = await this.getAccessToken(provider);
+    const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+      providerId,
+    );
     const peopleService = this.createPeopleClient(accessToken);
 
     const person: people_v1.Schema$Person = {
@@ -329,55 +315,14 @@ export class GoogleContactsSyncService {
    * Delete a contact from Google
    */
   async deleteContact(providerId: string, externalId: string): Promise<void> {
-    const provider = await this.prisma.providerConfig.findUnique({
-      where: { id: providerId },
-    });
-
-    if (!provider) {
-      throw new Error('Provider not found');
-    }
-
-    const accessToken = await this.getAccessToken(provider);
+    const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+      providerId,
+    );
     const peopleService = this.createPeopleClient(accessToken);
 
     await peopleService.people.deleteContact({
       resourceName: externalId,
     });
-  }
-
-  /**
-   * Get access token, refresh if needed
-   */
-  private async getAccessToken(provider: any): Promise<string> {
-    const now = new Date();
-    const isExpired = provider.tokenExpiresAt && now > new Date(provider.tokenExpiresAt);
-
-    if (isExpired && provider.refreshToken && provider.refreshTokenEncryptionIv) {
-      this.logger.log(`Access token expired for provider ${provider.id}, refreshing...`);
-
-      const refreshToken = this.crypto.decrypt(
-        provider.refreshToken,
-        provider.refreshTokenEncryptionIv,
-      );
-
-      const refreshed = await this.googleOAuth.refreshAccessToken(refreshToken);
-
-      const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-      await this.prisma.providerConfig.update({
-        where: { id: provider.id },
-        data: {
-          accessToken: encryptedAccess.encrypted,
-          tokenEncryptionIv: encryptedAccess.iv,
-          tokenExpiresAt: refreshed.expiresAt,
-        },
-      });
-
-      return refreshed.accessToken;
-    } else if (!provider.accessToken || !provider.tokenEncryptionIv) {
-      throw new Error('Provider missing access token');
-    } else {
-      return this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
-    }
   }
 
   /**

@@ -3,8 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios, { AxiosResponse } from 'axios';
 import { URLSearchParams } from 'url';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
+import { ProviderTokenService } from '../../email-sync/services/provider-token.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 interface MicrosoftEvent {
@@ -65,8 +64,7 @@ export class MicrosoftCalendarSyncService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly crypto: CryptoService,
-    private readonly microsoftOAuth: MicrosoftOAuthService,
+    private readonly providerTokenService: ProviderTokenService,
     private readonly realtimeEvents: RealtimeEventsService,
     private readonly configService: ConfigService,
   ) {
@@ -100,57 +98,13 @@ export class MicrosoftCalendarSyncService {
     this.logger.log(`Starting Microsoft Calendar sync for provider ${providerId}`);
 
     try {
-      // Get provider config
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
+      // Get provider and access token (handles refresh automatically)
+      const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+        providerId,
+      );
 
-      if (!provider || !provider.supportsCalendar) {
-        throw new Error('Provider not found or does not support calendar');
-      }
-
-      // Check if token is expired and needs refresh
-      const now = new Date();
-      const isExpired = provider.tokenExpiresAt && now > new Date(provider.tokenExpiresAt);
-
-      let accessToken: string;
-
-      if (isExpired && provider.refreshToken && provider.refreshTokenEncryptionIv) {
-        this.logger.log(`Access token expired for provider ${providerId}, refreshing...`);
-
-        const refreshToken = this.crypto.decrypt(
-          provider.refreshToken,
-          provider.refreshTokenEncryptionIv,
-        );
-
-        const refreshed = await this.microsoftOAuth.refreshAccessToken(refreshToken);
-        accessToken = refreshed.accessToken;
-
-        // Save new token to database
-        const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-        const updateData: any = {
-          accessToken: encryptedAccess.encrypted,
-          tokenEncryptionIv: encryptedAccess.iv,
-          tokenExpiresAt: refreshed.expiresAt,
-        };
-
-        if (refreshed.refreshToken) {
-          const encryptedRefresh = this.crypto.encrypt(refreshed.refreshToken);
-          updateData.refreshToken = encryptedRefresh.encrypted;
-          updateData.refreshTokenEncryptionIv = encryptedRefresh.iv;
-        }
-
-        await this.prisma.providerConfig.update({
-          where: { id: providerId },
-          data: updateData,
-        });
-      } else if (!provider.accessToken || !provider.tokenEncryptionIv) {
-        throw new Error('Provider missing access token');
-      } else {
-        accessToken = this.crypto.decrypt(
-          provider.accessToken,
-          provider.tokenEncryptionIv,
-        );
+      if (!provider.supportsCalendar) {
+        throw new Error('Provider does not support calendar');
       }
 
       // Calculate time range: last 60 days to next 60 days

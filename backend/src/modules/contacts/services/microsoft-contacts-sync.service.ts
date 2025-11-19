@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
+import { ProviderTokenService } from '../../email-sync/services/provider-token.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 export type ContactRealtimeReason =
@@ -30,8 +29,7 @@ export class MicrosoftContactsSyncService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly crypto: CryptoService,
-    private readonly microsoftOAuth: MicrosoftOAuthService,
+    private readonly providerTokenService: ProviderTokenService,
     private realtimeEvents: RealtimeEventsService,
     private readonly configService: ConfigService,
   ) {
@@ -56,15 +54,14 @@ export class MicrosoftContactsSyncService {
     this.logger.log(`Starting Microsoft Contacts sync for provider ${providerId}`);
 
     try {
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
+      // Get provider and access token (handles refresh automatically)
+      const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+        providerId,
+      );
 
-      if (!provider || !provider.supportsContacts) {
-        throw new Error('Provider not found or does not support contacts');
+      if (!provider.supportsContacts) {
+        throw new Error('Provider does not support contacts');
       }
-
-      const accessToken = await this.getAccessToken(provider);
 
       let contactsProcessed = 0;
       let newContacts = 0;
@@ -255,15 +252,9 @@ export class MicrosoftContactsSyncService {
    * Create a new contact in Microsoft
    */
   async createContact(providerId: string, data: any): Promise<{ id: string }> {
-    const provider = await this.prisma.providerConfig.findUnique({
-      where: { id: providerId },
-    });
-
-    if (!provider) {
-      throw new Error('Provider not found');
-    }
-
-    const accessToken = await this.getAccessToken(provider);
+    const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+      providerId,
+    );
 
     const contact = {
       givenName: data.firstName,
@@ -303,15 +294,9 @@ export class MicrosoftContactsSyncService {
     externalId: string,
     data: any,
   ): Promise<void> {
-    const provider = await this.prisma.providerConfig.findUnique({
-      where: { id: providerId },
-    });
-
-    if (!provider) {
-      throw new Error('Provider not found');
-    }
-
-    const accessToken = await this.getAccessToken(provider);
+    const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+      providerId,
+    );
 
     const contact: any = {};
 
@@ -350,54 +335,13 @@ export class MicrosoftContactsSyncService {
    * Delete a contact from Microsoft
    */
   async deleteContact(providerId: string, externalId: string): Promise<void> {
-    const provider = await this.prisma.providerConfig.findUnique({
-      where: { id: providerId },
-    });
-
-    if (!provider) {
-      throw new Error('Provider not found');
-    }
-
-    const accessToken = await this.getAccessToken(provider);
+    const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+      providerId,
+    );
 
     await axios.delete(`${this.GRAPH_API_BASE}/me/contacts/${externalId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-  }
-
-  /**
-   * Get access token, refresh if needed
-   */
-  private async getAccessToken(provider: any): Promise<string> {
-    const now = new Date();
-    const isExpired = provider.tokenExpiresAt && now > new Date(provider.tokenExpiresAt);
-
-    if (isExpired && provider.refreshToken && provider.refreshTokenEncryptionIv) {
-      this.logger.log(`Access token expired for provider ${provider.id}, refreshing...`);
-
-      const refreshToken = this.crypto.decrypt(
-        provider.refreshToken,
-        provider.refreshTokenEncryptionIv,
-      );
-
-      const refreshed = await this.microsoftOAuth.refreshAccessToken(refreshToken);
-
-      const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-      await this.prisma.providerConfig.update({
-        where: { id: provider.id },
-        data: {
-          accessToken: encryptedAccess.encrypted,
-          tokenEncryptionIv: encryptedAccess.iv,
-          tokenExpiresAt: refreshed.expiresAt,
-        },
-      });
-
-      return refreshed.accessToken;
-    } else if (!provider.accessToken || !provider.tokenEncryptionIv) {
-      throw new Error('Provider missing access token');
-    } else {
-      return this.crypto.decrypt(provider.accessToken, provider.tokenEncryptionIv);
-    }
   }
 
   /**

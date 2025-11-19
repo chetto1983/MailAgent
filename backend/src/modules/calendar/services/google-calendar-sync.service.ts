@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { calendar_v3, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
+import { ProviderTokenService } from '../../email-sync/services/provider-token.service';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { ConfigService } from '@nestjs/config';
 
@@ -23,8 +22,7 @@ export class GoogleCalendarSyncService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly crypto: CryptoService,
-    private readonly googleOAuth: GoogleOAuthService,
+    private readonly providerTokenService: ProviderTokenService,
     private readonly realtimeEvents: RealtimeEventsService,
     private readonly configService: ConfigService,
   ) {
@@ -58,49 +56,13 @@ export class GoogleCalendarSyncService {
     this.logger.log(`Starting Google Calendar sync for provider ${providerId}`);
 
     try {
-      // Get provider config
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
+      // Get provider and access token (handles refresh automatically)
+      const { provider, accessToken } = await this.providerTokenService.getProviderWithToken(
+        providerId,
+      );
 
-      if (!provider || !provider.supportsCalendar) {
-        throw new Error('Provider not found or does not support calendar');
-      }
-
-      // Check if token is expired and needs refresh
-      const now = new Date();
-      const isExpired = provider.tokenExpiresAt && now > new Date(provider.tokenExpiresAt);
-
-      let accessToken: string;
-
-      if (isExpired && provider.refreshToken && provider.refreshTokenEncryptionIv) {
-        this.logger.log(`Access token expired for provider ${providerId}, refreshing...`);
-
-        const refreshToken = this.crypto.decrypt(
-          provider.refreshToken,
-          provider.refreshTokenEncryptionIv,
-        );
-
-        const refreshed = await this.googleOAuth.refreshAccessToken(refreshToken);
-        accessToken = refreshed.accessToken;
-
-        // Save new token to database
-        const encryptedAccess = this.crypto.encrypt(refreshed.accessToken);
-        await this.prisma.providerConfig.update({
-          where: { id: providerId },
-          data: {
-            accessToken: encryptedAccess.encrypted,
-            tokenEncryptionIv: encryptedAccess.iv,
-            tokenExpiresAt: refreshed.expiresAt,
-          },
-        });
-      } else if (!provider.accessToken || !provider.tokenEncryptionIv) {
-        throw new Error('Provider missing access token');
-      } else {
-        accessToken = this.crypto.decrypt(
-          provider.accessToken,
-          provider.tokenEncryptionIv,
-        );
+      if (!provider.supportsCalendar) {
+        throw new Error('Provider does not support calendar');
       }
 
       // Create Google Calendar client
