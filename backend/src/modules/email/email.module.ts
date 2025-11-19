@@ -13,6 +13,7 @@ import { ProvidersModule } from '../providers/providers.module';
 import { AiModule } from '../ai/ai.module';
 import { EmailsController } from './controllers/emails.controller';
 import { FoldersController } from './controllers/folders.controller';
+import { AttachmentsController } from './controllers/attachments.controller';
 import { EmailSyncModule } from '../email-sync/email-sync.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { StorageService } from './services/storage.service';
@@ -39,7 +40,7 @@ import { ProviderTokenService } from '../email-sync/services/provider-token.serv
     StorageService,
     ProviderTokenService,
   ],
-  controllers: [EmailsController, FoldersController],
+  controllers: [EmailsController, FoldersController, AttachmentsController],
   exports: [
     EmailService,
     EmailsService,
