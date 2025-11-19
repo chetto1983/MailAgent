@@ -15,6 +15,7 @@ import { RetryService } from '../../../common/services/retry.service';
 import { AttachmentStorageService } from '../../email/services/attachment.storage';
 import { BaseEmailSyncService } from './base-email-sync.service';
 import { GmailAttachmentHandler, GmailAttachmentMeta } from './gmail/gmail-attachment-handler';
+import { GmailFolderService } from './gmail/gmail-folder.service';
 
 @Injectable()
 export class GoogleSyncService extends BaseEmailSyncService {
@@ -34,6 +35,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
     private retryService: RetryService,
     private attachmentStorage: AttachmentStorageService,
     private gmailAttachmentHandler: GmailAttachmentHandler,
+    private gmailFolderService: GmailFolderService,
   ) {
     super(prisma, realtimeEvents, config);
   }
@@ -428,7 +430,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
       });
 
       const labelIds = response.data.labelIds ?? [];
-      const folder = this.determineFolderFromLabels(labelIds, existing.folder);
+      const folder = this.gmailFolderService.determineFolderFromLabels(labelIds, existing.folder);
       const isDeleted = labelIds.includes('TRASH');
       const isRead = !labelIds.includes('UNREAD');
       const isStarred = labelIds.includes('STARRED');
@@ -599,54 +601,6 @@ export class GoogleSyncService extends BaseEmailSyncService {
       const message = this.extractErrorMessage(error);
       this.logger.warn(`Failed to remove email ${emailId} from database: ${message}`);
     }
-  }
-
-  private determineFolderFromLabels(labelIds?: string[], fallback?: string): string {
-    if (!labelIds || labelIds.length === 0) {
-      return fallback ?? 'INBOX';
-    }
-
-    if (labelIds.includes('TRASH')) {
-      return 'TRASH';
-    }
-
-    if (labelIds.includes('SPAM')) {
-      return 'SPAM';
-    }
-
-    if (labelIds.includes('SENT')) {
-      return 'SENT';
-    }
-
-    if (labelIds.includes('DRAFT') || labelIds.includes('DRAFTS')) {
-      return 'DRAFTS';
-    }
-
-    // Check for Gmail categories BEFORE generic INBOX
-    // Gmail adds both INBOX and CATEGORY_ labels, so we prioritize categories
-    const categoryLabel = labelIds.find((label) => label.startsWith('CATEGORY_'));
-    if (categoryLabel) {
-      switch (categoryLabel) {
-        case 'CATEGORY_PERSONAL':
-          return 'INBOX';
-        case 'CATEGORY_SOCIAL':
-          return 'SOCIAL';
-        case 'CATEGORY_PROMOTIONS':
-          return 'PROMOTIONS';
-        case 'CATEGORY_UPDATES':
-          return 'UPDATES';
-        case 'CATEGORY_FORUMS':
-          return 'FORUMS';
-        default:
-          break;
-      }
-    }
-
-    if (labelIds.includes('INBOX')) {
-      return 'INBOX';
-    }
-
-    return fallback ?? 'INBOX';
   }
 
   private async applyStatusMetadata(
@@ -835,7 +789,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
     const snippet = message.snippet || this.truncateText(bodyText, 200);
     const sentAt = dateStr ? new Date(dateStr) : new Date(message.internalDate ? parseInt(message.internalDate) : Date.now());
     const labelIds = message.labelIds ?? [];
-    const folder = this.determineFolderFromLabels(labelIds);
+    const folder = this.gmailFolderService.determineFolderFromLabels(labelIds);
     const isRead = !labelIds.includes('UNREAD');
     const isStarred = labelIds.includes('STARRED');
     const isDeleted = labelIds.includes('TRASH');
@@ -1106,140 +1060,6 @@ export class GoogleSyncService extends BaseEmailSyncService {
       emailId: existing.id,
       externalId: messageId,
     });
-  }
-
-  /**
-   * Sync Gmail labels as folders
-   */
-  async syncGmailFolders(tenantId: string, providerId: string): Promise<void> {
-    this.logger.log(`Starting Gmail folder (labels) sync for provider ${providerId}`);
-
-    try {
-      // Get provider config
-      const provider = await this.prisma.providerConfig.findUnique({
-        where: { id: providerId },
-      });
-
-      if (!provider || !provider.accessToken || !provider.tokenEncryptionIv) {
-        throw new Error('Provider not found or missing access token');
-      }
-
-      // Decrypt access token
-      const accessToken = this.crypto.decrypt(
-        provider.accessToken,
-        provider.tokenEncryptionIv,
-      );
-
-      // Create Gmail client
-      const gmail = this.createGmailClient(accessToken);
-
-      // List all labels
-      const labelsResponse = await gmail.users.labels.list({
-        userId: 'me',
-      });
-
-      const labels = labelsResponse.data.labels || [];
-      this.logger.log(`Found ${labels.length} Gmail labels for provider ${providerId}`);
-
-      // Get existing folders
-      const existingFolders = await (this.prisma as any).folder.findMany({
-        where: { providerId, tenantId },
-      });
-
-      const existingPaths = new Set<string>(existingFolders.map((f: any) => f.path as string));
-      const newPaths = new Set<string>(labels.map((l) => l.id).filter((id): id is string => !!id));
-
-      // Delete folders that no longer exist
-      const deletedPaths: string[] = [];
-      existingPaths.forEach((path) => {
-        if (!newPaths.has(path)) {
-          deletedPaths.push(path);
-        }
-      });
-
-      if (deletedPaths.length > 0) {
-        this.logger.log(`Deleting ${deletedPaths.length} removed Gmail labels`);
-        await (this.prisma as any).folder.deleteMany({
-          where: {
-            providerId,
-            path: { in: deletedPaths },
-          },
-        });
-      }
-
-      // Sync each label as a folder
-      for (const label of labels) {
-        if (!label.id || !label.name) continue;
-
-        // Determine special use
-        const specialUse = this.determineFolderTypeFromLabelId(label.id);
-
-        // Determine if selectable
-        const isSelectable = label.type !== 'system' || specialUse !== undefined;
-
-        await (this.prisma as any).folder.upsert({
-          where: {
-            providerId_path: {
-              providerId,
-              path: label.id,
-            },
-          },
-          create: {
-            tenantId,
-            providerId,
-            path: label.id,
-            name: label.name,
-            delimiter: '/',
-            specialUse,
-            isSelectable,
-            totalCount: label.messagesTotal || 0,
-            unreadCount: label.messagesUnread || 0,
-            level: 0,
-          },
-          update: {
-            name: label.name,
-            specialUse,
-            isSelectable,
-            totalCount: label.messagesTotal || 0,
-            unreadCount: label.messagesUnread || 0,
-            lastSyncedAt: new Date(),
-          },
-        });
-      }
-
-      this.logger.log(`Synced ${labels.length} Gmail labels as folders for provider ${providerId}`);
-    } catch (error) {
-      const errorMessage = this.extractErrorMessage(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(
-        `Error syncing Gmail folders for provider ${providerId}: ${errorMessage}`,
-        errorStack,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Determine folder type from Gmail label ID
-   */
-  private determineFolderTypeFromLabelId(labelId: string): string | undefined {
-    const labelMap: Record<string, string | undefined> = {
-      'INBOX': 'INBOX',
-      'SENT': 'SENT',
-      'DRAFT': 'DRAFTS',
-      'TRASH': 'TRASH',
-      'SPAM': 'JUNK',
-      'STARRED': 'FLAGGED',
-      'IMPORTANT': 'IMPORTANT',
-      'UNREAD': undefined, // Not a folder, it's a filter
-      'CATEGORY_PERSONAL': undefined,
-      'CATEGORY_SOCIAL': undefined,
-      'CATEGORY_PROMOTIONS': undefined,
-      'CATEGORY_UPDATES': undefined,
-      'CATEGORY_FORUMS': undefined,
-    };
-
-    return labelMap[labelId];
   }
 
   private notifyGmailMailboxChange(
