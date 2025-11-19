@@ -7,6 +7,7 @@ import { EmailSendService } from './services/email-send.service';
 import { EmailSyncBackService } from './services/email-sync-back.service';
 import { EmailCleanupService } from './services/email-cleanup.service';
 import { AttachmentStorageService } from './services/attachment.storage';
+import { AttachmentOnDemandService } from './services/attachment-on-demand.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { ProvidersModule } from '../providers/providers.module';
 import { AiModule } from '../ai/ai.module';
@@ -34,6 +35,7 @@ import { ProviderTokenService } from '../email-sync/services/provider-token.serv
     EmailSyncBackService,
     EmailCleanupService,
     AttachmentStorageService,
+    AttachmentOnDemandService,
     StorageService,
     ProviderTokenService,
   ],
@@ -47,6 +49,7 @@ import { ProviderTokenService } from '../email-sync/services/provider-token.serv
     EmailSyncBackService,
     EmailCleanupService,
     AttachmentStorageService,
+    AttachmentOnDemandService,
     StorageService,
   ],
 })

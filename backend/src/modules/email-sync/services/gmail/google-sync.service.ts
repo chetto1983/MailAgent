@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import { ProviderTokenService } from '../provider-token.service';
 import { RetryService } from '../../../../common/services/retry.service';
 import { AttachmentStorageService } from '../../../email/services/attachment.storage';
+import { StorageService } from '../../../email/services/storage.service';
 import { BaseEmailSyncService } from '../base-email-sync.service';
 import { GmailAttachmentHandler } from './gmail-attachment-handler';
 import { GmailFolderService } from './gmail-folder.service';
@@ -36,6 +37,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
     private providerTokenService: ProviderTokenService,
     private retryService: RetryService,
     private attachmentStorage: AttachmentStorageService,
+    private storage: StorageService,
     private gmailAttachmentHandler: GmailAttachmentHandler,
     private gmailFolderService: GmailFolderService,
     private gmailMessageParser: GmailMessageParser,
@@ -606,6 +608,13 @@ export class GoogleSyncService extends BaseEmailSyncService {
   }
 
   private async removeEmailPermanently(emailId: string, tenantId: string): Promise<void> {
+    // 1. Get attachments BEFORE deleting email
+    const attachments = await this.prisma.emailAttachment.findMany({
+      where: { emailId },
+      select: { storagePath: true, storageType: true },
+    });
+
+    // 2. Delete embeddings
     try {
       await this.knowledgeBaseService.deleteEmbeddingsForEmail(tenantId, emailId);
     } catch (error) {
@@ -615,6 +624,7 @@ export class GoogleSyncService extends BaseEmailSyncService {
       );
     }
 
+    // 3. Delete email from database (cascade deletes EmailAttachment records)
     try {
       await this.prisma.email.delete({
         where: { id: emailId },
@@ -622,6 +632,25 @@ export class GoogleSyncService extends BaseEmailSyncService {
     } catch (error) {
       const message = this.extractErrorMessage(error);
       this.logger.warn(`Failed to remove email ${emailId} from database: ${message}`);
+      throw error; // Re-throw to prevent S3 cleanup if DB deletion failed
+    }
+
+    // 4. Delete S3 files (after DB deletion)
+    const s3Keys = attachments
+      .filter((a) => a.storageType === 's3' && a.storagePath)
+      .map((a) => a.storagePath!);
+
+    if (s3Keys.length > 0) {
+      try {
+        const result = await this.storage.deleteObjects(s3Keys);
+        this.logger.debug(
+          `Deleted ${result.deleted} S3 objects for email ${emailId} (${result.failed} failed)`,
+        );
+      } catch (error) {
+        const message = this.extractErrorMessage(error);
+        this.logger.error(`Failed to delete S3 objects for email ${emailId}: ${message}`);
+        // Don't throw - email already deleted from DB
+      }
     }
   }
 
