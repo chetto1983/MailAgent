@@ -114,6 +114,9 @@ import { WebhookController } from './controllers/webhook.controller';
     CrossProviderSyncService,
     ProviderTokenService, // Export for use in calendar and contacts modules
     SyncAuthService,
+    // Attachment handlers (for on-demand download in EmailModule)
+    GmailAttachmentHandler,
+    MicrosoftAttachmentHandler,
   ],
 })
 export class EmailSyncModule {}
