@@ -1,37 +1,62 @@
 # MailAgent - AI-Powered Multi-Tenant Email Assistant
 
-![Backend](https://img.shields.io/badge/Backend-85%25-success?style=flat-square)
+![Backend](https://img.shields.io/badge/Backend-95%25-success?style=flat-square)
 ![Frontend](https://img.shields.io/badge/Frontend-90%25-success?style=flat-square)
-![Testing](https://img.shields.io/badge/Testing-5%25-critical?style=flat-square)
-![Version](https://img.shields.io/badge/Version-2.0.0-blue?style=flat-square)
+![Testing](https://img.shields.io/badge/Testing-15%25-orange?style=flat-square)
+![Version](https://img.shields.io/badge/Version-2.1.0-blue?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-MailAgent è una piattaforma full-stack completa e moderna per la gestione intelligente della posta elettronica con supporto IA, riconoscimento vocale (STT) e sintesi vocale (TTS). Progettato per supportare multi-tenancy con isolamento completo dei dati.
+MailAgent è una piattaforma full-stack completa e moderna per la gestione intelligente della posta elettronica con supporto IA, integrazione multi-provider e architettura multi-tenant enterprise-grade.
+
+## 🎉 Recent Updates (November 2025)
+
+### ✅ Latest Features Implemented
+- **Calendar Event Attachments** - Full sync support for Google Drive and OneDrive file references
+- **Gmail & Microsoft Attachment Sync** - Complete S3/MinIO storage integration with automatic download
+- **AI Email Insights Enhanced** - Summarization, smart replies, and auto-categorization with PDF/text attachment indexing
+- **Security Audit Completed** - Comprehensive tenant isolation review with critical fixes applied
+- **AI Embeddings Optimization** - Query caching (50-70% cost reduction), attachment content extraction
+- **Dead Letter Queue System** - Automatic retry with exponential backoff for failed sync jobs
+
+### 🔒 Security Improvements
+- Fixed critical tenant isolation vulnerabilities in retention service
+- Enhanced Redis operations (KEYS → SCAN for production safety)
+- Implemented CTE-based tenant filtering in vector queries
+- Strengthened CSRF protection with crypto.randomBytes (128-bit entropy)
 
 ## ✨ Features
 
 ### 🚀 Core Features (Production Ready)
 
-- ✅ **Multi-Tenant Architecture**: Isolamento completo dei dati con supporto per più tenant
-- ✅ **Email Management UI**: Viewer, composer (TipTap), threading, folders, search 🎉 **NEW!**
-- ✅ **Email Sync**: Gmail API, Microsoft Graph, IMAP con auto-refresh token
-- ✅ **AI Email Insights**: Email summarization, smart replies, auto-categorization 🎉 **NEW!**
-- ✅ **AI Assistant**: Chat con Mistral AI e RAG (Retrieval-Augmented Generation)
-- ✅ **Knowledge Base**: Semantic search con pgvector embeddings
-- ✅ **Provider Integration**: Gmail, Outlook/Microsoft Graph e IMAP/SMTP
-- ✅ **Advanced Authentication**: Email/Password + OTP/MFA obbligatorio
-- ✅ **Password Recovery**: Reset password sicuro con token temporaneo
-- ✅ **GDPR Compliance**: Crittografia AES-256, audit log, diritto all'oblio
-- ✅ **Material Design 3**: UI moderna, responsive, dark/light mode
-- ✅ **Docker**: Containerizzazione completa con orchestrazione
+- ✅ **Multi-Tenant Architecture**: Complete data isolation with enterprise-grade security
+- ✅ **Email Management UI**: Full-featured viewer, composer (TipTap), threading, folders, search
+- ✅ **Email Sync**: Gmail API, Microsoft Graph, IMAP with auto-refresh token
+- ✅ **Attachment Handling**: Complete multi-provider sync with S3/MinIO storage
+- ✅ **AI Email Insights**: Email summarization, smart replies, auto-categorization
+- ✅ **AI Assistant**: Chat with Mistral AI and RAG (Retrieval-Augmented Generation)
+- ✅ **Knowledge Base**: Semantic search with pgvector embeddings + PDF/text content extraction
+- ✅ **Provider Integration**: Gmail, Outlook/Microsoft Graph and IMAP/SMTP
+- ✅ **Calendar Integration**: Google Calendar & Microsoft Calendar event sync with attachments
+- ✅ **Contacts Sync**: Google Contacts & Microsoft Contacts integration
+- ✅ **Advanced Authentication**: Email/Password + OTP/MFA mandatory
+- ✅ **Password Recovery**: Secure reset with temporary tokens
+- ✅ **GDPR Compliance**: AES-256 encryption, audit log, right to be forgotten
+- ✅ **Material Design 3**: Modern, responsive UI with dark/light mode
+- ✅ **Docker**: Complete containerization with orchestration
 
-### 🚧 Coming Soon
+### 🚧 In Progress
 
-- ⏳ **Calendar Sync**: Google Calendar, Microsoft Calendar, CalDAV
-- ⏳ **Contacts Sync**: Google Contacts, Microsoft Contacts, CardDAV
+- ⏳ **Calendar UI**: Frontend calendar view and event management
+- ⏳ **Contacts UI**: Frontend contacts management interface
+- ⏳ **Email Labels System**: Advanced categorization and filtering
 - ⏳ **Daily Reports**: AI-generated activity summaries
 - ⏳ **Follow-up Alerts**: Automatic detection of emails needing response
-- 💡 **Voice Support**: STT (Speech-to-Text) e TTS (Text-to-Speech)
+
+### 💡 Planned
+
+- 💡 **Voice Support**: STT (Speech-to-Text) and TTS (Text-to-Speech)
+- 💡 **Mobile Apps**: React Native iOS/Android applications
+- 💡 **Advanced Analytics**: Email patterns, response time tracking
 
 ## Architettura
 
@@ -48,38 +73,40 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
                            │
     ┌──────────────────────┼──────────────────────┐
     │                      │                      │
-┌───▼────────┐  ┌────────▼──────────┐
-│   Backend   │  │   AI Worker      │
-│  (NestJS)   │  │  (Mistral API)   │
-└───┬────────┘  └────────┬──────────┘
-    │                      │                    │
-    └──────────────────────┼────────────────────┘
-                           │
-        ┌──────────────────┼──────────────────┐
-        │                  │                  │
-   ┌────▼─────┐  ┌────────▼─────┐  ┌────────▼──────┐
-   │ PostgreSQL│  │    Redis     │  │  pgvector    │
-   │           │  │  (Cache +    │  │  (Embeddings)│
-   │ (Data)    │  │   Queues)    │  │              │
-   └───────────┘  └──────────────┘  └───────────────┘
+┌───▼────────┐  ┌────────▼──────────┐  ┌────────▼──────┐
+│   Backend   │  │   AI Worker      │  │  Storage      │
+│  (NestJS)   │  │  (Mistral API)   │  │  (MinIO/S3)   │
+└───┬────────┘  └────────┬──────────┘  └────────┬──────┘
+    │                    │                      │
+    └────────────────────┼──────────────────────┘
+                         │
+      ┌──────────────────┼──────────────────┐
+      │                  │                  │
+ ┌────▼─────┐  ┌────────▼─────┐  ┌────────▼──────┐
+ │PostgreSQL│  │    Redis     │  │  pgvector    │
+ │          │  │  (Cache +    │  │  (Embeddings)│
+ │  (Data)  │  │   Queues)    │  │              │
+ └──────────┘  └──────────────┘  └───────────────┘
 ```
 
 ## Technology Stack
 
-### Backend (85% Complete ✅)
+### Backend (95% Complete ✅)
 - **Framework**: NestJS (TypeScript)
-- **Database**: PostgreSQL 15+ con pgvector per RAG
+- **Database**: PostgreSQL 15+ with pgvector for RAG
 - **ORM**: Prisma
-- **Cache**: Redis
-- **Job Queue**: BullMQ (34 concurrent workers)
+- **Cache**: Redis with query embedding cache
+- **Job Queue**: BullMQ (34 concurrent workers, DLQ system)
 - **AI**: Mistral API (mistral-large-latest + mistral-embed)
 - **Email**: nodemailer, IMAP-Flow, googleapis, microsoft-graph-client
-- **Auth**: JWT, bcrypt, OTP
-- **Encryption**: AES-256-CBC per token e password
+- **Storage**: MinIO (S3-compatible) for attachments
+- **Auth**: JWT, bcrypt, OTP/MFA
+- **Encryption**: AES-256-CBC for tokens and passwords
+- **Text Extraction**: pdf-parse, Mozilla Readability
 - **Voice**: Vosk (STT), Piper (TTS) - Planned
 
 ### Frontend (90% Complete ✅)
-- **Framework**: Next.js 14 con React 18
+- **Framework**: Next.js 14 with React 18
 - **Styling**: TailwindCSS + Material UI
 - **Rich Text Editor**: TipTap
 - **State Management**: Zustand + React Context
@@ -89,8 +116,9 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 
 ### DevOps
 - **Containerization**: Docker + docker-compose
-- **Reverse Proxy**: Nginx con HTTPS/SSL
+- **Reverse Proxy**: Nginx with HTTPS/SSL
 - **Database Migration**: Prisma Migrate
+- **Monitoring**: Prometheus + Grafana
 
 ## Quick Start
 
@@ -166,6 +194,7 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
    # PostgreSQL and Redis must be running
    docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=password pgvector/pgvector:pg15-latest
    docker run -d -p 6379:6379 redis:7-alpine
+   docker run -d -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
    ```
 
 ## API Endpoints
@@ -180,107 +209,113 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 - `POST /auth/logout` - Logout
 - `GET /auth/me` - Get current user profile
 
-### Users
-- `GET /users/me` - Get user profile
-- `PUT /users/me` - Update profile
-- `DELETE /users/me` - Delete account (GDPR)
-- `GET /users/me/messages` - Get message history
+### Emails
+- `GET /emails` - List emails with filtering
+- `GET /emails/:id` - Get single email with attachments
+- `GET /emails/:id/attachments` - List email attachments
+- `GET /emails/:id/attachments/:attachmentId` - Get attachment metadata
+- `POST /emails/send` - Send new email
+- `POST /emails/:id/reply` - Reply to email
+- `PATCH /emails/:id` - Update email (read status, folder, etc.)
+- `DELETE /emails/:id` - Delete email
+
+### Calendar
+- `GET /calendar/events` - List calendar events
+- `GET /calendar/events/:id` - Get single event
+- `GET /calendar/events/:eventId/attachments` - List event attachments
+- `POST /calendar/events` - Create event
+- `PATCH /calendar/events/:id` - Update event
+- `DELETE /calendar/events/:id` - Delete event
+
+### Contacts
+- `GET /contacts` - List contacts
+- `GET /contacts/:id` - Get single contact
+- `POST /contacts` - Create contact
+- `PUT /contacts/:id` - Update contact
+- `DELETE /contacts/:id` - Delete contact
 
 ### AI Chat
 - `POST /ai/chat` - Send message to AI
-- `GET /ai/chat/sessions` - List the latest chat sessions (FIFO per user/tenant)
-- `POST /ai/chat/sessions` - Create a new chat session
-- `GET /ai/chat/sessions/:id` - Retrieve a specific session with history
-- `DELETE /ai/chat/sessions/:id` - Delete a stored chat session
-- `POST /ai/agent` - Agentic workflow (LangChain) with automatic session persistence and titles
+- `GET /ai/chat/sessions` - List chat sessions
+- `POST /ai/chat/sessions` - Create new session
+- `GET /ai/chat/sessions/:id` - Get session with history
+- `DELETE /ai/chat/sessions/:id` - Delete session
+- `POST /ai/agent` - Agentic workflow with automatic persistence
 
 ### AI Knowledge Base
-- `POST /ai/knowledge-base/emails/backfill` - Admin: generate embeddings for existing emails
-- `GET /ai/knowledge-base/embeddings` - Admin: inspect stored embeddings
-- `DELETE /ai/knowledge-base/embeddings/:id` - Admin: remove a specific embedding
-- `DELETE /ai/knowledge-base/embeddings/email/:emailId` - Admin: purge embeddings linked to an email
+- `POST /ai/knowledge-base/search` - Semantic search across emails and attachments
+- `POST /ai/knowledge-base/emails/backfill` - Generate embeddings for existing emails
+- `GET /ai/knowledge-base/embeddings` - Inspect stored embeddings
+- `DELETE /ai/knowledge-base/embeddings/:id` - Remove embedding
+- `DELETE /ai/knowledge-base/embeddings/email/:emailId` - Purge email embeddings
 
-### Providers & Email Sync
-- `POST /providers/google/auth-url` - Ottieni URL OAuth Google
-- `POST /providers/google/connect` - Collega account Google
-- `POST /providers/microsoft/auth-url` - Ottieni URL OAuth Microsoft
-- `POST /providers/microsoft/connect` - Collega account Microsoft
-- `POST /providers/generic/connect` - Collega provider IMAP/SMTP
-- `GET /providers` - Elenco provider collegati
-- `GET /providers/:id/test/*` - Diagnostic API per Gmail/Microsoft
+### Providers & Sync
+- `POST /providers/google/auth-url` - Get Google OAuth URL
+- `POST /providers/google/connect` - Connect Google account
+- `POST /providers/microsoft/auth-url` - Get Microsoft OAuth URL
+- `POST /providers/microsoft/connect` - Connect Microsoft account
+- `POST /providers/generic/connect` - Connect IMAP/SMTP provider
+- `GET /providers` - List connected providers
+- `GET /providers/:id/test/*` - Diagnostic APIs
 
-### Tenants (Admin)
-- `GET /tenants` - List tenants
-- `GET /tenants/:id` - Get tenant details
-- `POST /tenants` - Create tenant
-- `PUT /tenants/:id` - Update tenant
-- `DELETE /tenants/:id` - Delete tenant
-
-### Health
+### Health & Monitoring
 - `GET /health` - System health status
 - `GET /health/ready` - Readiness probe
 - `GET /health/live` - Liveness probe
-- `GET /health/queues` - Email sync queue metrics (JSON)
-- `GET /health/metrics` - Prometheus metrics (text/plain)
+- `GET /health/queues` - Email sync queue metrics
+- `GET /health/metrics` - Prometheus metrics
 
-## Observability Stack
+## Security Features
 
-### Avvio Prometheus e Grafana
+- ✅ HTTPS/TLS with SSL certificates
+- ✅ JWT authentication with automatic rotation
+- ✅ OTP/MFA mandatory for every login
+- ✅ Bcrypt password hashing (cost factor 12)
+- ✅ AES-256-CBC encryption for sensitive data
+- ✅ CORS protection with domain whitelist
+- ✅ Helmet.js security headers
+- ✅ Rate limiting on auth endpoints
+- ✅ Multi-tenant data isolation with CTE queries
+- ✅ Comprehensive audit logging
+- ✅ GDPR compliance (right to be forgotten)
+- ✅ XSS protection with DOMPurify
+- ✅ CSRF protection with cryptographically secure tokens
+- ✅ Redis SCAN for production-safe operations
 
-Il `docker-compose.yml` include Prometheus (porta `9090`) e Grafana (porta `3002`). Per avviarli:
+## 📚 Complete Documentation
 
-```bash
-docker-compose up -d prometheus grafana
-```
+### 📋 Quick Links
+- **[Project Status](docs/development/PROJECT_STATUS.md)** - Implementation checklist & progress
+- **[Recent Updates](docs/development/recent-implementation-summary.md)** - Latest features and fixes
+- **[Security Audit](docs/security/tenant-isolation-audit-2025-11-19.md)** - Comprehensive security review
 
-Prometheus carica automaticamente `monitoring/prometheus.yml`, che esegue lo scrape di `backend:3000/health/metrics`.
-Grafana utilizza una datasource preconfigurata che punta al servizio Prometheus interno.
+### 📁 Documentation Index
 
-- Dashboard Prometheus: http://localhost:9090
-- Dashboard Grafana: http://localhost:3002 (credenziali di default `admin` / `admin`; personalizzabili via `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`)
+#### 🚀 [Setup & Getting Started](docs/setup/)
+- [OAuth Complete Guide](docs/setup/oauth-complete-guide.md) - Google & Microsoft OAuth setup
+- [OAuth Vercel Deployment](docs/setup/oauth-vercel.md) - Production OAuth configuration
 
-### Metriche disponibili
+#### 🏗️ [Architecture & Design](docs/architecture/)
+- [AI Embeddings Optimization](docs/architecture/ai-embeddings-optimization.md) - Performance optimization strategies
+- [Email Frontend Refactor](docs/architecture/email-frontend-refactor.md) - Frontend architecture analysis
+- [Provider Pattern](backend/src/modules/providers/README.md) - Unified provider abstraction
 
-- `email_sync_queue_completed{queue="high"}` – contatore job completati per coda
-- `email_sync_queue_failed{queue="normal"}` – contatore job falliti per coda
-- `email_sync_queue_last_duration_ms{queue="low"}` – durata dell’ultimo job
-- `email_sync_queue_avg_duration_ms{queue="high"}` – media mobile delle durate
+#### 🔐 [Security](docs/security/)
+- [Tenant Isolation Audit](docs/security/tenant-isolation-audit-2025-11-19.md) - Critical security findings
+- [XSS Fix Guide](docs/security/xss-fix-dompurify.md) - XSS vulnerability remediation
 
-È possibile estendere `QueueService` per esporre metriche aggiuntive (lag, rate limit, circuit breaker) se necessario.
+#### 💻 [Development](docs/development/)
+- [Project Status](docs/development/PROJECT_STATUS.md) - Current implementation state
+- [Recent Implementation](docs/development/recent-implementation-summary.md) - Latest session summary
+- [Labels Implementation Plan](docs/development/labels-implementation-plan.md) - Advanced categorization
+- [Provider Migration Phase 2](docs/development/provider-migration-phase2.md) - Migration completion report
+- [Folder Management Roadmap](docs/development/folder-management-roadmap.md) - Email folder features
 
-### Compliance
-- `GET /compliance/gdpr/status` - GDPR compliance snapshot with outstanding actions
+#### 📦 [Archive](docs/archive/)
+- [Implementation Analysis](docs/archive/implementation-analysis/) - Historical refactoring docs
+- [Testing Reports](docs/archive/testing/) - Previous test session results
 
-## OAuth Configuration
-
-### Gmail (Google Cloud)
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project
-3. Enable APIs: Gmail API, Google Drive API
-4. Create OAuth 2.0 credentials (Web Application)
-5. Add redirect URIs:
-   - `http://localhost:3000/auth/gmail/callback` (development)
-   - `https://yourdomain.com/auth/gmail/callback` (production)
-
-   **Note**: Backend receives OAuth callback, then redirects to frontend with auth code
-6. Copy Client ID and Secret to `.env`
-
-### Microsoft Graph (Azure)
-
-1. Go to [Azure Portal](https://portal.azure.com/)
-2. Register a new application in Azure AD
-3. Create client secret
-4. Configure redirect URIs:
-   - `http://localhost:3000/auth/microsoft/callback` (development)
-   - `https://yourdomain.com/auth/microsoft/callback` (production)
-
-   **Note**: Backend receives OAuth callback, then redirects to frontend with auth code
-5. Enable API permissions:
-   - Mail.Read
-   - Mail.Send
-   - offline_access
-6. Copy Client ID and Secret to `.env`
+**📚 [Full Documentation Index →](docs/README.md)**
 
 ## Useful Commands
 
@@ -309,171 +344,48 @@ docker-compose build
 
 # Restart a service
 docker-compose restart backend
+
+# Check health
+curl http://localhost:3000/health
+
+# View Prometheus metrics
+curl http://localhost:3000/health/metrics
 ```
 
-## Project Structure
+## Monitoring & Observability
 
-```
-mailagent/
-├── backend/                      # NestJS Backend
-│   ├── src/
-│   │   ├── main.ts              # Entry point
-│   │   ├── app.module.ts        # Root module
-│   │   ├── modules/
-│   │   │   ├── auth/            # Authentication
-│   │   │   ├── users/           # Users management
-│   │   │   ├── tenants/         # Tenants management
-│   │   │   ├── email/           # Email integration
-│   │   │   ├── ai/              # AI/Mistral
-│   │   │   ├── health/          # Health checks
-│   │   │   └── audit/           # Audit logging
-│   │   ├── workers/
+### Prometheus & Grafana
 
-│   │   │   └── ai.worker.ts     # AI processing worker
-│   │   ├── common/
-│   │   │   ├── services/
-│   │   │   └── filters/
-│   │   └── prisma/
-│   ├── prisma/
-│   │   ├── schema.prisma
-│   │   └── seed.ts
-│   ├── Dockerfile
-│   ├── Dockerfile.worker
-│   └── package.json
-│
-├── frontend/                     # Next.js Frontend
-│   ├── pages/
-│   │   ├── index.tsx            # Home
-│   │   ├── _app.tsx
-│   │   ├── auth/
-│   │   │   ├── login.tsx
-│   │   │   ├── register.tsx
-│   │   │   ├── forgot-password.tsx
-│   │   │   └── reset-password.tsx
-│   │   └── dashboard/
-│   │       ├── index.tsx        # Main dashboard
-│   │       ├── providers.tsx    # Provider management
-│   │       └── settings.tsx     # Settings
-│   ├── components/
-│   │   └── ui/                  # ShadCN UI
-│   ├── lib/
-│   │   ├── api-client.ts
-│   │   ├── context/
-│   │   ├── hooks/
-│   │   └── utils.ts
-│   ├── stores/
-│   │   └── auth-store.ts
-│   ├── styles/
-│   │   └── globals.css
-│   ├── Dockerfile
-│   ├── next.config.js
-│   ├── tailwind.config.ts
-│   └── package.json
-│
-├── nginx/
-│   ├── nginx.conf
-│   └── certs/                   # SSL certificates
-│
-├── database/
-│   └── init.sql
-│
-├── docker-compose.yml
-├── .env.example
-└── README.md
+Start monitoring stack:
+```bash
+docker-compose up -d prometheus grafana
 ```
 
-## Security Features
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3002 (admin/admin)
 
-- ✅ HTTPS/TLS with SSL certificates
-- ✅ JWT authentication
-- ✅ OTP/MFA for every login
-- ✅ Bcrypt password hashing
-- ✅ AES-256 encryption for sensitive data
-- ✅ CORS protection
-- ✅ Helmet.js security headers
-- ✅ Rate limiting on auth endpoints
-- ✅ Multi-tenant data isolation
-- ✅ Audit logging
-- ✅ GDPR compliance (right to be forgotten, data deletion)
-
-## GDPR and Privacy
-
-### Right to be Forgotten
-Users can request complete account deletion:
-- Endpoint: `DELETE /users/me`
-- Data is soft-deleted then permanently removed in background
-- All messages, embeddings, and email configs are deleted
-- Sensitive data in logs is anonymized
-
-### Audit Log
-All critical actions are logged:
-- User creation/modification/deletion
-- Login/logout events
-- Configuration changes
-- Email access
-
-### Encryption
-- Email credentials (OAuth tokens, IMAP passwords) encrypted with AES-256
-- Encryption keys managed via environment variables
-
-## Logging
-
-Backend uses **pino** for structured logging:
-```typescript
-logger.log('User logged in', { userId, timestamp });
-logger.warn('Failed login attempt', { email, attempts });
-logger.error('API error', { error: error.message, stack });
-```
-
-Logs available via:
-- Console (development)
-- File (production - configurable)
-- Structured logging for ELK stack integration
-
-## Monitoring
+### Available Metrics
+- `email_sync_queue_completed{queue="high"}` - Completed jobs per queue
+- `email_sync_queue_failed{queue="normal"}` - Failed jobs per queue
+- `email_sync_queue_last_duration_ms{queue="low"}` - Last job duration
+- `email_sync_queue_avg_duration_ms{queue="high"}` - Average duration
 
 ### Health Checks
 ```bash
 $ curl http://localhost:3000/health
 {
   "status": "healthy",
-  "timestamp": "2025-11-04T17:20:11.000Z",
   "services": {
     "database": { "status": "up", "responseTime": 5 },
     "redis": { "status": "up", "responseTime": 2 },
     "mistral": { "status": "up", "responseTime": 110 },
     "emailSyncQueue": {
       "status": "up",
-      "queues": [
-        { "queue": "high", "completed": 1234, "failed": 12, "averageDurationMs": 420 },
-        { "queue": "normal", "completed": 567, "failed": 3, "averageDurationMs": 610 },
-        { "queue": "low", "completed": 90, "failed": 0, "averageDurationMs": 1200 }
-      ],
       "totals": { "completed": 1891, "failed": 15 }
     }
   }
 }
 ```
-
-Queue-only metrics:
-
-```bash
-$ curl http://localhost:3000/health/queues
-```
-
-Prometheus metrics:
-
-```bash
-$ curl http://localhost:3000/health/metrics
-# HELP email_sync_queue_completed Total completed sync jobs per queue
-email_sync_queue_completed{queue="high"} 1234
-```
-
-### Dashboard Metrics
-- Message queue count
-- Service uptime
-- Last email sync per account
-- Connected users count
 
 ## Troubleshooting
 
@@ -489,93 +401,31 @@ docker-compose exec redis redis-cli ping
 
 ### SSL Certificate Issues
 ```bash
-# Regenerate self-signed certificates
 rm -rf nginx/certs/*
 openssl req -x509 -newkey rsa:4096 -keyout nginx/certs/key.pem -out nginx/certs/cert.pem -days 365 -nodes
 docker-compose restart nginx
 ```
 
-### Database Migration Failures
+### MinIO Storage Issues
 ```bash
-docker-compose exec backend npx prisma migrate reset
-docker-compose exec backend npx prisma db seed
+# Access MinIO console
+open http://localhost:9001
+# Default credentials: minioadmin / minioadmin
 ```
-
-## 📚 Documentation
-
-### 📖 Documentazione Principale
-
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Guida risoluzione problemi comuni
-- **[PROJECT_CHECKLIST.md](PROJECT_CHECKLIST.md)** - Stato progetto, test effettuati, roadmap
-- **[PRIVACY.md](PRIVACY.md)** - Informativa privacy e GDPR compliance
-
-### 📁 Documentazione Organizzata
-
-Tutta la documentazione è ora organizzata nella cartella **[`docs/`](docs/)**:
-
-#### 🚀 [Setup](docs/setup/)
-- Guide configurazione e quick start
-- Setup ambiente locale e produzione
-- Checklist iniziali
-
-#### 🔐 [OAuth](docs/oauth/)
-- Setup OAuth2 Gmail (step-by-step)
-- Setup OAuth2 Microsoft (step-by-step)
-- Fix e troubleshooting token
-
-#### 💻 [Implementation](docs/implementation/)
-- Strategia sincronizzazione email
-- Guida integrazione provider
-- Auto-refresh token (Google + Microsoft)
-- Architettura sistema
-
-#### 🧪 [Testing](docs/testing/)
-- Risultati test sessioni
-- Test token refresh
-- Test email sync success
-
-#### 📈 [Scalability](docs/scalability/)
-- Analisi capacità sistema
-- Piano B: Ottimizzazioni per 1000+ tenant
-- Test risultati performance
-
-**📚 [Indice Completo Documentazione →](docs/README.md)**
-
-### 🔧 Script di Test
-
-Gli script sono organizzati in **[`scripts/`](scripts/)**:
-
-- **[`scripts/test/`](scripts/test/)** - Test API (Google, Microsoft, IMAP)
-- **[`scripts/diagnostics/`](scripts/diagnostics/)** - Script diagnostici (database, provider, sync)
-- **[`scripts/scalability/`](scripts/scalability/)** - Test scalabilità e performance
-
-**🔧 [Guida Script →](scripts/README.md)**
-
-### Problemi Comuni
-
-Consulta [TROUBLESHOOTING.md](TROUBLESHOOTING.md) per soluzioni a:
-- ❌ Mistral AI "Service unavailable"
-- ❌ OAuth2 redirect_uri_mismatch
-- ❌ Token scaduti
-- ❌ Database connection error
-- ❌ Email OTP non ricevute
-- ❌ IMAP connection timeout
-- ❌ Docker container issues
-
----
 
 ## Production Deployment
 
 For production deployment:
 
-1. **Environment Variables**: Configure `.env.production`
+1. **Environment Variables**: Configure `.env.production` with secure values
 2. **SSL Certificates**: Use Let's Encrypt via Certbot
-3. **Database**: Use managed PostgreSQL service with automatic backups
-4. **Redis**: Use managed Redis or cluster setup
-5. **Reverse Proxy**: Consider CloudFlare or AWS CloudFront
-6. **Monitoring**: Integrate Prometheus + Grafana
-7. **Logging**: Use ELK stack or Datadog
-8. **Email**: Use SendGrid, Mailgun, or similar service
+3. **Database**: Use managed PostgreSQL service (AWS RDS, Google Cloud SQL)
+4. **Redis**: Use managed Redis or cluster setup (AWS ElastiCache, Redis Cloud)
+5. **Object Storage**: Use AWS S3, Google Cloud Storage, or managed MinIO
+6. **Reverse Proxy**: Consider CloudFlare or AWS CloudFront
+7. **Monitoring**: Integrate Prometheus + Grafana + AlertManager
+8. **Logging**: Use ELK stack, Datadog, or similar service
+9. **Email**: Use SendGrid, Mailgun, or similar service for transactional emails
 
 ## License
 
