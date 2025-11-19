@@ -98,11 +98,30 @@ async function bootstrap() {
     });
   }
 
+  // Enable graceful shutdown
+  app.enableShutdownHooks();
+
   await app.listen(config.api.port);
   logger.log(`🚀 Application is running on ${config.api.url}`);
   logger.log(`📊 Swagger docs available at ${config.api.url}/api/docs`);
   logger.log(`🗄️ Database: ${config.database.host}:${config.database.port}/${config.database.database}`);
   logger.log(`⚡ Redis: ${config.redis.host}:${config.redis.port}`);
+
+  // Graceful shutdown handlers
+  const gracefulShutdown = async (signal: string) => {
+    logger.log(`\n🛑 Received ${signal}, starting graceful shutdown...`);
+    try {
+      await app.close();
+      logger.log('✅ Application closed gracefully');
+      process.exit(0);
+    } catch (error) {
+      logger.error('❌ Error during shutdown:', error);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 bootstrap().catch((err) => {
