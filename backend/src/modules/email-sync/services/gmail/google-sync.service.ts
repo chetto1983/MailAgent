@@ -1,23 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { gmail_v1, google } from 'googleapis';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
-import { EmbeddingsService } from '../../ai/services/embeddings.service';
-import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
-import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
-import { EmailEventReason } from '../../realtime/types/realtime.types';
-import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
+import { PrismaService } from '../../../../prisma/prisma.service';
+import { CryptoService } from '../../../../common/services/crypto.service';
+import { SyncJobData, SyncJobResult } from '../../interfaces/sync-job.interface';
+import { EmailEmbeddingQueueService } from '../../../ai/services/email-embedding.queue';
+import { EmbeddingsService } from '../../../ai/services/embeddings.service';
+import { KnowledgeBaseService } from '../../../ai/services/knowledge-base.service';
+import { RealtimeEventsService } from '../../../realtime/services/realtime-events.service';
+import { EmailEventReason } from '../../../realtime/types/realtime.types';
+import { mergeEmailStatusMetadata } from '../../utils/email-metadata.util';
 import { ConfigService } from '@nestjs/config';
-import { ProviderTokenService } from './provider-token.service';
-import { RetryService } from '../../../common/services/retry.service';
-import { AttachmentStorageService } from '../../email/services/attachment.storage';
-import { BaseEmailSyncService } from './base-email-sync.service';
-import { GmailAttachmentHandler } from './gmail/gmail-attachment-handler';
-import { GmailFolderService } from './gmail/gmail-folder.service';
-import { GmailMessageParser } from './gmail/gmail-message-parser';
-import { GmailBatchProcessor } from './gmail/gmail-batch-processor';
+import { ProviderTokenService } from '../provider-token.service';
+import { RetryService } from '../../../../common/services/retry.service';
+import { AttachmentStorageService } from '../../../email/services/attachment.storage';
+import { BaseEmailSyncService } from '../base-email-sync.service';
+import { GmailAttachmentHandler } from './gmail-attachment-handler';
+import { GmailFolderService } from './gmail-folder.service';
+import { GmailMessageParser } from './gmail-message-parser';
+import { GmailBatchProcessor } from './gmail-batch-processor';
 
 @Injectable()
 export class GoogleSyncService extends BaseEmailSyncService {

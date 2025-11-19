@@ -1,23 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosResponse } from 'axios';
 import { URLSearchParams } from 'url';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { EmailEmbeddingJob, EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
-import { EmbeddingsService } from '../../ai/services/embeddings.service';
-import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
-import { EmailEventReason } from '../../realtime/types/realtime.types';
+import { PrismaService } from '../../../../prisma/prisma.service';
+import { CryptoService } from '../../../../common/services/crypto.service';
+import { SyncJobData, SyncJobResult } from '../../interfaces/sync-job.interface';
+import { EmailEmbeddingJob, EmailEmbeddingQueueService } from '../../../ai/services/email-embedding.queue';
+import { EmbeddingsService } from '../../../ai/services/embeddings.service';
+import { RealtimeEventsService } from '../../../realtime/services/realtime-events.service';
+import { EmailEventReason } from '../../../realtime/types/realtime.types';
 import { ConfigService } from '@nestjs/config';
-import { ProviderTokenService } from './provider-token.service';
-import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
-import { RetryService } from '../../../common/services/retry.service';
-import { AttachmentStorageService } from '../../email/services/attachment.storage';
-import { BaseEmailSyncService } from './base-email-sync.service';
-import { MicrosoftAttachmentHandler } from './microsoft/microsoft-attachment-handler';
-import { MicrosoftFolderService } from './microsoft/microsoft-folder.service';
-import { MicrosoftMessageParser, ParsedMicrosoftMessage } from './microsoft/microsoft-message-parser';
-import { MicrosoftBatchProcessor } from './microsoft/microsoft-batch-processor';
+import { ProviderTokenService } from '../provider-token.service';
+import { mergeEmailStatusMetadata } from '../../utils/email-metadata.util';
+import { RetryService } from '../../../../common/services/retry.service';
+import { AttachmentStorageService } from '../../../email/services/attachment.storage';
+import { BaseEmailSyncService } from '../base-email-sync.service';
+import { MicrosoftAttachmentHandler } from './microsoft-attachment-handler';
+import { MicrosoftFolderService } from './microsoft-folder.service';
+import { MicrosoftMessageParser, ParsedMicrosoftMessage } from './microsoft-message-parser';
+import { MicrosoftBatchProcessor } from './microsoft-batch-processor';
 
 /**
  * Microsoft Graph API attachment metadata
