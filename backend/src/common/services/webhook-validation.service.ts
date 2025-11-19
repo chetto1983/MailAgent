@@ -120,8 +120,9 @@ export class WebhookValidationService {
       this.logger.debug(
         `Webhook validation successful for ${options.provider} (${duration}ms)`,
       );
-    } catch (error) {
+    } catch (err) {
       const duration = Date.now() - startTime;
+      const error = err instanceof Error ? err : new Error(String(err));
       this.logger.error(
         `Webhook validation failed for ${options.provider} (${duration}ms):`,
         error.message,

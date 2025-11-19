@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
+import { randomBytes } from 'crypto';
 import { getConfiguration } from '../../../config/configuration';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
@@ -178,10 +179,10 @@ export class GoogleOAuthService {
 
   /**
    * Generate random state for CSRF protection
+   * Uses cryptographically secure random bytes
    */
   private generateRandomState(): string {
-    return Math.random().toString(36).substring(2, 15) +
-           Math.random().toString(36).substring(2, 15);
+    return randomBytes(16).toString('hex');
   }
 
   /**

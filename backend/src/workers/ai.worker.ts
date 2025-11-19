@@ -5,6 +5,7 @@
 
 import { Queue, Worker } from 'bullmq';
 import { NestFactory } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { AppModule } from '../app.module';
 import { MistralService } from '../modules/ai/services/mistral.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -20,6 +21,8 @@ const queueOptions = { connection };
 const aiQueue = new Queue('ai-processing', queueOptions);
 
 async function bootstrap() {
+  const logger = new Logger('AIWorker');
+
   const appContext = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn', 'log'],
   });
@@ -50,16 +53,16 @@ async function bootstrap() {
   );
 
   aiWorker.on('completed', (job) => {
-    console.log(`AI job ${job.id} completed successfully`);
+    logger.log(`AI job ${job.id} completed successfully`);
   });
 
   aiWorker.on('failed', (job, error) => {
     const jobId = job?.id || 'unknown';
-    console.error(`AI job ${jobId} failed:`, error);
+    logger.error(`AI job ${jobId} failed:`, error);
   });
 
   const shutdown = async () => {
-    console.log('AI worker shutting down gracefully');
+    logger.log('AI worker shutting down gracefully');
     await aiWorker.close();
     await aiQueue.close();
     await prismaService.$disconnect();
@@ -70,10 +73,11 @@ async function bootstrap() {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 
-  console.log('AI Worker started and listening for jobs');
+  logger.log('AI Worker started and listening for jobs');
 }
 
+const bootstrapLogger = new Logger('AIWorkerBootstrap');
 bootstrap().catch((error) => {
-  console.error('Failed to initialise AI worker:', error);
+  bootstrapLogger.error('Failed to initialise AI worker:', error);
   process.exit(1);
 });

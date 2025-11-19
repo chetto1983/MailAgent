@@ -124,7 +124,8 @@ async function bootstrap() {
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
+const bootstrapLogger = new Logger('Bootstrap');
 bootstrap().catch((err) => {
-  console.error('Failed to start application:', err);
+  bootstrapLogger.error('Failed to start application:', err);
   process.exit(1);
 });

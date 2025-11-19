@@ -192,7 +192,8 @@ export class DeadLetterQueueService implements OnModuleInit, OnModuleDestroy {
       // Check if this failure warrants an alert
       await this.checkAlertThresholds(originalQueue);
     } catch (err) {
-      this.logger.error(`Failed to add job to DLQ: ${err.message}`, err.stack);
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.error(`Failed to add job to DLQ: ${error.message}`, error.stack);
     }
   }
 
@@ -235,7 +236,8 @@ export class DeadLetterQueueService implements OnModuleInit, OnModuleDestroy {
 
       this.logger.log(`Successfully retried job ${dlqJobId}`);
       return true;
-    } catch (error) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
       this.logger.error(`Failed to retry job ${dlqJobId}: ${error.message}`, error.stack);
       return false;
     }
@@ -379,7 +381,8 @@ export class DeadLetterQueueService implements OnModuleInit, OnModuleDestroy {
       await job.remove();
       this.logger.log(`Removed job ${jobId} from DLQ`);
       return true;
-    } catch (error) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
       this.logger.error(`Failed to remove job ${jobId} from DLQ: ${error.message}`);
       return false;
     }
@@ -488,7 +491,8 @@ export class DeadLetterQueueService implements OnModuleInit, OnModuleDestroy {
   private async performCleanup(): Promise<void> {
     try {
       await this.cleanOldFailures();
-    } catch (error) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
       this.logger.error(`DLQ cleanup failed: ${error.message}`, error.stack);
     }
   }
