@@ -21,7 +21,7 @@ import { ProviderTokenService } from '../email-sync/services/provider-token.serv
   imports: [
     PrismaModule,
     ProvidersModule,
-    AiModule,
+    forwardRef(() => AiModule),
     forwardRef(() => EmailSyncModule),
     RealtimeModule,
   ],

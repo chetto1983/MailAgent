@@ -99,10 +99,8 @@ export class EnvironmentVariables {
 
   // Encryption
   @IsString()
-  ENCRYPTION_KEY: string;
-
-  @IsString()
-  ENCRYPTION_IV: string;
+  @IsOptional()
+  AES_SECRET_KEY?: string;
 
   // SMTP (Optional)
   @IsString()

@@ -43,7 +43,7 @@ import { WebhookController } from './controllers/webhook.controller';
     PrismaModule,
     forwardRef(() => ProvidersModule), // For OAuth services and crypto
     forwardRef(() => EmailModule), // For AttachmentStorageService
-    AiModule,
+    forwardRef(() => AiModule),
     RealtimeModule, // WebSocket events
   ],
   controllers: [
@@ -89,6 +89,7 @@ import { WebhookController } from './controllers/webhook.controller';
     WebhookLifecycleService,
     CrossProviderSyncService,
     ProviderTokenService, // Export for use in calendar and contacts modules
+    SyncAuthService,
   ],
 })
 export class EmailSyncModule {}
