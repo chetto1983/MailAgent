@@ -272,54 +272,6 @@ export const EmailList: React.FC<EmailListProps> = ({
     }
   }, [onRefresh]);
 
-  // Handle rows rendered for infinite scroll
-  const handleRowsRendered = useCallback(
-    ({ stopIndex }: { startIndex: number; stopIndex: number }) => {
-      if (!hasMore || loadingMore || !onLoadMore) return;
-
-      // Load more when approaching the end (within 10 items)
-      if (stopIndex >= filteredEmails.length - 10) {
-        onLoadMore();
-      }
-    },
-    [hasMore, loadingMore, onLoadMore, filteredEmails.length]
-  );
-
-  // Row renderer for react-window v2 List
-  const RowComponent = useMemo(() => {
-    console.log('[DEBUG EmailList] Creating RowComponent with filteredEmails.length:', filteredEmails.length);
-    const Row = ({
-      index,
-      style,
-      ariaAttributes,
-    }: {
-      index: number;
-      style: React.CSSProperties;
-      ariaAttributes: {
-        'aria-posinset': number;
-        'aria-setsize': number;
-        role: 'listitem';
-      };
-    }) => {
-      const email = filteredEmails[index];
-      if (!email) {
-        console.log('[DEBUG EmailList] Row', index, 'has no email');
-        return <div style={style} {...ariaAttributes} />;
-      }
-
-      const isSelected = selectedEmailId === email.id;
-      const isMultiSelected = selectedIds.has(email.id);
-
-      console.log('[DEBUG EmailList] Rendering row', index, 'style:', JSON.stringify(style), 'email:', email.subject);
-      return (
-        <div style={style} {...ariaAttributes}>
-          {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
-        </div>
-      );
-    };
-    return Row;
-  }, [filteredEmails, selectedEmailId, selectedIds, renderItem, handleToggleSelect, onEmailClick]);
-
   return (
     <Paper
       elevation={0}
