@@ -7,9 +7,9 @@ import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
 import { SyncSchedulerService } from '../services/sync-scheduler.service';
 import { FolderSyncService } from '../services/folder-sync.service';
 import { SyncAuthService } from '../services/sync-auth.service';
-import { GoogleSyncService } from '../services/google-sync.service';
-import { MicrosoftSyncService } from '../services/microsoft-sync.service';
-import { ImapSyncService } from '../services/imap-sync.service';
+import { GoogleSyncService } from '../services/gmail/google-sync.service';
+import { MicrosoftSyncService } from '../services/microsoft/microsoft-sync.service';
+import { ImapSyncService } from '../services/imap/imap-sync.service';
 
 @Injectable()
 export class SyncWorker implements OnModuleInit, OnModuleDestroy {

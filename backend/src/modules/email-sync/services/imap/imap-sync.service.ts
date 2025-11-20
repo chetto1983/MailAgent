@@ -2,15 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CryptoService } from '../../../common/services/crypto.service';
-import { SyncJobData, SyncJobResult } from '../interfaces/sync-job.interface';
-import { EmailEmbeddingQueueService } from '../../ai/services/email-embedding.queue';
-import { EmbeddingsService } from '../../ai/services/embeddings.service';
-import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
-import { EmailEventReason } from '../../realtime/types/realtime.types';
-import { mergeEmailStatusMetadata } from '../utils/email-metadata.util';
-import { BaseEmailSyncService } from './base-email-sync.service';
+import { PrismaService } from '../../../../prisma/prisma.service';
+import { CryptoService } from '../../../../common/services/crypto.service';
+import { SyncJobData, SyncJobResult } from '../../interfaces/sync-job.interface';
+import { EmailEmbeddingQueueService } from '../../../ai/services/email-embedding.queue';
+import { EmbeddingsService } from '../../../ai/services/embeddings.service';
+import { RealtimeEventsService } from '../../../realtime/services/realtime-events.service';
+import { EmailEventReason } from '../../../realtime/types/realtime.types';
+import { mergeEmailStatusMetadata } from '../../utils/email-metadata.util';
+import { BaseEmailSyncService } from '../base-email-sync.service';
 
 const IMAP_BODY_DOWNLOAD_TIMEOUT_MS = 10000;
 const IMAP_BODY_MAX_BYTES = 2 * 1024 * 1024; // 2MB

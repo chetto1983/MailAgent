@@ -176,60 +176,237 @@ storagePath: 'tenants/{tenantId}/providers/{providerId}/attachments/{uuid}-{file
 
 **Compilation Results**: ✅ 0 errors
 
-## Next Steps (Not Yet Implemented)
+## Skipped Phases (Analysis Complete)
 
-### Phase 2.2: Extract Specialized Services (Remaining)
+### Phase 2.2: MessageParserService ❌ SKIPPED
 
-#### 1. MessageParserService (8h)
-**Status**: Not yet started
-Extract message parsing logic:
-- Parse email headers
-- Extract recipients (to, cc, bcc)
-- Handle threading
-- Process MIME parts
+#### Decision (2025-11-19)
+**Status**: ❌ **SKIPPED** after analysis of official API documentation
 
-**Impact**: -120 duplicate lines
+**Reason**: Provider API structures are fundamentally different by design, making centralized parsing counterproductive.
 
-#### 3. FolderSyncService (Already exists - needs enhancement)
-Current: `backend/src/modules/email-sync/services/folder-sync.service.ts`
-- Already handles folder synchronization
-- May need minor updates to use BaseEmailSyncService patterns
+**Official API Analysis**:
+
+**Gmail API** (developers.google.com/gmail/api/reference/rest/v1/users.messages/get):
+```typescript
+// Headers: Array-based, requires .find() for each field
+const headers = message.payload?.headers || [];
+const from = headers.find((h) => h.name === 'From')?.value;
+const to = headers.find((h) => h.name === 'To')?.value?.split(',');
+
+// Parts: Recursive MIME parsing required
+const extractBody = (part: any) => {
+  if (part.mimeType === 'text/plain' && part.body?.data) { ... }
+  if (part.parts) part.parts.forEach(extractBody); // Recursive
+};
+```
+
+**Microsoft Graph API** (learn.microsoft.com/graph/api/resources/message):
+```typescript
+// Flat JSON with direct access
+const from = message.from?.emailAddress?.address;
+const to = message.toRecipients.map(r => r.emailAddress.address);
+const body = message.body?.contentType === 'html' ? message.body.content : '';
+const snippet = message.bodyPreview; // First 255 chars auto-provided
+```
+
+**IMAP** (RFC 3501):
+```typescript
+// Envelope-based with addressObject arrays
+const from = envelope.from?.[0]?.address;
+const to = envelope.to.map(addr => addr.address);
+const subject = envelope.subject;
+```
+
+**Conclusion**:
+- A centralized parser would require **forced abstractions** that obscure provider-specific optimizations
+- Each provider has different strengths (e.g., Microsoft auto-provides bodyPreview, Gmail requires recursion)
+- **Better approach**: Keep provider-specific parsers optimized for their API structure
+- **Alternative**: Focus on Phase 3 (file size reduction through modular architecture)
+
+**Impact**: -120 lines NOT eliminated, but **maintainability preserved**
+
+## Phase 3: Refactor Large Services (Next Priority)
+
+### Current State Analysis (2025-11-19)
+
+**File Sizes**:
+- `google-sync.service.ts`: **1,437 lines** (187% over 500-line limit) 🔴
+- `microsoft-sync.service.ts`: **1,595 lines** (219% over 500-line limit) 🔴
+- `imap-sync.service.ts`: **692 lines** (38% over limit) 🟡
+
+**Target**: Reduce each file to < 500 lines while maintaining provider-specific optimizations.
+
+### Strategy: Modular Extraction (Not Centralization)
+
+**Key Principle**: Extract provider-specific helper services, NOT shared services.
+- Each provider keeps its own optimized implementations
+- No forced abstractions that obscure API-specific patterns
+- Services are provider-scoped (e.g., `GmailBatchProcessor`, `MicrosoftMessageParser`)
 
 ### Phase 3: Refactor Large Services
 
-#### Google Sync Service Splitting (32h)
+#### Phase 3.1: Google Sync Service Splitting (24h)
+
+**Current Structure** (1,437 lines):
+- Core sync orchestration: ~350 lines
+- Batch processing: ~350 lines
+- Message parsing & processing: ~280 lines
+- Attachment handling: ~180 lines
+- Folder management: ~200 lines
+- Utilities & retry logic: ~77 lines
+
 **Target Structure**:
 ```
-google-sync.service.ts (300 lines) ← Main orchestration
+google-sync.service.ts (< 400 lines) ← Main orchestration
   ├─ extends BaseEmailSyncService
-  ├─ uses AttachmentHandlerService
-  ├─ uses MessageParserService
-  └─ uses FolderSyncService
+  ├─ uses GmailBatchProcessor (new)
+  ├─ uses GmailMessageProcessor (new)
+  ├─ uses GmailAttachmentHandler (new)
+  └─ uses GmailFolderService (new)
 ```
 
 **Extraction Plan**:
-1. Move attachment logic to AttachmentHandlerService
-2. Move parsing logic to MessageParserService
-3. Use BaseEmailSyncService utilities
-4. Keep only Gmail-specific API calls
 
-**Before**: 1,393 lines
-**After**: ~300-400 lines
-**Reduction**: ~70%
+**Step 1: Create GmailBatchProcessor** (~350 lines → new file)
+- `fetchMessagesBatch()`: Batch retrieval with retry
+- `processMessagesBatch()`: Orchestrate batch processing
+- `processParsedMessagesBatch()`: Database operations for batch
+- Dependencies: gmail client, prisma, logger
+- **Benefit**: Isolates all batch logic, easier to test batch edge cases
 
-#### Microsoft Sync Service Splitting (32h)
+**Step 2: Create GmailMessageProcessor** (~280 lines → new file)
+- `parseGmailMessage()`: Parse Gmail API response to our format
+- `processMessage()`: Single message processing logic
+- `handleMissingRemoteMessage()`: Handle deleted messages
+- Dependencies: prisma, attachment handler
+- **Benefit**: Single responsibility for message data transformation
+
+**Step 3: Create GmailAttachmentHandler** (~180 lines → new file)
+- `downloadGmailAttachment()`: Download from Gmail API
+- `processEmailAttachments()`: Process all attachments for an email
+- Dependencies: gmail client, AttachmentStorageService (already exists)
+- **Benefit**: Attachment logic separate from sync logic
+
+**Step 4: Create GmailFolderService** (~200 lines → new file)
+- `syncGmailFolders()`: Sync labels/folders from Gmail
+- `determineFolderFromLabels()`: Map Gmail labels to folders
+- `determineFolderTypeFromLabelId()`: Identify system folders
+- Dependencies: gmail client, prisma, BaseEmailSyncService.normalizeFolderName()
+- **Benefit**: Folder logic isolated, reusable across different sync scenarios
+
+**Step 5: Refactor google-sync.service.ts** (< 400 lines final)
+- Keep: `syncProvider()`, `syncIncremental()`, `syncFull()`, `refreshMessageMetadata()`
+- Keep: `createGmailClient()`, `withRetry()`, `applyStatusMetadata()`
+- Keep: Message deletion orchestration methods
+- Use: Injected helper services
+- **Benefit**: Clear orchestration layer, easier to understand flow
+
+**Estimated Line Distribution** (Final):
+```
+google-sync.service.ts:        ~380 lines (core orchestration)
+gmail-batch-processor.ts:      ~350 lines (batch operations)
+gmail-message-processor.ts:    ~280 lines (message parsing)
+gmail-attachment-handler.ts:   ~180 lines (attachments)
+gmail-folder.service.ts:       ~200 lines (folder sync)
+────────────────────────────────────────────────────
+Total:                        ~1,390 lines (modular)
+```
+
+**Testing Strategy**:
+- Unit tests for each extracted service
+- Integration tests for sync flow
+- Maintain 100% compatibility with existing behavior
+
+**Deliverables**:
+1. Four new provider-specific services (Batch, Message, Attachment, Folder)
+2. Refactored google-sync.service.ts (< 400 lines)
+3. 0 breaking changes
+4. Updated documentation
+
+---
+
+#### Phase 3.2: Microsoft Sync Service Splitting (24h)
+
+**Current Structure** (1,595 lines):
+- Core sync orchestration: ~380 lines
+- Batch processing: ~400 lines
+- Message parsing & processing: ~320 lines
+- Attachment handling: ~200 lines
+- Folder management: ~220 lines
+- Delta sync logic: ~75 lines
+
 **Target Structure**:
 ```
-microsoft-sync.service.ts (350 lines) ← Main orchestration
+microsoft-sync.service.ts (< 420 lines) ← Main orchestration
   ├─ extends BaseEmailSyncService
-  ├─ uses AttachmentHandlerService
-  ├─ uses MessageParserService
-  └─ uses FolderSyncService
+  ├─ uses MicrosoftBatchProcessor (new)
+  ├─ uses MicrosoftMessageProcessor (new)
+  ├─ uses MicrosoftAttachmentHandler (new)
+  └─ uses MicrosoftFolderService (new)
 ```
 
-**Before**: 1,535 lines
-**After**: ~350-400 lines
-**Reduction**: ~75%
+**Extraction Plan**:
+
+**Step 1: MicrosoftBatchProcessor** (~400 lines → new file)
+- Batch retrieval, processing orchestration, database operations
+- Dependencies: Graph client, prisma, logger
+
+**Step 2: MicrosoftMessageProcessor** (~320 lines → new file)
+- Parse Graph API to our format, single message processing
+- Dependencies: prisma, attachment handler
+
+**Step 3: MicrosoftAttachmentHandler** (~200 lines → new file)
+- Download, process, metadata fetching
+- Dependencies: Graph client, AttachmentStorageService
+
+**Step 4: MicrosoftFolderService** (~220 lines → new file)
+- Sync mailFolder, determine folder types
+- Dependencies: Graph client, prisma, BaseEmailSyncService
+
+**Step 5: Refactor microsoft-sync.service.ts** (< 420 lines)
+- Core orchestration only
+- Use injected helper services
+
+**Estimated Line Distribution** (Final):
+```
+microsoft-sync.service.ts:     ~410 lines (orchestration)
+ms-batch-processor.ts:         ~400 lines (batch ops)
+ms-message-processor.ts:       ~320 lines (parsing)
+ms-attachment-handler.ts:      ~200 lines (attachments)
+ms-folder.service.ts:          ~220 lines (folders)
+──────────────────────────────────────────────────
+Total:                        ~1,550 lines (modular)
+```
+
+**Deliverables**: Same as Phase 3.1
+
+---
+
+### Phase 3 Success Criteria
+
+**File Size Targets**:
+- ✅ google-sync.service.ts: < 400 lines (from 1,437)
+- ✅ microsoft-sync.service.ts: < 420 lines (from 1,595)
+- ✅ All extracted services: < 500 lines each
+
+**Code Quality**:
+- ✅ Single Responsibility Principle enforced
+- ✅ Clear dependency injection
+- ✅ Testable components
+- ✅ No circular dependencies
+
+**Compatibility**:
+- ✅ 0 breaking changes
+- ✅ All existing tests pass
+- ✅ Same behavior maintained
+
+**Documentation**:
+- ✅ Architecture diagram updated
+- ✅ Service dependency map
+- ✅ JSDoc comments for all services
+
+---
 
 ## Implementation Guidelines
 
@@ -311,15 +488,15 @@ export class GoogleSyncService extends BaseEmailSyncService {
 | Phase 1: Service Migration | ~4h | ✅ Complete | Critical |
 | Phase 3B: Advanced Cleanup | ~2h | ✅ Complete | High |
 | Phase 2.1: Intelligent Attachment Strategy | ~6h | ✅ Complete | High |
-| **Completed Subtotal** | **~18h** | | |
+| Phase 2.2: MessageParserService Analysis | ~2h | ✅ Complete (Skipped) | Medium |
+| **Completed Subtotal** | **~20h** | | |
 | | | | |
-| Phase 2.2: MessageParserService | 8h | 🔜 Pending | High |
-| Phase 3: Google Sync Refactor | 32h | 🔜 Pending | Critical |
-| Phase 3: Microsoft Sync Refactor | 32h | 🔜 Pending | Critical |
-| Testing & Documentation | 16h | 🔜 Pending | High |
-| **Remaining** | **88h** | | |
+| Phase 3: Google Sync Refactor | 24h | 🔜 Next | Critical |
+| Phase 3: Microsoft Sync Refactor | 24h | 🔜 Pending | Critical |
+| Testing & Documentation | 12h | 🔜 Pending | High |
+| **Remaining** | **60h** | | |
 | | | | |
-| **Grand Total** | **~106h** | | |
+| **Grand Total** | **~80h** | | |
 
 ## Testing Strategy
 

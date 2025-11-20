@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
+import { StorageService } from './storage.service';
 
 interface CleanupResult {
   removed: number;
@@ -19,6 +20,7 @@ export class EmailCleanupService {
     private readonly prisma: PrismaService,
     private readonly knowledgeBaseService: KnowledgeBaseService,
     private readonly configService: ConfigService,
+    private readonly storage: StorageService,
   ) {
     this.jobsEnabled =
       (this.configService.get<string>('JOBS_ENABLED') || 'true').toLowerCase() !== 'false';
@@ -122,9 +124,50 @@ export class EmailCleanupService {
   }
 
   private async permanentlyDeleteEmail(id: string, tenantId: string) {
-    await this.knowledgeBaseService.deleteEmbeddingsForEmail(tenantId, id);
+    // 1. Get attachments BEFORE deleting email
+    const attachments = await this.prisma.emailAttachment.findMany({
+      where: { emailId: id },
+      select: { id: true, storagePath: true, storageType: true, filename: true },
+    });
+
+    // 2. Delete embeddings
+    try {
+      await this.knowledgeBaseService.deleteEmbeddingsForEmail(tenantId, id);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to delete embeddings for email ${id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Continue with deletion even if embeddings fail
+    }
+
+    // 3. Delete email from database (cascade deletes EmailAttachment records)
     await this.prisma.email.delete({
       where: { id },
     });
+
+    // 4. Delete S3 files (after DB deletion to ensure cleanup even if S3 fails)
+    const s3Keys = attachments
+      .filter((a) => a.storageType === 's3' && a.storagePath)
+      .map((a) => a.storagePath!);
+
+    if (s3Keys.length > 0) {
+      try {
+        const result = await this.storage.deleteObjects(s3Keys);
+        this.logger.debug(
+          `Deleted ${result.deleted} S3 objects for email ${id} (${result.failed} failed)`,
+        );
+
+        if (result.failed > 0) {
+          this.logger.warn(
+            `Failed to delete ${result.failed} S3 objects for email ${id}. Objects may be orphaned.`,
+          );
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to delete S3 objects for email ${id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        // Don't throw - email already deleted from DB
+      }
+    }
   }
 }

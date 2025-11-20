@@ -2,15 +2,18 @@
 
 ![Backend](https://img.shields.io/badge/Backend-100%25-success?style=flat-square)
 ![Frontend](https://img.shields.io/badge/Frontend-90%25-success?style=flat-square)
-![Testing](https://img.shields.io/badge/Testing-15%25-orange?style=flat-square)
-![Version](https://img.shields.io/badge/Version-2.1.0-blue?style=flat-square)
+![Testing](https://img.shields.io/badge/Testing-17.45%25-orange?style=flat-square)
+![Version](https://img.shields.io/badge/Version-2.2.0-blue?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 MailAgent è una piattaforma full-stack completa e moderna per la gestione intelligente della posta elettronica con supporto IA, integrazione multi-provider e architettura multi-tenant enterprise-grade.
 
 ## 🎉 Recent Updates (November 2025)
 
-### ✅ Latest Features Implemented
+### ✅ Latest Features Implemented (Week of Nov 18-20)
+- **✨ IMAP Write Operations** - Complete bidirectional sync for IMAP providers (mark read/unread, star, delete, move) ✅ NEW
+- **✨ Backend Delivery Documentation** - Comprehensive 600+ line delivery document covering all features, architecture, and deployment
+- **✨ Test Infrastructure Improvements** - Increased test coverage from 12% to 17.45% (+45%), fixed Jest ESM issues
 - **Contacts Sync Worker System** - Complete BullMQ integration for Google and Microsoft contacts synchronization with priority queues
 - **Calendar Event Attachments** - Full sync support for Google Drive and OneDrive file references
 - **Gmail & Microsoft Attachment Sync** - Complete S3/MinIO storage integration with automatic download
@@ -31,14 +34,16 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 
 - ✅ **Multi-Tenant Architecture**: Complete data isolation with enterprise-grade security
 - ✅ **Email Management UI**: Full-featured viewer, composer (TipTap), threading, folders, search
-- ✅ **Email Sync**: Gmail API, Microsoft Graph, IMAP with auto-refresh token
+- ✅ **Email Sync (Bidirectional)**: Gmail API, Microsoft Graph, IMAP with auto-refresh token ✨ **100% COMPLETE**
+  - ✅ Gmail: Full bidirectional sync (read/write operations)
+  - ✅ Microsoft: Full bidirectional sync (read/write operations)
+  - ✅ IMAP: **NEW** Full bidirectional sync with write operations (mark read, star, delete, move)
 - ✅ **Attachment Handling**: Complete multi-provider sync with S3/MinIO storage
 - ✅ **AI Email Insights**: Email summarization, smart replies, auto-categorization
 - ✅ **AI Assistant**: Chat with Mistral AI and RAG (Retrieval-Augmented Generation)
 - ✅ **Knowledge Base**: Semantic search with pgvector embeddings + PDF/text content extraction
-- ✅ **Provider Integration**: Gmail, Outlook/Microsoft Graph and IMAP/SMTP
-- ✅ **Calendar Integration**: Google Calendar & Microsoft Calendar event sync with attachments
-- ✅ **Contacts Sync**: Google Contacts & Microsoft Contacts integration
+- ✅ **Calendar Integration (Bidirectional)**: Google Calendar & Microsoft Calendar event sync with attachments
+- ✅ **Contacts Sync (Bidirectional)**: Google Contacts & Microsoft Contacts integration
 - ✅ **Advanced Authentication**: Email/Password + OTP/MFA mandatory
 - ✅ **Password Recovery**: Secure reset with temporary tokens
 - ✅ **GDPR Compliance**: AES-256 encryption, audit log, right to be forgotten
@@ -92,18 +97,19 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 
 ## Technology Stack
 
-### Backend (95% Complete ✅)
-- **Framework**: NestJS (TypeScript)
-- **Database**: PostgreSQL 15+ with pgvector for RAG
-- **ORM**: Prisma
-- **Cache**: Redis with query embedding cache
-- **Job Queue**: BullMQ (34 concurrent workers, DLQ system)
-- **AI**: Mistral API (mistral-large-latest + mistral-embed)
-- **Email**: nodemailer, IMAP-Flow, googleapis, microsoft-graph-client
-- **Storage**: MinIO (S3-compatible) for attachments
+### Backend (100% Complete ✅ PRODUCTION READY)
+- **Framework**: NestJS 11.1.9 (TypeScript)
+- **Database**: PostgreSQL 16+ with pgvector for RAG
+- **ORM**: Prisma 6.19.0
+- **Cache**: Redis 7.x with query embedding cache
+- **Job Queue**: BullMQ 5.63.2 (34 concurrent workers, DLQ system)
+- **AI**: Mistral AI 1.10.0 (mistral-large-latest + mistral-embed)
+- **Email**: nodemailer, ImapFlow 1.1.1, googleapis 166.0.0, microsoft-graph-client 3.0.7
+- **Storage**: MinIO/S3 (S3-compatible) for attachments
 - **Auth**: JWT, bcrypt, OTP/MFA
 - **Encryption**: AES-256-CBC for tokens and passwords
 - **Text Extraction**: pdf-parse, Mozilla Readability
+- **Test Coverage**: 17.45% (282 passing tests, roadmap to 70%+)
 - **Voice**: Vosk (STT), Piper (TTS) - Planned
 
 ### Frontend (90% Complete ✅)
@@ -286,6 +292,9 @@ MailAgent è una piattaforma full-stack completa e moderna per la gestione intel
 ## 📚 Complete Documentation
 
 ### 📋 Quick Links
+- **[Backend Delivery](docs/BACKEND_DELIVERY.md)** - ✨ NEW: Complete backend delivery documentation (600+ lines)
+- **[Test Coverage Report](docs/development/TEST_COVERAGE_REPORT.md)** - ✨ NEW: Comprehensive test status & roadmap
+- **[Next Steps Analysis](docs/development/NEXT_STEPS_ANALYSIS.md)** - ✨ NEW: Prioritized development roadmap
 - **[Project Status](docs/development/PROJECT_STATUS.md)** - Implementation checklist & progress
 - **[Recent Updates](docs/development/recent-implementation-summary.md)** - Latest features and fixes
 - **[Security Audit](docs/security/tenant-isolation-audit-2025-11-19.md)** - Comprehensive security review
