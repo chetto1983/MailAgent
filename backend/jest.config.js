@@ -16,10 +16,12 @@ module.exports = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   transformIgnorePatterns: [
-    'node_modules/(?!(@nestjs|@prisma|imapflow|mailparser|isomorphic-ws|nanoid)/)',
+    'node_modules/(?!(@nestjs|@prisma|imapflow|mailparser|isomorphic-ws|nanoid|@mistralai)/)',
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^nanoid$': '<rootDir>/test/mocks/nanoid.mock.ts',
+    '^jsdom$': '<rootDir>/test/mocks/jsdom.mock.ts',
   },
   transform: {
     '^.+\\.ts$': ['ts-jest', {
