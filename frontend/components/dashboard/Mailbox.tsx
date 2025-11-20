@@ -612,7 +612,7 @@ export function Mailbox() {
                   loadingMore={loadingMore}
                   onAdvancedSearch={() => setAdvancedSearchOpen(true)}
                   hasActiveFilters={hasActiveFilters}
-                  renderItem={(email, isSelected, isMultiSelected, onToggleSelect) => (
+                  renderItem={(email, isSelected, isMultiSelected, onToggleSelect, onEmailClick) => (
                     <EmailListItem
                       email={email}
                       selected={isSelected}
@@ -620,6 +620,7 @@ export function Mailbox() {
                       onToggleSelect={onToggleSelect}
                       onToggleStar={handleToggleStar}
                       getProviderIcon={getProviderIcon}
+                      onClick={onEmailClick}
                     />
                   )}
                 />

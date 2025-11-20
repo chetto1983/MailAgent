@@ -80,7 +80,13 @@ interface EmailListProps {
   /**
    * Render function for each email item
    */
-  renderItem: (email: Email, isSelected: boolean, isMultiSelected: boolean, onToggleSelect: (id: string) => void) => React.ReactNode;
+  renderItem: (
+    email: Email,
+    isSelected: boolean,
+    isMultiSelected: boolean,
+    onToggleSelect: (id: string) => void,
+    onEmailClick: (email: Email) => void,
+  ) => React.ReactNode;
 
   /**
    * Callback for loading more emails (infinite scroll)
@@ -262,9 +268,7 @@ export const EmailList: React.FC<EmailListProps> = ({
 
     return (
       <div style={style} {...ariaAttributes}>
-        <Box onClick={() => onEmailClick(email)}>
-          {renderItem(email, isSelected, isMultiSelected, handleToggleSelect)}
-        </Box>
+        {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
       </div>
     );
   };

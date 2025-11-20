@@ -47,6 +47,11 @@ interface EmailListItemProps {
    * Custom provider icon renderer
    */
   getProviderIcon?: (providerId: string) => React.ReactNode;
+
+  /**
+   * Callback when email is clicked
+   */
+  onClick?: (email: Email) => void;
 }
 
 /**
@@ -98,7 +103,7 @@ function formatDate(date: string | Date): string {
  * ```
  */
 export const EmailListItem = React.memo<EmailListItemProps>(
-  ({ email, selected = false, multiSelected = false, onToggleSelect, onToggleStar, getProviderIcon }) => {
+  ({ email, selected = false, multiSelected = false, onToggleSelect, onToggleStar, getProviderIcon, onClick }) => {
     const fromData = parseEmailFrom(email.from);
     const { getLabelById } = useLabelStore();
 
@@ -118,6 +123,14 @@ export const EmailListItem = React.memo<EmailListItemProps>(
         }
       : undefined;
 
+    const handleClick = (e: React.MouseEvent) => {
+      // Don't trigger email open if clicking on checkbox or star button
+      if ((e.target as HTMLElement).closest('.MuiCheckbox-root, .MuiIconButton-root')) {
+        return;
+      }
+      onClick?.(email);
+    };
+
     return (
       <>
         <ListItemButton
@@ -125,6 +138,7 @@ export const EmailListItem = React.memo<EmailListItemProps>(
           {...listeners}
           {...attributes}
           selected={selected}
+          onClick={handleClick}
           sx={{
             py: 1.5,
             px: 2,
@@ -133,7 +147,7 @@ export const EmailListItem = React.memo<EmailListItemProps>(
             alignItems: 'flex-start',
             bgcolor: email.isRead ? 'transparent' : 'action.hover',
             opacity: isDragging ? 0.5 : 1,
-            cursor: isDragging ? 'grabbing' : 'grab',
+            cursor: isDragging ? 'grabbing' : 'pointer',
             transition: 'opacity 0.2s ease',
             '&.Mui-selected': {
               bgcolor: 'action.selected',
