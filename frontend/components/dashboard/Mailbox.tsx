@@ -467,7 +467,7 @@ export function Mailbox() {
     } finally {
       setLoadingMore(false);
     }
-  }, [activeFolder, searchQuery, advancedFilters, pagination, loadingMore, storeEmails, setEmails]);
+  }, [activeFolder, searchQuery, advancedFilters, pagination, loadingMore, storeEmails, setEmails, t.dashboard.email.messages.loadMoreFailed]);
 
   // Refresh emails
   const handleRefresh = useCallback(async () => {
@@ -497,7 +497,7 @@ export function Mailbox() {
         severity: 'error',
       });
     }
-  }, [selectedIds, storeMarkAsRead]);
+  }, [selectedIds, storeMarkAsRead, t.dashboard.email.messages.markRead, t.dashboard.email.messages.markReadFailed]);
 
   const handleBulkMarkUnread = useCallback(async () => {
     const ids = Array.from(selectedIds);
@@ -524,7 +524,7 @@ export function Mailbox() {
         severity: 'error',
       });
     }
-  }, [selectedIds, storeEmails]);
+  }, [selectedIds, storeEmails, t.dashboard.email.messages.markUnread, t.dashboard.email.messages.markUnreadFailed]);
 
   const handleBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
@@ -551,7 +551,7 @@ export function Mailbox() {
         severity: 'error',
       });
     }
-  }, [selectedIds, storeBulkDelete, clearSelection]);
+  }, [selectedIds, storeBulkDelete, clearSelection, t.dashboard.email.messages.deleteConfirm, t.dashboard.email.messages.deleted, t.dashboard.email.messages.deleteFailed]);
 
   const handleBulkStar = useCallback(async () => {
     const ids = Array.from(selectedIds);
@@ -573,7 +573,7 @@ export function Mailbox() {
         severity: 'error',
       });
     }
-  }, [selectedIds, storeMarkAsStarred]);
+  }, [selectedIds, storeMarkAsStarred, t.dashboard.email.messages.starred, t.dashboard.email.messages.starFailed]);
 
   const handleBulkUnstar = useCallback(async () => {
     const ids = Array.from(selectedIds);
@@ -595,7 +595,7 @@ export function Mailbox() {
         severity: 'error',
       });
     }
-  }, [selectedIds, storeMarkAsStarred]);
+  }, [selectedIds, storeMarkAsStarred, t.dashboard.email.messages.unstarred, t.dashboard.email.messages.unstarFailed]);
 
   const handleBulkAddLabels = useCallback(async (labelIds: string[]) => {
     const ids = Array.from(selectedIds);
@@ -618,7 +618,7 @@ export function Mailbox() {
         severity: 'error',
       });
     }
-  }, [selectedIds, clearSelection, loadData]);
+  }, [selectedIds, clearSelection, loadData, t.dashboard.email.messages.labelsAdded, t.dashboard.email.messages.labelsFailed]);
 
   const handleBulkMoveToFolder = useCallback(async (folder: string) => {
     const ids = Array.from(selectedIds);
@@ -642,7 +642,7 @@ export function Mailbox() {
         severity: 'error',
       });
     }
-  }, [selectedIds, storeBulkDelete, clearSelection]);
+  }, [selectedIds, storeBulkDelete, clearSelection, t.dashboard.email.messages.moved, t.dashboard.email.messages.moveFailed]);
 
   // Load folders on mount
   useEffect(() => {

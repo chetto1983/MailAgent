@@ -51,6 +51,7 @@ export const LabelSelectorDialog: React.FC<LabelSelectorDialogProps> = ({
       // Reset selection when dialog closes
       setSelectedLabels(new Set());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const loadLabels = async () => {

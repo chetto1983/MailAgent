@@ -293,7 +293,7 @@ export function ComposeDialog({
     } finally {
       setSending(false);
     }
-  }, [defaultProviderId, to, cc, bcc, subject, body, prefillData, parseEmails, onClose, onSent, onError]);
+  }, [defaultProviderId, to, cc, bcc, subject, body, prefillData, parseEmails, onClose, onSent, onError, attachments]);
 
   // Check if form has unsaved changes
   const hasChanges = useCallback(() => {
