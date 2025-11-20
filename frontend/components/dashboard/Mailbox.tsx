@@ -17,7 +17,7 @@ import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { useEmailStore } from '@/stores/email-store';
 import { useAuthStore } from '@/stores/auth-store';
-import { useWebSocket } from '@/hooks/use-websocket';
+//import { useWebSocket } from '@/hooks/use-websocket';
 import { useEmailActions } from '@/hooks/use-email-actions';
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation';
 import { normalizeFolderName, getFolderIcon as getIconForFolderUtil } from '@/lib/utils/folder-normalization';
