@@ -273,30 +273,6 @@ export const EmailList: React.FC<EmailListProps> = ({
     }
   }, [onRefresh]);
 
-  const Row = ({
-    index,
-    style,
-    ariaAttributes,
-  }: {
-    index: number;
-    style: React.CSSProperties;
-    ariaAttributes: {
-      'aria-posinset': number;
-      'aria-setsize': number;
-      role: 'listitem';
-    };
-  }) => {
-    const email = filteredEmails[index];
-    const isSelected = selectedEmailId === email.id;
-    const isMultiSelected = selectedIds.has(email.id);
-
-    return (
-      <div style={style} {...ariaAttributes}>
-        {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
-      </div>
-    );
-  };
-
   return (
     <Paper
       elevation={0}
@@ -445,13 +421,23 @@ export const EmailList: React.FC<EmailListProps> = ({
             <AutoSizer>
               {({ height, width }) => (
                 <List
-                  defaultHeight={height}
-                  style={{ height, width }}
-                  rowComponent={Row}
-                  rowCount={filteredEmails.length}
-                  rowHeight={80}
-                  rowProps={{}}
-                />
+                  height={height}
+                  width={width}
+                  itemCount={filteredEmails.length}
+                  itemSize={80}
+                >
+                  {({ index, style }) => {
+                    const email = filteredEmails[index];
+                    const isSelected = selectedEmailId === email.id;
+                    const isMultiSelected = selectedIds.has(email.id);
+
+                    return (
+                      <div style={style}>
+                        {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
+                      </div>
+                    );
+                  }}
+                </List>
               )}
             </AutoSizer>
             {/* Loading more indicator */}
