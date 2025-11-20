@@ -7,14 +7,20 @@ import {
   ListItemText,
   Typography,
   Button,
-  CircularProgress,
   Chip,
   Accordion,
   AccordionSummary,
   AccordionDetails,
   Paper,
+  Skeleton,
+  Stack,
+  Divider,
 } from '@mui/material';
-import { Mail, ChevronDown } from 'lucide-react';
+import {
+  Mail,
+  ChevronDown,
+  Filter,
+} from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useFoldersStore } from '@/stores/folders-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
@@ -40,6 +46,17 @@ export interface FolderGroup {
   providerId: string;
   providerEmail: string;
   folders: FolderItem[];
+}
+
+/**
+ * Smart filter definition
+ */
+export interface SmartFilter {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  count?: number;
+  color?: string;
 }
 
 /**
@@ -75,6 +92,16 @@ interface EmailSidebarProps {
    * Custom compose button handler
    */
   onCompose?: () => void;
+
+  /**
+   * Smart filters to display
+   */
+  smartFilters?: SmartFilter[];
+
+  /**
+   * Show smart filters section
+   */
+  showSmartFilters?: boolean;
 }
 
 /**
@@ -102,6 +129,8 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
   loading = false,
   showComposeButton = true,
   onCompose,
+  smartFilters = [],
+  showSmartFilters = true,
 }) => {
   const router = useRouter();
   const t = useTranslations();
@@ -163,11 +192,93 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
         </Box>
       )}
 
+      {/* Smart Filters */}
+      {showSmartFilters && smartFilters.length > 0 && (
+        <>
+          <Box sx={{ px: 2, py: 1 }}>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Filter size={14} />
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 600, textTransform: 'uppercase' }}
+              >
+                Quick Filters
+              </Typography>
+            </Stack>
+          </Box>
+
+          <List sx={{ px: 1, pb: 1 }}>
+            {smartFilters.map((filter) => {
+              const isSelected = selectedFolderId === filter.id;
+              return (
+                <ListItemButton
+                  key={filter.id}
+                  selected={isSelected}
+                  onClick={() => onFolderSelect(filter.id)}
+                  sx={{
+                    borderRadius: 2,
+                    mb: 0.5,
+                    mx: 1,
+                  }}
+                >
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 36,
+                      color: filter.color || 'inherit',
+                    }}
+                  >
+                    {filter.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={filter.label}
+                    primaryTypographyProps={{
+                      fontSize: '0.875rem',
+                      fontWeight: isSelected ? 600 : 500,
+                    }}
+                  />
+                  {filter.count != null && filter.count > 0 && (
+                    <Chip
+                      label={filter.count}
+                      size="small"
+                      sx={{
+                        height: 20,
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                      }}
+                    />
+                  )}
+                </ListItemButton>
+              );
+            })}
+          </List>
+
+          <Divider sx={{ mx: 2, mb: 1 }} />
+        </>
+      )}
+
       {/* Folders List */}
       <List sx={{ px: 1, flex: 1, overflow: 'auto' }}>
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
-            <CircularProgress size={18} />
+          <Box sx={{ px: 1, py: 2 }}>
+            {[...Array(3)].map((_, groupIndex) => (
+              <Box key={groupIndex} sx={{ mb: 3 }}>
+                <Skeleton variant="text" width="60%" height={20} sx={{ mb: 1 }} />
+                {[...Array(4)].map((_, itemIndex) => (
+                  <Stack
+                    key={itemIndex}
+                    direction="row"
+                    spacing={1.5}
+                    sx={{ mb: 1, alignItems: 'center', px: 1 }}
+                  >
+                    <Skeleton variant="circular" width={20} height={20} />
+                    <Skeleton variant="text" width="70%" height={18} />
+                    <Box sx={{ flex: 1 }} />
+                    <Skeleton variant="rounded" width={24} height={16} />
+                  </Stack>
+                ))}
+              </Box>
+            ))}
           </Box>
         ) : folderGroups.length === 0 ? (
           <Box sx={{ px: 2, py: 3 }}>

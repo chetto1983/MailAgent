@@ -8,7 +8,8 @@ import {
   Checkbox,
   Tooltip,
   Typography,
-  CircularProgress,
+  Skeleton,
+  Stack,
 } from '@mui/material';
 import { Search, RefreshCw, Trash2, Mail } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
@@ -274,8 +275,23 @@ export const EmailList: React.FC<EmailListProps> = ({
       {/* Email List */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
+          <Box sx={{ px: 2, pt: 2 }}>
+            {[...Array(8)].map((_, i) => (
+              <Stack key={i} direction="row" spacing={2} sx={{ mb: 2, alignItems: 'flex-start' }}>
+                <Skeleton variant="rectangular" width={18} height={18} sx={{ mt: 0.5 }} />
+                <Skeleton variant="circular" width={40} height={40} />
+                <Box sx={{ flex: 1 }}>
+                  <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
+                    <Skeleton variant="text" width="40%" height={20} />
+                    <Box sx={{ flex: 1 }} />
+                    <Skeleton variant="text" width={60} height={20} />
+                  </Stack>
+                  <Skeleton variant="text" width="90%" height={18} sx={{ mb: 0.5 }} />
+                  <Skeleton variant="text" width="70%" height={16} />
+                </Box>
+                <Skeleton variant="circular" width={24} height={24} sx={{ mt: 0.5 }} />
+              </Stack>
+            ))}
           </Box>
         ) : filteredEmails.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 4, px: 2 }}>

@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Inbox, Star } from 'lucide-react';
+import {
+  Inbox,
+  Star,
+  Mail as MailIcon,
+  Paperclip,
+  Clock,
+  Calendar as CalendarIcon,
+} from 'lucide-react';
+import { Snackbar, Alert as MuiAlert } from '@mui/material';
 import { emailApi, type EmailListParams } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
@@ -11,7 +19,7 @@ import { normalizeFolderName, getFolderIcon as getIconForFolderUtil } from '@/li
 
 // Components
 import { EmailLayout } from '@/components/email/EmailLayout';
-import { EmailSidebar, type FolderGroup } from '@/components/email/EmailSidebar';
+import { EmailSidebar, type FolderGroup, type SmartFilter } from '@/components/email/EmailSidebar/EmailSidebar';
 import { EmailList } from '@/components/email/EmailList';
 import { EmailListItem } from '@/components/email/EmailList';
 import { EmailDetail } from '@/components/email/EmailDetail';
@@ -62,6 +70,15 @@ export function Mailbox() {
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [searchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
 
   // Custom hooks
   const {
@@ -71,7 +88,63 @@ export function Mailbox() {
     handleReply,
     handleForward,
     handleEmailClick,
-  } = useEmailActions();
+  } = useEmailActions({
+    onSuccess: (message) => {
+      setSnackbar({
+        open: true,
+        message,
+        severity: 'success',
+      });
+    },
+    onError: (message) => {
+      setSnackbar({
+        open: true,
+        message,
+        severity: 'error',
+      });
+    },
+  });
+
+  // Smart Filters for quick access
+  const smartFilters = useMemo<SmartFilter[]>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+
+    return [
+      {
+        id: 'smart:unread',
+        label: 'Unread',
+        icon: <MailIcon size={18} />,
+        color: '#0B7EFF',
+      },
+      {
+        id: 'smart:today',
+        label: 'Today',
+        icon: <Clock size={18} />,
+        color: '#00C853',
+      },
+      {
+        id: 'smart:this-week',
+        label: 'This Week',
+        icon: <CalendarIcon size={18} />,
+        color: '#9C27B0',
+      },
+      {
+        id: 'smart:attachments',
+        label: 'Has Attachments',
+        icon: <Paperclip size={18} />,
+        color: '#FF9800',
+      },
+      {
+        id: 'smart:important',
+        label: 'Important',
+        icon: <Star size={18} />,
+        color: '#FFB300',
+      },
+    ];
+  }, []);
 
   // Aggregator folders (All Inbox, All Starred)
   const aggregatorFolders = useMemo<FolderItem[]>(
@@ -95,10 +168,50 @@ export function Mailbox() {
     [t]
   );
 
+  // Convert smart filters to folder items for unified handling
+  const smartFilterFolders = useMemo<FolderItem[]>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+
+    return smartFilters.map((filter) => {
+      let queryOverrides: Partial<EmailListParams> = {};
+
+      switch (filter.id) {
+        case 'smart:unread':
+          queryOverrides = { isRead: false };
+          break;
+        case 'smart:today':
+          queryOverrides = { startDate: today.toISOString() };
+          break;
+        case 'smart:this-week':
+          queryOverrides = { startDate: startOfWeek.toISOString() };
+          break;
+        case 'smart:attachments':
+          queryOverrides = { hasAttachments: true };
+          break;
+        case 'smart:important':
+          queryOverrides = { isStarred: true };
+          break;
+      }
+
+      return {
+        id: filter.id,
+        label: filter.label,
+        icon: filter.icon,
+        count: filter.count,
+        color: filter.color,
+        aggregate: true,
+        queryOverrides,
+      };
+    });
+  }, [smartFilters]);
+
   // Combined folders
   const combinedFolders = useMemo(
-    () => [...aggregatorFolders, ...remoteFolders],
-    [aggregatorFolders, remoteFolders]
+    () => [...smartFilterFolders, ...aggregatorFolders, ...remoteFolders],
+    [smartFilterFolders, aggregatorFolders, remoteFolders]
   );
 
   // Active folder
@@ -255,49 +368,70 @@ export function Mailbox() {
   });
 
   return (
-    <EmailLayout
-      sidebar={
-        <EmailSidebar
-          folderGroups={folderGroups}
-          selectedFolderId={selectedFolderId}
-          onFolderSelect={setSelectedFolderId}
-          loading={foldersLoading}
-        />
-      }
-      list={
-        <EmailList
-          emails={storeEmails}
-          selectedEmailId={storeSelectedEmail?.id}
-          onEmailClick={handleEmailClick}
-          loading={storeLoading}
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          onBulkDelete={(ids) => ids.forEach(handleDelete)}
-          renderItem={(email, isSelected, isMultiSelected, onToggleSelect) => (
-            <EmailListItem
-              email={email}
-              selected={isSelected}
-              multiSelected={isMultiSelected}
-              onToggleSelect={onToggleSelect}
-              onToggleStar={handleToggleStar}
-              getProviderIcon={getProviderIcon}
-            />
-          )}
-        />
-      }
-      detail={
-        storeSelectedEmail ? (
-          <EmailDetail
-            email={storeSelectedEmail}
-            onClose={() => setSelectedEmail(null)}
-            onArchive={(id) => handleArchive([id])}
-            onDelete={handleDelete}
-            onReply={handleReply}
-            onForward={handleForward}
+    <>
+      <EmailLayout
+        sidebar={
+          <EmailSidebar
+            folderGroups={folderGroups}
+            selectedFolderId={selectedFolderId}
+            onFolderSelect={setSelectedFolderId}
+            loading={foldersLoading}
+            smartFilters={smartFilters}
+            showSmartFilters={true}
           />
-        ) : undefined
-      }
-      showDetail={!!storeSelectedEmail}
-    />
+        }
+        list={
+          <EmailList
+            emails={storeEmails}
+            selectedEmailId={storeSelectedEmail?.id}
+            onEmailClick={handleEmailClick}
+            loading={storeLoading}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            onBulkDelete={(ids) => ids.forEach(handleDelete)}
+            renderItem={(email, isSelected, isMultiSelected, onToggleSelect) => (
+              <EmailListItem
+                email={email}
+                selected={isSelected}
+                multiSelected={isMultiSelected}
+                onToggleSelect={onToggleSelect}
+                onToggleStar={handleToggleStar}
+                getProviderIcon={getProviderIcon}
+              />
+            )}
+          />
+        }
+        detail={
+          storeSelectedEmail ? (
+            <EmailDetail
+              email={storeSelectedEmail}
+              onClose={() => setSelectedEmail(null)}
+              onArchive={(id) => handleArchive([id])}
+              onDelete={handleDelete}
+              onReply={handleReply}
+              onForward={handleForward}
+            />
+          ) : undefined
+        }
+        showDetail={!!storeSelectedEmail}
+      />
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
+    </>
   );
 }
