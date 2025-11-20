@@ -67,6 +67,8 @@ export class MicrosoftContactsSyncService {
       let newContacts = 0;
       let updatedContacts = 0;
       let nextLink: string | null = `${this.GRAPH_API_BASE}/me/contacts?$top=100`;
+      const createdContactIds: string[] = [];
+      const updatedContactIds: string[] = [];
 
       do {
         const response: any = await axios.get(nextLink, {
@@ -77,20 +79,15 @@ export class MicrosoftContactsSyncService {
 
         for (const contact of contacts) {
           try {
-            await this.processContact(provider, contact);
+            const result = await this.processContact(provider, contact);
             contactsProcessed++;
 
-            const existingContact = await this.prisma.contact.findFirst({
-              where: {
-                providerId: provider.id,
-                externalId: contact.id,
-              },
-            });
-
-            if (existingContact) {
-              updatedContacts++;
-            } else {
+            if (result.isNew) {
               newContacts++;
+              createdContactIds.push(result.contactId);
+            } else {
+              updatedContacts++;
+              updatedContactIds.push(result.contactId);
             }
           } catch (error: any) {
             this.logger.error(`Error processing contact: ${error.message}`);
@@ -99,6 +96,12 @@ export class MicrosoftContactsSyncService {
 
         nextLink = response.data['@odata.nextLink'] || null;
       } while (nextLink);
+
+      // Send bulk notifications after processing all contacts
+      this.notifyContactsBulk(provider.tenantId, provider.id, {
+        created: createdContactIds,
+        updated: updatedContactIds,
+      });
 
       const syncDuration = Date.now() - startTime;
       this.logger.log(
@@ -115,7 +118,7 @@ export class MicrosoftContactsSyncService {
   /**
    * Process a single contact from Microsoft Graph API
    */
-  private async processContact(provider: any, contact: any): Promise<void> {
+  private async processContact(provider: any, contact: any): Promise<{ contactId: string; isNew: boolean }> {
     const externalId = contact.id;
 
     // Extract email addresses
@@ -234,18 +237,11 @@ export class MicrosoftContactsSyncService {
       },
     });
 
-    // Emit events for contact creation or update
-    if (!existingContact) {
-      this.notifyContactChange(provider.tenantId, provider.id, 'contact-created', {
-        contactId: upsertedContact.id,
-        externalId,
-      });
-    } else {
-      this.notifyContactChange(provider.tenantId, provider.id, 'contact-updated', {
-        contactId: upsertedContact.id,
-        externalId,
-      });
-    }
+    // Return contact metadata for bulk notification
+    return {
+      contactId: upsertedContact.id,
+      isNew: !existingContact,
+    };
   }
 
   /**
@@ -342,6 +338,44 @@ export class MicrosoftContactsSyncService {
     await axios.delete(`${this.GRAPH_API_BASE}/me/contacts/${externalId}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+  }
+
+  /**
+   * Notify bulk contact changes via WebSocket
+   */
+  private notifyContactsBulk(
+    tenantId: string,
+    providerId: string,
+    payload: { created: string[]; updated: string[] },
+  ): void {
+    try {
+      // Emit bulk notifications for created contacts
+      if (payload.created.length > 0) {
+        payload.created.forEach((contactId) => {
+          this.realtimeEvents.emitContactNew(tenantId, {
+            providerId,
+            reason: 'contact-created',
+            contactId,
+          });
+        });
+        this.logger.debug(`Emitted ${payload.created.length} contact-created events for provider ${providerId}`);
+      }
+
+      // Emit bulk notifications for updated contacts
+      if (payload.updated.length > 0) {
+        payload.updated.forEach((contactId) => {
+          this.realtimeEvents.emitContactUpdate(tenantId, {
+            providerId,
+            reason: 'contact-updated',
+            contactId,
+          });
+        });
+        this.logger.debug(`Emitted ${payload.updated.length} contact-updated events for provider ${providerId}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Failed to emit bulk contact events for ${tenantId}: ${message}`);
+    }
   }
 
   /**
