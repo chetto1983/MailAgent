@@ -103,7 +103,7 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
             flexDirection: 'column',
             overflow: 'hidden',
             position: { xs: 'fixed', sm: 'relative' },
-            top: { xs: 0, sm: 'auto' },
+            top: { xs: 64, sm: 'auto' },
             left: { xs: 0, sm: 'auto' },
             right: { xs: 0, sm: 'auto' },
             bottom: { xs: 0, sm: 'auto' },

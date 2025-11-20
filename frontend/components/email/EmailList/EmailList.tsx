@@ -276,7 +276,7 @@ export const EmailList: React.FC<EmailListProps> = ({
   const Row = ({
     index,
     style,
-    ariaAttributes
+    ariaAttributes,
   }: {
     index: number;
     style: React.CSSProperties;
@@ -444,15 +444,14 @@ export const EmailList: React.FC<EmailListProps> = ({
           <>
             <AutoSizer>
               {({ height, width }) => (
-                <div style={{ height, width }}>
-                  <List
-                    defaultHeight={height}
-                    rowHeight={80}
-                    rowCount={filteredEmails.length}
-                    rowComponent={Row}
-                    rowProps={{}}
-                  />
-                </div>
+                <List
+                  defaultHeight={height}
+                  style={{ height, width }}
+                  rowComponent={Row}
+                  rowCount={filteredEmails.length}
+                  rowHeight={80}
+                  rowProps={{}}
+                />
               )}
             </AutoSizer>
             {/* Loading more indicator */}

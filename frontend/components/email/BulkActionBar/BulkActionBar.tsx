@@ -203,7 +203,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
           </Tooltip>
 
           {/* More Actions Menu */}
-          <Tooltip title="More actions">
+          <Tooltip title={t.dashboard.email.bulkBar.moreActions}>
             <span>
               <IconButton
                 size="small"
@@ -238,7 +238,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
                 disabled={loading !== null}
               >
                 <Star size={18} style={{ marginRight: 8 }} />
-                Add Star
+                {t.dashboard.email.bulkBar.addStar}
               </MenuItem>
             )}
             {onUnstar && (
@@ -250,7 +250,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
                 disabled={loading !== null}
               >
                 <Star size={18} style={{ marginRight: 8 }} />
-                Remove Star
+                {t.dashboard.email.bulkBar.removeStar}
               </MenuItem>
             )}
             {onAddLabels && (
@@ -262,7 +262,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
                 disabled={loading !== null}
               >
                 <Tag size={18} style={{ marginRight: 8 }} />
-                Add Labels
+                {t.dashboard.email.bulkBar.addLabels}
               </MenuItem>
             )}
             {onMoveToFolder && (
@@ -274,7 +274,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
                 disabled={loading !== null}
               >
                 <FolderInput size={18} style={{ marginRight: 8 }} />
-                Move to Folder
+                {t.dashboard.email.bulkBar.moveToFolder}
               </MenuItem>
             )}
           </Menu>

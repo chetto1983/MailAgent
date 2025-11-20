@@ -322,6 +322,82 @@ export class EmailsController {
   }
 
   /**
+   * DELETE /emails/bulk - Bulk delete emails
+   */
+  @Delete('bulk')
+  async bulkDelete(
+    @Req() req: any,
+    @Body() data: { emailIds: string[] },
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.bulkDelete(data.emailIds, tenantId);
+  }
+
+  /**
+   * PATCH /emails/bulk/star - Bulk star/unstar emails
+   */
+  @Patch('bulk/star')
+  async bulkUpdateStar(
+    @Req() req: any,
+    @Body() data: { emailIds: string[]; isStarred: boolean },
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.bulkUpdateStarred(
+      data.emailIds,
+      tenantId,
+      data.isStarred,
+    );
+  }
+
+  /**
+   * PATCH /emails/bulk/move - Bulk move emails to folder
+   */
+  @Patch('bulk/move')
+  async bulkMoveToFolder(
+    @Req() req: any,
+    @Body() data: { emailIds: string[]; folder: string },
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.bulkMoveToFolder(
+      data.emailIds,
+      tenantId,
+      data.folder,
+    );
+  }
+
+  /**
+   * PATCH /emails/bulk/labels/add - Bulk add labels to emails
+   */
+  @Patch('bulk/labels/add')
+  async bulkAddLabels(
+    @Req() req: any,
+    @Body() data: { emailIds: string[]; labelIds: string[] },
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.bulkAddLabels(
+      data.emailIds,
+      tenantId,
+      data.labelIds,
+    );
+  }
+
+  /**
+   * PATCH /emails/bulk/labels/remove - Bulk remove labels from emails
+   */
+  @Patch('bulk/labels/remove')
+  async bulkRemoveLabels(
+    @Req() req: any,
+    @Body() data: { emailIds: string[]; labelIds: string[] },
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.bulkRemoveLabels(
+      data.emailIds,
+      tenantId,
+      data.labelIds,
+    );
+  }
+
+  /**
    * POST /emails/:id/fetch-archived - Fetch archived email from server
    */
   @Post(':id/fetch-archived')

@@ -71,8 +71,8 @@ export default function Home() {
             gap: 2,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Image src="/logo.png" alt={`${t.app.name} logo`} width={40} height={40} priority />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Image src="/Logo PMSync.svg" alt={`${t.app.name} logo`} width={60} height={60} priority />
             <Box>
               <Typography variant="subtitle2" color="text.secondary">
                 {t.landing.hero.eyebrow}
@@ -110,7 +110,15 @@ export default function Home() {
       </AppBar>
 
       <Box component="main" sx={{ pt: { xs: 6, md: 12 }, pb: 10 }}>
-        <Container maxWidth="lg">
+        <Container
+          maxWidth="lg"
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center'
+          }}
+        >
           <Hero />
           <Features />
           <Modules />

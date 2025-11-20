@@ -717,4 +717,201 @@ export class EmailsService {
       contentId: attachment.contentId,
     };
   }
+
+  /**
+   * Bulk delete emails
+   */
+  async bulkDelete(emailIds: string[], tenantId: string) {
+    // Get emails for syncing
+    const emails = await this.prisma.email.findMany({
+      where: {
+        id: { in: emailIds },
+        tenantId,
+      },
+      select: {
+        id: true,
+        externalId: true,
+        providerId: true,
+        tenantId: true,
+      },
+    });
+
+    // Soft delete in database
+    const result = await this.prisma.email.updateMany({
+      where: {
+        id: { in: emailIds },
+        tenantId,
+      },
+      data: { isDeleted: true, folder: 'TRASH' },
+    });
+
+    // Sync to provider (async, don't wait)
+    const operations = emails.map((email) => ({
+      emailId: email.id,
+      externalId: email.externalId,
+      providerId: email.providerId,
+      tenantId: email.tenantId,
+      operation: 'delete' as const,
+    }));
+
+    this.emailSyncBack.syncOperationsBatch(operations).catch((error) => {
+      this.logger.error(`Failed to sync bulk delete to provider: ${error.message}`);
+    });
+
+    return { deleted: result.count };
+  }
+
+  /**
+   * Bulk update starred status
+   */
+  async bulkUpdateStarred(
+    emailIds: string[],
+    tenantId: string,
+    isStarred: boolean,
+  ) {
+    // Get emails for syncing
+    const emails = await this.prisma.email.findMany({
+      where: {
+        id: { in: emailIds },
+        tenantId,
+      },
+      select: {
+        id: true,
+        externalId: true,
+        providerId: true,
+        tenantId: true,
+      },
+    });
+
+    // Update in database
+    const result = await this.prisma.email.updateMany({
+      where: {
+        id: { in: emailIds },
+        tenantId,
+      },
+      data: { isStarred },
+    });
+
+    // Sync to provider (async, don't wait)
+    const operations = emails.map((email) => ({
+      emailId: email.id,
+      externalId: email.externalId,
+      providerId: email.providerId,
+      tenantId: email.tenantId,
+      operation: isStarred ? ('star' as const) : ('unstar' as const),
+    }));
+
+    this.emailSyncBack.syncOperationsBatch(operations).catch((error) => {
+      this.logger.error(`Failed to sync bulk starred update to provider: ${error.message}`);
+    });
+
+    return { updated: result.count };
+  }
+
+  /**
+   * Bulk move emails to folder
+   */
+  async bulkMoveToFolder(
+    emailIds: string[],
+    tenantId: string,
+    folder: string,
+  ) {
+    // Get emails for syncing
+    const emails = await this.prisma.email.findMany({
+      where: {
+        id: { in: emailIds },
+        tenantId,
+      },
+      select: {
+        id: true,
+        externalId: true,
+        providerId: true,
+        tenantId: true,
+        folder: true,
+      },
+    });
+
+    // Update in database
+    const result = await this.prisma.email.updateMany({
+      where: {
+        id: { in: emailIds },
+        tenantId,
+      },
+      data: { folder },
+    });
+
+    // Sync to provider (async, don't wait)
+    const operations = emails.map((email) => ({
+      emailId: email.id,
+      externalId: email.externalId,
+      providerId: email.providerId,
+      tenantId: email.tenantId,
+      operation: 'move' as const,
+      data: { fromFolder: email.folder, toFolder: folder },
+    }));
+
+    this.emailSyncBack.syncOperationsBatch(operations).catch((error) => {
+      this.logger.error(`Failed to sync bulk move to provider: ${error.message}`);
+    });
+
+    return { updated: result.count };
+  }
+
+  /**
+   * Bulk add labels to emails
+   */
+  async bulkAddLabels(
+    emailIds: string[],
+    tenantId: string,
+    labelIds: string[],
+  ) {
+    // Verify labels exist and belong to tenant
+    const labels = await this.prisma.label.findMany({
+      where: {
+        id: { in: labelIds },
+        tenantId,
+      },
+      select: { id: true },
+    });
+
+    if (labels.length !== labelIds.length) {
+      throw new NotFoundException('One or more labels not found');
+    }
+
+    // Create email-label associations
+    const emailLabelPairs = emailIds.flatMap((emailId) =>
+      labelIds.map((labelId) => ({
+        emailId,
+        labelId,
+        tenantId,
+      }))
+    );
+
+    // Use createMany with skipDuplicates to avoid conflicts
+    const result = await this.prisma.emailLabel.createMany({
+      data: emailLabelPairs,
+      skipDuplicates: true,
+    });
+
+    return { updated: result.count };
+  }
+
+  /**
+   * Bulk remove labels from emails
+   */
+  async bulkRemoveLabels(
+    emailIds: string[],
+    tenantId: string,
+    labelIds: string[],
+  ) {
+    const result = await this.prisma.emailLabel.deleteMany({
+      where: {
+        emailId: { in: emailIds },
+        labelId: { in: labelIds },
+        tenantId,
+      },
+    });
+
+    return { deleted: result.count };
+  }
 }

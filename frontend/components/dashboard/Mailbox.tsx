@@ -34,6 +34,8 @@ import { ComposeDialog } from '@/components/email/ComposeDialog/ComposeDialog';
 import { AdvancedSearchDialog, type AdvancedSearchFilters } from '@/components/email/AdvancedSearchDialog';
 import { LabelManager } from '@/components/labels';
 import { BulkActionBar } from '@/components/email/BulkActionBar';
+import { LabelSelectorDialog } from '@/components/email/LabelSelectorDialog';
+import { FolderSelectorDialog } from '@/components/email/FolderSelectorDialog';
 
 interface FolderItem {
   id: string;
@@ -115,6 +117,8 @@ export function Mailbox() {
 
   // Label manager state
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
+  const [labelSelectorOpen, setLabelSelectorOpen] = useState(false);
+  const [folderSelectorOpen, setFolderSelectorOpen] = useState(false);
 
   // Custom hooks
   const {
@@ -457,7 +461,7 @@ export function Mailbox() {
       console.error('Failed to load more emails:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to load more emails',
+        message: t.dashboard.email.messages.loadMoreFailed,
         severity: 'error',
       });
     } finally {
@@ -482,14 +486,14 @@ export function Mailbox() {
       storeMarkAsRead(ids);
       setSnackbar({
         open: true,
-        message: `Marked ${ids.length} email(s) as read`,
+        message: t.dashboard.email.messages.markRead.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to mark emails as read:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to mark emails as read',
+        message: t.dashboard.email.messages.markReadFailed,
         severity: 'error',
       });
     }
@@ -509,14 +513,14 @@ export function Mailbox() {
       });
       setSnackbar({
         open: true,
-        message: `Marked ${ids.length} email(s) as unread`,
+        message: t.dashboard.email.messages.markUnread.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to mark emails as unread:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to mark emails as unread',
+        message: t.dashboard.email.messages.markUnreadFailed,
         severity: 'error',
       });
     }
@@ -526,7 +530,7 @@ export function Mailbox() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
 
-    if (!window.confirm(`Are you sure you want to delete ${ids.length} email(s)?`)) {
+    if (!window.confirm(t.dashboard.email.messages.deleteConfirm.replace('{count}', ids.length.toString()))) {
       return;
     }
 
@@ -536,14 +540,14 @@ export function Mailbox() {
       clearSelection();
       setSnackbar({
         open: true,
-        message: `Deleted ${ids.length} email(s)`,
+        message: t.dashboard.email.messages.deleted.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to delete emails:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to delete emails',
+        message: t.dashboard.email.messages.deleteFailed,
         severity: 'error',
       });
     }
@@ -558,14 +562,14 @@ export function Mailbox() {
       storeMarkAsStarred(ids, true);
       setSnackbar({
         open: true,
-        message: `Starred ${ids.length} email(s)`,
+        message: t.dashboard.email.messages.starred.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to star emails:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to star emails',
+        message: t.dashboard.email.messages.starFailed,
         severity: 'error',
       });
     }
@@ -580,18 +584,65 @@ export function Mailbox() {
       storeMarkAsStarred(ids, false);
       setSnackbar({
         open: true,
-        message: `Unstarred ${ids.length} email(s)`,
+        message: t.dashboard.email.messages.unstarred.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to unstar emails:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to unstar emails',
+        message: t.dashboard.email.messages.unstarFailed,
         severity: 'error',
       });
     }
   }, [selectedIds, storeMarkAsStarred]);
+
+  const handleBulkAddLabels = useCallback(async (labelIds: string[]) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || labelIds.length === 0) return;
+
+    try {
+      await emailApi.bulkAddLabels(ids, labelIds);
+      clearSelection();
+      await loadData(); // Reload to show updated labels
+      setSnackbar({
+        open: true,
+        message: t.dashboard.email.messages.labelsAdded.replace('{count}', ids.length.toString()),
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to add labels:', error);
+      setSnackbar({
+        open: true,
+        message: t.dashboard.email.messages.labelsFailed,
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, clearSelection, loadData]);
+
+  const handleBulkMoveToFolder = useCallback(async (folder: string) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkMoveToFolder(ids, folder);
+      // Remove moved emails from current view
+      storeBulkDelete(ids);
+      clearSelection();
+      setSnackbar({
+        open: true,
+        message: t.dashboard.email.messages.moved.replace('{count}', ids.length.toString()).replace('{folder}', folder),
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to move emails:', error);
+      setSnackbar({
+        open: true,
+        message: t.dashboard.email.messages.moveFailed,
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeBulkDelete, clearSelection]);
 
   // Load folders on mount
   useEffect(() => {
@@ -743,6 +794,8 @@ export function Mailbox() {
                 onDelete={handleBulkDelete}
                 onStar={handleBulkStar}
                 onUnstar={handleBulkUnstar}
+                onAddLabels={() => setLabelSelectorOpen(true)}
+                onMoveToFolder={() => setFolderSelectorOpen(true)}
               />
             )}
 
@@ -838,7 +891,7 @@ export function Mailbox() {
         onSent={() => {
           setSnackbar({
             open: true,
-            message: 'Email sent successfully ✓',
+            message: t.dashboard.email.messages.emailSent,
             severity: 'success',
           });
           loadData(); // Refresh email list
@@ -865,6 +918,20 @@ export function Mailbox() {
       <LabelManager
         open={labelManagerOpen}
         onClose={() => setLabelManagerOpen(false)}
+      />
+
+      <LabelSelectorDialog
+        open={labelSelectorOpen}
+        onClose={() => setLabelSelectorOpen(false)}
+        onSelect={handleBulkAddLabels}
+        selectedCount={selectedIds.size}
+      />
+
+      <FolderSelectorDialog
+        open={folderSelectorOpen}
+        onClose={() => setFolderSelectorOpen(false)}
+        onSelect={handleBulkMoveToFolder}
+        selectedCount={selectedIds.size}
       />
     </>
   );
