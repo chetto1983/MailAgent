@@ -70,6 +70,7 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
       allCaughtUp: "All caught up!",
       noSubject: 'No subject',
       unnamedContact: 'Unnamed contact',
+      
     },
     timeAgo: {
       justNow: 'Just now',
