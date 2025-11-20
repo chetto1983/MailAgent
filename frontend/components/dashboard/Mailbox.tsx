@@ -8,6 +8,7 @@ import {
   Calendar as CalendarIcon,
 } from 'lucide-react';
 import { Snackbar, Alert as MuiAlert } from '@mui/material';
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
 import { emailApi, type EmailListParams } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
@@ -94,6 +95,7 @@ export function Mailbox() {
     handleToggleStar,
     handleArchive,
     handleMarkAsRead,
+    handleMoveToFolder,
     handleReply,
     handleForward,
     handleEmailClick,
@@ -456,10 +458,26 @@ export function Mailbox() {
     });
   }, [advancedFilters]);
 
+  // Handle drag and drop email to folder
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return; // No valid drop target or dropped on itself
+    }
+
+    const emailId = active.id as string;
+    const folderId = over.id as string;
+
+    // Move email to folder using existing hook
+    handleMoveToFolder([emailId], folderId);
+  }, [handleMoveToFolder]);
+
   return (
     <>
-      <EmailLayout
-        sidebar={
+      <DndContext onDragEnd={handleDragEnd}>
+        <EmailLayout
+          sidebar={
           <EmailSidebar
             folderGroups={folderGroups}
             selectedFolderId={selectedFolderId}
@@ -520,6 +538,7 @@ export function Mailbox() {
         }
         showDetail={!!storeSelectedEmail}
       />
+      </DndContext>
 
       {/* Snackbar for notifications */}
       <Snackbar

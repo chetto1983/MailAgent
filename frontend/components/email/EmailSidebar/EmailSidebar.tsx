@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Filter,
 } from 'lucide-react';
+import { useDroppable } from '@dnd-kit/core';
 import { useRouter } from 'next/router';
 import { useFoldersStore } from '@/stores/folders-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
@@ -103,6 +104,75 @@ interface EmailSidebarProps {
    */
   showSmartFilters?: boolean;
 }
+
+/**
+ * Droppable Folder Item Component
+ */
+interface DroppableFolderItemProps {
+  folder: FolderItem;
+  isSelected: boolean;
+  count: number | undefined;
+  onSelect: () => void;
+}
+
+const DroppableFolderItem: React.FC<DroppableFolderItemProps> = ({
+  folder,
+  isSelected,
+  count,
+  onSelect,
+}) => {
+  const { setNodeRef, isOver } = useDroppable({
+    id: folder.id,
+    data: {
+      type: 'folder',
+      folder,
+    },
+  });
+
+  return (
+    <ListItemButton
+      ref={setNodeRef}
+      selected={isSelected}
+      onClick={onSelect}
+      sx={{
+        borderRadius: 2,
+        mb: 0.5,
+        mx: 1,
+        bgcolor: isOver ? 'action.hover' : 'transparent',
+        borderLeft: isOver ? 4 : 0,
+        borderColor: isOver ? 'primary.main' : 'transparent',
+        transition: 'all 0.2s ease',
+      }}
+    >
+      <ListItemIcon
+        sx={{
+          minWidth: 36,
+          color: folder.color || 'inherit',
+        }}
+      >
+        {folder.icon}
+      </ListItemIcon>
+      <ListItemText
+        primary={folder.label}
+        primaryTypographyProps={{
+          fontSize: '0.875rem',
+          fontWeight: isSelected ? 600 : 500,
+        }}
+      />
+      {count != null && count > 0 && (
+        <Chip
+          label={count}
+          size="small"
+          sx={{
+            height: 20,
+            fontSize: '0.75rem',
+            fontWeight: 600,
+          }}
+        />
+      )}
+    </ListItemButton>
+  );
+};
 
 /**
  * EmailSidebar - Sidebar component for email navigation
@@ -324,43 +394,13 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
                     const isSelected = selectedFolderId === folder.id;
 
                     return (
-                      <ListItemButton
+                      <DroppableFolderItem
                         key={folder.id}
-                        selected={isSelected}
-                        onClick={() => onFolderSelect(folder.id)}
-                        sx={{
-                          borderRadius: 2,
-                          mb: 0.5,
-                          mx: 1,
-                        }}
-                      >
-                        <ListItemIcon
-                          sx={{
-                            minWidth: 36,
-                            color: folder.color || 'inherit',
-                          }}
-                        >
-                          {folder.icon}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={folder.label}
-                          primaryTypographyProps={{
-                            fontSize: '0.875rem',
-                            fontWeight: isSelected ? 600 : 500,
-                          }}
-                        />
-                        {displayCount != null && displayCount > 0 && (
-                          <Chip
-                            label={displayCount}
-                            size="small"
-                            sx={{
-                              height: 20,
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                            }}
-                          />
-                        )}
-                      </ListItemButton>
+                        folder={folder}
+                        isSelected={isSelected}
+                        count={displayCount}
+                        onSelect={() => onFolderSelect(folder.id)}
+                      />
                     );
                   })}
                 </List>

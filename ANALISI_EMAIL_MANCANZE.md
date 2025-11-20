@@ -1,9 +1,9 @@
 # Analisi Completa: Funzionalità Mancanti nel Sistema Email
 
 **Data Analisi**: 2025-11-20 (Aggiornato)
-**Versione**: 1.1
+**Versione**: 1.2
 **Branch**: claude/fix-build-errors-after-merge-01Qnu6vRr2Y96WPtMm1ca6sp
-**Ultimo Aggiornamento**: Aggiunta analisi Drag & Drop
+**Ultimo Aggiornamento**: ✅ Implementato Drag & Drop con @dnd-kit/core
 
 ---
 
@@ -16,12 +16,12 @@ Il sistema email di MailAgent ha raggiunto un buon livello di funzionalità base
 - ✅ **AI Features**: Summarization, Smart Reply, Auto-Categorization
 - ✅ **UX Avanzata**: Threading, infinite scroll, advanced filters
 - ✅ **Allegati**: Upload e download completi
+- ✅ **Drag and Drop**: Implementato con @dnd-kit/core (2025-11-20) ⭐ NUOVO
 - ⚠️ **Labels System**: API pronta, **UI mancante**
 - ⚠️ **Calendar**: API pronta, **UI mancante**
 - ⚠️ **Analytics**: API parziale, **UI mancante**
 - ❌ **Conversation View**: Endpoint disponibile, **non utilizzato**
 - ❌ **Bulk Operations**: Backend pronto, **UI limitata**
-- ❌ **Drag and Drop**: Hook pronto, **UI mancante** ⭐ NUOVO
 
 ---
 
@@ -180,9 +180,10 @@ handleBulkDelete(emailIds)  // Disponibile ma UI mancante
 
 ---
 
-### 5. Drag and Drop Email Organization (Backend ✅ / UI ❌)
+### 5. Drag and Drop Email Organization (✅ IMPLEMENTATO)
 
-**Status**: API e hook pronti, **UI mancante completamente**
+**Status**: ✅ **COMPLETATO** - Implementato con @dnd-kit/core
+**Data Implementazione**: 2025-11-20
 
 **Backend Disponibile**:
 ```typescript
@@ -198,14 +199,18 @@ emailApi.updateEmail(id, { folder })  // PATCH /emails/:id
 - `frontend/components/email/EmailList/EmailListItem.tsx` - Source draggable
 - `frontend/components/email/EmailSidebar/EmailSidebar.tsx` - Target droppable
 
-**Cosa Manca**:
-- [ ] Rendere EmailListItem draggable (HTML5 Drag API o react-beautiful-dnd)
-- [ ] Rendere folder items droppable in EmailSidebar
-- [ ] Visual feedback durante drag (ghost image, hover state)
-- [ ] Drop zones con highlight on drag over
+**Implementato**:
+- [x] ✅ EmailListItem draggable con @dnd-kit/core
+- [x] ✅ Folder items droppable in EmailSidebar
+- [x] ✅ Visual feedback durante drag (opacity, cursor, transform)
+- [x] ✅ Drop zones con highlight on drag over (border, background)
+- [x] ✅ Integrazione con handleMoveToFolder hook
+- [x] ✅ Animazione smooth con transitions
+- [x] ✅ Ottimistic UI updates con snackbar
+
+**Da Implementare (Future Enhancements)**:
 - [ ] Multi-select drag (drag multiple selected emails)
 - [ ] Undo/redo dopo drop
-- [ ] Animazione smooth dopo drop
 - [ ] Keyboard shortcuts per drag (Ctrl+X, Ctrl+V)
 - [ ] Drag to labels (oltre che folders)
 - [ ] Mobile touch drag support
@@ -372,6 +377,42 @@ handleMoveToFolder(emailsToMove, folderId);
   "@dnd-kit/utilities": "^3.2.2"
 }
 ```
+
+**Dettagli Implementazione** (2025-11-20):
+
+File modificati:
+- `frontend/components/dashboard/Mailbox.tsx` - Aggiunto DndContext wrapper e handleDragEnd
+- `frontend/components/email/EmailList/EmailListItem.tsx` - Implementato useDraggable hook
+- `frontend/components/email/EmailSidebar/EmailSidebar.tsx` - Creato DroppableFolderItem component
+
+Implementazione tecnica:
+```typescript
+// Mailbox.tsx - DndContext wrapper
+const handleDragEnd = useCallback((event: DragEndEvent) => {
+  const { active, over } = event;
+  if (!over || active.id === over.id) return;
+  const emailId = active.id as string;
+  const folderId = over.id as string;
+  handleMoveToFolder([emailId], folderId);
+}, [handleMoveToFolder]);
+
+// EmailListItem.tsx - Draggable
+const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  id: email.id,
+  data: { type: 'email', email },
+});
+
+// EmailSidebar.tsx - Droppable
+const { setNodeRef, isOver } = useDroppable({
+  id: folder.id,
+  data: { type: 'folder', folder },
+});
+```
+
+Visual feedback:
+- Drag source: opacity 0.5, cursor grabbing, CSS transform
+- Drop target: border-left 4px primary, background action.hover
+- Smooth transitions: all 0.2s ease
 
 ---
 

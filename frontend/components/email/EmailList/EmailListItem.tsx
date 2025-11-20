@@ -10,6 +10,7 @@ import {
   Divider,
 } from '@mui/material';
 import { Star, Paperclip } from 'lucide-react';
+import { useDraggable } from '@dnd-kit/core';
 import type { Email } from '@/stores/email-store';
 
 /**
@@ -99,9 +100,28 @@ export const EmailListItem = React.memo<EmailListItemProps>(
   ({ email, selected = false, multiSelected = false, onToggleSelect, onToggleStar, getProviderIcon }) => {
     const fromData = parseEmailFrom(email.from);
 
+    // Setup draggable functionality
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+      id: email.id,
+      data: {
+        type: 'email',
+        email,
+      },
+    });
+
+    // Apply transform for drag visual feedback
+    const style = transform
+      ? {
+          transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        }
+      : undefined;
+
     return (
       <>
         <ListItemButton
+          ref={setNodeRef}
+          {...listeners}
+          {...attributes}
           selected={selected}
           sx={{
             py: 1.5,
@@ -110,9 +130,13 @@ export const EmailListItem = React.memo<EmailListItemProps>(
             gap: 2,
             alignItems: 'flex-start',
             bgcolor: email.isRead ? 'transparent' : 'action.hover',
+            opacity: isDragging ? 0.5 : 1,
+            cursor: isDragging ? 'grabbing' : 'grab',
+            transition: 'opacity 0.2s ease',
             '&.Mui-selected': {
               bgcolor: 'action.selected',
             },
+            ...style,
           }}
         >
           {/* Multi-select Checkbox */}
