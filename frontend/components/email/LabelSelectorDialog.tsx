@@ -61,7 +61,7 @@ export const LabelSelectorDialog: React.FC<LabelSelectorDialogProps> = ({
       setLabels(response.labels || []);
     } catch (err) {
       console.error('Failed to load labels:', err);
-      setError('Failed to load labels');
+      setError(t.dashboard.email.messages.loadLabelsFailed);
     } finally {
       setLoading(false);
     }

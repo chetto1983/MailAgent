@@ -143,8 +143,12 @@ export interface AppTranslations {
       };
       messages: {
         loadMoreFailed: string;
+        markRead: string;
         markReadFailed: string;
+        markUnread: string;
         markUnreadFailed: string;
+        deleteConfirm: string;
+        deleted: string;
         deleteFailed: string;
         starred: string;
         starFailed: string;
@@ -157,6 +161,7 @@ export interface AppTranslations {
         loadLabelsFailed: string;
         selectedCount: string;
         move: string;
+        emailSent: string;
       };
     };
     labels: {

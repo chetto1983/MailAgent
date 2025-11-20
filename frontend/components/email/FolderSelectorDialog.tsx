@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -11,7 +11,7 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import { Inbox, Send, Archive, Trash2, Folder } from 'lucide-react';
+import { Inbox, Send, Archive, Trash2, Folder, Mail } from 'lucide-react';
 import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface FolderSelectorDialogProps {
@@ -21,20 +21,11 @@ interface FolderSelectorDialogProps {
   selectedCount: number;
 }
 
-const COMMON_FOLDERS = [
-  { id: 'INBOX', name: 'Inbox', icon: <Inbox size={20} /> },
-  { id: 'SENT', name: 'Sent', icon: <Send size={20} /> },
-  { id: 'ARCHIVE', name: 'Archive', icon: <Archive size={20} /> },
-  { id: 'TRASH', name: 'Trash', icon: <Trash2 size={20} /> },
-  { id: 'DRAFTS', name: 'Drafts', icon: <Folder size={20} /> },
-  { id: 'SPAM', name: 'Spam', icon: <Folder size={20} /> },
-];
-
 /**
  * FolderSelectorDialog - Dialog for selecting a folder to move emails to
  *
  * Features:
- * - Lists common email folders
+ * - Lists common email folders with translations
  * - Single selection
  */
 export const FolderSelectorDialog: React.FC<FolderSelectorDialogProps> = ({
@@ -45,6 +36,16 @@ export const FolderSelectorDialog: React.FC<FolderSelectorDialogProps> = ({
 }) => {
   const t = useTranslations();
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+
+  // Build folders list with translations
+  const commonFolders = useMemo(() => [
+    { id: 'INBOX', name: t.dashboard.folders.inbox, icon: <Inbox size={20} /> },
+    { id: 'SENT', name: t.dashboard.folders.sent, icon: <Send size={20} /> },
+    { id: 'ARCHIVE', name: t.dashboard.folders.archive, icon: <Archive size={20} /> },
+    { id: 'TRASH', name: t.dashboard.folders.trash, icon: <Trash2 size={20} /> },
+    { id: 'DRAFTS', name: t.dashboard.folders.drafts, icon: <Mail size={20} /> },
+    { id: 'SPAM', name: t.dashboard.folders.spam, icon: <Folder size={20} /> },
+  ], [t]);
 
   const handleSelect = (folderId: string) => {
     setSelectedFolder(folderId);
@@ -66,11 +67,11 @@ export const FolderSelectorDialog: React.FC<FolderSelectorDialogProps> = ({
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        {t.dashboard.email.bulkBar.moveToFolder} ({selectedCount} selected)
+        {t.dashboard.email.bulkBar.moveToFolder} ({t.dashboard.email.messages.selectedCount.replace('{count}', selectedCount.toString())})
       </DialogTitle>
       <DialogContent sx={{ p: 0 }}>
         <List>
-          {COMMON_FOLDERS.map((folder) => (
+          {commonFolders.map((folder) => (
             <ListItem key={folder.id} disablePadding>
               <ListItemButton
                 selected={selectedFolder === folder.id}
@@ -90,7 +91,7 @@ export const FolderSelectorDialog: React.FC<FolderSelectorDialogProps> = ({
           variant="contained"
           disabled={!selectedFolder}
         >
-          Move
+          {t.dashboard.email.messages.move}
         </Button>
       </DialogActions>
     </Dialog>

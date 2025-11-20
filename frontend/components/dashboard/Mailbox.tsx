@@ -461,7 +461,7 @@ export function Mailbox() {
       console.error('Failed to load more emails:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to load more emails',
+        message: t.dashboard.email.messages.loadMoreFailed,
         severity: 'error',
       });
     } finally {
@@ -486,14 +486,14 @@ export function Mailbox() {
       storeMarkAsRead(ids);
       setSnackbar({
         open: true,
-        message: `Marked ${ids.length} email(s) as read`,
+        message: t.dashboard.email.messages.markRead.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to mark emails as read:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to mark emails as read',
+        message: t.dashboard.email.messages.markReadFailed,
         severity: 'error',
       });
     }
@@ -513,14 +513,14 @@ export function Mailbox() {
       });
       setSnackbar({
         open: true,
-        message: `Marked ${ids.length} email(s) as unread`,
+        message: t.dashboard.email.messages.markUnread.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to mark emails as unread:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to mark emails as unread',
+        message: t.dashboard.email.messages.markUnreadFailed,
         severity: 'error',
       });
     }
@@ -530,7 +530,7 @@ export function Mailbox() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
 
-    if (!window.confirm(`Are you sure you want to delete ${ids.length} email(s)?`)) {
+    if (!window.confirm(t.dashboard.email.messages.deleteConfirm.replace('{count}', ids.length.toString()))) {
       return;
     }
 
@@ -540,14 +540,14 @@ export function Mailbox() {
       clearSelection();
       setSnackbar({
         open: true,
-        message: `Deleted ${ids.length} email(s)`,
+        message: t.dashboard.email.messages.deleted.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to delete emails:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to delete emails',
+        message: t.dashboard.email.messages.deleteFailed,
         severity: 'error',
       });
     }
@@ -562,14 +562,14 @@ export function Mailbox() {
       storeMarkAsStarred(ids, true);
       setSnackbar({
         open: true,
-        message: `Starred ${ids.length} email(s)`,
+        message: t.dashboard.email.messages.starred.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to star emails:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to star emails',
+        message: t.dashboard.email.messages.starFailed,
         severity: 'error',
       });
     }
@@ -584,14 +584,14 @@ export function Mailbox() {
       storeMarkAsStarred(ids, false);
       setSnackbar({
         open: true,
-        message: `Unstarred ${ids.length} email(s)`,
+        message: t.dashboard.email.messages.unstarred.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to unstar emails:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to unstar emails',
+        message: t.dashboard.email.messages.unstarFailed,
         severity: 'error',
       });
     }
@@ -607,14 +607,14 @@ export function Mailbox() {
       await loadData(); // Reload to show updated labels
       setSnackbar({
         open: true,
-        message: `Added labels to ${ids.length} email(s)`,
+        message: t.dashboard.email.messages.labelsAdded.replace('{count}', ids.length.toString()),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to add labels:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to add labels',
+        message: t.dashboard.email.messages.labelsFailed,
         severity: 'error',
       });
     }
@@ -631,14 +631,14 @@ export function Mailbox() {
       clearSelection();
       setSnackbar({
         open: true,
-        message: `Moved ${ids.length} email(s) to ${folder}`,
+        message: t.dashboard.email.messages.moved.replace('{count}', ids.length.toString()).replace('{folder}', folder),
         severity: 'success',
       });
     } catch (error) {
       console.error('Failed to move emails:', error);
       setSnackbar({
         open: true,
-        message: 'Failed to move emails',
+        message: t.dashboard.email.messages.moveFailed,
         severity: 'error',
       });
     }
@@ -891,7 +891,7 @@ export function Mailbox() {
         onSent={() => {
           setSnackbar({
             open: true,
-            message: 'Email sent successfully ✓',
+            message: t.dashboard.email.messages.emailSent,
             severity: 'success',
           });
           loadData(); // Refresh email list

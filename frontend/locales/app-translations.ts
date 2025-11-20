@@ -212,8 +212,12 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         },
         messages: {
           loadMoreFailed: 'Failed to load more emails',
+          markRead: 'Marked {count} email(s) as read',
           markReadFailed: 'Failed to mark emails as read',
+          markUnread: 'Marked {count} email(s) as unread',
           markUnreadFailed: 'Failed to mark emails as unread',
+          deleteConfirm: 'Are you sure you want to delete {count} email(s)?',
+          deleted: 'Deleted {count} email(s)',
           deleteFailed: 'Failed to delete emails',
           starred: 'Starred {count} email(s)',
           starFailed: 'Failed to star emails',
@@ -226,6 +230,7 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
           loadLabelsFailed: 'Failed to load labels',
           selectedCount: '{count} selected',
           move: 'Move',
+          emailSent: 'Email sent successfully ✓',
         },
       },
       labels: {
@@ -895,8 +900,12 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         },
         messages: {
           loadMoreFailed: 'Impossibile caricare altre email',
+          markRead: '{count} email segnate come lette',
           markReadFailed: 'Impossibile segnare le email come lette',
+          markUnread: '{count} email segnate come non lette',
           markUnreadFailed: 'Impossibile segnare le email come non lette',
+          deleteConfirm: 'Sei sicuro di voler eliminare {count} email?',
+          deleted: '{count} email eliminate',
           deleteFailed: 'Impossibile eliminare le email',
           starred: '{count} email contrassegnate con stella',
           starFailed: 'Impossibile aggiungere la stella alle email',
@@ -909,6 +918,7 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
           loadLabelsFailed: 'Impossibile caricare le etichette',
           selectedCount: '{count} selezionate',
           move: 'Sposta',
+          emailSent: 'Email inviata con successo ✓',
         },
       },
       labels: {
