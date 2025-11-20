@@ -11,7 +11,7 @@ import {
   Skeleton,
   Stack,
 } from '@mui/material';
-import { Search, RefreshCw, Trash2, Mail } from 'lucide-react';
+import { Search, RefreshCw, Trash2, Mail, Archive, MailOpen, MailCheck } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { List } from 'react-window';
@@ -55,6 +55,16 @@ interface EmailListProps {
    * Callback for bulk delete
    */
   onBulkDelete?: (ids: string[]) => void;
+
+  /**
+   * Callback for bulk archive
+   */
+  onBulkArchive?: (ids: string[]) => void;
+
+  /**
+   * Callback for bulk mark as read/unread
+   */
+  onBulkMarkAsRead?: (ids: string[], isRead: boolean) => void;
 
   /**
    * Custom empty state message
@@ -108,6 +118,8 @@ export const EmailList: React.FC<EmailListProps> = ({
   refreshing = false,
   onRefresh,
   onBulkDelete,
+  onBulkArchive,
+  onBulkMarkAsRead,
   emptyMessage,
   searchPlaceholder,
   renderItem,
@@ -161,6 +173,22 @@ export const EmailList: React.FC<EmailListProps> = ({
       setSelectedIds(new Set());
     }
   }, [onBulkDelete, selectedIds]);
+
+  // Handle bulk archive
+  const handleBulkArchive = useCallback(() => {
+    if (onBulkArchive && selectedIds.size > 0) {
+      onBulkArchive(Array.from(selectedIds));
+      setSelectedIds(new Set());
+    }
+  }, [onBulkArchive, selectedIds]);
+
+  // Handle bulk mark as read
+  const handleBulkMarkAsRead = useCallback((isRead: boolean) => {
+    if (onBulkMarkAsRead && selectedIds.size > 0) {
+      onBulkMarkAsRead(Array.from(selectedIds), isRead);
+      setSelectedIds(new Set());
+    }
+  }, [onBulkMarkAsRead, selectedIds]);
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
@@ -229,6 +257,27 @@ export const EmailList: React.FC<EmailListProps> = ({
               <Typography variant="body2" sx={{ mr: 1 }}>
                 {selectedIds.size} selected
               </Typography>
+              {onBulkMarkAsRead && (
+                <>
+                  <Tooltip title="Mark as read">
+                    <IconButton size="small" onClick={() => handleBulkMarkAsRead(true)}>
+                      <MailCheck size={18} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Mark as unread">
+                    <IconButton size="small" onClick={() => handleBulkMarkAsRead(false)}>
+                      <MailOpen size={18} />
+                    </IconButton>
+                  </Tooltip>
+                </>
+              )}
+              {onBulkArchive && (
+                <Tooltip title="Archive">
+                  <IconButton size="small" onClick={handleBulkArchive}>
+                    <Archive size={18} />
+                  </IconButton>
+                </Tooltip>
+              )}
               {onBulkDelete && (
                 <Tooltip title={t.common.delete}>
                   <IconButton size="small" onClick={handleBulkDelete}>

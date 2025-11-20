@@ -85,6 +85,7 @@ export function Mailbox() {
     handleDelete,
     handleToggleStar,
     handleArchive,
+    handleMarkAsRead,
     handleReply,
     handleForward,
     handleEmailClick,
@@ -389,6 +390,8 @@ export function Mailbox() {
             refreshing={refreshing}
             onRefresh={handleRefresh}
             onBulkDelete={(ids) => ids.forEach(handleDelete)}
+            onBulkArchive={(ids) => handleArchive(ids)}
+            onBulkMarkAsRead={(ids, isRead) => handleMarkAsRead(ids, isRead)}
             renderItem={(email, isSelected, isMultiSelected, onToggleSelect) => (
               <EmailListItem
                 email={email}
