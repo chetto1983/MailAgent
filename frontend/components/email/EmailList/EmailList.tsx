@@ -10,12 +10,11 @@ import {
   Typography,
   Skeleton,
   Stack,
+  List as MuiList,
 } from '@mui/material';
 import { Search, RefreshCw, Trash2, Mail, Archive, MailOpen, MailCheck, SlidersHorizontal } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
-import { List } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
 
 /**
  * Props for EmailList component
@@ -437,7 +436,7 @@ export const EmailList: React.FC<EmailListProps> = ({
       </Box>
 
       {/* Email List */}
-      <Box sx={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
         {(() => {
           console.log('[DEBUG EmailList] Rendering decision:', {
             loading,
@@ -475,24 +474,17 @@ export const EmailList: React.FC<EmailListProps> = ({
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-            <AutoSizer>
-              {({ height, width }) => {
-                console.log('[DEBUG EmailList] AutoSizer dimensions:', { height, width, rowCount: filteredEmails.length });
-                return (
-                  <List
-                    style={{ height, width }}
-                    rowComponent={RowComponent}
-                    rowCount={filteredEmails.length}
-                    rowHeight={80}
-                    rowProps={{}}
-                    onRowsRendered={handleRowsRendered}
-                    overscanCount={5}
-                  />
-                );
-              }}
-            </AutoSizer>
-          </Box>
+          <MuiList disablePadding>
+            {filteredEmails.map((email) => {
+              const isSelected = selectedEmailId === email.id;
+              const isMultiSelected = selectedIds.has(email.id);
+              return (
+                <React.Fragment key={email.id}>
+                  {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
+                </React.Fragment>
+              );
+            })}
+          </MuiList>
         )}
       </Box>
     </Paper>
