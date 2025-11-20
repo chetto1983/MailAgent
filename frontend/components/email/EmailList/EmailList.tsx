@@ -175,6 +175,13 @@ export const EmailList: React.FC<EmailListProps> = ({
   const t = useTranslations();
   const [searchQuery, setSearchQuery] = useState('');
 
+  console.log('[DEBUG EmailList] Render:', {
+    emailsLength: emails.length,
+    loading,
+    selectedEmailId,
+    searchQuery
+  });
+
   // Use prop selectedIds if provided, otherwise use local state
   const [localSelectedIds, setLocalSelectedIds] = useState<Set<string>>(new Set());
   const selectedIds = propSelectedIds ?? localSelectedIds;
@@ -188,15 +195,20 @@ export const EmailList: React.FC<EmailListProps> = ({
 
   // Filter emails by search query
   const filteredEmails = useMemo(() => {
-    if (!searchQuery.trim()) return emails;
+    if (!searchQuery.trim()) {
+      console.log('[DEBUG EmailList] No search query, returning all emails:', emails.length);
+      return emails;
+    }
 
     const query = searchQuery.toLowerCase();
-    return emails.filter(
+    const filtered = emails.filter(
       (email) =>
         email.subject?.toLowerCase().includes(query) ||
         email.from?.toLowerCase().includes(query) ||
         email.bodyPreview?.toLowerCase().includes(query)
     );
+    console.log('[DEBUG EmailList] Filtered emails:', filtered.length, 'from', emails.length);
+    return filtered;
   }, [emails, searchQuery]);
 
   // Handle select all
@@ -276,6 +288,7 @@ export const EmailList: React.FC<EmailListProps> = ({
 
   // Row renderer for react-window v2 List
   const RowComponent = useMemo(() => {
+    console.log('[DEBUG EmailList] Creating RowComponent with filteredEmails.length:', filteredEmails.length);
     const Row = ({
       index,
       style,
@@ -291,12 +304,14 @@ export const EmailList: React.FC<EmailListProps> = ({
     }) => {
       const email = filteredEmails[index];
       if (!email) {
+        console.log('[DEBUG EmailList] Row', index, 'has no email');
         return <div style={style} {...ariaAttributes} />;
       }
 
       const isSelected = selectedEmailId === email.id;
       const isMultiSelected = selectedIds.has(email.id);
 
+      console.log('[DEBUG EmailList] Rendering row', index, 'email:', email.subject);
       return (
         <div style={style} {...ariaAttributes}>
           {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
@@ -423,6 +438,16 @@ export const EmailList: React.FC<EmailListProps> = ({
 
       {/* Email List */}
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
+        {(() => {
+          console.log('[DEBUG EmailList] Rendering decision:', {
+            loading,
+            filteredEmailsLength: filteredEmails.length,
+            willShowLoading: loading,
+            willShowEmpty: !loading && filteredEmails.length === 0,
+            willShowList: !loading && filteredEmails.length > 0
+          });
+          return null;
+        })()}
         {loading ? (
           <Box sx={{ px: 2, pt: 2 }}>
             {[...Array(8)].map((_, i) => (
@@ -451,17 +476,20 @@ export const EmailList: React.FC<EmailListProps> = ({
           </Box>
         ) : (
           <AutoSizer>
-            {({ height, width }) => (
-              <List
-                style={{ height, width }}
-                rowComponent={RowComponent}
-                rowCount={filteredEmails.length}
-                rowHeight={80}
-                rowProps={{}}
-                onRowsRendered={handleRowsRendered}
-                overscanCount={5}
-              />
-            )}
+            {({ height, width }) => {
+              console.log('[DEBUG EmailList] AutoSizer dimensions:', { height, width, rowCount: filteredEmails.length });
+              return (
+                <List
+                  style={{ height, width }}
+                  rowComponent={RowComponent}
+                  rowCount={filteredEmails.length}
+                  rowHeight={80}
+                  rowProps={{}}
+                  onRowsRendered={handleRowsRendered}
+                  overscanCount={5}
+                />
+              );
+            }}
           </AutoSizer>
         )}
       </Box>
