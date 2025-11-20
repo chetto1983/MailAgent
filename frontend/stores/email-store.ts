@@ -19,7 +19,7 @@ export interface Email {
   folder?: string;
   hasAttachments?: boolean;
   inReplyTo?: string;
-  references?: string[];
+  references?: string;
 }
 
 /**
