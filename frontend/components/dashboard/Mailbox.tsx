@@ -61,6 +61,9 @@ interface FolderItem {
 export function Mailbox() {
   const t = useTranslations();
 
+  // Auth store - for WebSocket token
+  const { token } = useAuthStore();
+
   // Store state
   const {
     emails: storeEmails,
@@ -70,6 +73,9 @@ export function Mailbox() {
     setSelectedEmail,
     setLoading,
   } = useEmailStore();
+
+  // WebSocket for real-time updates (email events, folder counts, etc.)
+  useWebSocket(token, true);
 
   // Local state for folders and UI
   const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
