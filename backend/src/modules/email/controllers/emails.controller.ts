@@ -154,11 +154,13 @@ export class EmailsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('providerId') providerId?: string,
+    @Query('folder') folder?: string,
   ) {
     const tenantId = req.user.tenantId;
     return this.emailsService.getConversations({
       tenantId,
       providerId,
+      folder,
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 50,
     });

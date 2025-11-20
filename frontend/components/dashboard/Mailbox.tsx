@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Inbox,
   Star,
@@ -114,6 +114,16 @@ export function Mailbox() {
   // View mode state
   const [viewMode, setViewMode] = useState<'list' | 'conversation'>('list');
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+
+  // Refs for logging without causing dependency issues
+  const viewModeRef = useRef(viewMode);
+  const storeEmailsRef = useRef(storeEmails);
+
+  // Update refs on each render
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+    storeEmailsRef.current = storeEmails;
+  });
 
   // Label manager state
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
@@ -353,9 +363,9 @@ export function Mailbox() {
   const loadData = useCallback(async () => {
     console.log('[DEBUG] loadData called', {
       selectedFolderId,
-      viewMode,
+      viewMode: viewModeRef.current,
       combinedFoldersLength: combinedFolders.length,
-      storeEmailsLength: storeEmails.length
+      storeEmailsLength: storeEmailsRef.current.length
     });
 
     // Calculate active folder directly from selectedFolderId to avoid stale closure
@@ -448,7 +458,7 @@ export function Mailbox() {
       console.log('[DEBUG] loadData finished, loading set to false');
       setLoading(false);
     }
-  }, [combinedFolders, selectedFolderId, searchQuery, advancedFilters, setEmails, setLoading, setSelectedEmail, viewMode, storeEmails.length]);
+  }, [combinedFolders, selectedFolderId, searchQuery, advancedFilters, setEmails, setLoading, setSelectedEmail]);
 
   // Load more emails (infinite scroll)
   const loadMoreEmails = useCallback(async () => {
@@ -684,13 +694,15 @@ export function Mailbox() {
   }, [combinedFolders, selectedFolderId]);
 
   // Load emails when folder ID changes (not activeFolder object to avoid unnecessary re-renders)
+  // Only re-run when selectedFolderId or advancedFilters change, NOT when loadData changes
   useEffect(() => {
     console.log('[DEBUG] selectedFolderId changed, viewMode:', viewMode, 'selectedFolderId:', selectedFolderId);
     if (selectedFolderId) {
       console.log('[DEBUG] Calling loadData from useEffect');
       loadData();
     }
-  }, [selectedFolderId, loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFolderId, advancedFilters]);
 
   // Keyboard navigation
   useKeyboardNavigation({
@@ -744,7 +756,7 @@ export function Mailbox() {
   // Handle view mode toggle
   const handleViewModeChange = useCallback(
     (_event: React.MouseEvent<HTMLElement>, newMode: 'list' | 'conversation' | null) => {
-      console.log('[DEBUG] View mode change:', { from: viewMode, to: newMode, storeEmailsLength: storeEmails.length });
+      console.log('[DEBUG] View mode change:', { from: viewModeRef.current, to: newMode, storeEmailsLength: storeEmailsRef.current.length });
       if (newMode !== null) {
         setViewMode(newMode);
         // Reset selections when switching view modes
@@ -752,13 +764,13 @@ export function Mailbox() {
         setSelectedThreadId(null);
 
         // Reload data when switching to list view if emails are empty
-        if (newMode === 'list' && storeEmails.length === 0) {
+        if (newMode === 'list' && storeEmailsRef.current.length === 0) {
           console.log('[DEBUG] Reloading data because switching to list view with empty emails');
           loadData();
         }
       }
     },
-    [setSelectedEmail, storeEmails.length, loadData, viewMode]
+    [setSelectedEmail, loadData]
   );
 
   // Handle conversation selection
@@ -887,6 +899,7 @@ export function Mailbox() {
               ) : (
                 <ConversationList
                   providerId={activeFolder?.providerId}
+                  folder={activeFolder?.filterFolder || activeFolder?.queryOverrides?.folder}
                   selectedThreadId={selectedThreadId || undefined}
                   onSelectConversation={handleConversationSelect}
                   onRefresh={handleRefresh}

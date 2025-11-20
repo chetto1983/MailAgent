@@ -22,6 +22,11 @@ interface ConversationListProps {
   providerId?: string;
 
   /**
+   * Folder to filter conversations (e.g., "INBOX", "SENT")
+   */
+  folder?: string;
+
+  /**
    * Currently selected conversation thread ID
    */
   selectedThreadId?: string;
@@ -60,6 +65,7 @@ interface ConversationListProps {
  */
 export const ConversationList: React.FC<ConversationListProps> = ({
   providerId,
+  folder,
   selectedThreadId,
   onSelectConversation,
   onRefresh,
@@ -90,6 +96,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           page,
           limit: ITEMS_PER_PAGE,
           providerId,
+          folder,
         });
 
         const { conversations: newConversations, pagination } = response.data;
@@ -106,18 +113,18 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       } catch (err) {
         console.error('Failed to fetch conversations:', err);
         setError(t.dashboard.conversations.failedToLoad);
-      } finally {
+      } finally{
         setLoading(false);
         setLoadingMore(false);
       }
     },
-    [providerId, t.dashboard.conversations.failedToLoad]
+    [providerId, folder, t.dashboard.conversations.failedToLoad]
   );
 
-  // Load conversations on mount and when providerId changes
+  // Load conversations on mount and when providerId or folder changes
   useEffect(() => {
     fetchConversations(1, false);
-  }, [providerId, fetchConversations]);
+  }, [providerId, folder, fetchConversations]);
 
   // Handle refresh
   const handleRefresh = () => {
