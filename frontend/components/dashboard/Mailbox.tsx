@@ -6,14 +6,18 @@ import {
   Paperclip,
   Clock,
   Calendar as CalendarIcon,
+  List as ListIcon,
+  MessageSquare,
 } from 'lucide-react';
-import { Snackbar, Alert as MuiAlert } from '@mui/material';
+import { Snackbar, Alert as MuiAlert, Box, ToggleButtonGroup, ToggleButton, Tooltip } from '@mui/material';
 import { DndContext, DragEndEvent } from '@dnd-kit/core';
-import { emailApi, type EmailListParams } from '@/lib/api/email';
+import { emailApi, type EmailListParams, type Conversation } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { useEmailStore } from '@/stores/email-store';
+import { useAuthStore } from '@/stores/auth-store';
+import { useWebSocket } from '@/hooks/use-websocket';
 import { useEmailActions } from '@/hooks/use-email-actions';
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation';
 import { normalizeFolderName, getFolderIcon as getIconForFolderUtil } from '@/lib/utils/folder-normalization';
@@ -25,8 +29,11 @@ import { EmailList } from '@/components/email/EmailList';
 import { EmailListItem } from '@/components/email/EmailList';
 import { EmailDetail } from '@/components/email/EmailDetail';
 import { EmailThread } from '@/components/email/EmailThread';
+import { ConversationList } from '@/components/email/ConversationList';
 import { ComposeDialog } from '@/components/email/ComposeDialog/ComposeDialog';
 import { AdvancedSearchDialog, type AdvancedSearchFilters } from '@/components/email/AdvancedSearchDialog';
+import { LabelManager } from '@/components/labels';
+import { BulkActionBar } from '@/components/email/BulkActionBar';
 
 interface FolderItem {
   id: string;
@@ -57,15 +64,28 @@ interface FolderItem {
 export function Mailbox() {
   const t = useTranslations();
 
+  // Auth store - for WebSocket token
+  const { token } = useAuthStore();
+
   // Store state
   const {
     emails: storeEmails,
     selectedEmail: storeSelectedEmail,
     isLoading: storeLoading,
+    selectedIds,
     setEmails,
     setSelectedEmail,
     setLoading,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    markAsRead: storeMarkAsRead,
+    bulkDelete: storeBulkDelete,
+    markAsStarred: storeMarkAsStarred,
   } = useEmailStore();
+
+  // WebSocket for real-time updates (email events, folder counts, etc.)
+  useWebSocket(token, true);
 
   // Local state for folders and UI
   const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
@@ -88,6 +108,13 @@ export function Mailbox() {
     message: '',
     severity: 'info',
   });
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<'list' | 'conversation'>('list');
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+
+  // Label manager state
+  const [labelManagerOpen, setLabelManagerOpen] = useState(false);
 
   // Custom hooks
   const {
@@ -329,29 +356,62 @@ export function Mailbox() {
       const providersRes = await providersApi.getProviders();
       setProviders(providersRes || []);
 
-      const queryParams: EmailListParams = {
-        limit: 50,
-        page: 1,
-        ...activeFolder.queryOverrides,
-        search: advancedFilters.searchQuery || searchQuery || undefined,
-        from: advancedFilters.from || undefined,
-        startDate: advancedFilters.startDate || undefined,
-        endDate: advancedFilters.endDate || undefined,
-        hasAttachments: advancedFilters.hasAttachments || undefined,
-        isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
-        isStarred: advancedFilters.isStarred || undefined,
-      };
+      // Check if filtering by label
+      if (activeFolder.id.startsWith('label:')) {
+        const labelId = activeFolder.id.replace('label:', '');
+        // For now, just use regular email list with filter
+        // TODO: Backend should support filtering by label in listEmails endpoint
+        const queryParams: EmailListParams = {
+          limit: 50,
+          page: 1,
+          search: advancedFilters.searchQuery || searchQuery || undefined,
+          from: advancedFilters.from || undefined,
+          startDate: advancedFilters.startDate || undefined,
+          endDate: advancedFilters.endDate || undefined,
+          hasAttachments: advancedFilters.hasAttachments || undefined,
+          isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
+          isStarred: advancedFilters.isStarred || undefined,
+        };
 
-      const emailsRes = await emailApi.listEmails(queryParams);
-      setEmails((emailsRes.data.emails || []) as any);
-      setSelectedEmail(null);
+        const emailsRes = await emailApi.listEmails(queryParams);
+        // Filter emails by label client-side for now
+        const filteredEmails = (emailsRes.data.emails || []).filter((email: any) =>
+          email.labels && email.labels.includes(labelId)
+        );
+        setEmails(filteredEmails as any);
+        setSelectedEmail(null);
 
-      // Update pagination
-      setPagination({
-        page: 1,
-        hasMore: emailsRes.data.pagination.page < emailsRes.data.pagination.totalPages,
-        total: emailsRes.data.pagination.total,
-      });
+        // Update pagination (approximate since we're filtering client-side)
+        setPagination({
+          page: 1,
+          hasMore: false, // Disable pagination for label filtering for now
+          total: filteredEmails.length,
+        });
+      } else {
+        const queryParams: EmailListParams = {
+          limit: 50,
+          page: 1,
+          ...activeFolder.queryOverrides,
+          search: advancedFilters.searchQuery || searchQuery || undefined,
+          from: advancedFilters.from || undefined,
+          startDate: advancedFilters.startDate || undefined,
+          endDate: advancedFilters.endDate || undefined,
+          hasAttachments: advancedFilters.hasAttachments || undefined,
+          isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
+          isStarred: advancedFilters.isStarred || undefined,
+        };
+
+        const emailsRes = await emailApi.listEmails(queryParams);
+        setEmails((emailsRes.data.emails || []) as any);
+        setSelectedEmail(null);
+
+        // Update pagination
+        setPagination({
+          page: 1,
+          hasMore: emailsRes.data.pagination.page < emailsRes.data.pagination.totalPages,
+          total: emailsRes.data.pagination.total,
+        });
+      }
     } catch (error) {
       console.error('Failed to load mailbox data:', error);
       setEmails([]);
@@ -411,6 +471,127 @@ export function Mailbox() {
     await loadData();
     setRefreshing(false);
   }, [loadData]);
+
+  // Bulk operations handlers
+  const handleBulkMarkRead = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkMarkRead(ids, true);
+      storeMarkAsRead(ids);
+      setSnackbar({
+        open: true,
+        message: `Marked ${ids.length} email(s) as read`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to mark emails as read:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to mark emails as read',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeMarkAsRead]);
+
+  const handleBulkMarkUnread = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkMarkRead(ids, false);
+      // Update store - we need to mark as unread
+      storeEmails.forEach(email => {
+        if (ids.includes(email.id)) {
+          useEmailStore.getState().updateEmail(email.id, { isRead: false });
+        }
+      });
+      setSnackbar({
+        open: true,
+        message: `Marked ${ids.length} email(s) as unread`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to mark emails as unread:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to mark emails as unread',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeEmails]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    if (!window.confirm(`Are you sure you want to delete ${ids.length} email(s)?`)) {
+      return;
+    }
+
+    try {
+      await emailApi.bulkDelete(ids);
+      storeBulkDelete(ids);
+      clearSelection();
+      setSnackbar({
+        open: true,
+        message: `Deleted ${ids.length} email(s)`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to delete emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete emails',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeBulkDelete, clearSelection]);
+
+  const handleBulkStar = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkStar(ids, true);
+      storeMarkAsStarred(ids, true);
+      setSnackbar({
+        open: true,
+        message: `Starred ${ids.length} email(s)`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to star emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to star emails',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeMarkAsStarred]);
+
+  const handleBulkUnstar = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkStar(ids, false);
+      storeMarkAsStarred(ids, false);
+      setSnackbar({
+        open: true,
+        message: `Unstarred ${ids.length} email(s)`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to unstar emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to unstar emails',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeMarkAsStarred]);
 
   // Load folders on mount
   useEffect(() => {
@@ -473,6 +654,33 @@ export function Mailbox() {
     handleMoveToFolder([emailId], folderId);
   }, [handleMoveToFolder]);
 
+  // Handle view mode toggle
+  const handleViewModeChange = useCallback(
+    (_event: React.MouseEvent<HTMLElement>, newMode: 'list' | 'conversation' | null) => {
+      if (newMode !== null) {
+        setViewMode(newMode);
+        // Reset selections when switching view modes
+        setSelectedEmail(null);
+        setSelectedThreadId(null);
+      }
+    },
+    [setSelectedEmail]
+  );
+
+  // Handle conversation selection
+  const handleConversationSelect = useCallback((conversation: Conversation) => {
+    setSelectedThreadId(conversation.threadId);
+    // Fetch the first email in the thread to use for the EmailThread component
+    emailApi.getThread(conversation.threadId).then((response) => {
+      const threadEmails = response.data;
+      if (threadEmails.length > 0) {
+        setSelectedEmail(threadEmails[0] as any);
+      }
+    }).catch((error) => {
+      console.error('Failed to load thread:', error);
+    });
+  }, [setSelectedEmail]);
+
   return (
     <>
       <DndContext onDragEnd={handleDragEnd}>
@@ -485,36 +693,101 @@ export function Mailbox() {
             loading={foldersLoading}
             smartFilters={smartFilters}
             showSmartFilters={true}
+            showLabels={true}
+            onManageLabels={() => setLabelManagerOpen(true)}
             onCompose={() => setComposeOpen(true)}
           />
         }
         list={
-          <EmailList
-            emails={storeEmails}
-            selectedEmailId={storeSelectedEmail?.id}
-            onEmailClick={handleEmailClick}
-            loading={storeLoading}
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            onBulkDelete={(ids) => ids.forEach(handleDelete)}
-            onBulkArchive={(ids) => handleArchive(ids)}
-            onBulkMarkAsRead={(ids, isRead) => handleMarkAsRead(ids, isRead)}
-            onLoadMore={loadMoreEmails}
-            hasMore={pagination.hasMore}
-            loadingMore={loadingMore}
-            onAdvancedSearch={() => setAdvancedSearchOpen(true)}
-            hasActiveFilters={hasActiveFilters}
-            renderItem={(email, isSelected, isMultiSelected, onToggleSelect) => (
-              <EmailListItem
-                email={email}
-                selected={isSelected}
-                multiSelected={isMultiSelected}
-                onToggleSelect={onToggleSelect}
-                onToggleStar={handleToggleStar}
-                getProviderIcon={getProviderIcon}
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* View Mode Toggle */}
+            <Box
+              sx={{
+                p: 1,
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                justifyContent: 'center',
+                bgcolor: 'background.paper',
+              }}
+            >
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={handleViewModeChange}
+                size="small"
+                aria-label="view mode"
+              >
+                <ToggleButton value="list" aria-label="list view">
+                  <Tooltip title="Email List">
+                    <ListIcon size={18} />
+                  </Tooltip>
+                </ToggleButton>
+                <ToggleButton value="conversation" aria-label="conversation view">
+                  <Tooltip title="Conversation View">
+                    <MessageSquare size={18} />
+                  </Tooltip>
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+
+            {/* Bulk Action Bar */}
+            {viewMode === 'list' && (
+              <BulkActionBar
+                selectedCount={selectedIds.size}
+                totalCount={storeEmails.length}
+                onSelectAll={selectAll}
+                onClearSelection={clearSelection}
+                onMarkRead={handleBulkMarkRead}
+                onMarkUnread={handleBulkMarkUnread}
+                onDelete={handleBulkDelete}
+                onStar={handleBulkStar}
+                onUnstar={handleBulkUnstar}
               />
             )}
-          />
+
+            {/* Render appropriate view based on mode */}
+            <Box sx={{ flex: 1, overflow: 'hidden' }}>
+              {viewMode === 'list' ? (
+                <EmailList
+                  emails={storeEmails}
+                  selectedEmailId={storeSelectedEmail?.id}
+                  selectedIds={selectedIds}
+                  onToggleSelection={toggleSelection}
+                  onEmailClick={handleEmailClick}
+                  loading={storeLoading}
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  onBulkDelete={(ids) => ids.forEach(handleDelete)}
+                  onBulkArchive={(ids) => handleArchive(ids)}
+                  onBulkMarkAsRead={(ids, isRead) => handleMarkAsRead(ids, isRead)}
+                  onLoadMore={loadMoreEmails}
+                  hasMore={pagination.hasMore}
+                  loadingMore={loadingMore}
+                  onAdvancedSearch={() => setAdvancedSearchOpen(true)}
+                  hasActiveFilters={hasActiveFilters}
+                  renderItem={(email, isSelected, isMultiSelected, onToggleSelect, onEmailClick) => (
+                    <EmailListItem
+                      email={email}
+                      selected={isSelected}
+                      multiSelected={isMultiSelected}
+                      onToggleSelect={onToggleSelect}
+                      onToggleStar={handleToggleStar}
+                      getProviderIcon={getProviderIcon}
+                      onClick={onEmailClick}
+                    />
+                  )}
+                />
+              ) : (
+                <ConversationList
+                  providerId={activeFolder?.providerId}
+                  selectedThreadId={selectedThreadId || undefined}
+                  onSelectConversation={handleConversationSelect}
+                  onRefresh={handleRefresh}
+                />
+              )}
+            </Box>
+          </Box>
         }
         detail={
           storeSelectedEmail ? (
@@ -586,6 +859,12 @@ export function Mailbox() {
         onClose={() => setAdvancedSearchOpen(false)}
         onSearch={handleAdvancedSearch}
         onReset={handleResetFilters}
+      />
+
+      {/* Label Manager Dialog */}
+      <LabelManager
+        open={labelManagerOpen}
+        onClose={() => setLabelManagerOpen(false)}
       />
     </>
   );

@@ -283,6 +283,60 @@ export const emailApi = {
   },
 
   /**
+   * Bulk delete emails
+   * DELETE /emails/bulk
+   */
+  bulkDelete(emailIds: string[]) {
+    return apiClient.delete<{ deleted: number }>('/emails/bulk', {
+      data: { emailIds },
+    });
+  },
+
+  /**
+   * Bulk star/unstar emails
+   * PATCH /emails/bulk/star
+   */
+  bulkStar(emailIds: string[], isStarred: boolean) {
+    return apiClient.patch<{ updated: number }>(
+      '/emails/bulk/star',
+      { emailIds, isStarred }
+    );
+  },
+
+  /**
+   * Bulk move emails to folder
+   * PATCH /emails/bulk/move
+   */
+  bulkMoveToFolder(emailIds: string[], folder: string) {
+    return apiClient.patch<{ updated: number }>(
+      '/emails/bulk/move',
+      { emailIds, folder }
+    );
+  },
+
+  /**
+   * Bulk add labels to emails
+   * PATCH /emails/bulk/labels/add
+   */
+  bulkAddLabels(emailIds: string[], labelIds: string[]) {
+    return apiClient.patch<{ updated: number }>(
+      '/emails/bulk/labels/add',
+      { emailIds, labelIds }
+    );
+  },
+
+  /**
+   * Bulk remove labels from emails
+   * PATCH /emails/bulk/labels/remove
+   */
+  bulkRemoveLabels(emailIds: string[], labelIds: string[]) {
+    return apiClient.patch<{ updated: number }>(
+      '/emails/bulk/labels/remove',
+      { emailIds, labelIds }
+    );
+  },
+
+  /**
    * Save or update a draft (autosave)
    * POST /emails/drafts
    */

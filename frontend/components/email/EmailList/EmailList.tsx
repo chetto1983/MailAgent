@@ -80,7 +80,13 @@ interface EmailListProps {
   /**
    * Render function for each email item
    */
-  renderItem: (email: Email, isSelected: boolean, isMultiSelected: boolean, onToggleSelect: (id: string) => void) => React.ReactNode;
+  renderItem: (
+    email: Email,
+    isSelected: boolean,
+    isMultiSelected: boolean,
+    onToggleSelect: (id: string) => void,
+    onEmailClick: (email: Email) => void,
+  ) => React.ReactNode;
 
   /**
    * Callback for loading more emails (infinite scroll)
@@ -106,6 +112,16 @@ interface EmailListProps {
    * Whether advanced filters are active
    */
   hasActiveFilters?: boolean;
+
+  /**
+   * Set of selected email IDs (for multi-selection)
+   */
+  selectedIds?: Set<string>;
+
+  /**
+   * Callback when selection is toggled
+   */
+  onToggleSelection?: (id: string) => void;
 }
 
 /**
@@ -154,10 +170,18 @@ export const EmailList: React.FC<EmailListProps> = ({
   loadingMore = false,
   onAdvancedSearch,
   hasActiveFilters = false,
+  selectedIds: propSelectedIds,
+  onToggleSelection,
 }) => {
   const t = useTranslations();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Use prop selectedIds if provided, otherwise use local state
+  const [localSelectedIds, setLocalSelectedIds] = useState<Set<string>>(new Set());
+  const selectedIds = propSelectedIds ?? localSelectedIds;
+  const setSelectedIds = onToggleSelection ?
+    (ids: Set<string>) => ids.forEach(id => onToggleSelection(id)) :
+    setLocalSelectedIds;
 
   // Infinite scroll handler
   const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
@@ -201,16 +225,22 @@ export const EmailList: React.FC<EmailListProps> = ({
 
   // Handle toggle single selection
   const handleToggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
-  }, []);
+    if (onToggleSelection) {
+      // Use provided callback from parent
+      onToggleSelection(id);
+    } else {
+      // Fallback to local state
+      setLocalSelectedIds((prev) => {
+        const newSet = new Set(prev);
+        if (newSet.has(id)) {
+          newSet.delete(id);
+        } else {
+          newSet.add(id);
+        }
+        return newSet;
+      });
+    }
+  }, [onToggleSelection]);
 
   // Handle bulk delete
   const handleBulkDelete = useCallback(() => {
@@ -262,9 +292,7 @@ export const EmailList: React.FC<EmailListProps> = ({
 
     return (
       <div style={style} {...ariaAttributes}>
-        <Box onClick={() => onEmailClick(email)}>
-          {renderItem(email, isSelected, isMultiSelected, handleToggleSelect)}
-        </Box>
+        {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
       </div>
     );
   };

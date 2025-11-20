@@ -137,6 +137,38 @@ export interface AppTranslations {
         clear: string;
       };
     };
+    labels: {
+      title: string;
+      manageLabels: string;
+      addLabel: string;
+      createLabel: string;
+      editLabel: string;
+      labelName: string;
+      labelNameRequired: string;
+      chooseColor: string;
+      createButton: string;
+      updateButton: string;
+      cancelButton: string;
+      deleteConfirm: string;
+      failedToCreate: string;
+      failedToUpdate: string;
+      failedToDelete: string;
+      noLabels: string;
+      noLabelsDescription: string;
+      closeButton: string;
+    };
+    conversations: {
+      title: string;
+      noConversations: string;
+      noConversationsDescription: string;
+      failedToLoad: string;
+      loadMore: string;
+      loading: string;
+      messages: string;
+      participants: string;
+      yesterday: string;
+      retry: string;
+    };
     emailList: {
       loading: string;
       empty: string;
