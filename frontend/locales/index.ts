@@ -415,6 +415,29 @@ export interface AppTranslations {
       };
     };
   };
+  cookies: {
+    title: string;
+    description: string;
+    privacyLink: string;
+    customize: string;
+    showDetails: string;
+    hideDetails: string;
+    necessary: {
+      title: string;
+      description: string;
+    };
+    analytics: {
+      title: string;
+      description: string;
+    };
+    marketing: {
+      title: string;
+      description: string;
+    };
+    acceptAll: string;
+    rejectAll: string;
+    savePreferences: string;
+  };
   errors: {
     notFound: {
       title: string;

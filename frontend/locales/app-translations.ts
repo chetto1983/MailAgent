@@ -488,6 +488,29 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         draftSaved: 'Draft saved successfully',
       },
     },
+    cookies: {
+      title: 'Cookie Settings',
+      description: 'We use cookies to enhance your browsing experience, serve personalized content, and analyze our traffic. By clicking "Accept All", you consent to our use of cookies.',
+      privacyLink: 'Privacy Policy',
+      customize: 'Customize',
+      showDetails: 'Show details',
+      hideDetails: 'Hide details',
+      necessary: {
+        title: 'Necessary Cookies',
+        description: 'Essential for the website to function properly. These cannot be disabled.',
+      },
+      analytics: {
+        title: 'Analytics Cookies',
+        description: 'Help us understand how visitors interact with our website.',
+      },
+      marketing: {
+        title: 'Marketing Cookies',
+        description: 'Used to deliver personalized advertisements.',
+      },
+      acceptAll: 'Accept All',
+      rejectAll: 'Reject All',
+      savePreferences: 'Save Preferences',
+    },
     errors: {
       notFound: {
         title: '404',
@@ -993,6 +1016,29 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         sendError: 'Invio fallito. Riprova.',
         draftSaved: 'Bozza salvata con successo',
       },
+    },
+    cookies: {
+      title: 'Impostazioni Cookie',
+      description: 'Utilizziamo i cookie per migliorare la tua esperienza di navigazione, fornire contenuti personalizzati e analizzare il nostro traffico. Cliccando "Accetta Tutti", acconsenti all\'uso dei nostri cookie.',
+      privacyLink: 'Privacy Policy',
+      customize: 'Personalizza',
+      showDetails: 'Mostra dettagli',
+      hideDetails: 'Nascondi dettagli',
+      necessary: {
+        title: 'Cookie Necessari',
+        description: 'Essenziali per il corretto funzionamento del sito. Non possono essere disattivati.',
+      },
+      analytics: {
+        title: 'Cookie Analitici',
+        description: 'Ci aiutano a capire come i visitatori interagiscono con il nostro sito.',
+      },
+      marketing: {
+        title: 'Cookie Marketing',
+        description: 'Utilizzati per fornire pubblicità personalizzate.',
+      },
+      acceptAll: 'Accetta Tutti',
+      rejectAll: 'Rifiuta Tutti',
+      savePreferences: 'Salva Preferenze',
     },
     errors: {
       notFound: {

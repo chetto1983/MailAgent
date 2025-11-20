@@ -12,6 +12,7 @@ import {
   Stack,
 } from '@mui/material';
 import { X, Cookie, ChevronDown, ChevronUp } from 'lucide-react';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 const COOKIE_CONSENT_KEY = 'mailagent:cookie-consent';
 
@@ -22,6 +23,8 @@ interface CookiePreferences {
 }
 
 export function CookieConsent() {
+  const translations = useTranslations();
+  const cookieCopy = translations.cookies;
   const [visible, setVisible] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [preferences, setPreferences] = useState<CookiePreferences>({
@@ -75,7 +78,7 @@ export function CookieConsent() {
         left: 0,
         right: 0,
         zIndex: 9999,
-        p: 2,
+        p: { xs: 1, sm: 2 },
         display: 'flex',
         justifyContent: 'center',
         pointerEvents: 'none',
@@ -84,26 +87,25 @@ export function CookieConsent() {
       <Paper
         elevation={8}
         sx={{
-          maxWidth: 600,
+          maxWidth: { xs: '100%', sm: 600 },
           width: '100%',
-          p: 3,
+          p: { xs: 2, sm: 3 },
           pointerEvents: 'auto',
-          borderRadius: 2,
+          borderRadius: { xs: 0, sm: 2 },
           border: 1,
           borderColor: 'divider',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: { xs: 1, sm: 2 } }}>
           <Cookie size={24} style={{ flexShrink: 0, marginTop: 4 }} />
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-              Cookie Settings
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+              {cookieCopy.title}
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              We use cookies to enhance your browsing experience, serve personalized content, and
-              analyze our traffic. By clicking "Accept All", you consent to our use of cookies.{' '}
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: { xs: '0.8125rem', sm: '0.875rem' } }}>
+              {cookieCopy.description}{' '}
               <Link href="/privacy" underline="hover" sx={{ color: 'primary.main' }}>
-                Privacy Policy
+                {cookieCopy.privacyLink}
               </Link>
             </Typography>
 
@@ -114,17 +116,18 @@ export function CookieConsent() {
                 gap: 1,
                 mb: showDetails ? 2 : 0,
                 cursor: 'pointer',
+                minHeight: 44, // Touch target
               }}
               onClick={() => setShowDetails(!showDetails)}
             >
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                {showDetails ? 'Hide Details' : 'Customize Cookies'}
+              <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', fontSize: { xs: '0.8125rem', sm: '0.875rem' } }}>
+                {showDetails ? cookieCopy.hideDetails : cookieCopy.customize}
               </Typography>
               {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </Box>
 
             <Collapse in={showDetails}>
-              <Stack spacing={1.5} sx={{ my: 2, pl: 1 }}>
+              <Stack spacing={1.5} sx={{ my: 2, pl: { xs: 0, sm: 1 } }}>
                 <FormControlLabel
                   control={
                     <Switch
@@ -135,11 +138,11 @@ export function CookieConsent() {
                   }
                   label={
                     <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        Necessary Cookies
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8125rem', sm: '0.875rem' } }}>
+                        {cookieCopy.necessary.title}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Required for the website to function properly. Cannot be disabled.
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}>
+                        {cookieCopy.necessary.description}
                       </Typography>
                     </Box>
                   }
@@ -155,11 +158,11 @@ export function CookieConsent() {
                   }
                   label={
                     <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        Analytics Cookies
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8125rem', sm: '0.875rem' } }}>
+                        {cookieCopy.analytics.title}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Help us understand how you use our website to improve your experience.
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}>
+                        {cookieCopy.analytics.description}
                       </Typography>
                     </Box>
                   }
@@ -175,11 +178,11 @@ export function CookieConsent() {
                   }
                   label={
                     <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        Marketing Cookies
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: '0.8125rem', sm: '0.875rem' } }}>
+                        {cookieCopy.marketing.title}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Used to deliver relevant advertisements and track campaign performance.
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.6875rem', sm: '0.75rem' } }}>
+                        {cookieCopy.marketing.description}
                       </Typography>
                     </Box>
                   }
@@ -190,23 +193,23 @@ export function CookieConsent() {
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
               {showDetails ? (
                 <>
-                  <Button variant="outlined" onClick={handleRejectAll} size="small">
-                    Reject All
+                  <Button variant="outlined" onClick={handleRejectAll} size="small" sx={{ minHeight: 36 }}>
+                    {cookieCopy.rejectAll}
                   </Button>
-                  <Button variant="outlined" onClick={handleAcceptSelected} size="small">
-                    Save Preferences
+                  <Button variant="outlined" onClick={handleAcceptSelected} size="small" sx={{ minHeight: 36 }}>
+                    {cookieCopy.savePreferences}
                   </Button>
-                  <Button variant="contained" onClick={handleAcceptAll} size="small">
-                    Accept All
+                  <Button variant="contained" onClick={handleAcceptAll} size="small" sx={{ minHeight: 36 }}>
+                    {cookieCopy.acceptAll}
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button variant="outlined" onClick={handleRejectAll} size="small">
-                    Reject All
+                  <Button variant="outlined" onClick={handleRejectAll} size="small" sx={{ minHeight: 36 }}>
+                    {cookieCopy.rejectAll}
                   </Button>
-                  <Button variant="contained" onClick={handleAcceptAll} size="small">
-                    Accept All
+                  <Button variant="contained" onClick={handleAcceptAll} size="small" sx={{ minHeight: 36 }}>
+                    {cookieCopy.acceptAll}
                   </Button>
                 </>
               )}
@@ -215,7 +218,7 @@ export function CookieConsent() {
           <IconButton
             size="small"
             onClick={() => setVisible(false)}
-            sx={{ flexShrink: 0 }}
+            sx={{ flexShrink: 0, minWidth: 44, minHeight: 44 }} // Touch target
             aria-label="Close"
           >
             <X size={18} />

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Typography,
@@ -10,8 +9,11 @@ import {
 } from '@mui/material';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { usersApi } from '@/lib/api/users';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 export function ProfileSettings() {
+  const translations = useTranslations();
+  const settingsCopy = translations.dashboard.settings;
   const { user } = useAuth();
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
@@ -36,32 +38,32 @@ export function ProfileSettings() {
   return (
     <Paper sx={{ p: 4 }}>
       <Typography variant="h6" gutterBottom>
-        Profile Settings
+        {settingsCopy.profileTitle}
       </Typography>
       <Stack spacing={3}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField
             fullWidth
-            label="First Name"
+            label={settingsCopy.firstName}
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
           />
           <TextField
             fullWidth
-            label="Last Name"
+            label={settingsCopy.lastName}
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
           />
         </Stack>
         <TextField
           fullWidth
-          label="Email"
+          label={settingsCopy.emailReadonly}
           defaultValue={user.email}
           disabled
         />
         <Box>
           <Button variant="contained" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? settingsCopy.saving : settingsCopy.saveChanges}
           </Button>
         </Box>
       </Stack>
