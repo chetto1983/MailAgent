@@ -694,14 +694,13 @@ export function Mailbox() {
   }, [combinedFolders, selectedFolderId]);
 
   // Load emails when folder ID changes (not activeFolder object to avoid unnecessary re-renders)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Only re-run when selectedFolderId or advancedFilters change, NOT when loadData changes
   useEffect(() => {
     console.log('[DEBUG] selectedFolderId changed, viewMode:', viewMode, 'selectedFolderId:', selectedFolderId);
     if (selectedFolderId) {
       console.log('[DEBUG] Calling loadData from useEffect');
       loadData();
     }
-    // Only re-run when selectedFolderId or advancedFilters change, NOT when loadData changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFolderId, advancedFilters]);
 
