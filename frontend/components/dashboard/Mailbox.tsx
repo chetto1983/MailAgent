@@ -36,6 +36,10 @@ import { LabelManager } from '@/components/labels';
 import { BulkActionBar } from '@/components/email/BulkActionBar';
 import { LabelSelectorDialog } from '@/components/email/LabelSelectorDialog';
 import { FolderSelectorDialog } from '@/components/email/FolderSelectorDialog';
+import { mockEmails, mockFolders } from '@/lib/mocks/email-data';
+
+// Toggle to use mock data for testing
+const USE_MOCK_DATA = true;
 
 interface FolderItem {
   id: string;
@@ -257,13 +261,17 @@ export function Mailbox() {
   );
 
   // Active folder
-  const activeFolder = useMemo(
-    () =>
-      combinedFolders.find((folder) => folder.id === selectedFolderId) ||
+  const activeFolder = useMemo(() => {
+    const found = combinedFolders.find((folder) => folder.id === selectedFolderId) ||
       combinedFolders[0] ||
-      null,
-    [combinedFolders, selectedFolderId]
-  );
+      null;
+    console.log('[Mailbox] activeFolder calculated:', {
+      found: found?.id,
+      selectedFolderId,
+      combinedFoldersCount: combinedFolders.length
+    });
+    return found;
+  }, [combinedFolders, selectedFolderId]);
 
   // Folders grouped by provider for sidebar
   const folderGroups = useMemo<FolderGroup[]>(() => {
@@ -315,7 +323,7 @@ export function Mailbox() {
   const loadFolderMetadata = useCallback(async () => {
     try {
       setFoldersLoading(true);
-      const folderResponse = await getFolders();
+      const folderResponse = USE_MOCK_DATA ? mockFolders : await getFolders();
 
       const normalized: FolderItem[] = [];
       Object.entries(folderResponse.foldersByProvider).forEach(
@@ -352,17 +360,45 @@ export function Mailbox() {
 
   // Load emails data
   const loadData = useCallback(async () => {
-    if (!activeFolder) return;
+    // Calculate active folder directly from selectedFolderId to avoid stale closure
+    const currentActiveFolder = combinedFolders.find((folder) => folder.id === selectedFolderId) ||
+      combinedFolders[0] ||
+      null;
+
+    console.log('[Mailbox] loadData called', {
+      activeFolder: currentActiveFolder?.id,
+      selectedFolderId,
+      combinedFoldersCount: combinedFolders.length
+    });
+
+    if (!currentActiveFolder) {
+      console.warn('[Mailbox] No active folder, skipping loadData');
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log('[Mailbox] Loading emails for folder:', currentActiveFolder.id);
 
-      const providersRes = await providersApi.getProviders();
+      const providersRes = USE_MOCK_DATA ? mockFolders.providers : await providersApi.getProviders();
       setProviders(providersRes || []);
 
+      // Use mock data for testing
+      if (USE_MOCK_DATA) {
+        console.log('[Mailbox] Using mock data, setting', mockEmails.length, 'emails');
+        setEmails(mockEmails as any);
+        setSelectedEmail(null);
+        setPagination({
+          page: 1,
+          hasMore: false,
+          total: mockEmails.length,
+        });
+        return;
+      }
+
       // Check if filtering by label
-      if (activeFolder.id.startsWith('label:')) {
-        const labelId = activeFolder.id.replace('label:', '');
+      if (currentActiveFolder.id.startsWith('label:')) {
+        const labelId = currentActiveFolder.id.replace('label:', '');
         // For now, just use regular email list with filter
         // TODO: Backend should support filtering by label in listEmails endpoint
         const queryParams: EmailListParams = {
@@ -395,7 +431,7 @@ export function Mailbox() {
         const queryParams: EmailListParams = {
           limit: 50,
           page: 1,
-          ...activeFolder.queryOverrides,
+          ...currentActiveFolder.queryOverrides,
           search: advancedFilters.searchQuery || searchQuery || undefined,
           from: advancedFilters.from || undefined,
           startDate: advancedFilters.startDate || undefined,
@@ -406,6 +442,10 @@ export function Mailbox() {
         };
 
         const emailsRes = await emailApi.listEmails(queryParams);
+        console.log('[Mailbox] Emails loaded:', {
+          count: emailsRes.data.emails?.length || 0,
+          total: emailsRes.data.pagination?.total || 0
+        });
         setEmails((emailsRes.data.emails || []) as any);
         setSelectedEmail(null);
 
@@ -417,14 +457,14 @@ export function Mailbox() {
         });
       }
     } catch (error) {
-      console.error('Failed to load mailbox data:', error);
+      console.error('[Mailbox] Failed to load mailbox data:', error);
       setEmails([]);
       setSelectedEmail(null);
       setPagination({ page: 1, hasMore: false, total: 0 });
     } finally {
       setLoading(false);
     }
-  }, [activeFolder, searchQuery, advancedFilters, setEmails, setLoading, setSelectedEmail]);
+  }, [combinedFolders, selectedFolderId, searchQuery, advancedFilters, setEmails, setLoading, setSelectedEmail]);
 
   // Load more emails (infinite scroll)
   const loadMoreEmails = useCallback(async () => {
@@ -651,13 +691,20 @@ export function Mailbox() {
 
   // Auto-select first folder when folders are loaded
   useEffect(() => {
+    console.log('[Mailbox] Auto-select effect:', {
+      selectedFolderId,
+      combinedFoldersCount: combinedFolders.length,
+      firstFolder: combinedFolders[0]?.id
+    });
     if (!selectedFolderId && combinedFolders.length > 0) {
+      console.log('[Mailbox] Auto-selecting first folder:', combinedFolders[0].id);
       setSelectedFolderId(combinedFolders[0].id);
     }
   }, [combinedFolders, selectedFolderId]);
 
   // Load emails when folder ID changes (not activeFolder object to avoid unnecessary re-renders)
   useEffect(() => {
+    console.log('[Mailbox] selectedFolderId changed:', selectedFolderId);
     if (selectedFolderId) {
       loadData();
     }
