@@ -28,11 +28,13 @@ import {
   LogOut,
   Settings,
   Menu as MenuIcon,
+  Languages,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useAuthStore } from '@/stores/auth-store';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { emailApi } from '@/lib/api/email';
+import { useLocale } from '@/lib/hooks/use-locale';
 
 interface HeaderNotification {
   id: string;
@@ -47,7 +49,7 @@ export interface PmSyncHeaderProps {
   isDarkMode?: boolean;
 }
 
-export function PmSyncHeader({
+export function Header({
   onMenuClick,
   onThemeToggle,
   isDarkMode = true,
@@ -61,9 +63,11 @@ export function PmSyncHeader({
   const [searchValue, setSearchValue] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
+  const [languageAnchor, setLanguageAnchor] = useState<null | HTMLElement>(null);
   const [notifications, setNotifications] = useState<HeaderNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const { locale, changeLocale } = useLocale();
 
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -132,6 +136,19 @@ export function PmSyncHeader({
 
   const handleNotificationClose = () => {
     setNotificationAnchor(null);
+  };
+
+  const handleLanguageOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setLanguageAnchor(event.currentTarget);
+  };
+
+  const handleLanguageClose = () => {
+    setLanguageAnchor(null);
+  };
+
+  const handleLanguageChange = (newLocale: string) => {
+    changeLocale(newLocale);
+    handleLanguageClose();
   };
 
   const handleLogout = () => {
@@ -222,6 +239,15 @@ export function PmSyncHeader({
 
         {/* Right Side Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+          {/* Language Selector */}
+          {!isMobile && (
+            <Tooltip title="Language">
+              <IconButton onClick={handleLanguageOpen} color="inherit">
+                <Languages size={20} />
+              </IconButton>
+            </Tooltip>
+          )}
+
           {/* Theme Toggle */}
           {!isMobile && (
             <Tooltip title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
@@ -307,12 +333,20 @@ export function PmSyncHeader({
             <ListItemText>Settings</ListItemText>
           </MenuItem>
           {isMobile && (
-            <MenuItem onClick={onThemeToggle}>
-              <ListItemIcon>
-                {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-              </ListItemIcon>
-              <ListItemText>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</ListItemText>
-            </MenuItem>
+            <>
+              <MenuItem onClick={handleLanguageOpen}>
+                <ListItemIcon>
+                  <Languages size={18} />
+                </ListItemIcon>
+                <ListItemText>Language: {locale === 'en' ? 'EN' : 'IT'}</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={onThemeToggle}>
+                <ListItemIcon>
+                  {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+                </ListItemIcon>
+                <ListItemText>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</ListItemText>
+              </MenuItem>
+            </>
           )}
           <Divider />
           <MenuItem onClick={handleLogout}>
@@ -397,6 +431,65 @@ export function PmSyncHeader({
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               Go to Inbox
             </Typography>
+          </MenuItem>
+        </Menu>
+
+        {/* Language Menu */}
+        <Menu
+          anchorEl={languageAnchor}
+          open={Boolean(languageAnchor)}
+          onClose={handleLanguageClose}
+          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          PaperProps={{
+            sx: {
+              mt: 1.5,
+              minWidth: 150,
+            },
+          }}
+        >
+          <MenuItem
+            onClick={() => handleLanguageChange('en')}
+            selected={locale === 'en'}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box
+                sx={{
+                  width: 24,
+                  height: 16,
+                  borderRadius: 0.5,
+                  bgcolor: '#012169',
+                  backgroundImage: `
+                    linear-gradient(to bottom right, transparent 0%, transparent 49.9%, white 50%, transparent 50.1%),
+                    linear-gradient(to top right, transparent 0%, transparent 49.9%, white 50%, transparent 50.1%),
+                    linear-gradient(to bottom right, transparent 0%, transparent 49.5%, #C8102E 50%, transparent 50.5%),
+                    linear-gradient(to top right, transparent 0%, transparent 49.5%, #C8102E 50%, transparent 50.5%),
+                    linear-gradient(white, white),
+                    linear-gradient(#C8102E, #C8102E)
+                  `,
+                  backgroundSize: '100% 100%, 100% 100%, 100% 100%, 100% 100%, 20% 100%, 100% 20%',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                }}
+              />
+              <Typography>English</Typography>
+            </Box>
+          </MenuItem>
+          <MenuItem
+            onClick={() => handleLanguageChange('it')}
+            selected={locale === 'it'}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box
+                sx={{
+                  width: 24,
+                  height: 16,
+                  borderRadius: 0.5,
+                  background: 'linear-gradient(to right, #009246 0%, #009246 33.33%, white 33.33%, white 66.67%, #CE2B37 66.67%, #CE2B37 100%)',
+                }}
+              />
+              <Typography>Italiano</Typography>
+            </Box>
           </MenuItem>
         </Menu>
       </Toolbar>

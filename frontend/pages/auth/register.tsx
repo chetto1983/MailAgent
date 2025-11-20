@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Box, Container, Stack, Typography } from '@mui/material';
+import { Box, Container, Stack, Typography, FormControlLabel, Checkbox } from '@mui/material';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,8 @@ export default function RegisterPage() {
     firstName: '',
     lastName: '',
   });
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -37,6 +39,11 @@ export default function RegisterPage() {
 
     if (formData.password !== formData.confirmPassword) {
       setError(translations.common.passwordMismatch);
+      return;
+    }
+
+    if (!agreedToTerms || !agreedToPrivacy) {
+      setError('You must agree to the Terms of Service and Privacy Policy to register.');
       return;
     }
 
@@ -139,7 +146,52 @@ export default function RegisterPage() {
                 required
               />
 
-              <Button type="submit" disabled={loading} fullWidth>
+              <Stack spacing={1.5} sx={{ mt: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={agreedToTerms}
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      required
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" color="text.secondary">
+                      I agree to the{' '}
+                      <Link
+                        href="/terms"
+                        target="_blank"
+                        style={{ color: 'inherit', textDecoration: 'underline' }}
+                      >
+                        Terms of Service
+                      </Link>
+                    </Typography>
+                  }
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={agreedToPrivacy}
+                      onChange={(e) => setAgreedToPrivacy(e.target.checked)}
+                      required
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" color="text.secondary">
+                      I agree to the{' '}
+                      <Link
+                        href="/privacy"
+                        target="_blank"
+                        style={{ color: 'inherit', textDecoration: 'underline' }}
+                      >
+                        Privacy Policy
+                      </Link>
+                    </Typography>
+                  }
+                />
+              </Stack>
+
+              <Button type="submit" disabled={loading || !agreedToTerms || !agreedToPrivacy} fullWidth>
                 {loading ? translations.common.loading : copy.form.submit}
               </Button>
             </Stack>

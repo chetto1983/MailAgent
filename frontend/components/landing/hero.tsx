@@ -40,7 +40,7 @@ export function Hero() {
             <Button
               component={Link}
               href="/auth/register"
-              size="lg"
+              size="large"
               endIcon={<ArrowRight size={18} />}
             >
               {t.landing.hero.primaryCta}
@@ -48,8 +48,8 @@ export function Hero() {
             <Button
               component="a"
               href="#features"
-              variant="outline"
-              size="lg"
+              variant="outlined"
+              size="large"
               endIcon={<Play size={18} />}
             >
               {t.landing.hero.secondaryCta}

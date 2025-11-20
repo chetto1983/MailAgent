@@ -1,17 +1,17 @@
 import React from 'react';
-import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
-import { PmSyncCalendar } from '@/components/dashboard/PmSyncCalendar';
+import { Layout } from '@/components/layout/Layout';
+import { Calendar } from '@/components/dashboard/Calendar';
 
 /**
- * Calendar Page - New PmSync Design
+ * Calendar Page
  *
  * Modern calendar interface with monthly grid view
  */
 export default function CalendarPage() {
   return (
-    <PmSyncLayout>
-      <PmSyncCalendar />
-    </PmSyncLayout>
+    <Layout>
+      <Calendar />
+    </Layout>
   );
 }
 

@@ -151,7 +151,7 @@ export default function LoginPage() {
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="outlined"
                   fullWidth
                   onClick={() => {
                     setStep('login');

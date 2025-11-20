@@ -22,6 +22,8 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   CircularProgress,
+  Snackbar,
+  Alert as MuiAlert,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -40,6 +42,7 @@ import { useRouter } from 'next/router';
 import { calendarApi, type CalendarEvent, type CreateEventDto } from '@/lib/api/calendar';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { resolveLocale } from '@/locales';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface CalendarCategory {
   id: string;
@@ -51,8 +54,10 @@ interface CalendarCategory {
 // Color palette for calendar categories - defined outside component to avoid re-creation
 const CATEGORY_PALETTE = ['#9C27B0', '#00C853', '#FF9800', '#0B7EFF', '#E91E63', '#3F51B5'];
 
-export function PmSyncCalendar() {
+export function Calendar() {
   const router = useRouter();
+  const translations = useTranslations();
+  const calendarCopy = translations.dashboard.calendar;
   const calendarRef = useRef<FullCalendar>(null);
   const [currentMonth, setCurrentMonth] = useState('');
   const [currentYear, setCurrentYear] = useState('');
@@ -81,6 +86,15 @@ export function PmSyncCalendar() {
     end: '',
     calendar: 'work',
     description: '',
+  });
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info',
   });
 
   const updateCalendarHeader = useCallback(() => {
@@ -243,7 +257,11 @@ export function PmSyncCalendar() {
       : providers.find(p => p.supportsCalendar);
 
     if (!provider) {
-      alert('No calendar provider available. Please connect a calendar provider first.');
+      setSnackbar({
+        open: true,
+        message: calendarCopy.noProviderAlert,
+        severity: 'warning',
+      });
       return;
     }
 
@@ -272,9 +290,18 @@ export function PmSyncCalendar() {
         calendar: 'work',
         description: '',
       });
+      setSnackbar({
+        open: true,
+        message: `${calendarCopy.saveEvent} ✓`,
+        severity: 'success',
+      });
     } catch (error) {
       console.error('Failed to create event:', error);
-      alert('Failed to create event. Please try again.');
+      setSnackbar({
+        open: true,
+        message: calendarCopy.failedToCreateEvent,
+        severity: 'error',
+      });
     }
   };
 
@@ -286,7 +313,11 @@ export function PmSyncCalendar() {
       : providers.find((p) => p.supportsCalendar);
 
     if (!provider) {
-      alert('No calendar provider available. Please connect a provider first.');
+      setSnackbar({
+        open: true,
+        message: calendarCopy.noProviderAlert,
+        severity: 'warning',
+      });
       return;
     }
 
@@ -306,9 +337,18 @@ export function PmSyncCalendar() {
 
       setQuickEventText('');
       await loadData();
+      setSnackbar({
+        open: true,
+        message: `${calendarCopy.saveEvent} ✓`,
+        severity: 'success',
+      });
     } catch (error) {
       console.error('Failed to create quick event:', error);
-      alert('Failed to create quick event. Please try again.');
+      setSnackbar({
+        open: true,
+        message: calendarCopy.failedToCreateQuickEvent,
+        severity: 'error',
+      });
     }
   };
 
@@ -345,7 +385,7 @@ export function PmSyncCalendar() {
           <TextField
             fullWidth
             size="small"
-            placeholder="Schedule a team sync for Friday morning..."
+            placeholder={calendarCopy.quickEventPlaceholder}
             value={quickEventText}
             onChange={(e) => setQuickEventText(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleQuickEvent()}
@@ -357,13 +397,13 @@ export function PmSyncCalendar() {
             startIcon={<Plus size={18} />}
             onClick={() => setEventDialogOpen(true)}
           >
-            New Event
+            {calendarCopy.createEvent}
           </Button>
         </Box>
 
         {/* Calendars */}
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-          Calendars
+          {calendarCopy.filterTitle}
         </Typography>
         <List sx={{ mb: 2 }}>
           {categories.map((category) => (
@@ -411,11 +451,11 @@ export function PmSyncCalendar() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
               <Sparkles size={20} />
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                AI Insights
+                {calendarCopy.aiInsightsTitle}
               </Typography>
             </Box>
             <Typography variant="body2" sx={{ fontSize: '0.75rem', mb: 1.5, opacity: 0.9 }}>
-              You have {events.length} events scheduled. Would you like AI to optimize your calendar?
+              {calendarCopy.aiOptimizeMessage.replace('{count}', events.length.toString())}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
@@ -428,7 +468,7 @@ export function PmSyncCalendar() {
                 }}
                 onClick={() => router.push('/dashboard/ai')}
               >
-                Open AI Assistant
+                {calendarCopy.openAiAssistant}
               </Button>
             </Box>
           </Box>
@@ -443,7 +483,7 @@ export function PmSyncCalendar() {
             }}
           >
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-              No events scheduled. Click on the calendar to create your first event!
+              {calendarCopy.noEventsMessage}
             </Typography>
           </Box>
         )}
@@ -474,7 +514,7 @@ export function PmSyncCalendar() {
             </IconButton>
           </Box>
           <Button variant="outlined" size="small" onClick={handleToday}>
-            Today
+            {calendarCopy.today}
           </Button>
 
           <Box sx={{ flex: 1 }} />
@@ -485,9 +525,9 @@ export function PmSyncCalendar() {
             onChange={(_, newView) => newView && setViewType(newView)}
             size="small"
           >
-            <ToggleButton value="day">Day</ToggleButton>
-            <ToggleButton value="week">Week</ToggleButton>
-            <ToggleButton value="month">Month</ToggleButton>
+            <ToggleButton value="day">{calendarCopy.day}</ToggleButton>
+            <ToggleButton value="week">{calendarCopy.week}</ToggleButton>
+            <ToggleButton value="month">{calendarCopy.month}</ToggleButton>
           </ToggleButtonGroup>
         </Box>
 
@@ -538,18 +578,18 @@ export function PmSyncCalendar() {
 
       {/* Create Event Dialog */}
       <Dialog open={eventDialogOpen} onClose={() => setEventDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create New Event</DialogTitle>
+        <DialogTitle>{calendarCopy.createEventDialogTitle}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
               fullWidth
-              label="Event Title"
+              label={calendarCopy.eventTitleLabel}
               value={newEvent.title}
               onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
             />
             <TextField
               fullWidth
-              label="Start Date/Time"
+              label={calendarCopy.startDateTime}
               type="datetime-local"
               value={newEvent.start}
               onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
@@ -557,18 +597,18 @@ export function PmSyncCalendar() {
             />
             <TextField
               fullWidth
-              label="End Date/Time"
+              label={calendarCopy.endDateTime}
               type="datetime-local"
               value={newEvent.end}
               onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
               InputLabelProps={{ shrink: true }}
             />
             <FormControl fullWidth>
-              <InputLabel>Calendar</InputLabel>
+              <InputLabel>{calendarCopy.calendarLabel}</InputLabel>
               <Select
                 value={newEvent.calendar}
                 onChange={(e) => setNewEvent({ ...newEvent, calendar: e.target.value })}
-                label="Calendar"
+                label={calendarCopy.calendarLabel}
               >
                 {categories.map((cat) => (
                   <MenuItem key={cat.id} value={cat.id}>
@@ -589,7 +629,7 @@ export function PmSyncCalendar() {
             </FormControl>
             <TextField
               fullWidth
-              label="Description"
+              label={calendarCopy.eventDescription}
               multiline
               rows={3}
               value={newEvent.description}
@@ -598,12 +638,29 @@ export function PmSyncCalendar() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEventDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setEventDialogOpen(false)}>{calendarCopy.cancelEvent}</Button>
           <Button variant="contained" onClick={handleCreateEvent}>
-            Create
+            {calendarCopy.saveEvent}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 }

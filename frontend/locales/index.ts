@@ -208,11 +208,30 @@ export interface AppTranslations {
       attendees: string;
       saveEvent: string;
       cancelEvent: string;
+      quickEventPlaceholder: string;
+      today: string;
+      day: string;
+      week: string;
+      month: string;
+      eventTitle: string;
+      eventTitleLabel: string;
+      startDateTime: string;
+      endDateTime: string;
+      calendarLabel: string;
+      noProviderAlert: string;
+      createEventDialogTitle: string;
+      aiInsightsTitle: string;
+      aiOptimizeMessage: string;
+      openAiAssistant: string;
+      noEventsMessage: string;
+      failedToCreateEvent: string;
+      failedToCreateQuickEvent: string;
     };
     providers: {
       title: string;
       descriptionTemplate: string;
       refresh: string;
+      refreshing: string;
       connectedTab: string;
       addTab: string;
       connectedTitle: string;
@@ -221,12 +240,32 @@ export interface AppTranslations {
       googleTitle: string;
       googleDescription: string;
       googleConnect: string;
+      googleConnecting: string;
+      googleFeatures: {
+        description: string;
+        feature1: string;
+        feature2: string;
+        feature3: string;
+      };
       microsoftTitle: string;
       microsoftDescription: string;
       microsoftConnect: string;
+      microsoftConnecting: string;
+      microsoftFeatures: {
+        description: string;
+        feature1: string;
+        feature2: string;
+        feature3: string;
+      };
       genericTitle: string;
       genericDescription: string;
       genericConnect: string;
+      genericFeatures: {
+        description: string;
+        feature1: string;
+        feature2: string;
+        feature3: string;
+      };
       helpTitle: string;
       helpGoogle: string;
       helpMicrosoft: string;
@@ -235,7 +274,21 @@ export interface AppTranslations {
       successMessage: string;
       deleteSuccess: string;
       deleteConfirm: string;
+      disconnecting: string;
+      disconnect: string;
       oauthError: string;
+      addProvider: string;
+      noProvidersMessage: string;
+      badges: {
+        default: string;
+        active: string;
+        inactive: string;
+        email: string;
+        calendar: string;
+        contacts: string;
+      };
+      lastSynced: string;
+      neverSynced: string;
     };
     settings: {
       title: string;
@@ -374,6 +427,38 @@ export interface AppTranslations {
       sync: string;
       syncing: string;
       syncDisabledTooltip: string;
+      new: string;
+      noContactsFound: string;
+      selectContactMessage: string;
+      actions: {
+        email: string;
+        schedule: string;
+        addNote: string;
+        aiInsights: string;
+      };
+      details: {
+        contactInformation: string;
+        email: string;
+        phone: string;
+        company: string;
+        location: string;
+        lastInteraction: string;
+        notAvailable: string;
+      };
+      tabs: {
+        details: string;
+        activity: string;
+        notes: string;
+      };
+      activity: {
+        title: string;
+        noActivity: string;
+      };
+      notes: {
+        title: string;
+        noNotes: string;
+        addNote: string;
+      };
       list: {
         emptyTitle: string;
         emptyDescription: string;
@@ -397,6 +482,19 @@ export interface AppTranslations {
         deleteConfirmDescription: string;
         deleteSuccess: string;
         deleteError: string;
+        selectProvider: string;
+        failedToSave: string;
+      };
+      createDialog: {
+        title: string;
+        provider: string;
+        name: string;
+        email: string;
+        company: string;
+        jobTitle: string;
+        notes: string;
+        create: string;
+        cancel: string;
       };
       editDialog: {
         title: string;
@@ -404,16 +502,41 @@ export interface AppTranslations {
         firstName: string;
         lastName: string;
         displayName: string;
+        name: string;
         email: string;
         phone: string;
         company: string;
         jobTitle: string;
+        notes: string;
         save: string;
         cancel: string;
         success: string;
         error: string;
       };
     };
+  };
+  cookies: {
+    title: string;
+    description: string;
+    privacyLink: string;
+    customize: string;
+    showDetails: string;
+    hideDetails: string;
+    necessary: {
+      title: string;
+      description: string;
+    };
+    analytics: {
+      title: string;
+      description: string;
+    };
+    marketing: {
+      title: string;
+      description: string;
+    };
+    acceptAll: string;
+    rejectAll: string;
+    savePreferences: string;
   };
   errors: {
     notFound: {

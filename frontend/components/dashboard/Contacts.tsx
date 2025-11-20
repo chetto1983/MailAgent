@@ -28,6 +28,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Snackbar,
+  Alert as MuiAlert,
+  DialogContentText,
 } from '@mui/material';
 import {
   Search,
@@ -46,6 +49,7 @@ import {
 import { useRouter } from 'next/router';
 import { contactsApi, type Contact } from '@/lib/api/contacts';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -87,8 +91,10 @@ const getPrimaryPhone = (contact?: Contact | null) =>
   contact?.phoneNumbers?.[0]?.value ||
   '';
 
-export function PmSyncContacts() {
+export function Contacts() {
   const router = useRouter();
+  const translations = useTranslations();
+  const contactsCopy = translations.dashboard.contacts;
   const [loading, setLoading] = useState(true);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -107,6 +113,17 @@ export function PmSyncContacts() {
   });
   const [actionLoading, setActionLoading] = useState(false);
   const selectedContactIdRef = useRef<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
 
   useEffect(() => {
     selectedContactIdRef.current = selectedContact?.id ?? null;
@@ -193,7 +210,11 @@ export function PmSyncContacts() {
 
   const handleSubmitContact = async () => {
     if (!contactForm.providerId) {
-      alert('Please select a provider');
+      setSnackbar({
+        open: true,
+        message: contactsCopy.alerts.selectProvider,
+        severity: 'warning',
+      });
       return;
     }
 
@@ -224,25 +245,54 @@ export function PmSyncContacts() {
 
       await loadContacts();
       setContactDialogOpen(false);
+      setSnackbar({
+        open: true,
+        message: contactDialogMode === 'create'
+          ? `${contactsCopy.createDialog.create} ✓`
+          : contactsCopy.editDialog.success,
+        severity: 'success',
+      });
     } catch (error) {
       console.error('Failed to save contact:', error);
-      alert('Failed to save contact. Please try again.');
+      setSnackbar({
+        open: true,
+        message: contactsCopy.alerts.failedToSave,
+        severity: 'error',
+      });
     } finally {
       setActionLoading(false);
     }
   };
 
+  const openDeleteDialog = (contact: Contact) => {
+    setContactToDelete(contact);
+    setDeleteDialogOpen(true);
+  };
+
   const handleDeleteContact = async () => {
-    if (!selectedContact) return;
-    if (!confirm('Are you sure you want to delete this contact?')) return;
+    if (!contactToDelete) return;
 
     try {
       setActionLoading(true);
-      await contactsApi.deleteContact(selectedContact.id);
+      await contactsApi.deleteContact(contactToDelete.id);
       await loadContacts();
+      setDeleteDialogOpen(false);
+      setContactToDelete(null);
+      if (selectedContact?.id === contactToDelete.id) {
+        setSelectedContact(null);
+      }
+      setSnackbar({
+        open: true,
+        message: contactsCopy.alerts.deleteSuccess,
+        severity: 'success',
+      });
     } catch (error) {
       console.error('Failed to delete contact:', error);
-      alert('Failed to delete contact. Please try again.');
+      setSnackbar({
+        open: true,
+        message: contactsCopy.alerts.deleteError,
+        severity: 'error',
+      });
     } finally {
       setActionLoading(false);
     }
@@ -300,7 +350,7 @@ export function PmSyncContacts() {
         <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600, flex: 1 }}>
-              Contacts
+              {contactsCopy.title}
             </Typography>
             <Button
               variant="contained"
@@ -308,14 +358,14 @@ export function PmSyncContacts() {
               startIcon={<Plus size={18} />}
               onClick={openCreateContactDialog}
             >
-              New
+              {contactsCopy.new}
             </Button>
           </Box>
 
           <TextField
             fullWidth
             size="small"
-            placeholder="Search contacts..."
+            placeholder={contactsCopy.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             InputProps={{
@@ -337,7 +387,7 @@ export function PmSyncContacts() {
           ) : contacts.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4, px: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                No contacts found
+                {contactsCopy.noContactsFound}
               </Typography>
             </Box>
           ) : (
@@ -405,7 +455,11 @@ export function PmSyncContacts() {
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Delete">
-                  <IconButton size="small" onClick={handleDeleteContact} disabled={actionLoading}>
+                  <IconButton
+                    size="small"
+                    onClick={() => selectedContact && openDeleteDialog(selectedContact)}
+                    disabled={actionLoading}
+                  >
                     <Trash2 size={18} />
                   </IconButton>
                 </Tooltip>
@@ -423,7 +477,7 @@ export function PmSyncContacts() {
                   router.push(`/dashboard/email/compose?to=${selectedContactEmail}`)
                 }
               >
-                Email
+                {contactsCopy.actions.email}
               </Button>
               <Button
                 fullWidth
@@ -431,13 +485,13 @@ export function PmSyncContacts() {
                 startIcon={<Calendar size={18} />}
                 onClick={() => router.push(`/dashboard/calendar?contact=${selectedContact.id}`)}
               >
-                Schedule
+                {contactsCopy.actions.schedule}
               </Button>
               <Button fullWidth variant="outlined" startIcon={<MessageSquare size={18} />}>
-                Add Note
+                {contactsCopy.actions.addNote}
               </Button>
               <Button fullWidth variant="outlined" startIcon={<Sparkles size={18} />}>
-                AI Insights
+                {contactsCopy.actions.aiInsights}
               </Button>
             </Stack>
           </Box>
@@ -445,9 +499,9 @@ export function PmSyncContacts() {
           {/* Tabs */}
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
-              <Tab label="Details" />
-              <Tab label="Activity" />
-              <Tab label="Notes" />
+              <Tab label={contactsCopy.tabs.details} />
+              <Tab label={contactsCopy.tabs.activity} />
+              <Tab label={contactsCopy.tabs.notes} />
             </Tabs>
           </Box>
 
@@ -455,7 +509,7 @@ export function PmSyncContacts() {
           <Box sx={{ flex: 1, overflow: 'auto', px: 3 }}>
             <TabPanel value={tabValue} index={0}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Contact Information
+                {contactsCopy.details.contactInformation}
               </Typography>
               <Box
                 sx={{
@@ -472,11 +526,11 @@ export function PmSyncContacts() {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <Mail size={18} color="#0B7EFF" />
                       <Typography variant="subtitle2" color="text.secondary">
-                        Email
+                        {contactsCopy.details.email}
                       </Typography>
                     </Box>
                     <Typography variant="body1">
-                      {selectedContactEmail || 'Not available'}
+                      {selectedContactEmail || contactsCopy.details.notAvailable}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -487,7 +541,7 @@ export function PmSyncContacts() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Phone size={18} color="#00C853" />
                         <Typography variant="subtitle2" color="text.secondary">
-                          Phone
+                          {contactsCopy.details.phone}
                         </Typography>
                       </Box>
                       <Typography variant="body1">{selectedContactPhone}</Typography>
@@ -501,7 +555,7 @@ export function PmSyncContacts() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Building size={18} color="#FF9800" />
                         <Typography variant="subtitle2" color="text.secondary">
-                          Company
+                          {contactsCopy.details.company}
                         </Typography>
                       </Box>
                       <Typography variant="body1">{selectedContact.company}</Typography>
@@ -515,7 +569,7 @@ export function PmSyncContacts() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <MapPin size={18} color="#9C27B0" />
                         <Typography variant="subtitle2" color="text.secondary">
-                          Location
+                          {contactsCopy.details.location}
                         </Typography>
                       </Box>
                       <Typography variant="body1">{selectedContactLocation}</Typography>
@@ -528,7 +582,7 @@ export function PmSyncContacts() {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <Clock size={18} color="#757575" />
                       <Typography variant="subtitle2" color="text.secondary">
-                        Last Interaction
+                        {contactsCopy.details.lastInteraction}
                       </Typography>
                     </Box>
                     <Typography variant="body1">
@@ -541,7 +595,7 @@ export function PmSyncContacts() {
               {selectedContact.notes && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                    Notes
+                    {contactsCopy.notes.title}
                   </Typography>
                   <Card variant="outlined">
                     <CardContent>
@@ -554,29 +608,29 @@ export function PmSyncContacts() {
 
             <TabPanel value={tabValue} index={1}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Recent Activity
+                {contactsCopy.activity.title}
               </Typography>
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant="body2" color="text.secondary">
-                  No recent activity
+                  {contactsCopy.activity.noActivity}
                 </Typography>
               </Box>
             </TabPanel>
 
             <TabPanel value={tabValue} index={2}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Notes
+                {contactsCopy.notes.title}
               </Typography>
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant="body2" color="text.secondary">
-                  No notes yet
+                  {contactsCopy.notes.noNotes}
                 </Typography>
                 <Button
                   variant="contained"
                   startIcon={<Plus size={18} />}
                   sx={{ mt: 2 }}
                 >
-                  Add Note
+                  {contactsCopy.notes.addNote}
                 </Button>
               </Box>
             </TabPanel>
@@ -592,7 +646,7 @@ export function PmSyncContacts() {
           }}
         >
           <Typography variant="body1" color="text.secondary">
-            Select a contact to view details
+            {contactsCopy.selectContactMessage}
           </Typography>
         </Box>
       )}
@@ -604,14 +658,14 @@ export function PmSyncContacts() {
         maxWidth="sm"
       >
         <DialogTitle>
-          {contactDialogMode === 'create' ? 'New Contact' : 'Edit Contact'}
+          {contactDialogMode === 'create' ? contactsCopy.createDialog.title : contactsCopy.editDialog.title}
         </DialogTitle>
         <DialogContent dividers>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <FormControl fullWidth disabled={contactDialogMode === 'edit'}>
-              <InputLabel>Provider</InputLabel>
+              <InputLabel>{contactsCopy.createDialog.provider}</InputLabel>
               <Select
-                label="Provider"
+                label={contactsCopy.createDialog.provider}
                 value={contactForm.providerId || ''}
                 onChange={(event) =>
                   handleContactFormChange('providerId', String(event.target.value))
@@ -626,35 +680,35 @@ export function PmSyncContacts() {
             </FormControl>
 
             <TextField
-              label="Name"
+              label={contactsCopy.createDialog.name}
               value={contactForm.displayName}
               onChange={(event) => handleContactFormChange('displayName', event.target.value)}
               fullWidth
             />
 
             <TextField
-              label="Email"
+              label={contactsCopy.createDialog.email}
               value={contactForm.email}
               onChange={(event) => handleContactFormChange('email', event.target.value)}
               fullWidth
             />
 
             <TextField
-              label="Company"
+              label={contactsCopy.createDialog.company}
               value={contactForm.company}
               onChange={(event) => handleContactFormChange('company', event.target.value)}
               fullWidth
             />
 
             <TextField
-              label="Job Title"
+              label={contactsCopy.createDialog.jobTitle}
               value={contactForm.jobTitle}
               onChange={(event) => handleContactFormChange('jobTitle', event.target.value)}
               fullWidth
             />
 
             <TextField
-              label="Notes"
+              label={contactsCopy.createDialog.notes}
               value={contactForm.notes}
               onChange={(event) => handleContactFormChange('notes', event.target.value)}
               fullWidth
@@ -664,16 +718,61 @@ export function PmSyncContacts() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setContactDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setContactDialogOpen(false)}>{contactsCopy.createDialog.cancel}</Button>
           <Button
             variant="contained"
             onClick={handleSubmitContact}
             disabled={actionLoading || (contactDialogMode === 'create' && !contactForm.providerId)}
           >
-            {contactDialogMode === 'create' ? 'Create Contact' : 'Save Changes'}
+            {contactDialogMode === 'create' ? contactsCopy.createDialog.create : contactsCopy.editDialog.save}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>{contactsCopy.alerts.deleteConfirmTitle}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {contactsCopy.alerts.deleteConfirmDescription}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={actionLoading}>
+            {contactsCopy.createDialog.cancel}
+          </Button>
+          <Button
+            onClick={handleDeleteContact}
+            color="error"
+            variant="contained"
+            disabled={actionLoading}
+          >
+            {contactsCopy.alerts.deleteConfirmTitle}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 }

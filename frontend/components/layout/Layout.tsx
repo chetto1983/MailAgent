@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, ThemeProvider, CssBaseline, useMediaQuery, Snackbar, Alert } from '@mui/material';
-import { PmSyncSidebar } from './PmSyncSidebar';
-import { PmSyncHeader } from './PmSyncHeader';
-import { darkTheme, lightTheme } from '@/theme/pmSyncTheme';
+import { Sidebar } from './Sidebar';
+import { Header } from './Header';
+import { CookieConsent } from '@/components/ui/cookie-consent';
+import { darkTheme, lightTheme } from '@/theme/appTheme';
 import {
   DEFAULT_USER_SETTINGS,
   getStoredUserSettings,
@@ -19,11 +20,11 @@ import { useSyncStore } from '@/stores/sync-store';
 const DRAWER_WIDTH_EXPANDED = 240;
 const DRAWER_WIDTH_COLLAPSED = 72;
 
-export interface PmSyncLayoutProps {
+export interface LayoutProps {
   children: React.ReactNode;
 }
 
-export function PmSyncLayout({ children }: PmSyncLayoutProps) {
+export function Layout({ children }: LayoutProps) {
   const { token } = useAuth();
   useWebSocket(token || null, true);
   const { lastStatus, clear } = useSyncStore();
@@ -103,7 +104,7 @@ export function PmSyncLayout({ children }: PmSyncLayoutProps) {
       <CssBaseline />
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* Sidebar */}
-        <PmSyncSidebar
+        <Sidebar
           collapsed={collapsed}
           onToggleCollapse={handleToggleCollapse}
           mobileOpen={mobileOpen}
@@ -134,7 +135,7 @@ export function PmSyncLayout({ children }: PmSyncLayoutProps) {
           }}
         >
           {/* Header */}
-          <PmSyncHeader
+          <Header
             onMenuClick={handleMobileDrawerToggle}
             onThemeToggle={handleThemeToggle}
             isDarkMode={resolvedThemeMode === 'dark'}
@@ -171,6 +172,7 @@ export function PmSyncLayout({ children }: PmSyncLayoutProps) {
             </Alert>
           </Snackbar>
         )}
+        <CookieConsent />
       </Box>
     </ThemeProvider>
   );

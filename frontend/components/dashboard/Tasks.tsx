@@ -33,7 +33,7 @@ interface Task {
   assignee?: string;
 }
 
-export function PmSyncTasks() {
+export function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([
     {
       id: '1',

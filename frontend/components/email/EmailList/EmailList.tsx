@@ -8,15 +8,14 @@ import {
   Checkbox,
   Tooltip,
   Typography,
-  CircularProgress,
+  Skeleton,
+  Stack,
 } from '@mui/material';
 import { Search, RefreshCw, Trash2, Mail } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
-import { FixedSizeList } from 'react-window';
+import { List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
-
-// TODO: npm install react-virtualized-auto-sizer
 
 /**
  * Props for EmailList component
@@ -170,13 +169,25 @@ export const EmailList: React.FC<EmailListProps> = ({
     }
   }, [onRefresh]);
 
-  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+  const Row = ({
+    index,
+    style,
+    ariaAttributes
+  }: {
+    index: number;
+    style: React.CSSProperties;
+    ariaAttributes: {
+      'aria-posinset': number;
+      'aria-setsize': number;
+      role: 'listitem';
+    };
+  }) => {
     const email = filteredEmails[index];
     const isSelected = selectedEmailId === email.id;
     const isMultiSelected = selectedIds.has(email.id);
 
     return (
-      <div style={style}>
+      <div style={style} {...ariaAttributes}>
         <Box onClick={() => onEmailClick(email)}>
           {renderItem(email, isSelected, isMultiSelected, handleToggleSelect)}
         </Box>
@@ -264,8 +275,23 @@ export const EmailList: React.FC<EmailListProps> = ({
       {/* Email List */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
+          <Box sx={{ px: 2, pt: 2 }}>
+            {[...Array(8)].map((_, i) => (
+              <Stack key={i} direction="row" spacing={2} sx={{ mb: 2, alignItems: 'flex-start' }}>
+                <Skeleton variant="rectangular" width={18} height={18} sx={{ mt: 0.5 }} />
+                <Skeleton variant="circular" width={40} height={40} />
+                <Box sx={{ flex: 1 }}>
+                  <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
+                    <Skeleton variant="text" width="40%" height={20} />
+                    <Box sx={{ flex: 1 }} />
+                    <Skeleton variant="text" width={60} height={20} />
+                  </Stack>
+                  <Skeleton variant="text" width="90%" height={18} sx={{ mb: 0.5 }} />
+                  <Skeleton variant="text" width="70%" height={16} />
+                </Box>
+                <Skeleton variant="circular" width={24} height={24} sx={{ mt: 0.5 }} />
+              </Stack>
+            ))}
           </Box>
         ) : filteredEmails.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 4, px: 2 }}>
@@ -277,14 +303,15 @@ export const EmailList: React.FC<EmailListProps> = ({
         ) : (
           <AutoSizer>
             {({ height, width }) => (
-              <FixedSizeList
-                height={height}
-                width={width}
-                itemSize={80}
-                itemCount={filteredEmails.length}
-              >
-                {Row}
-              </FixedSizeList>
+              <div style={{ height, width }}>
+                <List
+                  defaultHeight={height}
+                  rowHeight={80}
+                  rowCount={filteredEmails.length}
+                  rowComponent={Row}
+                  rowProps={{}}
+                />
+              </div>
             )}
           </AutoSizer>
         )}

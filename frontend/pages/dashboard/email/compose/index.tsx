@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { Paperclip, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/router';
-import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
+import { Layout } from '@/components/layout/Layout';
 import { providersApi, type ProviderConfig, type ProviderAlias } from '@/lib/api/providers';
 import { emailApi } from '@/lib/api/email';
 import { useTranslations } from '@/lib/hooks/use-translations';
@@ -474,9 +474,9 @@ function EmailComposeInner() {
 
 export default function EmailComposePage() {
   return (
-    <PmSyncLayout>
+    <Layout>
       <EmailComposeInner />
-    </PmSyncLayout>
+    </Layout>
   );
 }
 

@@ -44,7 +44,7 @@ export function Cta() {
               >
                 {t.landing.secondaryCta.primaryCta}
               </Button>
-              <Button component="a" href="#features" variant="outline">
+              <Button component="a" href="#features" variant="outlined">
                 {t.landing.secondaryCta.secondaryCta}
               </Button>
             </Stack>

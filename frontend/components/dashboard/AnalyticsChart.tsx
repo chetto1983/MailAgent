@@ -10,20 +10,18 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Paper, Typography, CircularProgress, Box } from '@mui/material';
-import { analyticsApi } from '@/lib/api/analytics';
-
-// TODO: npm install recharts
+import { Paper, Typography, CircularProgress } from '@mui/material';
+import { analyticsApi, EmailAnalyticsDataPoint } from '@/lib/api/analytics';
 
 export function AnalyticsChart() {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<EmailAnalyticsDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await analyticsApi.getEmailAnalytics();
-        setData(response.data);
+        const data = await analyticsApi.getEmailAnalytics();
+        setData(data);
       } catch (error) {
         console.error('Failed to fetch analytics data:', error);
       } finally {

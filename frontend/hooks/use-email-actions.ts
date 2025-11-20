@@ -3,6 +3,11 @@ import { useEmailStore, type Email } from '@/stores/email-store';
 import { emailApi } from '@/lib/api/email';
 import { useRouter } from 'next/router';
 
+export interface EmailActionsCallbacks {
+  onSuccess?: (message: string) => void;
+  onError?: (message: string) => void;
+}
+
 /**
  * Email actions hook
  *
@@ -10,12 +15,15 @@ import { useRouter } from 'next/router';
  *
  * @example
  * ```tsx
- * const { handleDelete, handleMarkAsRead, handleToggleStar } = useEmailActions();
+ * const { handleDelete, handleMarkAsRead, handleToggleStar } = useEmailActions({
+ *   onSuccess: (msg) => showSnackbar(msg, 'success'),
+ *   onError: (msg) => showSnackbar(msg, 'error')
+ * });
  *
  * <Button onClick={() => handleDelete(email.id)}>Delete</Button>
  * ```
  */
-export function useEmailActions() {
+export function useEmailActions(callbacks?: EmailActionsCallbacks) {
   const router = useRouter();
   const {
     updateEmail,
@@ -38,12 +46,14 @@ export function useEmailActions() {
 
         // API call
         await emailApi.deleteEmail(emailId);
+
+        callbacks?.onSuccess?.('Email deleted successfully ✓');
       } catch (error) {
         console.error('Failed to delete email:', error);
-        // TODO: Revert optimistic update or show error toast
+        callbacks?.onError?.('Failed to delete email. Please try again.');
       }
     },
-    [deleteEmail]
+    [deleteEmail, callbacks]
   );
 
   /**
@@ -57,12 +67,14 @@ export function useEmailActions() {
 
         // API calls (in parallel)
         await Promise.all(emailIds.map((id) => emailApi.deleteEmail(id)));
+
+        callbacks?.onSuccess?.(`${emailIds.length} email${emailIds.length > 1 ? 's' : ''} deleted successfully ✓`);
       } catch (error) {
         console.error('Failed to bulk delete emails:', error);
-        // TODO: Revert optimistic update or show error toast
+        callbacks?.onError?.('Failed to delete emails. Please try again.');
       }
     },
-    [bulkDelete]
+    [bulkDelete, callbacks]
   );
 
   /**
@@ -78,12 +90,15 @@ export function useEmailActions() {
         await Promise.all(
           emailIds.map((id) => emailApi.updateEmail(id, { isRead }))
         );
+
+        const action = isRead ? 'read' : 'unread';
+        callbacks?.onSuccess?.(`Marked as ${action} ✓`);
       } catch (error) {
         console.error('Failed to mark emails as read:', error);
-        // TODO: Revert optimistic update or show error toast
+        callbacks?.onError?.('Failed to update email status. Please try again.');
       }
     },
-    [markAsRead]
+    [markAsRead, callbacks]
   );
 
   /**
@@ -99,13 +114,16 @@ export function useEmailActions() {
 
         // API call
         await emailApi.updateEmail(emailId, { isStarred: newStarred });
+
+        callbacks?.onSuccess?.(newStarred ? 'Email starred ✓' : 'Email unstarred ✓');
       } catch (error) {
         console.error('Failed to toggle star:', error);
         // Revert on error
         markAsStarred([emailId], currentStarred);
+        callbacks?.onError?.('Failed to update star status. Please try again.');
       }
     },
-    [markAsStarred]
+    [markAsStarred, callbacks]
   );
 
   /**
@@ -121,12 +139,14 @@ export function useEmailActions() {
         await Promise.all(
           emailIds.map((id) => emailApi.updateEmail(id, { folder: 'ARCHIVE' }))
         );
+
+        callbacks?.onSuccess?.(`${emailIds.length} email${emailIds.length > 1 ? 's' : ''} archived ✓`);
       } catch (error) {
         console.error('Failed to archive emails:', error);
-        // TODO: Revert optimistic update or show error toast
+        callbacks?.onError?.('Failed to archive emails. Please try again.');
       }
     },
-    [moveToFolder]
+    [moveToFolder, callbacks]
   );
 
   /**
@@ -142,12 +162,14 @@ export function useEmailActions() {
         await Promise.all(
           emailIds.map((id) => emailApi.updateEmail(id, { folder: folderId }))
         );
+
+        callbacks?.onSuccess?.(`${emailIds.length} email${emailIds.length > 1 ? 's' : ''} moved ✓`);
       } catch (error) {
         console.error('Failed to move emails to folder:', error);
-        // TODO: Revert optimistic update or show error toast
+        callbacks?.onError?.('Failed to move emails. Please try again.');
       }
     },
-    [moveToFolder]
+    [moveToFolder, callbacks]
   );
 
   /**

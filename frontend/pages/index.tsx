@@ -84,23 +84,23 @@ export default function Home() {
           </Box>
 
           <Box sx={{ flex: 1, display: { xs: 'none', md: 'flex' }, gap: 3, justifyContent: 'center' }}>
-            <Button variant="ghost" component="a" href="#product">
+            <Button variant="text" component="a" href="#product">
               {t.nav.product}
             </Button>
-            <Button variant="ghost" component="a" href="#features">
+            <Button variant="text" component="a" href="#features">
               {t.nav.features}
             </Button>
-            <Button variant="ghost" component="a" href="#automation">
+            <Button variant="text" component="a" href="#automation">
               {t.nav.automation}
             </Button>
-            <Button variant="ghost" component="a" href="#resources">
+            <Button variant="text" component="a" href="#resources">
               {t.nav.resources}
             </Button>
           </Box>
 
           <ThemeToggle />
 
-          <Button component={Link} href="/auth/login" variant="ghost">
+          <Button component={Link} href="/auth/login" variant="text">
             {t.nav.login}
           </Button>
           <Button component={Link} href="/auth/register">

@@ -1,12 +1,12 @@
 import React from 'react';
-import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
-import { PmSyncTasks } from '@/components/dashboard/PmSyncTasks';
+import { Layout } from '@/components/layout/Layout';
+import { Tasks } from '@/components/dashboard/Tasks';
 
 export default function TasksPage() {
   return (
-    <PmSyncLayout>
-      <PmSyncTasks />
-    </PmSyncLayout>
+    <Layout>
+      <Tasks />
+    </Layout>
   );
 }
 
