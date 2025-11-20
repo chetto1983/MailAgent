@@ -46,6 +46,7 @@ import {
 import { useRouter } from 'next/router';
 import { contactsApi, type Contact } from '@/lib/api/contacts';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -89,6 +90,8 @@ const getPrimaryPhone = (contact?: Contact | null) =>
 
 export function Contacts() {
   const router = useRouter();
+  const translations = useTranslations();
+  const contactsCopy = translations.dashboard.contacts;
   const [loading, setLoading] = useState(true);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -193,7 +196,7 @@ export function Contacts() {
 
   const handleSubmitContact = async () => {
     if (!contactForm.providerId) {
-      alert('Please select a provider');
+      alert(contactsCopy.alerts.selectProvider);
       return;
     }
 
@@ -226,7 +229,7 @@ export function Contacts() {
       setContactDialogOpen(false);
     } catch (error) {
       console.error('Failed to save contact:', error);
-      alert('Failed to save contact. Please try again.');
+      alert(contactsCopy.alerts.failedToSave);
     } finally {
       setActionLoading(false);
     }
@@ -234,7 +237,7 @@ export function Contacts() {
 
   const handleDeleteContact = async () => {
     if (!selectedContact) return;
-    if (!confirm('Are you sure you want to delete this contact?')) return;
+    if (!confirm(contactsCopy.alerts.deleteConfirmDescription)) return;
 
     try {
       setActionLoading(true);
@@ -242,7 +245,7 @@ export function Contacts() {
       await loadContacts();
     } catch (error) {
       console.error('Failed to delete contact:', error);
-      alert('Failed to delete contact. Please try again.');
+      alert(contactsCopy.alerts.deleteError);
     } finally {
       setActionLoading(false);
     }
@@ -300,7 +303,7 @@ export function Contacts() {
         <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600, flex: 1 }}>
-              Contacts
+              {contactsCopy.title}
             </Typography>
             <Button
               variant="contained"
@@ -308,14 +311,14 @@ export function Contacts() {
               startIcon={<Plus size={18} />}
               onClick={openCreateContactDialog}
             >
-              New
+              {contactsCopy.new}
             </Button>
           </Box>
 
           <TextField
             fullWidth
             size="small"
-            placeholder="Search contacts..."
+            placeholder={contactsCopy.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             InputProps={{
@@ -337,7 +340,7 @@ export function Contacts() {
           ) : contacts.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4, px: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                No contacts found
+                {contactsCopy.noContactsFound}
               </Typography>
             </Box>
           ) : (
@@ -423,7 +426,7 @@ export function Contacts() {
                   router.push(`/dashboard/email/compose?to=${selectedContactEmail}`)
                 }
               >
-                Email
+                {contactsCopy.actions.email}
               </Button>
               <Button
                 fullWidth
@@ -431,13 +434,13 @@ export function Contacts() {
                 startIcon={<Calendar size={18} />}
                 onClick={() => router.push(`/dashboard/calendar?contact=${selectedContact.id}`)}
               >
-                Schedule
+                {contactsCopy.actions.schedule}
               </Button>
               <Button fullWidth variant="outlined" startIcon={<MessageSquare size={18} />}>
-                Add Note
+                {contactsCopy.actions.addNote}
               </Button>
               <Button fullWidth variant="outlined" startIcon={<Sparkles size={18} />}>
-                AI Insights
+                {contactsCopy.actions.aiInsights}
               </Button>
             </Stack>
           </Box>
@@ -445,9 +448,9 @@ export function Contacts() {
           {/* Tabs */}
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
-              <Tab label="Details" />
-              <Tab label="Activity" />
-              <Tab label="Notes" />
+              <Tab label={contactsCopy.tabs.details} />
+              <Tab label={contactsCopy.tabs.activity} />
+              <Tab label={contactsCopy.tabs.notes} />
             </Tabs>
           </Box>
 
@@ -455,7 +458,7 @@ export function Contacts() {
           <Box sx={{ flex: 1, overflow: 'auto', px: 3 }}>
             <TabPanel value={tabValue} index={0}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Contact Information
+                {contactsCopy.details.contactInformation}
               </Typography>
               <Box
                 sx={{
@@ -472,11 +475,11 @@ export function Contacts() {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <Mail size={18} color="#0B7EFF" />
                       <Typography variant="subtitle2" color="text.secondary">
-                        Email
+                        {contactsCopy.details.email}
                       </Typography>
                     </Box>
                     <Typography variant="body1">
-                      {selectedContactEmail || 'Not available'}
+                      {selectedContactEmail || contactsCopy.details.notAvailable}
                     </Typography>
                   </CardContent>
                 </Card>
@@ -487,7 +490,7 @@ export function Contacts() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Phone size={18} color="#00C853" />
                         <Typography variant="subtitle2" color="text.secondary">
-                          Phone
+                          {contactsCopy.details.phone}
                         </Typography>
                       </Box>
                       <Typography variant="body1">{selectedContactPhone}</Typography>
@@ -501,7 +504,7 @@ export function Contacts() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Building size={18} color="#FF9800" />
                         <Typography variant="subtitle2" color="text.secondary">
-                          Company
+                          {contactsCopy.details.company}
                         </Typography>
                       </Box>
                       <Typography variant="body1">{selectedContact.company}</Typography>
@@ -515,7 +518,7 @@ export function Contacts() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <MapPin size={18} color="#9C27B0" />
                         <Typography variant="subtitle2" color="text.secondary">
-                          Location
+                          {contactsCopy.details.location}
                         </Typography>
                       </Box>
                       <Typography variant="body1">{selectedContactLocation}</Typography>
@@ -528,7 +531,7 @@ export function Contacts() {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <Clock size={18} color="#757575" />
                       <Typography variant="subtitle2" color="text.secondary">
-                        Last Interaction
+                        {contactsCopy.details.lastInteraction}
                       </Typography>
                     </Box>
                     <Typography variant="body1">
@@ -541,7 +544,7 @@ export function Contacts() {
               {selectedContact.notes && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                    Notes
+                    {contactsCopy.notes.title}
                   </Typography>
                   <Card variant="outlined">
                     <CardContent>
@@ -554,29 +557,29 @@ export function Contacts() {
 
             <TabPanel value={tabValue} index={1}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Recent Activity
+                {contactsCopy.activity.title}
               </Typography>
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant="body2" color="text.secondary">
-                  No recent activity
+                  {contactsCopy.activity.noActivity}
                 </Typography>
               </Box>
             </TabPanel>
 
             <TabPanel value={tabValue} index={2}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Notes
+                {contactsCopy.notes.title}
               </Typography>
               <Box sx={{ textAlign: 'center', py: 4 }}>
                 <Typography variant="body2" color="text.secondary">
-                  No notes yet
+                  {contactsCopy.notes.noNotes}
                 </Typography>
                 <Button
                   variant="contained"
                   startIcon={<Plus size={18} />}
                   sx={{ mt: 2 }}
                 >
-                  Add Note
+                  {contactsCopy.notes.addNote}
                 </Button>
               </Box>
             </TabPanel>
@@ -592,7 +595,7 @@ export function Contacts() {
           }}
         >
           <Typography variant="body1" color="text.secondary">
-            Select a contact to view details
+            {contactsCopy.selectContactMessage}
           </Typography>
         </Box>
       )}
@@ -604,14 +607,14 @@ export function Contacts() {
         maxWidth="sm"
       >
         <DialogTitle>
-          {contactDialogMode === 'create' ? 'New Contact' : 'Edit Contact'}
+          {contactDialogMode === 'create' ? contactsCopy.createDialog.title : contactsCopy.editDialog.title}
         </DialogTitle>
         <DialogContent dividers>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <FormControl fullWidth disabled={contactDialogMode === 'edit'}>
-              <InputLabel>Provider</InputLabel>
+              <InputLabel>{contactsCopy.createDialog.provider}</InputLabel>
               <Select
-                label="Provider"
+                label={contactsCopy.createDialog.provider}
                 value={contactForm.providerId || ''}
                 onChange={(event) =>
                   handleContactFormChange('providerId', String(event.target.value))
@@ -626,35 +629,35 @@ export function Contacts() {
             </FormControl>
 
             <TextField
-              label="Name"
+              label={contactsCopy.createDialog.name}
               value={contactForm.displayName}
               onChange={(event) => handleContactFormChange('displayName', event.target.value)}
               fullWidth
             />
 
             <TextField
-              label="Email"
+              label={contactsCopy.createDialog.email}
               value={contactForm.email}
               onChange={(event) => handleContactFormChange('email', event.target.value)}
               fullWidth
             />
 
             <TextField
-              label="Company"
+              label={contactsCopy.createDialog.company}
               value={contactForm.company}
               onChange={(event) => handleContactFormChange('company', event.target.value)}
               fullWidth
             />
 
             <TextField
-              label="Job Title"
+              label={contactsCopy.createDialog.jobTitle}
               value={contactForm.jobTitle}
               onChange={(event) => handleContactFormChange('jobTitle', event.target.value)}
               fullWidth
             />
 
             <TextField
-              label="Notes"
+              label={contactsCopy.createDialog.notes}
               value={contactForm.notes}
               onChange={(event) => handleContactFormChange('notes', event.target.value)}
               fullWidth
@@ -664,13 +667,13 @@ export function Contacts() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setContactDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setContactDialogOpen(false)}>{contactsCopy.createDialog.cancel}</Button>
           <Button
             variant="contained"
             onClick={handleSubmitContact}
             disabled={actionLoading || (contactDialogMode === 'create' && !contactForm.providerId)}
           >
-            {contactDialogMode === 'create' ? 'Create Contact' : 'Save Changes'}
+            {contactDialogMode === 'create' ? contactsCopy.createDialog.create : contactsCopy.editDialog.save}
           </Button>
         </DialogActions>
       </Dialog>

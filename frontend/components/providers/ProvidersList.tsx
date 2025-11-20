@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ProviderConfig, providersApi } from '@/lib/api/providers';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface ProvidersListProps {
   providers: ProviderConfig[];
@@ -12,11 +13,13 @@ interface ProvidersListProps {
 }
 
 export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
+  const translations = useTranslations();
+  const providersCopy = translations.dashboard.providers;
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const handleDelete = async (id: string, email: string) => {
-    if (!confirm(`Are you sure you want to disconnect ${email}?`)) {
+    if (!confirm(providersCopy.deleteConfirm.replace('{email}', email))) {
       return;
     }
 
@@ -95,7 +98,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
   };
 
   const formatDate = (date?: string) => {
-    if (!date) return 'Never';
+    if (!date) return providersCopy.neverSynced;
     return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -110,7 +113,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
       <Card>
         <CardContent sx={{ pt: 6 }}>
           <Typography variant="body2" color="text.secondary" align="center">
-            No providers connected yet. Connect a provider to get started.
+            {providersCopy.noProvidersMessage}
           </Typography>
         </CardContent>
       </Card>
@@ -150,14 +153,14 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
             </Stack>
             <Stack direction="row" spacing={1}>
               {provider.isDefault && (
-                <Badge variant="success" label="Default" sx={{ fontSize: '0.7rem', px: 1.5, py: 0.25 }} />
+                <Badge variant="success" label={providersCopy.badges.default} sx={{ fontSize: '0.7rem', px: 1.5, py: 0.25 }} />
               )}
               {provider.isActive ? (
-                <Badge variant="outline" label="Active" sx={{ fontSize: '0.7rem', px: 1.5, py: 0.25 }} />
+                <Badge variant="outline" label={providersCopy.badges.active} sx={{ fontSize: '0.7rem', px: 1.5, py: 0.25 }} />
               ) : (
                 <Badge
                   variant="destructive"
-                  label="Inactive"
+                  label={providersCopy.badges.inactive}
                   sx={{ fontSize: '0.7rem', px: 1.5, py: 0.25 }}
                 />
               )}
@@ -182,7 +185,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
                         </svg>
                       </Box>
                     }
-                    label="Email"
+                    label={providersCopy.badges.email}
                     sx={{ fontSize: '0.72rem', px: 1.25, py: 0.25 }}
                   />
                 )}
@@ -201,7 +204,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
                         </svg>
                       </Box>
                     }
-                    label="Calendar"
+                    label={providersCopy.badges.calendar}
                     sx={{ fontSize: '0.72rem', px: 1.25, py: 0.25 }}
                   />
                 )}
@@ -220,14 +223,14 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
                         </svg>
                       </Box>
                     }
-                    label="Contacts"
+                    label={providersCopy.badges.contacts}
                     sx={{ fontSize: '0.72rem', px: 1.25, py: 0.25 }}
                   />
                 )}
               </Stack>
 
               <Typography variant="caption" color="text.secondary">
-                Last synced: {formatDate(provider.lastSyncedAt)}
+                {providersCopy.lastSynced.replace('{date}', formatDate(provider.lastSyncedAt))}
               </Typography>
 
               <Box>
@@ -238,7 +241,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
                   onClick={() => handleDelete(provider.id, provider.email)}
                   disabled={deletingId === provider.id}
                 >
-                  {deletingId === provider.id ? 'Disconnecting...' : 'Disconnect'}
+                  {deletingId === provider.id ? providersCopy.disconnecting : providersCopy.disconnect}
                 </Button>
               </Box>
             </Stack>

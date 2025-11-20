@@ -4,12 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { providersApi } from '@/lib/api/providers';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface GoogleProviderCardProps {
   onSuccess: () => void;
 }
 
 export function GoogleProviderCard({ onSuccess }: GoogleProviderCardProps) {
+  const translations = useTranslations();
+  const providersCopy = translations.dashboard.providers;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -65,9 +68,9 @@ export function GoogleProviderCard({ onSuccess }: GoogleProviderCardProps) {
               />
             </svg>
           </Box>
-          Google
+          {providersCopy.googleTitle}
         </CardTitle>
-        <CardDescription>Connect Gmail and Google Calendar</CardDescription>
+        <CardDescription>{providersCopy.googleDescription}</CardDescription>
       </CardHeader>
       <CardContent
         sx={{
@@ -84,7 +87,7 @@ export function GoogleProviderCard({ onSuccess }: GoogleProviderCardProps) {
 
         <Stack spacing={1.5}>
           <Typography variant="body2" color="text.secondary">
-            Connect your Google account to sync emails and calendar events.
+            {providersCopy.googleFeatures.description}
           </Typography>
 
           <Box
@@ -99,14 +102,14 @@ export function GoogleProviderCard({ onSuccess }: GoogleProviderCardProps) {
               color: 'text.secondary',
             }}
           >
-            <li>Read and send emails via Gmail</li>
-            <li>Access Google Calendar events</li>
-            <li>Sync contacts (optional)</li>
+            <li>{providersCopy.googleFeatures.feature1}</li>
+            <li>{providersCopy.googleFeatures.feature2}</li>
+            <li>{providersCopy.googleFeatures.feature3}</li>
           </Box>
         </Stack>
 
         <Button onClick={handleConnect} disabled={loading} className="w-full">
-          {loading ? 'Connecting...' : 'Connect Google Account'}
+          {loading ? providersCopy.googleConnecting : providersCopy.googleConnect}
         </Button>
       </CardContent>
     </Card>
