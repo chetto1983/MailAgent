@@ -95,6 +95,7 @@
     "@types/node": "^24.10.1",
     "@types/nodemailer": "^7.0.4",
     "@types/passport-jwt": "^4.0.1",
+    "@types/sentiment": "^5.0.4",
     "@types/speakeasy": "^2.0.10",
     "@typescript-eslint/eslint-plugin": "^8.47.0",
     "@typescript-eslint/parser": "^8.47.0",

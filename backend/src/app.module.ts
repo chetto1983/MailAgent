@@ -22,6 +22,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { LabelsModule } from './modules/labels/labels.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 const config = getConfiguration();
 
@@ -53,13 +54,10 @@ const config = getConfiguration();
     ComplianceModule,
     CalendarModule,
     ContactsModule,
-import { AnalyticsModule } from './modules/analytics/analytics.module';
-// ...
     RealtimeModule, // WebSocket Gateway per eventi realtime multi-tenant
     LabelsModule,
     AnalyticsModule,
   ],
-// ...
   providers: [
     // Apply throttler globally to all routes
     {

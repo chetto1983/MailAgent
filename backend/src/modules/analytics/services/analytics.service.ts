@@ -9,21 +9,17 @@ export class AnalyticsService {
   async getEmailAnalytics(tenantId: string) {
     // This is a placeholder implementation.
     // In a real application, you would have a more complex query to calculate the analytics data.
-    const sent = await this.prisma.message.count({
+    const sent = await this.prisma.email.count({
       where: {
         tenantId,
-        from: {
-          contains: '@'
-        }
+        folder: 'SENT'
       }
     });
 
-    const received = await this.prisma.message.count({
+    const received = await this.prisma.email.count({
       where: {
         tenantId,
-        to: {
-          contains: '@'
-        }
+        folder: 'INBOX'
       }
     });
 
