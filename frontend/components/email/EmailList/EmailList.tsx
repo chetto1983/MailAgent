@@ -10,8 +10,9 @@ import {
   Typography,
   Skeleton,
   Stack,
+  CircularProgress,
 } from '@mui/material';
-import { Search, RefreshCw, Trash2, Mail, Archive, MailOpen, MailCheck } from 'lucide-react';
+import { Search, RefreshCw, Trash2, Mail, Archive, MailOpen, MailCheck, SlidersHorizontal } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { List } from 'react-window';
@@ -80,6 +81,31 @@ interface EmailListProps {
    * Render function for each email item
    */
   renderItem: (email: Email, isSelected: boolean, isMultiSelected: boolean, onToggleSelect: (id: string) => void) => React.ReactNode;
+
+  /**
+   * Callback for loading more emails (infinite scroll)
+   */
+  onLoadMore?: () => void;
+
+  /**
+   * Whether there are more emails to load
+   */
+  hasMore?: boolean;
+
+  /**
+   * Whether more emails are being loaded
+   */
+  loadingMore?: boolean;
+
+  /**
+   * Callback for opening advanced search
+   */
+  onAdvancedSearch?: () => void;
+
+  /**
+   * Whether advanced filters are active
+   */
+  hasActiveFilters?: boolean;
 }
 
 /**
@@ -123,10 +149,30 @@ export const EmailList: React.FC<EmailListProps> = ({
   emptyMessage,
   searchPlaceholder,
   renderItem,
+  onLoadMore,
+  hasMore = false,
+  loadingMore = false,
+  onAdvancedSearch,
+  hasActiveFilters = false,
 }) => {
   const t = useTranslations();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Infinite scroll handler
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    if (!hasMore || loadingMore || !onLoadMore) return;
+
+    const target = event.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight;
+    const clientHeight = target.clientHeight;
+
+    // Load more when 200px from bottom
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      onLoadMore();
+    }
+  }, [hasMore, loadingMore, onLoadMore]);
 
   // Filter emails by search query
   const filteredEmails = useMemo(() => {
@@ -305,24 +351,41 @@ export const EmailList: React.FC<EmailListProps> = ({
         </Box>
 
         {/* Search Bar */}
-        <TextField
-          fullWidth
-          size="small"
-          placeholder={searchPlaceholder || t.dashboard.email.searchPlaceholder}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search size={18} />
-              </InputAdornment>
-            ),
-          }}
-        />
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder={searchPlaceholder || t.dashboard.email.searchPlaceholder}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search size={18} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          {onAdvancedSearch && (
+            <Tooltip title="Advanced Search">
+              <IconButton
+                size="small"
+                onClick={onAdvancedSearch}
+                color={hasActiveFilters ? 'primary' : 'default'}
+                sx={{
+                  border: 1,
+                  borderColor: hasActiveFilters ? 'primary.main' : 'divider',
+                }}
+              >
+                <SlidersHorizontal size={18} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
       </Box>
 
       {/* Email List */}
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, overflow: 'auto' }} onScroll={handleScroll}>
         {loading ? (
           <Box sx={{ px: 2, pt: 2 }}>
             {[...Array(8)].map((_, i) => (
@@ -350,19 +413,27 @@ export const EmailList: React.FC<EmailListProps> = ({
             </Typography>
           </Box>
         ) : (
-          <AutoSizer>
-            {({ height, width }) => (
-              <div style={{ height, width }}>
-                <List
-                  defaultHeight={height}
-                  rowHeight={80}
-                  rowCount={filteredEmails.length}
-                  rowComponent={Row}
-                  rowProps={{}}
-                />
-              </div>
+          <>
+            <AutoSizer>
+              {({ height, width }) => (
+                <div style={{ height, width }}>
+                  <List
+                    defaultHeight={height}
+                    rowHeight={80}
+                    rowCount={filteredEmails.length}
+                    rowComponent={Row}
+                    rowProps={{}}
+                  />
+                </div>
+              )}
+            </AutoSizer>
+            {/* Loading more indicator */}
+            {loadingMore && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress size={24} />
+              </Box>
             )}
-          </AutoSizer>
+          </>
         )}
       </Box>
     </Paper>
