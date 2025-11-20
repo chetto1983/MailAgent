@@ -311,7 +311,7 @@ export const EmailList: React.FC<EmailListProps> = ({
       const isSelected = selectedEmailId === email.id;
       const isMultiSelected = selectedIds.has(email.id);
 
-      console.log('[DEBUG EmailList] Rendering row', index, 'style:', style, 'email:', email.subject);
+      console.log('[DEBUG EmailList] Rendering row', index, 'style:', JSON.stringify(style), 'email:', email.subject);
       return (
         <div style={{...style, overflow: 'visible'}} {...ariaAttributes}>
           {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
