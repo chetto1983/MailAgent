@@ -141,6 +141,23 @@ export interface AppTranslations {
         addLabels: string;
         moveToFolder: string;
       };
+      messages: {
+        loadMoreFailed: string;
+        markReadFailed: string;
+        markUnreadFailed: string;
+        deleteFailed: string;
+        starred: string;
+        starFailed: string;
+        unstarred: string;
+        unstarFailed: string;
+        labelsAdded: string;
+        labelsFailed: string;
+        moved: string;
+        moveFailed: string;
+        loadLabelsFailed: string;
+        selectedCount: string;
+        move: string;
+      };
     };
     labels: {
       title: string;
