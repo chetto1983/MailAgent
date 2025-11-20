@@ -204,6 +204,11 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
           delete: 'Delete',
           selectAll: 'Select all',
           clear: 'Clear selection',
+          moreActions: 'More actions',
+          addStar: 'Add Star',
+          removeStar: 'Remove Star',
+          addLabels: 'Add Labels',
+          moveToFolder: 'Move to Folder',
         },
       },
       labels: {
@@ -865,6 +870,11 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
           delete: 'Elimina',
           selectAll: 'Seleziona tutto',
           clear: 'Cancella selezione',
+          moreActions: 'Altre azioni',
+          addStar: 'Aggiungi Stella',
+          removeStar: 'Rimuovi Stella',
+          addLabels: 'Aggiungi Etichette',
+          moveToFolder: 'Sposta nella Cartella',
         },
       },
       labels: {

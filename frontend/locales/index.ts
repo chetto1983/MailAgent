@@ -135,6 +135,11 @@ export interface AppTranslations {
         delete: string;
         selectAll: string;
         clear: string;
+        moreActions: string;
+        addStar: string;
+        removeStar: string;
+        addLabels: string;
+        moveToFolder: string;
       };
     };
     labels: {
