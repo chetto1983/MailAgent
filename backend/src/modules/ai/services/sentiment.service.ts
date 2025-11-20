@@ -1,8 +1,6 @@
 
 import { Injectable } from '@nestjs/common';
-import * as Sentiment from 'sentiment';
-
-// TODO: npm install sentiment
+import Sentiment = require('sentiment');
 
 @Injectable()
 export class SentimentService {
