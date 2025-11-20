@@ -726,9 +726,14 @@ export function Mailbox() {
         // Reset selections when switching view modes
         setSelectedEmail(null);
         setSelectedThreadId(null);
+
+        // Reload data when switching to list view if emails are empty
+        if (newMode === 'list' && storeEmails.length === 0) {
+          loadData();
+        }
       }
     },
-    [setSelectedEmail]
+    [setSelectedEmail, storeEmails.length, loadData]
   );
 
   // Handle conversation selection
