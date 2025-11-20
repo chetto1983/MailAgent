@@ -794,7 +794,9 @@ export function Mailbox() {
     storeLoading,
     selectedFolderId,
     activeFolderId: activeFolder?.id,
-    activeFolderLabel: activeFolder?.label
+    activeFolderLabel: activeFolder?.label,
+    storeSelectedEmail: storeSelectedEmail?.id,
+    showDetail: !!storeSelectedEmail
   });
 
   return (

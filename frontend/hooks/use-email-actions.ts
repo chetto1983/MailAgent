@@ -211,8 +211,10 @@ export function useEmailActions(callbacks?: EmailActionsCallbacks) {
    */
   const handleEmailClick = useCallback(
     async (email: Email) => {
+      console.log('[DEBUG handleEmailClick] Email clicked:', email.id, email.subject);
       // Set as selected
       setSelectedEmail(email);
+      console.log('[DEBUG handleEmailClick] setSelectedEmail called');
 
       // Mark as read if unread
       if (!email.isRead) {
