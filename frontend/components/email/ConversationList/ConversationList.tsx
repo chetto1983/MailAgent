@@ -111,7 +111,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         setLoadingMore(false);
       }
     },
-    [providerId]
+    [providerId, t.dashboard.conversations.failedToLoad]
   );
 
   // Load conversations on mount and when providerId changes

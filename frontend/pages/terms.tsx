@@ -44,7 +44,7 @@ export default function TermsOfService() {
             1. Acceptance of Terms
           </Typography>
           <Typography variant="body1" paragraph>
-            By accessing and using MailAgent ("Service"), you accept and agree to be bound by the
+            By accessing and using MailAgent (&quot;Service&quot;), you accept and agree to be bound by the
             terms and provisions of this agreement. If you do not agree to these Terms of Service,
             please do not use the Service.
           </Typography>
@@ -136,7 +136,7 @@ export default function TermsOfService() {
             </li>
             <li>
               <Typography variant="body1">
-                You are responsible for complying with your email provider's terms of service
+                You are responsible for complying with your email provider&apos;s terms of service
               </Typography>
             </li>
             <li>
@@ -206,7 +206,7 @@ export default function TermsOfService() {
             </li>
             <li>
               <Typography variant="body1">
-                AI-generated content is provided "as is" and may contain errors
+                AI-generated content is provided &quot;as is&quot; and may contain errors
               </Typography>
             </li>
             <li>
@@ -274,7 +274,7 @@ export default function TermsOfService() {
           <Box component="ul" sx={{ pl: 3, mb: 2 }}>
             <li>
               <Typography variant="body1">
-                The Service is provided "as is" without warranties of any kind
+                The Service is provided &quot;as is&quot; without warranties of any kind
               </Typography>
             </li>
             <li>
@@ -408,7 +408,7 @@ export default function TermsOfService() {
           </Typography>
           <Box component="ul" sx={{ pl: 3, mb: 2 }}>
             <li>
-              <Typography variant="body1">Updating the "Last updated" date</Typography>
+              <Typography variant="body1">Updating the &quot;Last updated&quot; date</Typography>
             </li>
             <li>
               <Typography variant="body1">Sending you an email notification</Typography>

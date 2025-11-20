@@ -10,7 +10,6 @@ import {
   Typography,
   Skeleton,
   Stack,
-  CircularProgress,
 } from '@mui/material';
 import { Search, RefreshCw, Trash2, Mail, Archive, MailOpen, MailCheck, SlidersHorizontal } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
@@ -179,24 +178,13 @@ export const EmailList: React.FC<EmailListProps> = ({
   // Use prop selectedIds if provided, otherwise use local state
   const [localSelectedIds, setLocalSelectedIds] = useState<Set<string>>(new Set());
   const selectedIds = propSelectedIds ?? localSelectedIds;
-  const setSelectedIds = onToggleSelection ?
-    (ids: Set<string>) => ids.forEach(id => onToggleSelection(id)) :
-    setLocalSelectedIds;
-
-  // Infinite scroll handler
-  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    if (!hasMore || loadingMore || !onLoadMore) return;
-
-    const target = event.currentTarget;
-    const scrollTop = target.scrollTop;
-    const scrollHeight = target.scrollHeight;
-    const clientHeight = target.clientHeight;
-
-    // Load more when 200px from bottom
-    if (scrollHeight - scrollTop - clientHeight < 200) {
-      onLoadMore();
-    }
-  }, [hasMore, loadingMore, onLoadMore]);
+  const setSelectedIds = useMemo(
+    () =>
+      onToggleSelection
+        ? (ids: Set<string>) => ids.forEach((id) => onToggleSelection(id))
+        : setLocalSelectedIds,
+    [onToggleSelection]
+  );
 
   // Filter emails by search query
   const filteredEmails = useMemo(() => {
@@ -273,13 +261,25 @@ export const EmailList: React.FC<EmailListProps> = ({
     }
   }, [onRefresh]);
 
-  // Row renderer for react-window v2
-  const RowComponent = React.useMemo(() => {
-    // Create a component that receives index, style, and ariaAttributes from react-window
+  // Handle rows rendered for infinite scroll
+  const handleRowsRendered = useCallback(
+    ({ stopIndex }: { startIndex: number; stopIndex: number }) => {
+      if (!hasMore || loadingMore || !onLoadMore) return;
+
+      // Load more when approaching the end (within 10 items)
+      if (stopIndex >= filteredEmails.length - 10) {
+        onLoadMore();
+      }
+    },
+    [hasMore, loadingMore, onLoadMore, filteredEmails.length]
+  );
+
+  // Row renderer for react-window v2 List
+  const RowComponent = useMemo(() => {
     const Row = ({
       index,
       style,
-      ariaAttributes
+      ariaAttributes,
     }: {
       index: number;
       style: React.CSSProperties;
@@ -422,7 +422,7 @@ export const EmailList: React.FC<EmailListProps> = ({
       </Box>
 
       {/* Email List */}
-      <Box sx={{ flex: 1, overflow: 'auto' }} onScroll={handleScroll}>
+      <Box sx={{ flex: 1, overflow: 'hidden' }}>
         {loading ? (
           <Box sx={{ px: 2, pt: 2 }}>
             {[...Array(8)].map((_, i) => (
@@ -450,26 +450,19 @@ export const EmailList: React.FC<EmailListProps> = ({
             </Typography>
           </Box>
         ) : (
-          <>
-            <AutoSizer>
-              {({ height, width }) => (
-                <List
-                  defaultHeight={height}
-                  style={{ height, width }}
-                  rowComponent={RowComponent}
-                  rowCount={filteredEmails.length}
-                  rowHeight={80}
-                  rowProps={{}}
-                />
-              )}
-            </AutoSizer>
-            {/* Loading more indicator */}
-            {loadingMore && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                <CircularProgress size={24} />
-              </Box>
+          <AutoSizer>
+            {({ height, width }) => (
+              <List
+                style={{ height, width }}
+                rowComponent={RowComponent}
+                rowCount={filteredEmails.length}
+                rowHeight={80}
+                rowProps={{}}
+                onRowsRendered={handleRowsRendered}
+                overscanCount={5}
+              />
             )}
-          </>
+          </AutoSizer>
         )}
       </Box>
     </Paper>

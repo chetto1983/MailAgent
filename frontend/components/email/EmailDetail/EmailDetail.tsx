@@ -178,7 +178,7 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
     };
 
     loadAttachments();
-  }, [email.id, email.hasAttachments]);
+  }, [email]);
 
   // Handle attachment download
   // Handle label changes

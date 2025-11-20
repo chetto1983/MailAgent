@@ -44,7 +44,7 @@ export default function PrivacyPolicy() {
             1. Introduction
           </Typography>
           <Typography variant="body1" paragraph>
-            MailAgent ("we", "our", or "us") is committed to protecting your privacy. This Privacy
+            MailAgent (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy. This Privacy
             Policy explains how we collect, use, disclose, and safeguard your information when you
             use our email management service.
           </Typography>
@@ -304,7 +304,7 @@ export default function PrivacyPolicy() {
               <Typography variant="body1">
                 <strong>Google (Gmail)</strong>: Subject to{' '}
                 <Link href="https://policies.google.com/privacy" target="_blank" rel="noopener">
-                  Google's Privacy Policy
+                  Google&apos;s Privacy Policy
                 </Link>
               </Typography>
             </li>
@@ -316,7 +316,7 @@ export default function PrivacyPolicy() {
                   target="_blank"
                   rel="noopener"
                 >
-                  Microsoft's Privacy Statement
+                  Microsoft&apos;s Privacy Statement
                 </Link>
               </Typography>
             </li>
@@ -337,7 +337,7 @@ export default function PrivacyPolicy() {
           </Typography>
 
           <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, mt: 4 }}>
-            12. Children's Privacy
+            12. Children&apos;s Privacy
           </Typography>
           <Typography variant="body1" paragraph>
             Our service is not intended for users under 18 years of age. We do not knowingly collect
@@ -349,7 +349,7 @@ export default function PrivacyPolicy() {
           </Typography>
           <Typography variant="body1" paragraph>
             We may update this Privacy Policy from time to time. We will notify you of any changes by
-            posting the new Privacy Policy on this page and updating the "Last updated" date.
+            posting the new Privacy Policy on this page and updating the &quot;Last updated&quot; date.
           </Typography>
 
           <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, mt: 4 }}>
