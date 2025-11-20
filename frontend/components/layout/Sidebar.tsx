@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 const DRAWER_WIDTH_EXPANDED = 240;
 const DRAWER_WIDTH_COLLAPSED = 72;
@@ -55,25 +56,26 @@ export function Sidebar({
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const t = useTranslations();
 
   const navigationItems: NavigationItem[] = [
     {
-      label: 'Home',
+      label: t.nav.home,
       icon: <Home size={20} />,
       href: '/dashboard',
     },
     {
-      label: 'Mail',
+      label: t.nav.mail,
       icon: <Mail size={20} />,
       href: '/dashboard/email',
     },
     {
-      label: 'Calendar',
+      label: t.nav.calendar,
       icon: <Calendar size={20} />,
       href: '/dashboard/calendar',
     },
     {
-      label: 'Contacts',
+      label: t.nav.contacts,
       icon: <Users size={20} />,
       href: '/dashboard/contacts',
     },
@@ -206,7 +208,7 @@ export function Sidebar({
 
       {/* AI Assistant Button */}
       <Box sx={{ px: 1, pb: 2 }}>
-        <Tooltip title={collapsed ? 'AI Assistant' : ''} placement="right" arrow>
+        <Tooltip title={collapsed ? t.nav.ai : ''} placement="right" arrow>
           <Button
             fullWidth
             variant="contained"
@@ -219,7 +221,7 @@ export function Sidebar({
             }}
             onClick={() => router.push('/dashboard/ai')}
           >
-            {collapsed ? <Sparkles size={18} /> : 'AI Assistant'}
+            {collapsed ? <Sparkles size={18} /> : t.nav.ai}
           </Button>
         </Tooltip>
       </Box>
@@ -228,7 +230,7 @@ export function Sidebar({
 
       {/* Settings */}
       <Box sx={{ p: 1 }}>
-        <Tooltip title={collapsed ? 'Settings' : ''} placement="right" arrow>
+        <Tooltip title={collapsed ? t.nav.settings : ''} placement="right" arrow>
           <Link href="/dashboard/settings" passHref legacyBehavior>
             <ListItemButton
               selected={isActive('/dashboard/settings')}
@@ -254,7 +256,7 @@ export function Sidebar({
               </ListItemIcon>
               {!collapsed && (
                 <ListItemText
-                  primary="Settings"
+                  primary={t.nav.settings}
                   primaryTypographyProps={{
                     fontSize: '0.875rem',
                     fontWeight: isActive('/dashboard/settings') ? 600 : 500,

@@ -157,14 +157,15 @@ export default function RegisterPage() {
                   }
                   label={
                     <Typography variant="body2" color="text.secondary">
-                      I agree to the{' '}
+                      {copy.form.agreeToTerms}{' '}
                       <Link
                         href="/terms"
                         target="_blank"
                         style={{ color: 'inherit', textDecoration: 'underline' }}
                       >
-                        Terms of Service
+                        {copy.form.termsOfService}
                       </Link>
+                      {copy.form.and ? ` ${copy.form.and}` : ''}
                     </Typography>
                   }
                 />
@@ -178,13 +179,13 @@ export default function RegisterPage() {
                   }
                   label={
                     <Typography variant="body2" color="text.secondary">
-                      I agree to the{' '}
+                      {copy.form.agreeToTerms}{' '}
                       <Link
                         href="/privacy"
                         target="_blank"
                         style={{ color: 'inherit', textDecoration: 'underline' }}
                       >
-                        Privacy Policy
+                        {copy.form.privacyPolicy}
                       </Link>
                     </Typography>
                   }
