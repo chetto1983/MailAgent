@@ -313,7 +313,7 @@ export const EmailList: React.FC<EmailListProps> = ({
 
       console.log('[DEBUG EmailList] Rendering row', index, 'style:', JSON.stringify(style), 'email:', email.subject);
       return (
-        <div style={{...style, overflow: 'visible'}} {...ariaAttributes}>
+        <div style={{...style, overflow: 'visible', border: '2px solid red', backgroundColor: 'rgba(255, 0, 0, 0.1)'}} {...ariaAttributes}>
           {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
         </div>
       );
