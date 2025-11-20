@@ -734,7 +734,7 @@ export function Mailbox() {
 
   return (
     <>
-      <DndContext onDragEnd={handleDragEnd}>
+      <DndContext id="email-dnd-context" onDragEnd={handleDragEnd}>
         <EmailLayout
           sidebar={
           <EmailSidebar
