@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -8,6 +8,7 @@ import {
   Tooltip,
   Button,
   Paper,
+  CircularProgress,
 } from '@mui/material';
 import {
   ArrowLeft,
@@ -20,18 +21,8 @@ import {
 } from 'lucide-react';
 import DOMPurify from 'isomorphic-dompurify'; // HTML sanitization for XSS protection
 import type { Email } from '@/stores/email-store';
+import { emailApi, type EmailAttachment } from '@/lib/api/email';
 import { useTranslations } from '@/lib/hooks/use-translations';
-
-/**
- * Email attachment interface
- */
-interface Attachment {
-  id: string;
-  filename: string;
-  size: number;
-  mimeType: string;
-  url?: string;
-}
 
 /**
  * Props for EmailDetail component
@@ -71,11 +62,6 @@ interface EmailDetailProps {
    * Callback for more options menu
    */
   onMoreOptions?: (event: React.MouseEvent<HTMLElement>) => void;
-
-  /**
-   * Attachments data (if available)
-   */
-  attachments?: Attachment[];
 }
 
 /**
@@ -144,10 +130,56 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
   onReply,
   onForward,
   onMoreOptions,
-  attachments,
 }) => {
   const t = useTranslations();
   const fromData = useMemo(() => parseEmailFrom(email.from), [email.from]);
+
+  // Attachments state
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
+
+  // Load attachments if email has them
+  useEffect(() => {
+    const loadAttachments = async () => {
+      if (!email.hasAttachments) {
+        setAttachments([]);
+        return;
+      }
+
+      // If email object already has attachments array, use it
+      if ((email as any).attachments && Array.isArray((email as any).attachments)) {
+        setAttachments((email as any).attachments);
+        return;
+      }
+
+      // Otherwise we'd need to fetch from API
+      // For now, show empty state as backend might not expose attachment list endpoint
+      setAttachments([]);
+    };
+
+    loadAttachments();
+  }, [email.id, email.hasAttachments]);
+
+  // Handle attachment download
+  const handleDownloadAttachment = useCallback(async (attachmentId: string, filename: string) => {
+    try {
+      setDownloadingAttachmentId(attachmentId);
+
+      const response = await emailApi.downloadAttachment(email.id, attachmentId);
+
+      if (response.data.downloadUrl) {
+        // Open download URL in new window
+        window.open(response.data.downloadUrl, '_blank');
+      } else {
+        console.error('No download URL available for attachment');
+      }
+    } catch (error) {
+      console.error('Failed to download attachment:', error);
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
+  }, [email.id]);
 
   // Sanitize email body with DOMPurify to prevent XSS attacks
   const emailBody = useMemo(() => {
@@ -289,16 +321,19 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
                       {formatFileSize(attachment.size)}
                     </Typography>
                   </Box>
-                  {attachment.url && (
+                  <Tooltip title="Download">
                     <IconButton
                       size="small"
-                      component="a"
-                      href={attachment.url}
-                      download={attachment.filename}
+                      onClick={() => handleDownloadAttachment(attachment.id, attachment.filename)}
+                      disabled={downloadingAttachmentId === attachment.id}
                     >
-                      <Download size={16} />
+                      {downloadingAttachmentId === attachment.id ? (
+                        <CircularProgress size={16} />
+                      ) : (
+                        <Download size={16} />
+                      )}
                     </IconButton>
-                  )}
+                  </Tooltip>
                 </Paper>
               ))}
             </Box>

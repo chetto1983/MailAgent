@@ -13,8 +13,8 @@ import {
   CircularProgress,
   Chip,
 } from '@mui/material';
-import { X, Send, Paperclip, Check } from 'lucide-react';
-import type { SendEmailPayload } from '@/lib/api/email';
+import { X, Send, Paperclip, Check, FileText, Trash2 } from 'lucide-react';
+import type { SendEmailPayload, EmailAttachmentUpload } from '@/lib/api/email';
 import { emailApi } from '@/lib/api/email';
 import { useDraftAutosave } from '@/hooks/use-draft-autosave';
 
@@ -100,6 +100,9 @@ export function ComposeDialog({
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
   const [sending, setSending] = useState(false);
+  const [attachments, setAttachments] = useState<EmailAttachmentUpload[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Initialize form with prefill data
   useEffect(() => {
@@ -120,6 +123,7 @@ export function ComposeDialog({
       setBody('');
       setShowCc(false);
       setShowBcc(false);
+      setAttachments([]);
     }
   }, [open, prefillData]);
 
@@ -129,6 +133,74 @@ export function ComposeDialog({
       .split(',')
       .map(e => e.trim())
       .filter(e => e.length > 0);
+  }, []);
+
+  // Handle file selection
+  const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+
+    try {
+      const newAttachments: EmailAttachmentUpload[] = [];
+
+      for (const file of Array.from(files)) {
+        // Check file size (max 10MB per file)
+        if (file.size > 10 * 1024 * 1024) {
+          onError?.(`File ${file.name} is too large (max 10MB)`);
+          continue;
+        }
+
+        // Convert to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            // Remove data URL prefix (data:image/png;base64,...)
+            const base64Content = result.split(',')[1];
+            resolve(base64Content);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        newAttachments.push({
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+          contentBase64: base64,
+        });
+      }
+
+      setAttachments((prev) => [...prev, ...newAttachments]);
+    } catch (error) {
+      console.error('Failed to upload attachments:', error);
+      onError?.('Failed to upload attachments');
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [onError]);
+
+  // Remove attachment
+  const handleRemoveAttachment = useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // Format file size
+  const formatFileSize = useCallback((bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }, []);
+
+  // Calculate attachment size from base64
+  const getBase64Size = useCallback((base64: string): number => {
+    // Base64 encoding increases size by ~33%
+    return Math.floor((base64.length * 3) / 4);
   }, []);
 
   // Draft data for autosave
@@ -199,6 +271,7 @@ export function ComposeDialog({
         bodyText: body,
         inReplyTo: prefillData?.inReplyTo,
         references: prefillData?.references,
+        attachments: attachments.length > 0 ? attachments : undefined,
       };
 
       await emailApi.sendEmail(payload);
@@ -213,6 +286,7 @@ export function ComposeDialog({
       setBcc('');
       setSubject('');
       setBody('');
+      setAttachments([]);
     } catch (error) {
       console.error('Failed to send email:', error);
       onError?.('Failed to send email. Please try again.');
@@ -381,6 +455,28 @@ export function ComposeDialog({
             </Box>
           </Box>
 
+          {/* Attachments Preview */}
+          {attachments.length > 0 && (
+            <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                Attachments ({attachments.length})
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {attachments.map((attachment, index) => (
+                  <Chip
+                    key={index}
+                    icon={<FileText size={14} />}
+                    label={`${attachment.filename} (${formatFileSize(getBase64Size(attachment.contentBase64))})`}
+                    onDelete={() => handleRemoveAttachment(index)}
+                    deleteIcon={<Trash2 size={14} />}
+                    size="small"
+                    sx={{ maxWidth: '100%' }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+
           {/* Body Field */}
           <Box sx={{ flex: 1, px: 2, py: 2 }}>
             <TextField
@@ -409,8 +505,23 @@ export function ComposeDialog({
 
       <DialogActions sx={{ px: 2, py: 1.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-          <IconButton size="small" disabled>
-            <Paperclip size={18} />
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileSelect}
+            style={{ display: 'none' }}
+            accept="*/*"
+          />
+          {/* Attach files button */}
+          <IconButton
+            size="small"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending || uploading}
+            title="Attach files"
+          >
+            {uploading ? <CircularProgress size={18} /> : <Paperclip size={18} />}
           </IconButton>
           <Box sx={{ flex: 1 }} />
           <Button onClick={handleClose} disabled={sending}>
