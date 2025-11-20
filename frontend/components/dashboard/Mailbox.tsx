@@ -36,10 +36,6 @@ import { LabelManager } from '@/components/labels';
 import { BulkActionBar } from '@/components/email/BulkActionBar';
 import { LabelSelectorDialog } from '@/components/email/LabelSelectorDialog';
 import { FolderSelectorDialog } from '@/components/email/FolderSelectorDialog';
-import { mockEmails, mockFolders } from '@/lib/mocks/email-data';
-
-// Toggle to use mock data for testing
-const USE_MOCK_DATA = true;
 
 interface FolderItem {
   id: string;
@@ -265,11 +261,6 @@ export function Mailbox() {
     const found = combinedFolders.find((folder) => folder.id === selectedFolderId) ||
       combinedFolders[0] ||
       null;
-    console.log('[Mailbox] activeFolder calculated:', {
-      found: found?.id,
-      selectedFolderId,
-      combinedFoldersCount: combinedFolders.length
-    });
     return found;
   }, [combinedFolders, selectedFolderId]);
 
@@ -323,7 +314,7 @@ export function Mailbox() {
   const loadFolderMetadata = useCallback(async () => {
     try {
       setFoldersLoading(true);
-      const folderResponse = USE_MOCK_DATA ? mockFolders : await getFolders();
+      const folderResponse = await getFolders();
 
       const normalized: FolderItem[] = [];
       Object.entries(folderResponse.foldersByProvider).forEach(
@@ -365,36 +356,15 @@ export function Mailbox() {
       combinedFolders[0] ||
       null;
 
-    console.log('[Mailbox] loadData called', {
-      activeFolder: currentActiveFolder?.id,
-      selectedFolderId,
-      combinedFoldersCount: combinedFolders.length
-    });
-
     if (!currentActiveFolder) {
-      console.warn('[Mailbox] No active folder, skipping loadData');
       return;
     }
 
     try {
       setLoading(true);
-      console.log('[Mailbox] Loading emails for folder:', currentActiveFolder.id);
 
-      const providersRes = USE_MOCK_DATA ? mockFolders.providers : await providersApi.getProviders();
+      const providersRes = await providersApi.getProviders();
       setProviders(providersRes || []);
-
-      // Use mock data for testing
-      if (USE_MOCK_DATA) {
-        console.log('[Mailbox] Using mock data, setting', mockEmails.length, 'emails');
-        setEmails(mockEmails as any);
-        setSelectedEmail(null);
-        setPagination({
-          page: 1,
-          hasMore: false,
-          total: mockEmails.length,
-        });
-        return;
-      }
 
       // Check if filtering by label
       if (currentActiveFolder.id.startsWith('label:')) {
@@ -442,10 +412,6 @@ export function Mailbox() {
         };
 
         const emailsRes = await emailApi.listEmails(queryParams);
-        console.log('[Mailbox] Emails loaded:', {
-          count: emailsRes.data.emails?.length || 0,
-          total: emailsRes.data.pagination?.total || 0
-        });
         setEmails((emailsRes.data.emails || []) as any);
         setSelectedEmail(null);
 
@@ -457,7 +423,7 @@ export function Mailbox() {
         });
       }
     } catch (error) {
-      console.error('[Mailbox] Failed to load mailbox data:', error);
+      console.error('Failed to load mailbox data:', error);
       setEmails([]);
       setSelectedEmail(null);
       setPagination({ page: 1, hasMore: false, total: 0 });
@@ -691,20 +657,13 @@ export function Mailbox() {
 
   // Auto-select first folder when folders are loaded
   useEffect(() => {
-    console.log('[Mailbox] Auto-select effect:', {
-      selectedFolderId,
-      combinedFoldersCount: combinedFolders.length,
-      firstFolder: combinedFolders[0]?.id
-    });
     if (!selectedFolderId && combinedFolders.length > 0) {
-      console.log('[Mailbox] Auto-selecting first folder:', combinedFolders[0].id);
       setSelectedFolderId(combinedFolders[0].id);
     }
   }, [combinedFolders, selectedFolderId]);
 
   // Load emails when folder ID changes (not activeFolder object to avoid unnecessary re-renders)
   useEffect(() => {
-    console.log('[Mailbox] selectedFolderId changed:', selectedFolderId);
     if (selectedFolderId) {
       loadData();
     }
