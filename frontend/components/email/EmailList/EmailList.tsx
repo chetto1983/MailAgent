@@ -220,7 +220,7 @@ export const EmailList: React.FC<EmailListProps> = ({
         setSelectedIds(new Set());
       }
     },
-    [filteredEmails]
+    [filteredEmails, setSelectedIds]
   );
 
   // Handle toggle single selection
@@ -248,7 +248,7 @@ export const EmailList: React.FC<EmailListProps> = ({
       onBulkDelete(Array.from(selectedIds));
       setSelectedIds(new Set());
     }
-  }, [onBulkDelete, selectedIds]);
+  }, [onBulkDelete, selectedIds, setSelectedIds]);
 
   // Handle bulk archive
   const handleBulkArchive = useCallback(() => {
@@ -256,7 +256,7 @@ export const EmailList: React.FC<EmailListProps> = ({
       onBulkArchive(Array.from(selectedIds));
       setSelectedIds(new Set());
     }
-  }, [onBulkArchive, selectedIds]);
+  }, [onBulkArchive, selectedIds, setSelectedIds]);
 
   // Handle bulk mark as read
   const handleBulkMarkAsRead = useCallback((isRead: boolean) => {
@@ -264,7 +264,7 @@ export const EmailList: React.FC<EmailListProps> = ({
       onBulkMarkAsRead(Array.from(selectedIds), isRead);
       setSelectedIds(new Set());
     }
-  }, [onBulkMarkAsRead, selectedIds]);
+  }, [onBulkMarkAsRead, selectedIds, setSelectedIds]);
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
@@ -272,6 +272,39 @@ export const EmailList: React.FC<EmailListProps> = ({
       onRefresh();
     }
   }, [onRefresh]);
+
+  // Row renderer for react-window v2
+  const RowComponent = React.useMemo(() => {
+    // Create a component that receives index, style, and ariaAttributes from react-window
+    const Row = ({
+      index,
+      style,
+      ariaAttributes
+    }: {
+      index: number;
+      style: React.CSSProperties;
+      ariaAttributes: {
+        'aria-posinset': number;
+        'aria-setsize': number;
+        role: 'listitem';
+      };
+    }) => {
+      const email = filteredEmails[index];
+      if (!email) {
+        return <div style={style} {...ariaAttributes} />;
+      }
+
+      const isSelected = selectedEmailId === email.id;
+      const isMultiSelected = selectedIds.has(email.id);
+
+      return (
+        <div style={style} {...ariaAttributes}>
+          {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
+        </div>
+      );
+    };
+    return Row;
+  }, [filteredEmails, selectedEmailId, selectedIds, renderItem, handleToggleSelect, onEmailClick]);
 
   return (
     <Paper
@@ -421,23 +454,13 @@ export const EmailList: React.FC<EmailListProps> = ({
             <AutoSizer>
               {({ height, width }) => (
                 <List
-                  height={height}
-                  width={width}
-                  itemCount={filteredEmails.length}
-                  itemSize={80}
-                >
-                  {({ index, style }) => {
-                    const email = filteredEmails[index];
-                    const isSelected = selectedEmailId === email.id;
-                    const isMultiSelected = selectedIds.has(email.id);
-
-                    return (
-                      <div style={style}>
-                        {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
-                      </div>
-                    );
-                  }}
-                </List>
+                  defaultHeight={height}
+                  style={{ height, width }}
+                  rowComponent={RowComponent}
+                  rowCount={filteredEmails.length}
+                  rowHeight={80}
+                  rowProps={{}}
+                />
               )}
             </AutoSizer>
             {/* Loading more indicator */}
