@@ -26,7 +26,7 @@ import {
   Tab,
   Alert,
 } from '@mui/material';
-import { Settings, User, Bell, Mail, Moon, Globe, Clock, Sparkles, RefreshCw } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Mail, Moon, Globe, Clock, Sparkles, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { useAuth } from '@/lib/hooks/use-auth';
@@ -70,7 +70,7 @@ export function Settings() {
 
   const sections = useMemo(
     () => [
-      { id: 'general', label: settingsCopy.sections.general, icon: <Settings size={20} /> },
+      { id: 'general', label: settingsCopy.sections.general, icon: <SettingsIcon size={20} /> },
       { id: 'ai', label: settingsCopy.sections.ai, icon: <Sparkles size={20} /> },
       { id: 'accounts', label: settingsCopy.sections.accounts, icon: <Mail size={20} /> },
       { id: 'account', label: settingsCopy.sections.account, icon: <User size={20} /> },

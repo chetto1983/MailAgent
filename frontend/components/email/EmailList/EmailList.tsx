@@ -13,10 +13,8 @@ import {
 import { Search, RefreshCw, Trash2, Mail } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
-import { FixedSizeList } from 'react-window';
+import { List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
-
-// TODO: npm install react-virtualized-auto-sizer
 
 /**
  * Props for EmailList component
@@ -170,13 +168,25 @@ export const EmailList: React.FC<EmailListProps> = ({
     }
   }, [onRefresh]);
 
-  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+  const Row = ({
+    index,
+    style,
+    ariaAttributes
+  }: {
+    index: number;
+    style: React.CSSProperties;
+    ariaAttributes: {
+      'aria-posinset': number;
+      'aria-setsize': number;
+      role: 'listitem';
+    };
+  }) => {
     const email = filteredEmails[index];
     const isSelected = selectedEmailId === email.id;
     const isMultiSelected = selectedIds.has(email.id);
 
     return (
-      <div style={style}>
+      <div style={style} {...ariaAttributes}>
         <Box onClick={() => onEmailClick(email)}>
           {renderItem(email, isSelected, isMultiSelected, handleToggleSelect)}
         </Box>
@@ -277,14 +287,15 @@ export const EmailList: React.FC<EmailListProps> = ({
         ) : (
           <AutoSizer>
             {({ height, width }) => (
-              <FixedSizeList
-                height={height}
-                width={width}
-                itemSize={80}
-                itemCount={filteredEmails.length}
-              >
-                {Row}
-              </FixedSizeList>
+              <div style={{ height, width }}>
+                <List
+                  defaultHeight={height}
+                  rowHeight={80}
+                  rowCount={filteredEmails.length}
+                  rowComponent={Row}
+                  rowProps={{}}
+                />
+              </div>
             )}
           </AutoSizer>
         )}

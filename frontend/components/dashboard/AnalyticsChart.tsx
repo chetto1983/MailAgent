@@ -10,7 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Paper, Typography, CircularProgress, Box } from '@mui/material';
+import { Paper, Typography, CircularProgress } from '@mui/material';
 import { analyticsApi } from '@/lib/api/analytics';
 
 // TODO: npm install recharts

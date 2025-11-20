@@ -232,8 +232,9 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
 
               <Box>
                 <Button
-                  variant="destructive"
-                  size="sm"
+                  variant="outlined"
+                  color="error"
+                  size="small"
                   onClick={() => handleDelete(provider.id, provider.email)}
                   disabled={deletingId === provider.id}
                 >

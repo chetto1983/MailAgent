@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, ThemeProvider, CssBaseline, useMediaQuery, Snackbar, Alert } from '@mui/material';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { CookieConsent } from '@/components/ui/cookie-consent';
 import { darkTheme, lightTheme } from '@/theme/appTheme';
 import {
   DEFAULT_USER_SETTINGS,
@@ -171,6 +172,7 @@ export function Layout({ children }: LayoutProps) {
             </Alert>
           </Snackbar>
         )}
+        <CookieConsent />
       </Box>
     </ThemeProvider>
   );
