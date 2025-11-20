@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   List,
@@ -15,15 +15,19 @@ import {
   Skeleton,
   Stack,
   Divider,
+  IconButton,
 } from '@mui/material';
 import {
   Mail,
   ChevronDown,
   Filter,
+  Tag,
+  Settings,
 } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { useRouter } from 'next/router';
 import { useFoldersStore } from '@/stores/folders-store';
+import { useLabelStore } from '@/stores/label-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
 
 /**
@@ -103,6 +107,16 @@ interface EmailSidebarProps {
    * Show smart filters section
    */
   showSmartFilters?: boolean;
+
+  /**
+   * Show labels section
+   */
+  showLabels?: boolean;
+
+  /**
+   * Callback to open label manager
+   */
+  onManageLabels?: () => void;
 }
 
 /**
@@ -201,10 +215,20 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
   onCompose,
   smartFilters = [],
   showSmartFilters = true,
+  showLabels = true,
+  onManageLabels,
 }) => {
   const router = useRouter();
   const t = useTranslations();
   const countsByFolderId = useFoldersStore((state) => state.countsByFolderId);
+  const { labels, fetchLabels, isLoading: labelsLoading } = useLabelStore();
+
+  // Load labels on mount
+  useEffect(() => {
+    if (showLabels && labels.length === 0) {
+      fetchLabels();
+    }
+  }, [showLabels, labels.length, fetchLabels]);
 
   // Track which providers are expanded
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(() => {
@@ -321,6 +345,94 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
                 </ListItemButton>
               );
             })}
+          </List>
+
+          <Divider sx={{ mx: 2, mb: 1 }} />
+        </>
+      )}
+
+      {/* Labels Section */}
+      {showLabels && (
+        <>
+          <Box sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Tag size={14} />
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 600, textTransform: 'uppercase' }}
+              >
+                Labels
+              </Typography>
+            </Stack>
+            {onManageLabels && (
+              <IconButton size="small" onClick={onManageLabels}>
+                <Settings size={14} />
+              </IconButton>
+            )}
+          </Box>
+
+          <List sx={{ px: 1, pb: 1 }}>
+            {labelsLoading ? (
+              <Box sx={{ px: 2, py: 1 }}>
+                <Skeleton variant="text" width="60%" />
+                <Skeleton variant="text" width="50%" />
+              </Box>
+            ) : labels.length === 0 ? (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ px: 3, py: 1, display: 'block' }}
+              >
+                No labels yet
+              </Typography>
+            ) : (
+              labels.slice(0, 10).map((label) => {
+                const labelId = `label:${label.id}`;
+                const isSelected = selectedFolderId === labelId;
+                return (
+                  <ListItemButton
+                    key={label.id}
+                    selected={isSelected}
+                    onClick={() => onFolderSelect(labelId)}
+                    sx={{
+                      borderRadius: 2,
+                      mb: 0.5,
+                      mx: 1,
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        minWidth: 36,
+                      }}
+                    >
+                      <Tag size={18} color={label.color} />
+                    </ListItemIcon>
+                    <Chip
+                      label={label.name}
+                      size="small"
+                      sx={{
+                        bgcolor: label.color,
+                        color: '#fff',
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                      }}
+                    />
+                    <Box sx={{ flex: 1 }} />
+                    {/* TODO: Add count when available */}
+                  </ListItemButton>
+                );
+              })
+            )}
+            {labels.length > 10 && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ px: 3, py: 0.5, display: 'block' }}
+              >
+                +{labels.length - 10} more
+              </Typography>
+            )}
           </List>
 
           <Divider sx={{ mx: 2, mb: 1 }} />

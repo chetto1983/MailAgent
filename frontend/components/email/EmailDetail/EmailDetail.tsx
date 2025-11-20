@@ -29,6 +29,8 @@ import {
 } from '@/lib/api/email';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { Sparkles, Tag } from 'lucide-react';
+import { LabelSelector } from '@/components/labels';
+import { useLabelStore } from '@/stores/label-store';
 
 /**
  * Props for EmailDetail component
@@ -152,6 +154,10 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
   const [loadingSmartReplies, setLoadingSmartReplies] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [emailLabels, setEmailLabels] = useState<string[]>(email.labels || []);
+  const [savingLabels, setSavingLabels] = useState(false);
+
+  const { addEmailsToLabel, removeEmailFromLabel } = useLabelStore();
 
   // Load attachments if email has them
   useEffect(() => {
@@ -176,6 +182,35 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
   }, [email.id, email.hasAttachments]);
 
   // Handle attachment download
+  // Handle label changes
+  const handleLabelsChange = useCallback(async (newLabelIds: string[]) => {
+    const oldLabelIds = emailLabels;
+    setEmailLabels(newLabelIds);
+    setSavingLabels(true);
+
+    try {
+      // Find added and removed labels
+      const addedLabels = newLabelIds.filter((id) => !oldLabelIds.includes(id));
+      const removedLabels = oldLabelIds.filter((id) => !newLabelIds.includes(id));
+
+      // Add new labels
+      for (const labelId of addedLabels) {
+        await addEmailsToLabel(labelId, [email.id]);
+      }
+
+      // Remove old labels
+      for (const labelId of removedLabels) {
+        await removeEmailFromLabel(labelId, email.id);
+      }
+    } catch (error) {
+      console.error('Failed to update labels:', error);
+      // Revert on error
+      setEmailLabels(oldLabelIds);
+    } finally {
+      setSavingLabels(false);
+    }
+  }, [emailLabels, email.id, addEmailsToLabel, removeEmailFromLabel]);
+
   const handleDownloadAttachment = useCallback(async (attachmentId: string) => {
     try {
       setDownloadingAttachmentId(attachmentId);
@@ -344,6 +379,19 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
         <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
           {email.subject || '(No subject)'}
         </Typography>
+
+        {/* Labels */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" gutterBottom display="block">
+            Labels
+          </Typography>
+          <LabelSelector
+            selectedLabelIds={emailLabels}
+            onLabelsChange={handleLabelsChange}
+            variant="chips"
+            disabled={savingLabels}
+          />
+        </Box>
 
         {/* AI Categories */}
         {categories.length > 0 && (

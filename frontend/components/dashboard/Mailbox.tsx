@@ -30,6 +30,7 @@ import { EmailThread } from '@/components/email/EmailThread';
 import { ConversationList } from '@/components/email/ConversationList';
 import { ComposeDialog } from '@/components/email/ComposeDialog/ComposeDialog';
 import { AdvancedSearchDialog, type AdvancedSearchFilters } from '@/components/email/AdvancedSearchDialog';
+import { LabelManager } from '@/components/labels';
 
 interface FolderItem {
   id: string;
@@ -95,6 +96,9 @@ export function Mailbox() {
   // View mode state
   const [viewMode, setViewMode] = useState<'list' | 'conversation'>('list');
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+
+  // Label manager state
+  const [labelManagerOpen, setLabelManagerOpen] = useState(false);
 
   // Custom hooks
   const {
@@ -336,29 +340,62 @@ export function Mailbox() {
       const providersRes = await providersApi.getProviders();
       setProviders(providersRes || []);
 
-      const queryParams: EmailListParams = {
-        limit: 50,
-        page: 1,
-        ...activeFolder.queryOverrides,
-        search: advancedFilters.searchQuery || searchQuery || undefined,
-        from: advancedFilters.from || undefined,
-        startDate: advancedFilters.startDate || undefined,
-        endDate: advancedFilters.endDate || undefined,
-        hasAttachments: advancedFilters.hasAttachments || undefined,
-        isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
-        isStarred: advancedFilters.isStarred || undefined,
-      };
+      // Check if filtering by label
+      if (activeFolder.id.startsWith('label:')) {
+        const labelId = activeFolder.id.replace('label:', '');
+        // For now, just use regular email list with filter
+        // TODO: Backend should support filtering by label in listEmails endpoint
+        const queryParams: EmailListParams = {
+          limit: 50,
+          page: 1,
+          search: advancedFilters.searchQuery || searchQuery || undefined,
+          from: advancedFilters.from || undefined,
+          startDate: advancedFilters.startDate || undefined,
+          endDate: advancedFilters.endDate || undefined,
+          hasAttachments: advancedFilters.hasAttachments || undefined,
+          isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
+          isStarred: advancedFilters.isStarred || undefined,
+        };
 
-      const emailsRes = await emailApi.listEmails(queryParams);
-      setEmails((emailsRes.data.emails || []) as any);
-      setSelectedEmail(null);
+        const emailsRes = await emailApi.listEmails(queryParams);
+        // Filter emails by label client-side for now
+        const filteredEmails = (emailsRes.data.emails || []).filter((email: any) =>
+          email.labels && email.labels.includes(labelId)
+        );
+        setEmails(filteredEmails as any);
+        setSelectedEmail(null);
 
-      // Update pagination
-      setPagination({
-        page: 1,
-        hasMore: emailsRes.data.pagination.page < emailsRes.data.pagination.totalPages,
-        total: emailsRes.data.pagination.total,
-      });
+        // Update pagination (approximate since we're filtering client-side)
+        setPagination({
+          page: 1,
+          hasMore: false, // Disable pagination for label filtering for now
+          total: filteredEmails.length,
+        });
+      } else {
+        const queryParams: EmailListParams = {
+          limit: 50,
+          page: 1,
+          ...activeFolder.queryOverrides,
+          search: advancedFilters.searchQuery || searchQuery || undefined,
+          from: advancedFilters.from || undefined,
+          startDate: advancedFilters.startDate || undefined,
+          endDate: advancedFilters.endDate || undefined,
+          hasAttachments: advancedFilters.hasAttachments || undefined,
+          isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
+          isStarred: advancedFilters.isStarred || undefined,
+        };
+
+        const emailsRes = await emailApi.listEmails(queryParams);
+        setEmails((emailsRes.data.emails || []) as any);
+        setSelectedEmail(null);
+
+        // Update pagination
+        setPagination({
+          page: 1,
+          hasMore: emailsRes.data.pagination.page < emailsRes.data.pagination.totalPages,
+          total: emailsRes.data.pagination.total,
+        });
+      }
     } catch (error) {
       console.error('Failed to load mailbox data:', error);
       setEmails([]);
@@ -519,6 +556,8 @@ export function Mailbox() {
             loading={foldersLoading}
             smartFilters={smartFilters}
             showSmartFilters={true}
+            showLabels={true}
+            onManageLabels={() => setLabelManagerOpen(true)}
             onCompose={() => setComposeOpen(true)}
           />
         }
@@ -665,6 +704,12 @@ export function Mailbox() {
         onClose={() => setAdvancedSearchOpen(false)}
         onSearch={handleAdvancedSearch}
         onReset={handleResetFilters}
+      />
+
+      {/* Label Manager Dialog */}
+      <LabelManager
+        open={labelManagerOpen}
+        onClose={() => setLabelManagerOpen(false)}
       />
     </>
   );

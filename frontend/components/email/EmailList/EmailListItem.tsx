@@ -9,9 +9,10 @@ import {
   Chip,
   Divider,
 } from '@mui/material';
-import { Star, Paperclip } from 'lucide-react';
+import { Star, Paperclip, Tag } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import type { Email } from '@/stores/email-store';
+import { useLabelStore } from '@/stores/label-store';
 
 /**
  * Props for EmailListItem component
@@ -99,6 +100,7 @@ function formatDate(date: string | Date): string {
 export const EmailListItem = React.memo<EmailListItemProps>(
   ({ email, selected = false, multiSelected = false, onToggleSelect, onToggleStar, getProviderIcon }) => {
     const fromData = parseEmailFrom(email.from);
+    const { getLabelById } = useLabelStore();
 
     // Setup draggable functionality
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -217,15 +219,51 @@ export const EmailListItem = React.memo<EmailListItemProps>(
               {email.bodyPreview || ''}
             </Typography>
 
-            {/* Attachment Indicator */}
-            {email.hasAttachments && (
-              <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-                <Chip
-                  size="small"
-                  icon={<Paperclip size={12} />}
-                  label="Attachment"
-                  sx={{ height: 18, fontSize: '0.65rem' }}
-                />
+            {/* Labels and Indicators */}
+            {((email.labels && email.labels.length > 0) || email.hasAttachments) && (
+              <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
+                {/* Label Chips */}
+                {email.labels && email.labels.slice(0, 3).map((labelId) => {
+                  const label = getLabelById(labelId);
+                  if (!label) return null;
+                  return (
+                    <Chip
+                      key={labelId}
+                      size="small"
+                      icon={<Tag size={10} />}
+                      label={label.name}
+                      sx={{
+                        height: 18,
+                        fontSize: '0.65rem',
+                        bgcolor: label.color,
+                        color: '#fff',
+                        '& .MuiChip-icon': {
+                          color: '#fff',
+                        },
+                      }}
+                    />
+                  );
+                })}
+                {email.labels && email.labels.length > 3 && (
+                  <Chip
+                    size="small"
+                    label={`+${email.labels.length - 3}`}
+                    sx={{
+                      height: 18,
+                      fontSize: '0.65rem',
+                      bgcolor: 'action.hover',
+                    }}
+                  />
+                )}
+                {/* Attachment Indicator */}
+                {email.hasAttachments && (
+                  <Chip
+                    size="small"
+                    icon={<Paperclip size={12} />}
+                    label="Attachment"
+                    sx={{ height: 18, fontSize: '0.65rem' }}
+                  />
+                )}
               </Box>
             )}
           </Box>
