@@ -846,7 +846,7 @@ export class EmailsService {
       externalId: email.externalId,
       providerId: email.providerId,
       tenantId: email.tenantId,
-      operation: 'move' as const,
+      operation: 'moveToFolder' as const,
       data: { fromFolder: email.folder, toFolder: folder },
     }));
 
@@ -866,7 +866,7 @@ export class EmailsService {
     labelIds: string[],
   ) {
     // Verify labels exist and belong to tenant
-    const labels = await this.prisma.label.findMany({
+    const labels = await this.prisma.userLabel.findMany({
       where: {
         id: { in: labelIds },
         tenantId,
@@ -908,7 +908,6 @@ export class EmailsService {
       where: {
         emailId: { in: emailIds },
         labelId: { in: labelIds },
-        tenantId,
       },
     });
 
