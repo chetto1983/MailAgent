@@ -34,6 +34,8 @@ import { ComposeDialog } from '@/components/email/ComposeDialog/ComposeDialog';
 import { AdvancedSearchDialog, type AdvancedSearchFilters } from '@/components/email/AdvancedSearchDialog';
 import { LabelManager } from '@/components/labels';
 import { BulkActionBar } from '@/components/email/BulkActionBar';
+import { LabelSelectorDialog } from '@/components/email/LabelSelectorDialog';
+import { FolderSelectorDialog } from '@/components/email/FolderSelectorDialog';
 
 interface FolderItem {
   id: string;
@@ -115,6 +117,8 @@ export function Mailbox() {
 
   // Label manager state
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
+  const [labelSelectorOpen, setLabelSelectorOpen] = useState(false);
+  const [folderSelectorOpen, setFolderSelectorOpen] = useState(false);
 
   // Custom hooks
   const {
@@ -593,6 +597,53 @@ export function Mailbox() {
     }
   }, [selectedIds, storeMarkAsStarred]);
 
+  const handleBulkAddLabels = useCallback(async (labelIds: string[]) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || labelIds.length === 0) return;
+
+    try {
+      await emailApi.bulkAddLabels(ids, labelIds);
+      clearSelection();
+      await loadData(); // Reload to show updated labels
+      setSnackbar({
+        open: true,
+        message: `Added labels to ${ids.length} email(s)`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to add labels:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to add labels',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, clearSelection, loadData]);
+
+  const handleBulkMoveToFolder = useCallback(async (folder: string) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkMoveToFolder(ids, folder);
+      // Remove moved emails from current view
+      storeBulkDelete(ids);
+      clearSelection();
+      setSnackbar({
+        open: true,
+        message: `Moved ${ids.length} email(s) to ${folder}`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to move emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to move emails',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeBulkDelete, clearSelection]);
+
   // Load folders on mount
   useEffect(() => {
     loadFolderMetadata();
@@ -743,6 +794,8 @@ export function Mailbox() {
                 onDelete={handleBulkDelete}
                 onStar={handleBulkStar}
                 onUnstar={handleBulkUnstar}
+                onAddLabels={() => setLabelSelectorOpen(true)}
+                onMoveToFolder={() => setFolderSelectorOpen(true)}
               />
             )}
 
@@ -865,6 +918,20 @@ export function Mailbox() {
       <LabelManager
         open={labelManagerOpen}
         onClose={() => setLabelManagerOpen(false)}
+      />
+
+      <LabelSelectorDialog
+        open={labelSelectorOpen}
+        onClose={() => setLabelSelectorOpen(false)}
+        onSelect={handleBulkAddLabels}
+        selectedCount={selectedIds.size}
+      />
+
+      <FolderSelectorDialog
+        open={folderSelectorOpen}
+        onClose={() => setFolderSelectorOpen(false)}
+        onSelect={handleBulkMoveToFolder}
+        selectedCount={selectedIds.size}
       />
     </>
   );
