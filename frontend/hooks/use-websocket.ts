@@ -199,11 +199,11 @@ export function useWebSocket(token: string | null, enabled = true) {
   ]);
 
   return {
-    isConnected: websocketClient.isConnected(),
+    isConnected: typeof window !== 'undefined' ? websocketClient.isConnected() : false,
     connect,
     disconnect,
-    ping: websocketClient.ping.bind(websocketClient),
-    joinRoom: websocketClient.joinRoom.bind(websocketClient),
-    leaveRoom: websocketClient.leaveRoom.bind(websocketClient),
+    ping: typeof window !== 'undefined' ? websocketClient.ping.bind(websocketClient) : () => {},
+    joinRoom: typeof window !== 'undefined' ? websocketClient.joinRoom.bind(websocketClient) : () => {},
+    leaveRoom: typeof window !== 'undefined' ? websocketClient.leaveRoom.bind(websocketClient) : () => {},
   };
 }
