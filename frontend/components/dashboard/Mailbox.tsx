@@ -6,10 +6,12 @@ import {
   Paperclip,
   Clock,
   Calendar as CalendarIcon,
+  List as ListIcon,
+  MessageSquare,
 } from 'lucide-react';
-import { Snackbar, Alert as MuiAlert } from '@mui/material';
+import { Snackbar, Alert as MuiAlert, Box, ToggleButtonGroup, ToggleButton, Tooltip } from '@mui/material';
 import { DndContext, DragEndEvent } from '@dnd-kit/core';
-import { emailApi, type EmailListParams } from '@/lib/api/email';
+import { emailApi, type EmailListParams, type Conversation } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
@@ -25,6 +27,7 @@ import { EmailList } from '@/components/email/EmailList';
 import { EmailListItem } from '@/components/email/EmailList';
 import { EmailDetail } from '@/components/email/EmailDetail';
 import { EmailThread } from '@/components/email/EmailThread';
+import { ConversationList } from '@/components/email/ConversationList';
 import { ComposeDialog } from '@/components/email/ComposeDialog/ComposeDialog';
 import { AdvancedSearchDialog, type AdvancedSearchFilters } from '@/components/email/AdvancedSearchDialog';
 
@@ -88,6 +91,10 @@ export function Mailbox() {
     message: '',
     severity: 'info',
   });
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<'list' | 'conversation'>('list');
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 
   // Custom hooks
   const {
@@ -473,6 +480,33 @@ export function Mailbox() {
     handleMoveToFolder([emailId], folderId);
   }, [handleMoveToFolder]);
 
+  // Handle view mode toggle
+  const handleViewModeChange = useCallback(
+    (_event: React.MouseEvent<HTMLElement>, newMode: 'list' | 'conversation' | null) => {
+      if (newMode !== null) {
+        setViewMode(newMode);
+        // Reset selections when switching view modes
+        setSelectedEmail(null);
+        setSelectedThreadId(null);
+      }
+    },
+    [setSelectedEmail]
+  );
+
+  // Handle conversation selection
+  const handleConversationSelect = useCallback((conversation: Conversation) => {
+    setSelectedThreadId(conversation.threadId);
+    // Fetch the first email in the thread to use for the EmailThread component
+    emailApi.getThread(conversation.threadId).then((response) => {
+      const threadEmails = response.data;
+      if (threadEmails.length > 0) {
+        setSelectedEmail(threadEmails[0] as any);
+      }
+    }).catch((error) => {
+      console.error('Failed to load thread:', error);
+    });
+  }, [setSelectedEmail]);
+
   return (
     <>
       <DndContext onDragEnd={handleDragEnd}>
@@ -489,32 +523,77 @@ export function Mailbox() {
           />
         }
         list={
-          <EmailList
-            emails={storeEmails}
-            selectedEmailId={storeSelectedEmail?.id}
-            onEmailClick={handleEmailClick}
-            loading={storeLoading}
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            onBulkDelete={(ids) => ids.forEach(handleDelete)}
-            onBulkArchive={(ids) => handleArchive(ids)}
-            onBulkMarkAsRead={(ids, isRead) => handleMarkAsRead(ids, isRead)}
-            onLoadMore={loadMoreEmails}
-            hasMore={pagination.hasMore}
-            loadingMore={loadingMore}
-            onAdvancedSearch={() => setAdvancedSearchOpen(true)}
-            hasActiveFilters={hasActiveFilters}
-            renderItem={(email, isSelected, isMultiSelected, onToggleSelect) => (
-              <EmailListItem
-                email={email}
-                selected={isSelected}
-                multiSelected={isMultiSelected}
-                onToggleSelect={onToggleSelect}
-                onToggleStar={handleToggleStar}
-                getProviderIcon={getProviderIcon}
-              />
-            )}
-          />
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {/* View Mode Toggle */}
+            <Box
+              sx={{
+                p: 1,
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                justifyContent: 'center',
+                bgcolor: 'background.paper',
+              }}
+            >
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={handleViewModeChange}
+                size="small"
+                aria-label="view mode"
+              >
+                <ToggleButton value="list" aria-label="list view">
+                  <Tooltip title="Email List">
+                    <ListIcon size={18} />
+                  </Tooltip>
+                </ToggleButton>
+                <ToggleButton value="conversation" aria-label="conversation view">
+                  <Tooltip title="Conversation View">
+                    <MessageSquare size={18} />
+                  </Tooltip>
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+
+            {/* Render appropriate view based on mode */}
+            <Box sx={{ flex: 1, overflow: 'hidden' }}>
+              {viewMode === 'list' ? (
+                <EmailList
+                  emails={storeEmails}
+                  selectedEmailId={storeSelectedEmail?.id}
+                  onEmailClick={handleEmailClick}
+                  loading={storeLoading}
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  onBulkDelete={(ids) => ids.forEach(handleDelete)}
+                  onBulkArchive={(ids) => handleArchive(ids)}
+                  onBulkMarkAsRead={(ids, isRead) => handleMarkAsRead(ids, isRead)}
+                  onLoadMore={loadMoreEmails}
+                  hasMore={pagination.hasMore}
+                  loadingMore={loadingMore}
+                  onAdvancedSearch={() => setAdvancedSearchOpen(true)}
+                  hasActiveFilters={hasActiveFilters}
+                  renderItem={(email, isSelected, isMultiSelected, onToggleSelect) => (
+                    <EmailListItem
+                      email={email}
+                      selected={isSelected}
+                      multiSelected={isMultiSelected}
+                      onToggleSelect={onToggleSelect}
+                      onToggleStar={handleToggleStar}
+                      getProviderIcon={getProviderIcon}
+                    />
+                  )}
+                />
+              ) : (
+                <ConversationList
+                  providerId={activeFolder?.providerId}
+                  selectedThreadId={selectedThreadId || undefined}
+                  onSelectConversation={handleConversationSelect}
+                  onRefresh={handleRefresh}
+                />
+              )}
+            </Box>
+          </Box>
         }
         detail={
           storeSelectedEmail ? (
