@@ -87,7 +87,7 @@ export function Mailbox() {
   } = useEmailStore();
 
   // WebSocket for real-time updates (email events, folder counts, etc.)
-  useWebSocket(token, true);
+  //useWebSocket(token, true);
 
   // Local state for folders and UI
   const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
