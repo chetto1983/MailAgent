@@ -19,7 +19,6 @@ import {
   Forward,
   Download,
 } from 'lucide-react';
-import DOMPurify from 'isomorphic-dompurify'; // HTML sanitization for XSS protection
 import type { Email } from '@/stores/email-store';
 import {
   emailApi,
@@ -287,25 +286,9 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
     loadAIFeatures();
   }, [email.id]);
 
-  // Sanitize email body with DOMPurify to prevent XSS attacks
+  // Email body as pure HTML (no sanitization)
   const emailBody = useMemo(() => {
-    const rawHtml = email.body || email.bodyPreview || '';
-
-    // Configure DOMPurify to allow safe HTML while removing dangerous elements
-    const cleanHtml = DOMPurify.sanitize(rawHtml, {
-      ALLOWED_TAGS: [
-        'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'a', 'img', 'blockquote', 'code', 'pre',
-        'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div', 'span',
-      ],
-      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'id', 'style'],
-      ALLOW_DATA_ATTR: false,
-      // Remove all script tags and event handlers
-      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'applet'],
-      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
-    });
-
-    return cleanHtml;
+    return email.body || email.bodyPreview || '';
   }, [email.body, email.bodyPreview]);
 
   return (

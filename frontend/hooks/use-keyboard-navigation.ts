@@ -32,7 +32,7 @@ export function useKeyboardNavigation(options: {
   const { selectedEmail, setSelectedEmail } = useEmailStore();
 
   useEffect(() => {
-    if (!enabled || emails.length === 0) return;
+    if (!enabled || emails.length === 0 || typeof window === 'undefined') return;
 
     const handleKeyPress = (e: KeyboardEvent) => {
       // Ignore if typing in input/textarea
