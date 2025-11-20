@@ -12,7 +12,6 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { ChevronDown, ChevronUp, Reply, Forward } from 'lucide-react';
-import DOMPurify from 'isomorphic-dompurify';
 import type { Email } from '@/lib/api/email';
 import { emailApi } from '@/lib/api/email';
 
@@ -103,20 +102,9 @@ const ThreadMessage: React.FC<ThreadMessageProps> = ({
 }) => {
   const fromData = parseEmailFrom(email.from);
 
-  // Sanitize email body
+  // Email body as pure HTML (no sanitization)
   const emailBody = React.useMemo(() => {
-    const rawHtml = email.bodyHtml || email.bodyText || email.snippet || '';
-    return DOMPurify.sanitize(rawHtml, {
-      ALLOWED_TAGS: [
-        'p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'a', 'img', 'blockquote', 'code', 'pre',
-        'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div', 'span',
-      ],
-      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'id', 'style'],
-      ALLOW_DATA_ATTR: false,
-      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'applet'],
-      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
-    });
+    return email.bodyHtml || email.bodyText || email.snippet || '';
   }, [email.bodyHtml, email.bodyText, email.snippet]);
 
   return (

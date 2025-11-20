@@ -64,16 +64,12 @@ interface FolderItem {
  * - Custom hooks for actions and keyboard navigation
  */
 export function Mailbox() {
-  console.log('[Mailbox] Component rendering, SSR:', typeof window === 'undefined');
   const t = useTranslations();
 
   // Auth store - for WebSocket token
-  console.log('[Mailbox] Accessing auth store...');
   const { token } = useAuthStore();
-  console.log('[Mailbox] Auth store accessed, token:', !!token);
 
   // Store state
-  console.log('[Mailbox] Accessing email store...');
   const {
     emails: storeEmails,
     selectedEmail: storeSelectedEmail,
@@ -89,12 +85,9 @@ export function Mailbox() {
     bulkDelete: storeBulkDelete,
     markAsStarred: storeMarkAsStarred,
   } = useEmailStore();
-  console.log('[Mailbox] Email store accessed');
 
   // WebSocket for real-time updates (email events, folder counts, etc.)
-  console.log('[Mailbox] Initializing WebSocket hook...');
   useWebSocket(token, true);
-  console.log('[Mailbox] WebSocket hook initialized');
 
   // Local state for folders and UI
   const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
@@ -128,7 +121,6 @@ export function Mailbox() {
   const [folderSelectorOpen, setFolderSelectorOpen] = useState(false);
 
   // Custom hooks
-  console.log('[Mailbox] Initializing email actions hook...');
   const {
     handleDelete,
     handleToggleStar,
@@ -154,7 +146,6 @@ export function Mailbox() {
       });
     },
   });
-  console.log('[Mailbox] Email actions hook initialized');
 
   // Smart Filters for quick access
   const smartFilters = useMemo<SmartFilter[]>(() => {
