@@ -50,7 +50,14 @@ interface AuthScreenCopy {
     confirmPasswordLabel?: string;
     otpLabel?: string;
     firstNameLabel?: string;
+    firstNamePlaceholder?: string;
     lastNameLabel?: string;
+    lastNamePlaceholder?: string;
+    agreeToTerms?: string;
+    termsOfService?: string;
+    and?: string;
+    privacyPolicy?: string;
+    termsRequired?: string;
     submit: string;
     cta?: string;
   };
@@ -77,6 +84,22 @@ export interface AppTranslations {
     resources: string;
     login: string;
     register: string;
+    home: string;
+    mail: string;
+    calendar: string;
+    contacts: string;
+    tasks: string;
+    analytics: string;
+    ai: string;
+    settings: string;
+    profile: string;
+    logout: string;
+    account: string;
+    notifications: string;
+    language: string;
+    lightMode: string;
+    darkMode: string;
+    searchPlaceholder: string;
   };
   common: {
     loading: string;
@@ -90,6 +113,9 @@ export interface AppTranslations {
     send: string;
     compose: string;
     refresh: string;
+    refreshing: string;
+    saving: string;
+    sending: string;
     otpPlaceholder: string;
     emailPlaceholder: string;
     passwordPlaceholder: string;
@@ -106,6 +132,33 @@ export interface AppTranslations {
     confirm: string;
     yes: string;
     no: string;
+    discard: string;
+    viewAll: string;
+    join: string;
+    retry: string;
+    user: string;
+    version: string;
+    allCaughtUp: string;
+    noSubject: string;
+    unnamedContact: string;
+  };
+  timeAgo: {
+    justNow: string;
+    minutesAgo: string;
+    hoursAgo: string;
+    daysAgo: string;
+  };
+  date: {
+    today: string;
+    yesterday: string;
+    daysAgo: string;
+    never: string;
+  };
+  greetings: {
+    morning: string;
+    afternoon: string;
+    evening: string;
+    subtitle: string;
   };
   landing: LandingTranslations;
   auth: {
@@ -119,6 +172,38 @@ export interface AppTranslations {
     index: {
       loading: string;
       redirecting: string;
+    };
+    home: {
+      stats: {
+        unreadEmails: string;
+        todayEvents: string;
+        pendingTasks: string;
+        contacts: string;
+      };
+      sections: {
+        upcomingEvents: string;
+        upcomingEventsSubtitle: string;
+        noEvents: string;
+        viewCalendar: string;
+        priorityInbox: string;
+        priorityInboxSubtitle: string;
+        noStarredEmails: string;
+        viewAllEmails: string;
+        aiInsights: string;
+        aiInsightsSubtitle: string;
+        smartReplyReady: string;
+        aiAssistMessage: string;
+        aiAssistMessageSingular: string;
+        viewSuggestions: string;
+        inboxStatus: string;
+        inboxStatusMessage: string;
+        quickActions: string;
+        analyzeInbox: string;
+        smartCompose: string;
+        recentConnections: string;
+        recentConnectionsSubtitle: string;
+        noRecentContacts: string;
+      };
     };
     email: {
       title: string;
@@ -383,12 +468,39 @@ export interface AppTranslations {
         appearanceTitle: string;
         themeLabel: string;
         themeHint: string;
+        themeOptions: {
+          light: string;
+          dark: string;
+          system: string;
+        };
         languageTitle: string;
         languageLabel: string;
         languageHint: string;
+        languageOptions: {
+          en: string;
+          it: string;
+          es: string;
+          fr: string;
+          de: string;
+        };
         timezoneLabel: string;
+        timezoneOptions: {
+          pst: string;
+          est: string;
+          gmt: string;
+          cet: string;
+          jst: string;
+        };
         notificationsTitle: string;
         notificationsDescription: string;
+        notificationOptions: {
+          newEmails: string;
+          newEmailsDescription: string;
+          calendarReminders: string;
+          calendarRemindersDescription: string;
+          taskDeadlines: string;
+          taskDeadlinesDescription: string;
+        };
         reset: string;
         save: string;
       };
@@ -397,13 +509,31 @@ export interface AppTranslations {
         description: string;
         empty: string;
         manage: string;
+        add: string;
+        refresh: string;
         defaultBadge: string;
         emailBadge: string;
         calendarBadge: string;
         contactsBadge: string;
         lastSyncPrefix: string;
         neverSynced: string;
+        connectedProviders: string;
+        connectedProvidersSubtitle: string;
         providerTypes: Record<string, string>;
+        loadError: string;
+        connectSuccess: string;
+        connectRedirect: string;
+        disconnectSuccess: string;
+        saveSuccess: string;
+        saveError: string;
+        helpTitle: string;
+        helpGoogle: string;
+        helpMicrosoft: string;
+        helpIMAP: string;
+        helpCommonSettings: string;
+        helpGmail: string;
+        helpOutlook: string;
+        helpYahoo: string;
       };
       aiPanel: {
         title: string;
@@ -451,12 +581,20 @@ export interface AppTranslations {
       titleForward: string;
       from: string;
       to: string;
+      toLabel: string;
+      toPlaceholder: string;
       cc: string;
+      ccLabel: string;
       bcc: string;
+      bccLabel: string;
       subject: string;
+      subjectLabel: string;
+      subjectPlaceholder: string;
       bodyLabel: string;
+      bodyPlaceholder: string;
       attachFiles: string;
       removeAttachment: string;
+      attachments: string;
       formatting: string;
       bold: string;
       italic: string;
@@ -465,13 +603,21 @@ export interface AppTranslations {
       link: string;
       send: string;
       saveDraft: string;
+      discard: string;
       sending: string;
       saving: string;
+      savedJustNow: string;
+      savedMinutesAgo: string;
+      savedHoursAgo: string;
       selectProvider: string;
+      noProvider: string;
       validationTo: string;
       validationSubject: string;
       sendError: string;
+      uploadError: string;
+      fileTooLarge: string;
       draftSaved: string;
+      discardConfirm: string;
     };
     contacts: {
       title: string;
