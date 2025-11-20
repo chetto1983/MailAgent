@@ -1,5 +1,6 @@
 import { NextPageContext } from 'next';
 import Link from 'next/link';
+import { Box, Typography, Button } from '@mui/material';
 
 interface ErrorProps {
   statusCode?: number;
@@ -17,50 +18,44 @@ function Error({ statusCode }: ErrorProps) {
     : 'Something went wrong on our end. Please try again later.';
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(to bottom right, #0f172a, #1e293b)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '1rem'
-    }}>
-      <div style={{ textAlign: 'center', maxWidth: '28rem' }}>
-        <h1 style={{
-          fontSize: '3.75rem',
-          fontWeight: 'bold',
-          color: 'white',
-          marginBottom: '1rem'
-        }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: 'linear-gradient(to bottom right, #0f172a, #1e293b)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        p: 1,
+      }}
+    >
+      <Box sx={{ textAlign: 'center', maxWidth: '28rem' }}>
+        <Typography variant="h1" sx={{ fontWeight: 'bold', color: 'white', mb: 1 }}>
           {statusCode || 'Error'}
-        </h1>
-        <h2 style={{
-          fontSize: '1.5rem',
-          fontWeight: '600',
-          color: '#d1d5db',
-          marginBottom: '1rem'
-        }}>
+        </Typography>
+        <Typography variant="h4" component="h2" sx={{ fontWeight: 600, color: '#d1d5db', mb: 1 }}>
           {title}
-        </h2>
-        <p style={{ color: '#9ca3af', marginBottom: '2rem' }}>
+        </Typography>
+        <Typography sx={{ color: '#9ca3af', mb: 2 }}>
           {message}
-        </p>
-        <Link
+        </Typography>
+        <Button
+          component={Link}
           href="/"
-          style={{
+          variant="contained"
+          sx={{
             display: 'inline-block',
             padding: '0.75rem 1.5rem',
             backgroundColor: '#3b82f6',
             color: 'white',
             borderRadius: '0.5rem',
             textDecoration: 'none',
-            fontWeight: '500'
+            fontWeight: 500,
           }}
         >
           Go Back Home
-        </Link>
-      </div>
-    </div>
+        </Button>
+      </Box>
+    </Box>
   );
 }
 

@@ -13,6 +13,10 @@ import {
 import { Search, RefreshCw, Trash2, Mail } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
+import { FixedSizeList } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+
+// TODO: npm install react-virtualized-auto-sizer
 
 /**
  * Props for EmailList component
@@ -166,6 +170,20 @@ export const EmailList: React.FC<EmailListProps> = ({
     }
   }, [onRefresh]);
 
+  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const email = filteredEmails[index];
+    const isSelected = selectedEmailId === email.id;
+    const isMultiSelected = selectedIds.has(email.id);
+
+    return (
+      <div style={style}>
+        <Box onClick={() => onEmailClick(email)}>
+          {renderItem(email, isSelected, isMultiSelected, handleToggleSelect)}
+        </Box>
+      </div>
+    );
+  };
+
   return (
     <Paper
       elevation={0}
@@ -257,18 +275,18 @@ export const EmailList: React.FC<EmailListProps> = ({
             </Typography>
           </Box>
         ) : (
-          <Box>
-            {filteredEmails.map((email) => {
-              const isSelected = selectedEmailId === email.id;
-              const isMultiSelected = selectedIds.has(email.id);
-
-              return (
-                <Box key={email.id} onClick={() => onEmailClick(email)}>
-                  {renderItem(email, isSelected, isMultiSelected, handleToggleSelect)}
-                </Box>
-              );
-            })}
-          </Box>
+          <AutoSizer>
+            {({ height, width }) => (
+              <FixedSizeList
+                height={height}
+                width={width}
+                itemSize={80}
+                itemCount={filteredEmails.length}
+              >
+                {Row}
+              </FixedSizeList>
+            )}
+          </AutoSizer>
         )}
       </Box>
     </Paper>

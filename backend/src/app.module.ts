@@ -53,9 +53,13 @@ const config = getConfiguration();
     ComplianceModule,
     CalendarModule,
     ContactsModule,
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+// ...
     RealtimeModule, // WebSocket Gateway per eventi realtime multi-tenant
     LabelsModule,
+    AnalyticsModule,
   ],
+// ...
   providers: [
     // Apply throttler globally to all routes
     {
