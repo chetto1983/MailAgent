@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { gmail_v1, google } from 'googleapis';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CryptoService } from '../../../common/services/crypto.service';
@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import { ProviderTokenService } from './provider-token.service';
 import { RetryService } from '../../../common/services/retry.service';
 import { AttachmentStorageService } from '../../email/services/attachment.storage';
+import { BaseEmailSyncService } from './base-email-sync.service';
 
 /**
  * Attachment metadata from Gmail message
@@ -27,37 +28,39 @@ interface GmailAttachmentMeta {
 }
 
 @Injectable()
-export class GoogleSyncService implements OnModuleInit {
-  private readonly logger = new Logger(GoogleSyncService.name);
-  private GMAIL_BATCH_GET_SIZE: number;
+export class GoogleSyncService extends BaseEmailSyncService {
+  protected readonly logger = new Logger(GoogleSyncService.name);
   private GMAIL_HISTORY_MAX_PAGES: number;
-  private GMAIL_FULL_MAX_MESSAGES: number;
   private suppressMessageEvents = false;
-  private RETRY_MAX_ATTEMPTS = 3;
-  private RETRY_429_DELAY_MS = 2000;
-  private RETRY_5XX_DELAY_MS = 2000;
 
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
+    realtimeEvents: RealtimeEventsService,
+    config: ConfigService,
     private crypto: CryptoService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
     private knowledgeBaseService: KnowledgeBaseService,
-    private realtimeEvents: RealtimeEventsService,
-    private config: ConfigService,
     private providerTokenService: ProviderTokenService,
     private retryService: RetryService,
     private attachmentStorage: AttachmentStorageService,
-  ) {}
+  ) {
+    super(prisma, realtimeEvents, config);
+  }
 
   onModuleInit() {
-    this.GMAIL_BATCH_GET_SIZE = this.config.get<number>('GMAIL_BATCH_GET_SIZE', 100);
+    super.onModuleInit(); // Load base configuration
+
+    // Gmail-specific configuration overrides
+    this.batchSize = this.config.get<number>('GMAIL_BATCH_GET_SIZE', 100);
+    this.fullSyncMaxMessages = this.config.get<number>('GMAIL_FULL_MAX_MESSAGES', 200);
+    this.retryMaxAttempts = this.config.get<number>('GMAIL_RETRY_MAX_ATTEMPTS', 3);
+    this.retry429DelayMs = this.config.get<number>('GMAIL_RETRY_429_DELAY_MS', 2000);
+    this.retry5xxDelayMs = this.config.get<number>('GMAIL_RETRY_5XX_DELAY_MS', 2000);
+
+    // Gmail-only configuration
     this.GMAIL_HISTORY_MAX_PAGES = this.config.get<number>('GMAIL_HISTORY_MAX_PAGES', 25);
-    this.GMAIL_FULL_MAX_MESSAGES = this.config.get<number>('GMAIL_FULL_MAX_MESSAGES', 200);
     this.suppressMessageEvents = this.config.get<boolean>('REALTIME_SUPPRESS_MESSAGE_EVENTS', false);
-    this.RETRY_MAX_ATTEMPTS = this.config.get<number>('GMAIL_RETRY_MAX_ATTEMPTS', 3);
-    this.RETRY_429_DELAY_MS = this.config.get<number>('GMAIL_RETRY_429_DELAY_MS', 2000);
-    this.RETRY_5XX_DELAY_MS = this.config.get<number>('GMAIL_RETRY_5XX_DELAY_MS', 2000);
   }
 
   async syncProvider(jobData: SyncJobData): Promise<SyncJobResult> {
@@ -143,9 +146,9 @@ export class GoogleSyncService implements OnModuleInit {
 
   private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
     return this.retryService.withRetry(fn, {
-      maxAttempts: this.RETRY_MAX_ATTEMPTS,
-      delay429Ms: this.RETRY_429_DELAY_MS,
-      delay5xxMs: this.RETRY_5XX_DELAY_MS,
+      maxAttempts: this.retryMaxAttempts,
+      delay429Ms: this.retry429DelayMs,
+      delay5xxMs: this.retry5xxDelayMs,
       loggerName: 'Gmail',
     });
   }
@@ -252,8 +255,8 @@ export class GoogleSyncService implements OnModuleInit {
 
       // Process added messages in batches
       const addedIds = Array.from(addedMessageIds);
-      for (let i = 0; i < addedIds.length; i += this.GMAIL_BATCH_GET_SIZE) {
-        const chunkIds = addedIds.slice(i, i + this.GMAIL_BATCH_GET_SIZE);
+      for (let i = 0; i < addedIds.length; i += this.batchSize) {
+        const chunkIds = addedIds.slice(i, i + this.batchSize);
         if (!chunkIds.length) continue;
 
         const batchGet = (gmail.users.messages as any)?.batchGet;
@@ -333,7 +336,7 @@ export class GoogleSyncService implements OnModuleInit {
     newMessages: number;
     historyId: string;
   }> {
-    this.logger.debug(`Full sync - fetching latest Gmail messages (limit ${this.GMAIL_FULL_MAX_MESSAGES})`);
+    this.logger.debug(`Full sync - fetching latest Gmail messages (limit ${this.fullSyncMaxMessages})`);
 
     try {
       // Get profile for historyId
@@ -341,7 +344,7 @@ export class GoogleSyncService implements OnModuleInit {
       const historyId = profile.data.historyId!;
 
       // List newest messages (all folders) up to the configured cap
-      const remaining = this.GMAIL_FULL_MAX_MESSAGES;
+      const remaining = this.fullSyncMaxMessages;
       const messagesResponse = await gmail.users.messages.list({
         userId: 'me',
         maxResults: Math.min(500, remaining), // Gmail API max per request
@@ -351,17 +354,17 @@ export class GoogleSyncService implements OnModuleInit {
       let pageToken = messagesResponse.data.nextPageToken;
 
       // Fetch additional pages if needed (up to configured total)
-      while (pageToken && messages.length < this.GMAIL_FULL_MAX_MESSAGES) {
+      while (pageToken && messages.length < this.fullSyncMaxMessages) {
         const nextResponse = await gmail.users.messages.list({
           userId: 'me',
-          maxResults: Math.min(500, this.GMAIL_FULL_MAX_MESSAGES - messages.length),
+          maxResults: Math.min(500, this.fullSyncMaxMessages - messages.length),
           pageToken,
         });
 
         messages = [...messages, ...(nextResponse.data.messages || [])];
         pageToken = nextResponse.data.nextPageToken;
 
-        if (!pageToken || messages.length >= this.GMAIL_FULL_MAX_MESSAGES) {
+        if (!pageToken || messages.length >= this.fullSyncMaxMessages) {
           break;
         }
       }
@@ -371,8 +374,8 @@ export class GoogleSyncService implements OnModuleInit {
       let messagesProcessed = 0;
       let newMessages = 0;
 
-      for (let i = 0; i < messages.length; i += this.GMAIL_BATCH_GET_SIZE) {
-        const chunkIds = messages.slice(i, i + this.GMAIL_BATCH_GET_SIZE).map((m) => m.id!).filter(Boolean);
+      for (let i = 0; i < messages.length; i += this.batchSize) {
+        const chunkIds = messages.slice(i, i + this.batchSize).map((m) => m.id!).filter(Boolean);
         if (!chunkIds.length) continue;
 
         const fullMessages = await this.fetchMessagesBatch(gmail, chunkIds, 'full');
@@ -454,7 +457,7 @@ export class GoogleSyncService implements OnModuleInit {
           },
         });
 
-        this.notifyMailboxChange(tenantId, providerId, 'labels-updated', {
+        this.notifyGmailMailboxChange(tenantId, providerId, 'labels-updated', {
           emailId: existing.id,
           externalId: messageId,
           folder,
@@ -469,12 +472,12 @@ export class GoogleSyncService implements OnModuleInit {
       if (this.isNotFoundError(error)) {
         await this.enforceTrashState(existing, tenantId);
 
-        this.notifyMailboxChange(tenantId, providerId, 'message-deleted', {
+        this.notifyGmailMailboxChange(tenantId, providerId, 'message-deleted', {
           emailId: existing.id,
           externalId: messageId,
         });
       } else {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = this.extractErrorMessage(error);
         this.logger.warn(`Failed to refresh Gmail message ${messageId}: ${message}`);
       }
     }
@@ -541,7 +544,7 @@ export class GoogleSyncService implements OnModuleInit {
       if (this.isNotFoundError(error)) {
         await this.enforceTrashState(existing, tenantId);
       } else {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = this.extractErrorMessage(error);
         this.logger.warn(`Error while handling Gmail deletion for ${messageId}: ${message}`);
       }
     }
@@ -581,7 +584,7 @@ export class GoogleSyncService implements OnModuleInit {
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(
         `Failed to soft-delete Gmail message ${existing.id} locally: ${message}`,
       );
@@ -592,7 +595,7 @@ export class GoogleSyncService implements OnModuleInit {
     try {
       await this.knowledgeBaseService.deleteEmbeddingsForEmail(tenantId, emailId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(
         `Failed to delete embeddings for email ${emailId} during hard-delete: ${message}`,
       );
@@ -603,7 +606,7 @@ export class GoogleSyncService implements OnModuleInit {
         where: { id: emailId },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(`Failed to remove email ${emailId} from database: ${message}`);
     }
   }
@@ -679,27 +682,11 @@ export class GoogleSyncService implements OnModuleInit {
         },
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.extractErrorMessage(error);
       this.logger.warn(`Failed to update metadata for email ${emailId}: ${message}`);
     }
   }
 
-  private isNotFoundError(error: unknown): boolean {
-    if (!error) {
-      return false;
-    }
-
-    const anyError = error as any;
-
-    const status =
-      anyError?.status ??
-      anyError?.statusCode ??
-      anyError?.code ??
-      anyError?.response?.status ??
-      anyError?.response?.statusCode;
-
-    return status === 404;
-  }
 
   /**
    * Process a single Gmail message and persist it locally.
@@ -761,9 +748,7 @@ export class GoogleSyncService implements OnModuleInit {
           );
       } catch (error) {
         this.logger.warn(
-          `Gmail batchGet failed, falling back to parallel gets: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          `Gmail batchGet failed, falling back to parallel gets: ${this.extractErrorMessage(error)}`,
         );
       }
     }
@@ -857,7 +842,7 @@ export class GoogleSyncService implements OnModuleInit {
       extractBody(message.payload);
     }
 
-    const snippet = message.snippet || bodyText.substring(0, 200);
+    const snippet = message.snippet || this.truncateText(bodyText, 200);
     const sentAt = dateStr ? new Date(dateStr) : new Date(message.internalDate ? parseInt(message.internalDate) : Date.now());
     const labelIds = message.labelIds ?? [];
     const folder = this.determineFolderFromLabels(labelIds);
@@ -929,7 +914,10 @@ export class GoogleSyncService implements OnModuleInit {
   }
 
   /**
-   * Process and store attachments for an email
+   * Process and store attachments for an email using intelligent strategy:
+   * - Inline images: skip (already in HTML)
+   * - Small PDFs (<5MB): download + store + queue for embeddings
+   * - Everything else: metadata-only (on-demand download)
    */
   private async processEmailAttachments(
     gmail: gmail_v1.Gmail,
@@ -949,51 +937,107 @@ export class GoogleSyncService implements OnModuleInit {
         where: { emailId },
       });
 
-      // Process each attachment
+      // Process each attachment with intelligent strategy
       for (const attachment of attachments) {
         try {
-          // Download attachment data
-          const data = await this.downloadGmailAttachment(
-            gmail,
-            externalId,
-            attachment.attachmentId,
-          );
+          // Convert to provider-agnostic metadata
+          const metadata = {
+            filename: attachment.filename,
+            mimeType: attachment.mimeType,
+            size: attachment.size,
+            isInline: attachment.isInline,
+            contentId: attachment.contentId,
+            externalId: attachment.attachmentId,
+            externalMessageId: externalId,
+          };
 
-          if (!data) {
-            this.logger.warn(
-              `Skipping attachment ${attachment.filename} for email ${emailId} - download failed`,
+          // Determine processing strategy
+          const strategy = this.attachmentStorage.getProcessingStrategy(metadata);
+
+          if (strategy === 'skip') {
+            this.logger.debug(
+              `Skipping inline image ${attachment.filename} for email ${emailId}`,
             );
             continue;
           }
 
-          // Upload to S3/MinIO
-          const uploaded = await this.attachmentStorage.uploadAttachment(
-            tenantId,
-            providerId,
-            {
+          if (strategy === 'embeddings') {
+            // Small PDF: download + store + queue for embeddings
+            const data = await this.downloadGmailAttachment(
+              gmail,
+              externalId,
+              attachment.attachmentId,
+            );
+
+            if (!data) {
+              this.logger.warn(
+                `Failed to download PDF ${attachment.filename}, storing metadata only`,
+              );
+              // Fall back to metadata-only
+              const stored = this.attachmentStorage.storeAttachmentMetadata(providerId, metadata);
+              await this.prisma.emailAttachment.create({
+                data: {
+                  emailId,
+                  filename: stored.filename,
+                  mimeType: stored.mimeType,
+                  size: stored.size,
+                  contentId: stored.contentId,
+                  storageType: stored.storageType,
+                  storagePath: stored.storagePath,
+                  isInline: stored.isInline,
+                },
+              });
+              continue;
+            }
+
+            // Upload to S3/MinIO
+            const uploaded = await this.attachmentStorage.uploadAttachment(tenantId, providerId, {
               filename: attachment.filename,
               content: data,
               contentType: attachment.mimeType,
-            },
-          );
+            });
 
-          // Save attachment metadata to database
-          await this.prisma.emailAttachment.create({
-            data: {
-              emailId,
-              filename: uploaded.filename,
-              mimeType: uploaded.mimeType,
-              size: uploaded.size,
-              contentId: attachment.contentId,
-              storageType: uploaded.storageType,
-              storagePath: uploaded.storagePath,
-              isInline: attachment.isInline,
-            },
-          });
+            // Save to database with s3 storage
+            await this.prisma.emailAttachment.create({
+              data: {
+                emailId,
+                filename: uploaded.filename,
+                mimeType: uploaded.mimeType,
+                size: uploaded.size,
+                contentId: attachment.contentId,
+                storageType: uploaded.storageType,
+                storagePath: uploaded.storagePath,
+                isInline: uploaded.isInline,
+              },
+            });
 
-          this.logger.debug(
-            `Stored attachment ${attachment.filename} (${attachment.size} bytes) for email ${emailId}`,
-          );
+            this.logger.debug(
+              `Downloaded document ${attachment.filename} (${(attachment.size / 1024 / 1024).toFixed(2)}MB) for embeddings`,
+            );
+
+            // Embeddings will be processed automatically by KnowledgeBaseService
+            // which extracts text from PDF/Office files via AttachmentContentExtractorService
+          } else {
+            // metadata-only: save reference for on-demand download
+            const stored = this.attachmentStorage.storeAttachmentMetadata(providerId, metadata);
+
+            await this.prisma.emailAttachment.create({
+              data: {
+                emailId,
+                filename: stored.filename,
+                mimeType: stored.mimeType,
+                size: stored.size,
+                contentId: stored.contentId,
+                storageType: stored.storageType,
+                storagePath: stored.storagePath,
+                isInline: stored.isInline,
+              },
+            });
+
+            this.logger.debug(
+              `Stored metadata-only for ${attachment.filename} (${(attachment.size / 1024 / 1024).toFixed(2)}MB)`,
+            );
+          }
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err));
           this.logger.error(
@@ -1239,7 +1283,7 @@ export class GoogleSyncService implements OnModuleInit {
 
     await this.enforceTrashState(existing, tenantId, true);
 
-    this.notifyMailboxChange(tenantId, providerId, 'message-deleted', {
+    this.notifyGmailMailboxChange(tenantId, providerId, 'message-deleted', {
       emailId: existing.id,
       externalId: messageId,
     });
@@ -1346,7 +1390,7 @@ export class GoogleSyncService implements OnModuleInit {
 
       this.logger.log(`Synced ${labels.length} Gmail labels as folders for provider ${providerId}`);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = this.extractErrorMessage(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
       this.logger.error(
         `Error syncing Gmail folders for provider ${providerId}: ${errorMessage}`,
@@ -1379,13 +1423,13 @@ export class GoogleSyncService implements OnModuleInit {
     return labelMap[labelId];
   }
 
-  private notifyMailboxChange(
+  private notifyGmailMailboxChange(
     tenantId: string,
     providerId: string,
     reason: EmailEventReason,
     payload?: { emailId?: string; externalId?: string; folder?: string },
   ): void {
-    // Delegate to centralized RealtimeEventsService method
+    // Gmail-specific wrapper with suppressMessageEvents support
     this.realtimeEvents.notifyMailboxChange(tenantId, providerId, reason, payload, {
       suppressMessageEvents: this.suppressMessageEvents,
     });
