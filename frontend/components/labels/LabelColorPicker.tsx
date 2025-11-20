@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { Check } from 'lucide-react';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface LabelColorPickerProps {
   selectedColor: string;
@@ -18,10 +19,12 @@ export const LabelColorPicker: React.FC<LabelColorPickerProps> = ({
   colors,
   onColorSelect,
 }) => {
+  const t = useTranslations();
+
   return (
     <Box>
       <Typography variant="caption" color="text.secondary" gutterBottom>
-        Choose a color
+        {t.dashboard.labels.chooseColor}
       </Typography>
       <Box
         sx={{

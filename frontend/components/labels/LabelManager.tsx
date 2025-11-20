@@ -18,6 +18,7 @@ import {
 import { Plus, Edit2, Trash2, X } from 'lucide-react';
 import { useLabelStore } from '@/stores/label-store';
 import { LabelColorPicker } from './LabelColorPicker';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface LabelManagerProps {
   open: boolean;
@@ -57,6 +58,7 @@ const LABEL_COLORS = [
  * - Color picker for labels
  */
 export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => {
+  const t = useTranslations();
   const {
     labels,
     isLoading,
@@ -94,7 +96,7 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
 
   const handleCreateLabel = async () => {
     if (!labelName.trim()) {
-      setActionError('Label name is required');
+      setActionError(t.dashboard.labels.labelNameRequired);
       return;
     }
 
@@ -108,7 +110,7 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
       setLabelColor(LABEL_COLORS[0]);
       setIsCreating(false);
     } catch (err) {
-      setActionError('Failed to create label');
+      setActionError(t.dashboard.labels.failedToCreate);
     } finally {
       setActionLoading(false);
     }
@@ -116,7 +118,7 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
 
   const handleUpdateLabel = async () => {
     if (!editingLabelId || !labelName.trim()) {
-      setActionError('Label name is required');
+      setActionError(t.dashboard.labels.labelNameRequired);
       return;
     }
 
@@ -130,14 +132,14 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
       setLabelName('');
       setLabelColor(LABEL_COLORS[0]);
     } catch (err) {
-      setActionError('Failed to update label');
+      setActionError(t.dashboard.labels.failedToUpdate);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteLabel = async (labelId: string) => {
-    if (!window.confirm('Are you sure you want to delete this label?')) {
+    if (!window.confirm(t.dashboard.labels.deleteConfirm)) {
       return;
     }
 
@@ -147,7 +149,7 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
     try {
       await deleteLabel(labelId);
     } catch (err) {
-      setActionError('Failed to delete label');
+      setActionError(t.dashboard.labels.failedToDelete);
     } finally {
       setActionLoading(false);
     }
@@ -178,7 +180,7 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Manage Labels</Typography>
+          <Typography variant="h6">{t.dashboard.labels.manageLabels}</Typography>
           <IconButton size="small" onClick={onClose}>
             <X size={20} />
           </IconButton>
@@ -197,12 +199,12 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
         {(isCreating || editingLabelId) && (
           <Box sx={{ mb: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
             <Typography variant="subtitle2" gutterBottom>
-              {editingLabelId ? 'Edit Label' : 'Create Label'}
+              {editingLabelId ? t.dashboard.labels.editLabel : t.dashboard.labels.createLabel}
             </Typography>
             <TextField
               fullWidth
               size="small"
-              label="Label Name"
+              label={t.dashboard.labels.labelName}
               value={labelName}
               onChange={(e) => setLabelName(e.target.value)}
               sx={{ mb: 2 }}
@@ -220,10 +222,10 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
                 onClick={editingLabelId ? handleUpdateLabel : handleCreateLabel}
                 disabled={actionLoading || !labelName.trim()}
               >
-                {actionLoading ? <CircularProgress size={20} /> : editingLabelId ? 'Update' : 'Create'}
+                {actionLoading ? <CircularProgress size={20} /> : editingLabelId ? t.dashboard.labels.updateButton : t.dashboard.labels.createButton}
               </Button>
               <Button variant="outlined" size="small" onClick={handleCancelEdit}>
-                Cancel
+                {t.dashboard.labels.cancelButton}
               </Button>
             </Box>
           </Box>
@@ -238,7 +240,7 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
             onClick={handleStartCreate}
             sx={{ mb: 2 }}
           >
-            Create New Label
+            {t.dashboard.labels.addLabel}
           </Button>
         )}
 
@@ -249,7 +251,7 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
           </Box>
         ) : labels.length === 0 ? (
           <Typography color="text.secondary" textAlign="center" py={4}>
-            No labels yet. Create your first label to get started.
+            {t.dashboard.labels.noLabels}. {t.dashboard.labels.noLabelsDescription}.
           </Typography>
         ) : (
           <List>
@@ -299,7 +301,7 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={onClose}>{t.dashboard.labels.closeButton}</Button>
       </DialogActions>
     </Dialog>
   );

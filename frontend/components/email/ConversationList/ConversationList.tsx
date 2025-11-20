@@ -10,6 +10,7 @@ import {
 import { RefreshCw } from 'lucide-react';
 import { ConversationListItem } from './ConversationListItem';
 import { emailApi, type Conversation } from '@/lib/api/email';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 /**
  * Props for ConversationList component
@@ -63,6 +64,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   onSelectConversation,
   onRefresh,
 }) => {
+  const t = useTranslations();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -103,7 +105,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         setHasMore(pagination.page < pagination.totalPages);
       } catch (err) {
         console.error('Failed to fetch conversations:', err);
-        setError('Failed to load conversations. Please try again.');
+        setError(t.dashboard.conversations.failedToLoad);
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -178,7 +180,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
           severity="error"
           action={
             <Button size="small" onClick={handleRefresh} startIcon={<RefreshCw size={16} />}>
-              Retry
+              {t.dashboard.conversations.retry}
             </Button>
           }
         >
@@ -203,17 +205,17 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         }}
       >
         <Typography variant="h6" color="text.secondary" gutterBottom>
-          No conversations found
+          {t.dashboard.conversations.noConversations}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Your conversations will appear here
+          {t.dashboard.conversations.noConversationsDescription}
         </Typography>
         <Button
           variant="outlined"
           startIcon={<RefreshCw size={16} />}
           onClick={handleRefresh}
         >
-          Refresh
+          {t.dashboard.conversations.retry}
         </Button>
       </Box>
     );
@@ -251,7 +253,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
               disabled={loadingMore}
               startIcon={loadingMore ? <CircularProgress size={16} /> : null}
             >
-              {loadingMore ? 'Loading...' : 'Load More'}
+              {loadingMore ? t.dashboard.conversations.loading : t.dashboard.conversations.loadMore}
             </Button>
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
               Page {currentPage} of {totalPages}

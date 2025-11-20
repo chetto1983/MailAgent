@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { Star, StarOff, Flag, Users } from 'lucide-react';
 import type { Conversation } from '@/lib/api/email';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 /**
  * Props for ConversationListItem component
@@ -54,7 +55,7 @@ function parseEmailFrom(from: string): { name: string; email: string } {
 /**
  * Format date for display
  */
-function formatDate(date: string | Date): string {
+function formatDate(date: string | Date, yesterdayText: string): string {
   const d = new Date(date);
   const now = new Date();
   const diff = now.getTime() - d.getTime();
@@ -67,7 +68,7 @@ function formatDate(date: string | Date): string {
       hour12: true,
     });
   } else if (days === 1) {
-    return 'Yesterday';
+    return yesterdayText;
   } else if (days < 7) {
     return d.toLocaleString('en-US', { weekday: 'short' });
   } else {
@@ -117,6 +118,7 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
   onClick,
   onToggleStar,
 }) => {
+  const t = useTranslations();
   const fromData = parseEmailFrom(conversation.from);
   const participantCount = getParticipantCount(conversation);
   const hasMultipleParticipants = participantCount > 2;
@@ -201,7 +203,7 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
               color="text.secondary"
               sx={{ flexShrink: 0 }}
             >
-              {formatDate(conversation.receivedAt)}
+              {formatDate(conversation.receivedAt, t.dashboard.conversations.yesterday)}
             </Typography>
           </Box>
 
@@ -240,7 +242,7 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
             {/* Email count */}
             {conversation.emailCount > 1 && (
               <Chip
-                label={`${conversation.emailCount} messages`}
+                label={`${conversation.emailCount} ${t.dashboard.conversations.messages}`}
                 size="small"
                 sx={{
                   height: 20,
