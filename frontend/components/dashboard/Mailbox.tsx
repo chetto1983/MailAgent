@@ -33,6 +33,7 @@ import { ConversationList } from '@/components/email/ConversationList';
 import { ComposeDialog } from '@/components/email/ComposeDialog/ComposeDialog';
 import { AdvancedSearchDialog, type AdvancedSearchFilters } from '@/components/email/AdvancedSearchDialog';
 import { LabelManager } from '@/components/labels';
+import { BulkActionBar } from '@/components/email/BulkActionBar';
 
 interface FolderItem {
   id: string;
@@ -71,9 +72,16 @@ export function Mailbox() {
     emails: storeEmails,
     selectedEmail: storeSelectedEmail,
     isLoading: storeLoading,
+    selectedIds,
     setEmails,
     setSelectedEmail,
     setLoading,
+    toggleSelection,
+    selectAll,
+    clearSelection,
+    markAsRead: storeMarkAsRead,
+    bulkDelete: storeBulkDelete,
+    markAsStarred: storeMarkAsStarred,
   } = useEmailStore();
 
   // WebSocket for real-time updates (email events, folder counts, etc.)
@@ -464,6 +472,127 @@ export function Mailbox() {
     setRefreshing(false);
   }, [loadData]);
 
+  // Bulk operations handlers
+  const handleBulkMarkRead = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkMarkRead(ids, true);
+      storeMarkAsRead(ids);
+      setSnackbar({
+        open: true,
+        message: `Marked ${ids.length} email(s) as read`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to mark emails as read:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to mark emails as read',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeMarkAsRead]);
+
+  const handleBulkMarkUnread = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkMarkRead(ids, false);
+      // Update store - we need to mark as unread
+      storeEmails.forEach(email => {
+        if (ids.includes(email.id)) {
+          useEmailStore.getState().updateEmail(email.id, { isRead: false });
+        }
+      });
+      setSnackbar({
+        open: true,
+        message: `Marked ${ids.length} email(s) as unread`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to mark emails as unread:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to mark emails as unread',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeEmails]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    if (!window.confirm(`Are you sure you want to delete ${ids.length} email(s)?`)) {
+      return;
+    }
+
+    try {
+      await emailApi.bulkDelete(ids);
+      storeBulkDelete(ids);
+      clearSelection();
+      setSnackbar({
+        open: true,
+        message: `Deleted ${ids.length} email(s)`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to delete emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete emails',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeBulkDelete, clearSelection]);
+
+  const handleBulkStar = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkStar(ids, true);
+      storeMarkAsStarred(ids, true);
+      setSnackbar({
+        open: true,
+        message: `Starred ${ids.length} email(s)`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to star emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to star emails',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeMarkAsStarred]);
+
+  const handleBulkUnstar = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkStar(ids, false);
+      storeMarkAsStarred(ids, false);
+      setSnackbar({
+        open: true,
+        message: `Unstarred ${ids.length} email(s)`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to unstar emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to unstar emails',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeMarkAsStarred]);
+
   // Load folders on mount
   useEffect(() => {
     loadFolderMetadata();
@@ -602,12 +731,29 @@ export function Mailbox() {
               </ToggleButtonGroup>
             </Box>
 
+            {/* Bulk Action Bar */}
+            {viewMode === 'list' && (
+              <BulkActionBar
+                selectedCount={selectedIds.size}
+                totalCount={storeEmails.length}
+                onSelectAll={selectAll}
+                onClearSelection={clearSelection}
+                onMarkRead={handleBulkMarkRead}
+                onMarkUnread={handleBulkMarkUnread}
+                onDelete={handleBulkDelete}
+                onStar={handleBulkStar}
+                onUnstar={handleBulkUnstar}
+              />
+            )}
+
             {/* Render appropriate view based on mode */}
             <Box sx={{ flex: 1, overflow: 'hidden' }}>
               {viewMode === 'list' ? (
                 <EmailList
                   emails={storeEmails}
                   selectedEmailId={storeSelectedEmail?.id}
+                  selectedIds={selectedIds}
+                  onToggleSelection={toggleSelection}
                   onEmailClick={handleEmailClick}
                   loading={storeLoading}
                   refreshing={refreshing}
