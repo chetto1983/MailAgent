@@ -313,7 +313,7 @@ export const EmailList: React.FC<EmailListProps> = ({
 
       console.log('[DEBUG EmailList] Rendering row', index, 'style:', JSON.stringify(style), 'email:', email.subject);
       return (
-        <div style={{...style, overflow: 'visible', border: '2px solid red', backgroundColor: 'rgba(255, 0, 0, 0.1)'}} {...ariaAttributes}>
+        <div style={style} {...ariaAttributes}>
           {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
         </div>
       );
@@ -475,22 +475,24 @@ export const EmailList: React.FC<EmailListProps> = ({
             </Typography>
           </Box>
         ) : (
-          <AutoSizer>
-            {({ height, width }) => {
-              console.log('[DEBUG EmailList] AutoSizer dimensions:', { height, width, rowCount: filteredEmails.length });
-              return (
-                <List
-                  style={{ height, width }}
-                  rowComponent={RowComponent}
-                  rowCount={filteredEmails.length}
-                  rowHeight={80}
-                  rowProps={{}}
-                  onRowsRendered={handleRowsRendered}
-                  overscanCount={5}
-                />
-              );
-            }}
-          </AutoSizer>
+          <Box sx={{ height: '100%', width: '100%' }}>
+            <AutoSizer>
+              {({ height, width }) => {
+                console.log('[DEBUG EmailList] AutoSizer dimensions:', { height, width, rowCount: filteredEmails.length });
+                return (
+                  <List
+                    style={{ height, width }}
+                    rowComponent={RowComponent}
+                    rowCount={filteredEmails.length}
+                    rowHeight={80}
+                    rowProps={{}}
+                    onRowsRendered={handleRowsRendered}
+                    overscanCount={5}
+                  />
+                );
+              }}
+            </AutoSizer>
+          </Box>
         )}
       </Box>
     </Paper>
