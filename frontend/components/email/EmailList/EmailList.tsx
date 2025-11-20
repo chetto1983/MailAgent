@@ -437,7 +437,7 @@ export const EmailList: React.FC<EmailListProps> = ({
       </Box>
 
       {/* Email List */}
-      <Box sx={{ flex: 1, overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         {(() => {
           console.log('[DEBUG EmailList] Rendering decision:', {
             loading,
@@ -475,7 +475,7 @@ export const EmailList: React.FC<EmailListProps> = ({
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ height: '100%', width: '100%' }}>
+          <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
             <AutoSizer>
               {({ height, width }) => {
                 console.log('[DEBUG EmailList] AutoSizer dimensions:', { height, width, rowCount: filteredEmails.length });
