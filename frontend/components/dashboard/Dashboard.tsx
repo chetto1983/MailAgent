@@ -29,6 +29,7 @@ import { DashboardCard } from './DashboardCard';
 import { useRouter } from 'next/router';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface Email {
   id: string;
@@ -70,6 +71,7 @@ interface Stats {
 export function Dashboard() {
   const router = useRouter();
   const { user } = useAuth();
+  const t = useTranslations();
   const [_loading, setLoading] = useState(true);
   const [emails, setEmails] = useState<Email[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -140,9 +142,9 @@ export function Dashboard() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 18) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return t.greetings.morning;
+    if (hour < 18) return t.greetings.afternoon;
+    return t.greetings.evening;
   };
 
   const getProviderIcon = (providerType?: string) => {
@@ -158,13 +160,13 @@ export function Dashboard() {
 
   const formatTimeAgo = (date: Date) => {
     const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
-    if (seconds < 60) return 'Just now';
+    if (seconds < 60) return t.timeAgo.justNow;
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 60) return t.timeAgo.minutesAgo.replace('{minutes}', minutes.toString());
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return t.timeAgo.hoursAgo.replace('{hours}', hours.toString());
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return t.timeAgo.daysAgo.replace('{days}', days.toString());
   };
 
   return (
@@ -175,7 +177,7 @@ export function Dashboard() {
           {getGreeting()}, {user?.firstName || user?.email?.split('@')[0] || 'User'}
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          Here&apos;s what&apos;s happening today
+          {t.greetings.subtitle}
         </Typography>
       </Box>
 
@@ -195,25 +197,25 @@ export function Dashboard() {
         {[
           {
             value: stats.unreadEmails,
-            label: 'Unread Emails',
+            label: t.dashboard.home.stats.unreadEmails,
             icon: <Mail size={24} color="white" />,
             color: 'primary.main',
           },
           {
             value: stats.todayEvents,
-            label: "Today's Events",
+            label: t.dashboard.home.stats.todayEvents,
             icon: <Calendar size={24} color="white" />,
             color: 'success.main',
           },
           {
             value: stats.pendingTasks,
-            label: 'Pending Tasks',
+            label: t.dashboard.home.stats.pendingTasks,
             icon: <CheckSquare size={24} color="white" />,
             color: 'warning.main',
           },
           {
             value: stats.totalContacts,
-            label: 'Contacts',
+            label: t.dashboard.home.stats.contacts,
             icon: <Users size={24} color="white" />,
             color: 'info.main',
           },
@@ -261,8 +263,8 @@ export function Dashboard() {
         <Box>
           {/* Upcoming Events */}
           <DashboardCard
-            title="Upcoming Events"
-            subtitle="Your schedule for today"
+            title={t.dashboard.home.sections.upcomingEvents}
+            subtitle={t.dashboard.home.sections.upcomingEventsSubtitle}
             sx={{ mb: 2 }}
           >
             {events.length === 0 ? (
@@ -274,7 +276,7 @@ export function Dashboard() {
               >
                 <Calendar size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
                 <Typography variant="body2" color="text.secondary">
-                  No events scheduled for today
+                  {t.dashboard.home.sections.noEvents}
                 </Typography>
                 <Button
                   variant="contained"
@@ -282,7 +284,7 @@ export function Dashboard() {
                   sx={{ mt: 2 }}
                   onClick={() => router.push('/dashboard/calendar')}
                 >
-                  View Calendar
+                  {t.dashboard.home.sections.viewCalendar}
                 </Button>
               </Box>
             ) : (
@@ -321,7 +323,7 @@ export function Dashboard() {
                         }
                       />
                       <Button size="small" variant="outlined">
-                        Join
+                        {t.common.join}
                       </Button>
                     </ListItemButton>
                   </React.Fragment>
@@ -331,12 +333,12 @@ export function Dashboard() {
           </DashboardCard>
 
           {/* Priority Inbox */}
-          <DashboardCard title="Priority Inbox" subtitle="Starred and important emails">
+          <DashboardCard title={t.dashboard.home.sections.priorityInbox} subtitle={t.dashboard.home.sections.priorityInboxSubtitle}>
             {emails.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 2 }}>
                 <Star size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
                 <Typography variant="body2" color="text.secondary">
-                  No starred emails
+                  {t.dashboard.home.sections.noStarredEmails}
                 </Typography>
               </Box>
             ) : (
@@ -420,7 +422,7 @@ export function Dashboard() {
                 endIcon={<ArrowRight size={18} />}
                 onClick={() => router.push('/dashboard/email')}
               >
-                View All Emails
+                {t.dashboard.home.sections.viewAllEmails}
               </Button>
             </Box>
           </DashboardCard>
@@ -430,8 +432,8 @@ export function Dashboard() {
         <Box>
           {/* AI Insights */}
           <DashboardCard
-            title="AI Insights"
-            subtitle="Smart suggestions for you"
+            title={t.dashboard.home.sections.aiInsights}
+            subtitle={t.dashboard.home.sections.aiInsightsSubtitle}
             sx={{ mb: 2 }}
           >
             <Box
@@ -446,13 +448,15 @@ export function Dashboard() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Sparkles size={20} />
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Smart Reply Ready
+                  {t.dashboard.home.sections.smartReplyReady}
                 </Typography>
               </Box>
               <Typography variant="body2" sx={{ opacity: 0.9 }}>
                 {stats.unreadEmails > 0
-                  ? `You have ${stats.unreadEmails} unread email${stats.unreadEmails > 1 ? 's' : ''} that can be managed with AI assistance.`
-                  : 'All caught up! AI will assist you when new emails arrive.'}
+                  ? (stats.unreadEmails > 1
+                      ? t.dashboard.home.sections.aiAssistMessage.replace('{count}', stats.unreadEmails.toString()).replace('{plural}', 's')
+                      : t.dashboard.home.sections.aiAssistMessageSingular.replace('{count}', stats.unreadEmails.toString()))
+                  : t.common.allCaughtUp}
               </Typography>
               <Button
                 variant="contained"
@@ -467,7 +471,7 @@ export function Dashboard() {
                 }}
                 onClick={() => router.push('/dashboard/ai')}
               >
-                View Suggestions
+                {t.dashboard.home.sections.viewSuggestions}
               </Button>
             </Box>
 
@@ -475,7 +479,7 @@ export function Dashboard() {
               <>
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Inbox Status
+                    {t.dashboard.home.sections.inboxStatus}
                   </Typography>
                   <LinearProgress
                     variant="determinate"
@@ -487,7 +491,7 @@ export function Dashboard() {
                     }}
                   />
                   <Typography variant="caption" color="text.secondary">
-                    {stats.unreadEmails} unread - Keep going!
+                    {t.dashboard.home.sections.inboxStatusMessage.replace('{count}', stats.unreadEmails.toString())}
                   </Typography>
                 </Box>
 
@@ -497,7 +501,7 @@ export function Dashboard() {
 
             <Box>
               <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                Quick Actions
+                {t.dashboard.home.sections.quickActions}
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <Button
@@ -506,7 +510,7 @@ export function Dashboard() {
                   startIcon={<TrendingUp size={18} />}
                   onClick={() => router.push('/dashboard/ai')}
                 >
-                  Analyze Inbox
+                  {t.dashboard.home.sections.analyzeInbox}
                 </Button>
                 <Button
                   variant="outlined"
@@ -514,18 +518,18 @@ export function Dashboard() {
                   startIcon={<Sparkles size={18} />}
                   onClick={() => router.push('/dashboard/ai')}
                 >
-                  Smart Compose
+                  {t.dashboard.home.sections.smartCompose}
                 </Button>
               </Box>
             </Box>
           </DashboardCard>
 
           {/* Recent Connections */}
-          <DashboardCard title="Recent Connections" subtitle="Latest contacts">
+          <DashboardCard title={t.dashboard.home.sections.recentConnections} subtitle={t.dashboard.home.sections.recentConnectionsSubtitle}>
             {contacts.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 2 }}>
                 <Typography variant="body2" color="text.secondary">
-                  No recent contacts
+                  {t.dashboard.home.sections.noRecentContacts}
                 </Typography>
               </Box>
             ) : (
@@ -560,7 +564,7 @@ export function Dashboard() {
                 endIcon={<ArrowRight size={18} />}
                 onClick={() => router.push('/dashboard/contacts')}
               >
-                View All
+                {t.common.viewAll}
               </Button>
             </Box>
           </DashboardCard>
