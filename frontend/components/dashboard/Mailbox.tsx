@@ -899,6 +899,7 @@ export function Mailbox() {
               ) : (
                 <ConversationList
                   providerId={activeFolder?.providerId}
+                  folder={activeFolder?.filterFolder || activeFolder?.queryOverrides?.folder}
                   selectedThreadId={selectedThreadId || undefined}
                   onSelectConversation={handleConversationSelect}
                   onRefresh={handleRefresh}

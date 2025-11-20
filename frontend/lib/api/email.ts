@@ -391,11 +391,12 @@ export const emailApi = {
    * Get conversations (threaded view of all emails)
    * GET /emails/conversations
    */
-  getConversations(params?: { page?: number; limit?: number; providerId?: string }) {
+  getConversations(params?: { page?: number; limit?: number; providerId?: string; folder?: string }) {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.providerId) queryParams.append('providerId', params.providerId);
+    if (params?.folder) queryParams.append('folder', params.folder);
 
     const query = queryParams.toString();
     return apiClient.get<ConversationsResponse>(

@@ -559,18 +559,23 @@ export class EmailsService {
   async getConversations(params: {
     tenantId: string;
     providerId?: string;
+    folder?: string;
     page?: number;
     limit?: number;
   }) {
-    const { tenantId, providerId, page = 1, limit = 50 } = params;
+    const { tenantId, providerId, folder, page = 1, limit = 50 } = params;
     const skip = (page - 1) * limit;
 
-    // Get all non-deleted emails, excluding TRASH and SPAM
+    // Get all non-deleted emails
     const where: Prisma.EmailWhereInput = {
       tenantId,
       ...(providerId && { providerId }),
       isDeleted: false,
-      folder: { notIn: ['TRASH', 'SPAM'] },
+      // If folder is specified, filter by it; otherwise exclude TRASH and SPAM
+      ...(folder
+        ? { folder }
+        : { folder: { notIn: ['TRASH', 'SPAM'] } }
+      ),
     };
 
     // Get emails grouped by thread - find the latest email in each thread
