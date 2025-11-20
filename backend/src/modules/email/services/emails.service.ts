@@ -117,6 +117,9 @@ export class EmailsService {
       }),
     ]);
 
+    // Debug: log what we're returning
+    this.logger.debug(`[listEmails] Returning ${emails.length} emails (total: ${total}) for tenantId=${tenantId}, providerId=${providerId || 'all'}, folder=${filters.folder || 'none'}`);
+
     return {
       emails,
       pagination: {
