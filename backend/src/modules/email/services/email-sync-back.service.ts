@@ -5,6 +5,7 @@ import { GoogleOAuthService } from '../../providers/services/google-oauth.servic
 import { MicrosoftOAuthService } from '../../providers/services/microsoft-oauth.service';
 import { google } from 'googleapis';
 import { Client } from '@microsoft/microsoft-graph-client';
+import { ImapFlow } from 'imapflow';
 
 export interface EmailSyncOperation {
   emailId: string;
@@ -107,8 +108,7 @@ export class EmailSyncBackService {
           await this.syncToMicrosoft(operation, accessToken);
           break;
         case 'IMAP':
-          // IMAP sync would go here
-          this.logger.warn('IMAP bidirectional sync not yet implemented');
+          await this.syncToImap(operation, provider);
           break;
         default:
           this.logger.warn(`Unsupported provider type: ${provider.providerType}`);
@@ -346,6 +346,141 @@ export class EmailSyncBackService {
       case 'hardDelete':
         await client.api(`/me/messages/${operation.externalId}`).delete();
         break;
+    }
+  }
+
+  /**
+   * Sync operation to IMAP server
+   * Implements write operations for IMAP providers
+   */
+  private async syncToImap(operation: EmailSyncOperation, provider: any): Promise<void> {
+    let client: ImapFlow | null = null;
+
+    try {
+      // Decrypt IMAP credentials
+      const imapPassword = this.crypto.decrypt(
+        provider.imapPassword,
+        provider.imapEncryptionIv,
+      );
+
+      // Connect to IMAP server
+      client = new ImapFlow({
+        host: provider.imapHost,
+        port: provider.imapPort || 993,
+        secure: provider.imapUseTls ?? true,
+        auth: {
+          user: provider.imapUsername,
+          pass: imapPassword,
+        },
+        logger: false, // Disable verbose logging
+      });
+
+      await client.connect();
+      this.logger.log(`📧 Connected to IMAP server: ${provider.imapHost}`);
+
+      // Parse external message ID (UID)
+      const uid = parseInt(operation.externalId, 10);
+      if (isNaN(uid)) {
+        throw new Error(`Invalid IMAP UID: ${operation.externalId}`);
+      }
+
+      // Get current folder from email record
+      const email = await this.prisma.email.findUnique({
+        where: { id: operation.emailId },
+        select: { folder: true },
+      });
+      const currentFolder = email?.folder || 'INBOX';
+
+      // Open mailbox
+      await client.mailboxOpen(currentFolder);
+
+      // Execute operation based on type
+      switch (operation.operation) {
+        case 'markRead':
+          await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
+          this.logger.log(`✅ IMAP: Marked message ${uid} as read`);
+          break;
+
+        case 'markUnread':
+          await client.messageFlagsRemove({ uid }, ['\\Seen'], { uid: true });
+          this.logger.log(`✅ IMAP: Marked message ${uid} as unread`);
+          break;
+
+        case 'star':
+          await client.messageFlagsAdd({ uid }, ['\\Flagged'], { uid: true });
+          this.logger.log(`✅ IMAP: Starred message ${uid}`);
+          break;
+
+        case 'unstar':
+          await client.messageFlagsRemove({ uid }, ['\\Flagged'], { uid: true });
+          this.logger.log(`✅ IMAP: Unstarred message ${uid}`);
+          break;
+
+        case 'delete':
+          // Mark as deleted and expunge
+          await client.messageFlagsAdd({ uid }, ['\\Deleted'], { uid: true });
+          await client.mailboxClose();
+          await client.mailboxOpen(currentFolder);
+          this.logger.log(`✅ IMAP: Deleted message ${uid}`);
+          break;
+
+        case 'moveToFolder':
+          if (!operation.folder) {
+            throw new Error('Target folder not specified for move operation');
+          }
+
+          // Map folder names to IMAP folders
+          const folderMap: Record<string, string> = {
+            'INBOX': 'INBOX',
+            'SENT': 'Sent',
+            'DRAFTS': 'Drafts',
+            'TRASH': 'Trash',
+            'SPAM': 'Spam',
+            'JUNK': 'Junk',
+          };
+
+          const targetFolder = folderMap[operation.folder] || operation.folder;
+
+          // Use MOVE command if supported, otherwise COPY + DELETE
+          try {
+            await client.messageMove({ uid }, targetFolder, { uid: true });
+            this.logger.log(`✅ IMAP: Moved message ${uid} to ${targetFolder}`);
+          } catch (moveError) {
+            // Fallback to COPY + DELETE
+            this.logger.warn(`MOVE not supported, using COPY + DELETE fallback`);
+            await client.messageCopy({ uid }, targetFolder, { uid: true });
+            await client.messageFlagsAdd({ uid }, ['\\Deleted'], { uid: true });
+            await client.mailboxClose();
+            await client.mailboxOpen(currentFolder);
+            this.logger.log(`✅ IMAP: Moved message ${uid} to ${targetFolder} (via COPY+DELETE)`);
+          }
+          break;
+
+        case 'hardDelete':
+          // Permanent deletion with expunge
+          await client.messageFlagsAdd({ uid }, ['\\Deleted'], { uid: true });
+          await client.mailboxClose();
+          await client.mailboxOpen(currentFolder);
+          this.logger.log(`✅ IMAP: Hard deleted message ${uid}`);
+          break;
+
+        default:
+          this.logger.warn(`Unsupported IMAP operation: ${operation.operation}`);
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.logger.error(`❌ IMAP operation failed: ${err.message}`, err.stack);
+      throw error;
+    } finally {
+      // Always close connection
+      if (client) {
+        try {
+          await client.logout();
+          this.logger.log(`🔌 Disconnected from IMAP server`);
+        } catch (logoutError) {
+          this.logger.warn(`Failed to logout from IMAP: ${logoutError}`);
+        }
+      }
     }
   }
 
