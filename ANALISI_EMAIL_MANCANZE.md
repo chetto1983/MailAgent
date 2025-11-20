@@ -1,8 +1,9 @@
 # Analisi Completa: Funzionalità Mancanti nel Sistema Email
 
-**Data Analisi**: 2025-11-20
-**Versione**: 1.0
+**Data Analisi**: 2025-11-20 (Aggiornato)
+**Versione**: 1.1
 **Branch**: claude/fix-build-errors-after-merge-01Qnu6vRr2Y96WPtMm1ca6sp
+**Ultimo Aggiornamento**: Aggiunta analisi Drag & Drop
 
 ---
 
@@ -20,6 +21,7 @@ Il sistema email di MailAgent ha raggiunto un buon livello di funzionalità base
 - ⚠️ **Analytics**: API parziale, **UI mancante**
 - ❌ **Conversation View**: Endpoint disponibile, **non utilizzato**
 - ❌ **Bulk Operations**: Backend pronto, **UI limitata**
+- ❌ **Drag and Drop**: Hook pronto, **UI mancante** ⭐ NUOVO
 
 ---
 
@@ -178,9 +180,204 @@ handleBulkDelete(emailIds)  // Disponibile ma UI mancante
 
 ---
 
+### 5. Drag and Drop Email Organization (Backend ✅ / UI ❌)
+
+**Status**: API e hook pronti, **UI mancante completamente**
+
+**Backend Disponibile**:
+```typescript
+// Hook già implementato
+useEmailActions.handleMoveToFolder(emailIds, folderId)  // PRONTO
+
+// API già implementata
+emailApi.updateEmail(id, { folder })  // PATCH /emails/:id
+```
+
+**File Coinvolti**:
+- `frontend/hooks/use-email-actions.ts:155-169` - Hook moveToFolder
+- `frontend/components/email/EmailList/EmailListItem.tsx` - Source draggable
+- `frontend/components/email/EmailSidebar/EmailSidebar.tsx` - Target droppable
+
+**Cosa Manca**:
+- [ ] Rendere EmailListItem draggable (HTML5 Drag API o react-beautiful-dnd)
+- [ ] Rendere folder items droppable in EmailSidebar
+- [ ] Visual feedback durante drag (ghost image, hover state)
+- [ ] Drop zones con highlight on drag over
+- [ ] Multi-select drag (drag multiple selected emails)
+- [ ] Undo/redo dopo drop
+- [ ] Animazione smooth dopo drop
+- [ ] Keyboard shortcuts per drag (Ctrl+X, Ctrl+V)
+- [ ] Drag to labels (oltre che folders)
+- [ ] Mobile touch drag support
+
+**Opzioni Implementazione**:
+
+**Opzione 1: HTML5 Drag and Drop API** (Nativo)
+```typescript
+// EmailListItem.tsx
+<ListItemButton
+  draggable
+  onDragStart={(e) => {
+    e.dataTransfer.setData('emailId', email.id);
+    e.dataTransfer.effectAllowed = 'move';
+  }}
+>
+
+// EmailSidebar - Folder Item
+<ListItemButton
+  onDragOver={(e) => e.preventDefault()}
+  onDrop={(e) => {
+    const emailId = e.dataTransfer.getData('emailId');
+    handleMoveToFolder([emailId], folder.id);
+  }}
+>
+```
+
+**Pro**:
+- Zero dependencies
+- Performance nativa
+- Supporto browser moderno
+**Contro**:
+- Più codice boilerplate
+- Styling custom più complesso
+
+**Opzione 2: @dnd-kit/core** (Raccomandato)
+```typescript
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+
+// Migliore performance vs react-beautiful-dnd
+// Typescript first
+// Accessibility built-in
+```
+
+**Pro**:
+- API moderna e TypeScript-first
+- Accessibility automatica
+- Multi-touch support
+- Ottima performance
+**Contro**:
+- Dependency aggiuntiva (~30KB)
+
+**Opzione 3: react-beautiful-dnd**
+**Pro**: Molto popolare
+**Contro**: Non più mantenuto attivamente, deprecated
+
+**Raccomandazione**: **@dnd-kit/core**
+
+**Implementazione Consigliata**:
+
+**Step 1**: Install dependency
+```bash
+npm install @dnd-kit/core @dnd-kit/utilities
+```
+
+**Step 2**: Setup DndContext in Mailbox.tsx
+```typescript
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
+
+<DndContext onDragEnd={handleDragEnd}>
+  <EmailLayout
+    sidebar={...}
+    list={...}
+  />
+</DndContext>
+
+function handleDragEnd(event: DragEndEvent) {
+  const { active, over } = event;
+  if (over && active.id !== over.id) {
+    // active.id = emailId
+    // over.id = folderId
+    handleMoveToFolder([active.id as string], over.id as string);
+  }
+}
+```
+
+**Step 3**: Make EmailListItem draggable
+```typescript
+import { useDraggable } from '@dnd-kit/core';
+
+const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  id: email.id,
+  data: { type: 'email', email },
+});
+
+<ListItemButton
+  ref={setNodeRef}
+  {...listeners}
+  {...attributes}
+  sx={{
+    transform: transform
+      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+      : undefined,
+    opacity: isDragging ? 0.5 : 1,
+  }}
+>
+```
+
+**Step 4**: Make Sidebar folders droppable
+```typescript
+import { useDroppable } from '@dnd-kit/core';
+
+const { setNodeRef, isOver } = useDroppable({
+  id: folder.id,
+  data: { type: 'folder', folder },
+});
+
+<ListItemButton
+  ref={setNodeRef}
+  sx={{
+    bgcolor: isOver ? 'action.hover' : 'transparent',
+    borderLeft: isOver ? '4px solid primary.main' : 'none',
+  }}
+>
+```
+
+**Visual Feedback**:
+- Dragging email: Semi-transparent con ghost image
+- Hover folder: Highlight con border colorato
+- Drop animation: Smooth fade out
+- Success snackbar: "Email moved to {folder} ✓"
+
+**Keyboard Support** (da @dnd-kit):
+- Space: Pick up / Drop
+- Arrow keys: Navigate drop zones
+- Escape: Cancel drag
+
+**Multi-select Drag**:
+```typescript
+// Se email è parte di selezione multipla
+const emailsToMove = multiSelected.length > 0
+  ? multiSelected
+  : [emailId];
+
+handleMoveToFolder(emailsToMove, folderId);
+```
+
+**Impatto**: **ALTO** - Feature UX standard in tutti i client email moderni
+
+**Effort**: 1-2 giorni
+- Setup @dnd-kit: 2 ore
+- EmailListItem draggable: 2 ore
+- Sidebar droppable: 2 ore
+- Visual feedback & animations: 2 ore
+- Multi-select drag: 2 ore
+- Testing & polish: 2 ore
+
+**ROI**: **Molto Alto** - Drammatico miglioramento UX con backend già pronto
+
+**Dependencies**:
+```json
+{
+  "@dnd-kit/core": "^6.1.0",
+  "@dnd-kit/utilities": "^3.2.2"
+}
+```
+
+---
+
 ## 🟡 PRIORITÀ MEDIA - Miglioramenti Funzionali
 
-### 5. Analytics Dashboard (API Parziale ⚠️ / UI ❌)
+### 6. Analytics Dashboard (API Parziale ⚠️ / UI ❌)
 
 **File API**: `frontend/lib/api/analytics.ts` (89 righe)
 
@@ -451,14 +648,16 @@ emailApi.deleteDraft(id)       // DELETE /emails/drafts/:id
 |-----------|----------------|--------------|----------|----------|-----------------|
 | **Email Base** | 10 | 8 | 2 | 0 | 80% |
 | **AI Features** | 4 | 3 | 0 | 1 | 75% |
-| **Organization** | 6 | 0 | 1 | 5 | 8% |
+| **Organization** | 7 | 0 | 1 | 6 | 7% |
 | **Calendar** | 5 | 0 | 0 | 5 | 0% |
 | **Analytics** | 4 | 1 | 1 | 2 | 25% |
 | **Automation** | 3 | 0 | 0 | 3 | 0% |
 | **Contacts** | 1 | 0 | 0 | 1 | 0% |
 | **Productivity** | 7 | 1 | 1 | 5 | 14% |
 
-**Overall**: 40 feature totali, 13 implementate, 5 parziali, 22 mancanti = **32.5% completamento**
+**Overall**: **41 feature totali**, 13 implementate, 5 parziali, **23 mancanti** = **31.7% completamento**
+
+**⭐ AGGIORNAMENTO**: Aggiunto Drag and Drop come priorità ALTA (+1 Organization feature)
 
 ---
 
@@ -470,17 +669,20 @@ emailApi.deleteDraft(id)       // DELETE /emails/drafts/:id
    - Label management dialog
    - Assign/remove labels
    - Filter by label
-2. **Conversation View** (1 giorno)
+2. **Drag and Drop** (1-2 giorni) **⭐ NUOVO**
+   - Install @dnd-kit/core
+   - EmailListItem draggable
+   - Sidebar folders droppable
+   - Visual feedback & animations
+   - Multi-select drag support
+3. **Conversation View** (1 giorno)
    - Toggle view mode
    - Conversation list
-3. **Bulk Operations** (1 giorno)
+4. **Bulk Operations** (1 giorno)
    - Selection UI
    - Bulk toolbar
-4. **Drafts Management** (1 giorno)
-   - Drafts folder
-   - Resume draft
 
-**Output**: Sistema email completo per produzione base
+**Output**: Sistema email production-ready con UX moderna
 
 ---
 
@@ -555,6 +757,7 @@ frontend/hooks/use-email-actions.ts            ✅ handleBulkDelete  ❌ UI manc
 
 ### 1. Prioritizzare Quick Wins
 - **Labels System**: Alto impatto, effort basso, API pronta
+- **Drag and Drop**: ⭐ **Massimo ROI** - UX standard, hook pronto, 1-2 giorni
 - **Conversation View**: Standard di mercato, effort basso
 - **Bulk Operations**: UX improvement significativo, effort basso
 
@@ -573,6 +776,7 @@ frontend/hooks/use-email-actions.ts            ✅ handleBulkDelete  ❌ UI manc
 ### 5. Separare Frontend/Backend Work
 Molte feature richiedono solo frontend:
 - Labels: **solo UI** (API pronta)
+- Drag and Drop: **solo UI** ⭐ (hook pronto, API pronta)
 - Conversation View: **solo UI** (endpoint pronto)
 - Bulk Operations: **solo UI** (hook pronto)
 - RAG Search: **solo UI** (API pronta)
@@ -590,6 +794,7 @@ Feature che richiedono backend:
 
 ### Must-Have (Blockers)
 - [ ] Labels System completo
+- [ ] **Drag and Drop email organization** ⭐ NUOVO
 - [ ] Conversation View
 - [ ] Bulk selection & actions
 - [ ] Draft management UI
@@ -626,21 +831,26 @@ Il sistema email di MailAgent ha una **solida base tecnica** con:
 
 **Gap principali**:
 1. **Labels** - Backend pronto, UI mancante (CRITICO)
-2. **Conversation View** - Endpoint disponibile, non usato (ALTO)
-3. **Calendar** - API completa, zero integrazione (ALTO)
-4. **Bulk Operations** - Hook pronti, UI limitata (MEDIO)
-5. **Analytics** - Infrastruttura parziale (MEDIO)
+2. **Drag and Drop** ⭐ - Hook pronto, UI mancante (ALTO, Quick Win)
+3. **Conversation View** - Endpoint disponibile, non usato (ALTO)
+4. **Calendar** - API completa, zero integrazione (ALTO)
+5. **Bulk Operations** - Hook pronti, UI limitata (MEDIO)
+6. **Analytics** - Infrastruttura parziale (MEDIO)
 
 **Stima effort per production-ready**: 3-4 settimane
-- Sprint 1: Labels, Conversations, Bulk (1 sett)
+- Sprint 1: Labels, **Drag & Drop**, Conversations, Bulk (1 sett)
 - Sprint 2: RAG, Analytics (1 sett)
 - Sprint 3-4: Calendar, Templates (2 sett)
 
-**Next Step Immediato**: Implementare Labels System (2 giorni, massimo ROI)
+**Next Steps Immediati** (in parallelo):
+1. **Drag and Drop** (1-2 giorni, massimo ROI UX)
+2. **Labels System** (2 giorni, organizzazione critica)
 
 ---
 
 **Documento generato da**: Claude Code Analysis
-**Ultima modifica**: 2025-11-20
-**File analizzati**: 15+
-**Linee di codice analizzate**: 5000+
+**Ultima modifica**: 2025-11-20 (v1.1 - Aggiunto Drag & Drop)
+**File analizzati**: 18+
+**Linee di codice analizzate**: 6000+
+**Feature Totali**: 41 (aggiunto Drag and Drop)
+**Priorità Alta Feature**: 5 (Labels, Drag & Drop, Conversation, Calendar, Bulk Ops)
