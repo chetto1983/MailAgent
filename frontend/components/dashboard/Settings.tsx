@@ -87,11 +87,11 @@ export function Settings() {
       setProviders(response || []);
     } catch (error) {
       console.error('Failed to load providers:', error);
-      setProviderError('Failed to load providers. Please try again.');
+      setProviderError(t.dashboard.settings.mailAccountsPanel.loadError);
     } finally {
       setProvidersLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadProviders();
@@ -132,20 +132,20 @@ export function Settings() {
 
   const handleProviderInitiated = useCallback(() => {
     setProviderError('');
-    setProviderSuccess('Redirecting to provider. Complete the authorization flow to finish connecting.');
-  }, []);
+    setProviderSuccess(t.dashboard.settings.mailAccountsPanel.connectRedirect);
+  }, [t]);
 
   const handleProviderConnected = useCallback(() => {
     setProviderError('');
-    setProviderSuccess('Provider connected successfully!');
+    setProviderSuccess(t.dashboard.settings.mailAccountsPanel.connectSuccess);
     loadProviders();
-  }, [loadProviders]);
+  }, [loadProviders, t]);
 
   const handleProviderDeleted = useCallback(() => {
     setProviderError('');
-    setProviderSuccess('Provider disconnected successfully!');
+    setProviderSuccess(t.dashboard.settings.mailAccountsPanel.disconnectSuccess);
     loadProviders();
-  }, [loadProviders]);
+  }, [loadProviders, t]);
 
   // Handle success/error messages from OAuth callback page
   useEffect(() => {
@@ -157,7 +157,7 @@ export function Settings() {
 
     if (success) {
       setSelectedSection('accounts');
-      setProviderSuccess('Provider connected successfully!');
+      setProviderSuccess(t.dashboard.settings.mailAccountsPanel.connectSuccess);
       setProviderError('');
       loadProviders();
 
@@ -181,7 +181,7 @@ export function Settings() {
         { shallow: true },
       );
     }
-  }, [router, loadProviders]);
+  }, [router, loadProviders, t]);
 
   const generalCopy = settingsCopy.generalPanel;
   const aiCopy = settingsCopy.aiPanel;
@@ -202,10 +202,10 @@ export function Settings() {
         emailNotifications,
       });
 
-      alert('Settings saved successfully');
+      alert(t.dashboard.settings.mailAccountsPanel.saveSuccess);
     } catch (error) {
       console.error('Failed to save settings:', error);
-      alert('Failed to save settings');
+      alert(t.dashboard.settings.mailAccountsPanel.saveError);
     } finally {
       setSaveLoading(false);
     }

@@ -66,6 +66,8 @@ export class GoogleContactsSyncService {
       let newContacts = 0;
       let updatedContacts = 0;
       let pageToken: string | undefined;
+      const createdContactIds: string[] = [];
+      const updatedContactIds: string[] = [];
 
       do {
         const response = await peopleService.people.connections.list({
@@ -80,20 +82,15 @@ export class GoogleContactsSyncService {
 
         for (const person of connections) {
           try {
-            await this.processContact(provider, person);
+            const result = await this.processContact(provider, person);
             contactsProcessed++;
 
-            const existingContact = await this.prisma.contact.findFirst({
-              where: {
-                providerId: provider.id,
-                externalId: person.resourceName!,
-              },
-            });
-
-            if (existingContact) {
-              updatedContacts++;
-            } else {
+            if (result.isNew) {
               newContacts++;
+              createdContactIds.push(result.contactId);
+            } else {
+              updatedContacts++;
+              updatedContactIds.push(result.contactId);
             }
           } catch (error: any) {
             this.logger.error(`Error processing contact: ${error.message}`);
@@ -102,6 +99,12 @@ export class GoogleContactsSyncService {
 
         pageToken = response.data.nextPageToken || undefined;
       } while (pageToken);
+
+      // Send bulk notifications after processing all contacts
+      this.notifyContactsBulk(provider.tenantId, provider.id, {
+        created: createdContactIds,
+        updated: updatedContactIds,
+      });
 
       const syncDuration = Date.now() - startTime;
       this.logger.log(
@@ -121,7 +124,7 @@ export class GoogleContactsSyncService {
   private async processContact(
     provider: any,
     person: people_v1.Schema$Person,
-  ): Promise<void> {
+  ): Promise<{ contactId: string; isNew: boolean }> {
     const externalId = person.resourceName!;
 
     // Extract contact data
@@ -208,18 +211,11 @@ export class GoogleContactsSyncService {
       },
     });
 
-    // Emit events for contact creation or update
-    if (!existingContact) {
-      this.notifyContactChange(provider.tenantId, provider.id, 'contact-created', {
-        contactId: upsertedContact.id,
-        externalId,
-      });
-    } else {
-      this.notifyContactChange(provider.tenantId, provider.id, 'contact-updated', {
-        contactId: upsertedContact.id,
-        externalId,
-      });
-    }
+    // Return contact metadata for bulk notification
+    return {
+      contactId: upsertedContact.id,
+      isNew: !existingContact,
+    };
   }
 
   /**
@@ -333,6 +329,44 @@ export class GoogleContactsSyncService {
     oauth2Client.setCredentials({ access_token: accessToken });
 
     return google.people({ version: 'v1', auth: oauth2Client });
+  }
+
+  /**
+   * Notify bulk contact changes via WebSocket
+   */
+  private notifyContactsBulk(
+    tenantId: string,
+    providerId: string,
+    payload: { created: string[]; updated: string[] },
+  ): void {
+    try {
+      // Emit bulk notifications for created contacts
+      if (payload.created.length > 0) {
+        payload.created.forEach((contactId) => {
+          this.realtimeEvents.emitContactNew(tenantId, {
+            providerId,
+            reason: 'contact-created',
+            contactId,
+          });
+        });
+        this.logger.debug(`Emitted ${payload.created.length} contact-created events for provider ${providerId}`);
+      }
+
+      // Emit bulk notifications for updated contacts
+      if (payload.updated.length > 0) {
+        payload.updated.forEach((contactId) => {
+          this.realtimeEvents.emitContactUpdate(tenantId, {
+            providerId,
+            reason: 'contact-updated',
+            contactId,
+          });
+        });
+        this.logger.debug(`Emitted ${payload.updated.length} contact-updated events for provider ${providerId}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Failed to emit bulk contact events for ${tenantId}: ${message}`);
+    }
   }
 
   /**
