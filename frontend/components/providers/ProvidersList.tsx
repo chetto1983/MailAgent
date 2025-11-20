@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
 import { Box, Stack, Typography, Divider } from '@mui/material';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+} from '@mui/material';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,18 +24,25 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
   const providersCopy = translations.dashboard.providers;
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [providerToDelete, setProviderToDelete] = useState<{ id: string; email: string } | null>(null);
 
-  const handleDelete = async (id: string, email: string) => {
-    if (!confirm(providersCopy.deleteConfirm.replace('{email}', email))) {
-      return;
-    }
+  const openDeleteDialog = (id: string, email: string) => {
+    setProviderToDelete({ id, email });
+    setDeleteDialogOpen(true);
+  };
 
-    setDeletingId(id);
+  const handleDelete = async () => {
+    if (!providerToDelete) return;
+
+    setDeletingId(providerToDelete.id);
     setError('');
 
     try {
-      await providersApi.deleteProvider(id);
+      await providersApi.deleteProvider(providerToDelete.id);
       onDelete();
+      setDeleteDialogOpen(false);
+      setProviderToDelete(null);
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(error.response?.data?.message || 'Failed to delete provider');
@@ -238,7 +252,7 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
                   variant="outlined"
                   color="error"
                   size="small"
-                  onClick={() => handleDelete(provider.id, provider.email)}
+                  onClick={() => openDeleteDialog(provider.id, provider.email)}
                   disabled={deletingId === provider.id}
                 >
                   {deletingId === provider.id ? providersCopy.disconnecting : providersCopy.disconnect}
@@ -248,6 +262,34 @@ export function ProvidersList({ providers, onDelete }: ProvidersListProps) {
           </CardContent>
         </Card>
       ))}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>{providersCopy.deleteConfirm.replace('{email}', providerToDelete?.email || '')}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will disconnect the provider and stop syncing. You can reconnect it later.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deletingId !== null}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDelete}
+            color="error"
+            variant="contained"
+            disabled={deletingId !== null}
+          >
+            {deletingId !== null ? providersCopy.disconnecting : providersCopy.disconnect}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

@@ -28,6 +28,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Snackbar,
+  Alert as MuiAlert,
+  DialogContentText,
 } from '@mui/material';
 import {
   Search,
@@ -110,6 +113,17 @@ export function Contacts() {
   });
   const [actionLoading, setActionLoading] = useState(false);
   const selectedContactIdRef = useRef<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
 
   useEffect(() => {
     selectedContactIdRef.current = selectedContact?.id ?? null;
@@ -196,7 +210,11 @@ export function Contacts() {
 
   const handleSubmitContact = async () => {
     if (!contactForm.providerId) {
-      alert(contactsCopy.alerts.selectProvider);
+      setSnackbar({
+        open: true,
+        message: contactsCopy.alerts.selectProvider,
+        severity: 'warning',
+      });
       return;
     }
 
@@ -227,25 +245,54 @@ export function Contacts() {
 
       await loadContacts();
       setContactDialogOpen(false);
+      setSnackbar({
+        open: true,
+        message: contactDialogMode === 'create'
+          ? `${contactsCopy.createDialog.create} ✓`
+          : contactsCopy.editDialog.success,
+        severity: 'success',
+      });
     } catch (error) {
       console.error('Failed to save contact:', error);
-      alert(contactsCopy.alerts.failedToSave);
+      setSnackbar({
+        open: true,
+        message: contactsCopy.alerts.failedToSave,
+        severity: 'error',
+      });
     } finally {
       setActionLoading(false);
     }
   };
 
+  const openDeleteDialog = (contact: Contact) => {
+    setContactToDelete(contact);
+    setDeleteDialogOpen(true);
+  };
+
   const handleDeleteContact = async () => {
-    if (!selectedContact) return;
-    if (!confirm(contactsCopy.alerts.deleteConfirmDescription)) return;
+    if (!contactToDelete) return;
 
     try {
       setActionLoading(true);
-      await contactsApi.deleteContact(selectedContact.id);
+      await contactsApi.deleteContact(contactToDelete.id);
       await loadContacts();
+      setDeleteDialogOpen(false);
+      setContactToDelete(null);
+      if (selectedContact?.id === contactToDelete.id) {
+        setSelectedContact(null);
+      }
+      setSnackbar({
+        open: true,
+        message: contactsCopy.alerts.deleteSuccess,
+        severity: 'success',
+      });
     } catch (error) {
       console.error('Failed to delete contact:', error);
-      alert(contactsCopy.alerts.deleteError);
+      setSnackbar({
+        open: true,
+        message: contactsCopy.alerts.deleteError,
+        severity: 'error',
+      });
     } finally {
       setActionLoading(false);
     }
@@ -408,7 +455,11 @@ export function Contacts() {
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Delete">
-                  <IconButton size="small" onClick={handleDeleteContact} disabled={actionLoading}>
+                  <IconButton
+                    size="small"
+                    onClick={() => selectedContact && openDeleteDialog(selectedContact)}
+                    disabled={actionLoading}
+                  >
                     <Trash2 size={18} />
                   </IconButton>
                 </Tooltip>
@@ -677,6 +728,51 @@ export function Contacts() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>{contactsCopy.alerts.deleteConfirmTitle}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {contactsCopy.alerts.deleteConfirmDescription}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={actionLoading}>
+            {contactsCopy.createDialog.cancel}
+          </Button>
+          <Button
+            onClick={handleDeleteContact}
+            color="error"
+            variant="contained"
+            disabled={actionLoading}
+          >
+            {contactsCopy.alerts.deleteConfirmTitle}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 }

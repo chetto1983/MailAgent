@@ -22,6 +22,8 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   CircularProgress,
+  Snackbar,
+  Alert as MuiAlert,
 } from '@mui/material';
 import {
   ChevronLeft,
@@ -84,6 +86,15 @@ export function Calendar() {
     end: '',
     calendar: 'work',
     description: '',
+  });
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info',
   });
 
   const updateCalendarHeader = useCallback(() => {
@@ -246,7 +257,11 @@ export function Calendar() {
       : providers.find(p => p.supportsCalendar);
 
     if (!provider) {
-      alert(calendarCopy.noProviderAlert);
+      setSnackbar({
+        open: true,
+        message: calendarCopy.noProviderAlert,
+        severity: 'warning',
+      });
       return;
     }
 
@@ -275,9 +290,18 @@ export function Calendar() {
         calendar: 'work',
         description: '',
       });
+      setSnackbar({
+        open: true,
+        message: `${calendarCopy.saveEvent} ✓`,
+        severity: 'success',
+      });
     } catch (error) {
       console.error('Failed to create event:', error);
-      alert(calendarCopy.failedToCreateEvent);
+      setSnackbar({
+        open: true,
+        message: calendarCopy.failedToCreateEvent,
+        severity: 'error',
+      });
     }
   };
 
@@ -289,7 +313,11 @@ export function Calendar() {
       : providers.find((p) => p.supportsCalendar);
 
     if (!provider) {
-      alert(calendarCopy.noProviderAlert);
+      setSnackbar({
+        open: true,
+        message: calendarCopy.noProviderAlert,
+        severity: 'warning',
+      });
       return;
     }
 
@@ -309,9 +337,18 @@ export function Calendar() {
 
       setQuickEventText('');
       await loadData();
+      setSnackbar({
+        open: true,
+        message: `${calendarCopy.saveEvent} ✓`,
+        severity: 'success',
+      });
     } catch (error) {
       console.error('Failed to create quick event:', error);
-      alert(calendarCopy.failedToCreateQuickEvent);
+      setSnackbar({
+        open: true,
+        message: calendarCopy.failedToCreateQuickEvent,
+        severity: 'error',
+      });
     }
   };
 
@@ -607,6 +644,23 @@ export function Calendar() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MuiAlert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 }
