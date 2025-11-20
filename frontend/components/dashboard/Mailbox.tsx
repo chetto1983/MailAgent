@@ -649,6 +649,13 @@ export function Mailbox() {
     loadFolderMetadata();
   }, [loadFolderMetadata]);
 
+  // Auto-select first folder when folders are loaded
+  useEffect(() => {
+    if (!selectedFolderId && combinedFolders.length > 0) {
+      setSelectedFolderId(combinedFolders[0].id);
+    }
+  }, [combinedFolders, selectedFolderId]);
+
   // Load emails when folder ID changes (not activeFolder object to avoid unnecessary re-renders)
   useEffect(() => {
     if (selectedFolderId) {
