@@ -16,7 +16,7 @@ import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { useEmailStore } from '@/stores/email-store';
-import { useAuthStore } from '@/stores/auth-store';
+//import { useAuthStore } from '@/stores/auth-store';
 //import { useWebSocket } from '@/hooks/use-websocket';
 import { useEmailActions } from '@/hooks/use-email-actions';
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation';
@@ -67,7 +67,7 @@ export function Mailbox() {
   const t = useTranslations();
 
   // Auth store - for WebSocket token
-  const { token } = useAuthStore();
+  //const { token } = useAuthStore();
 
   // Store state
   const {
