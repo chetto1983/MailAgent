@@ -23,6 +23,7 @@ import { EmailSidebar, type FolderGroup, type SmartFilter } from '@/components/e
 import { EmailList } from '@/components/email/EmailList';
 import { EmailListItem } from '@/components/email/EmailList';
 import { EmailDetail } from '@/components/email/EmailDetail';
+import { ComposeDialog } from '@/components/email/ComposeDialog/ComposeDialog';
 
 interface FolderItem {
   id: string;
@@ -70,6 +71,7 @@ export function Mailbox() {
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [searchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -368,6 +370,11 @@ export function Mailbox() {
     onToggleStar: handleToggleStar,
   });
 
+  // Get default provider for compose
+  const defaultProviderId = useMemo(() => {
+    return providers.find(p => p.isDefault)?.id || providers[0]?.id;
+  }, [providers]);
+
   return (
     <>
       <EmailLayout
@@ -379,6 +386,7 @@ export function Mailbox() {
             loading={foldersLoading}
             smartFilters={smartFilters}
             showSmartFilters={true}
+            onCompose={() => setComposeOpen(true)}
           />
         }
         list={
@@ -435,6 +443,28 @@ export function Mailbox() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+
+      {/* Compose Dialog */}
+      <ComposeDialog
+        open={composeOpen}
+        defaultProviderId={defaultProviderId}
+        onClose={() => setComposeOpen(false)}
+        onSent={() => {
+          setSnackbar({
+            open: true,
+            message: 'Email sent successfully ✓',
+            severity: 'success',
+          });
+          loadData(); // Refresh email list
+        }}
+        onError={(message) => {
+          setSnackbar({
+            open: true,
+            message,
+            severity: 'error',
+          });
+        }}
+      />
     </>
   );
 }
