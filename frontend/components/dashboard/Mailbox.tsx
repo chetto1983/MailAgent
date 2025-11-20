@@ -8,6 +8,7 @@ import {
   Calendar as CalendarIcon,
 } from 'lucide-react';
 import { Snackbar, Alert as MuiAlert } from '@mui/material';
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
 import { emailApi, type EmailListParams } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
@@ -23,6 +24,9 @@ import { EmailSidebar, type FolderGroup, type SmartFilter } from '@/components/e
 import { EmailList } from '@/components/email/EmailList';
 import { EmailListItem } from '@/components/email/EmailList';
 import { EmailDetail } from '@/components/email/EmailDetail';
+import { EmailThread } from '@/components/email/EmailThread';
+import { ComposeDialog } from '@/components/email/ComposeDialog/ComposeDialog';
+import { AdvancedSearchDialog, type AdvancedSearchFilters } from '@/components/email/AdvancedSearchDialog';
 
 interface FolderItem {
   id: string;
@@ -70,6 +74,11 @@ export function Mailbox() {
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [searchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchFilters>({});
+  const [pagination, setPagination] = useState({ page: 1, hasMore: true, total: 0 });
+  const [loadingMore, setLoadingMore] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -85,6 +94,8 @@ export function Mailbox() {
     handleDelete,
     handleToggleStar,
     handleArchive,
+    handleMarkAsRead,
+    handleMoveToFolder,
     handleReply,
     handleForward,
     handleEmailClick,
@@ -322,22 +333,77 @@ export function Mailbox() {
         limit: 50,
         page: 1,
         ...activeFolder.queryOverrides,
-        search: searchQuery || undefined,
+        search: advancedFilters.searchQuery || searchQuery || undefined,
+        from: advancedFilters.from || undefined,
+        startDate: advancedFilters.startDate || undefined,
+        endDate: advancedFilters.endDate || undefined,
+        hasAttachments: advancedFilters.hasAttachments || undefined,
+        isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
+        isStarred: advancedFilters.isStarred || undefined,
       };
 
       const emailsRes = await emailApi.listEmails(queryParams);
       setEmails((emailsRes.data.emails || []) as any);
       setSelectedEmail(null);
+
+      // Update pagination
+      setPagination({
+        page: 1,
+        hasMore: emailsRes.data.pagination.page < emailsRes.data.pagination.totalPages,
+        total: emailsRes.data.pagination.total,
+      });
     } catch (error) {
       console.error('Failed to load mailbox data:', error);
       setEmails([]);
       setSelectedEmail(null);
+      setPagination({ page: 1, hasMore: false, total: 0 });
     } finally {
       setLoading(false);
     }
-  }, [activeFolder, searchQuery, setEmails, setLoading, setSelectedEmail]);
+  }, [activeFolder, searchQuery, advancedFilters, setEmails, setLoading, setSelectedEmail]);
 
-  // TODO: Implement infinite scroll with loadMoreRows for pagination
+  // Load more emails (infinite scroll)
+  const loadMoreEmails = useCallback(async () => {
+    if (!activeFolder || !pagination.hasMore || loadingMore) return;
+
+    try {
+      setLoadingMore(true);
+
+      const queryParams: EmailListParams = {
+        limit: 50,
+        page: pagination.page + 1,
+        ...activeFolder.queryOverrides,
+        search: advancedFilters.searchQuery || searchQuery || undefined,
+        from: advancedFilters.from || undefined,
+        startDate: advancedFilters.startDate || undefined,
+        endDate: advancedFilters.endDate || undefined,
+        hasAttachments: advancedFilters.hasAttachments || undefined,
+        isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
+        isStarred: advancedFilters.isStarred || undefined,
+      };
+
+      const emailsRes = await emailApi.listEmails(queryParams);
+
+      // Append new emails to existing ones
+      setEmails([...storeEmails, ...(emailsRes.data.emails || [])] as any);
+
+      // Update pagination
+      setPagination({
+        page: emailsRes.data.pagination.page,
+        hasMore: emailsRes.data.pagination.page < emailsRes.data.pagination.totalPages,
+        total: emailsRes.data.pagination.total,
+      });
+    } catch (error) {
+      console.error('Failed to load more emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to load more emails',
+        severity: 'error',
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [activeFolder, searchQuery, advancedFilters, pagination, loadingMore, storeEmails, setEmails]);
 
   // Refresh emails
   const handleRefresh = useCallback(async () => {
@@ -367,10 +433,51 @@ export function Mailbox() {
     onToggleStar: handleToggleStar,
   });
 
+  // Get default provider for compose
+  const defaultProviderId = useMemo(() => {
+    return providers.find(p => p.isDefault)?.id || providers[0]?.id;
+  }, [providers]);
+
+  // Handle advanced search
+  const handleAdvancedSearch = useCallback((filters: AdvancedSearchFilters) => {
+    setAdvancedFilters(filters);
+    // Reload data with new filters (loadData will be called via useEffect since advancedFilters changes)
+  }, []);
+
+  // Reset advanced filters
+  const handleResetFilters = useCallback(() => {
+    setAdvancedFilters({});
+  }, []);
+
+  // Check if any advanced filters are active
+  const hasActiveFilters = useMemo(() => {
+    return Object.values(advancedFilters).some((value) => {
+      if (value === null || value === undefined || value === '') return false;
+      if (typeof value === 'boolean') return value;
+      return true;
+    });
+  }, [advancedFilters]);
+
+  // Handle drag and drop email to folder
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return; // No valid drop target or dropped on itself
+    }
+
+    const emailId = active.id as string;
+    const folderId = over.id as string;
+
+    // Move email to folder using existing hook
+    handleMoveToFolder([emailId], folderId);
+  }, [handleMoveToFolder]);
+
   return (
     <>
-      <EmailLayout
-        sidebar={
+      <DndContext onDragEnd={handleDragEnd}>
+        <EmailLayout
+          sidebar={
           <EmailSidebar
             folderGroups={folderGroups}
             selectedFolderId={selectedFolderId}
@@ -378,6 +485,7 @@ export function Mailbox() {
             loading={foldersLoading}
             smartFilters={smartFilters}
             showSmartFilters={true}
+            onCompose={() => setComposeOpen(true)}
           />
         }
         list={
@@ -389,6 +497,13 @@ export function Mailbox() {
             refreshing={refreshing}
             onRefresh={handleRefresh}
             onBulkDelete={(ids) => ids.forEach(handleDelete)}
+            onBulkArchive={(ids) => handleArchive(ids)}
+            onBulkMarkAsRead={(ids, isRead) => handleMarkAsRead(ids, isRead)}
+            onLoadMore={loadMoreEmails}
+            hasMore={pagination.hasMore}
+            loadingMore={loadingMore}
+            onAdvancedSearch={() => setAdvancedSearchOpen(true)}
+            hasActiveFilters={hasActiveFilters}
             renderItem={(email, isSelected, isMultiSelected, onToggleSelect) => (
               <EmailListItem
                 email={email}
@@ -403,18 +518,27 @@ export function Mailbox() {
         }
         detail={
           storeSelectedEmail ? (
-            <EmailDetail
-              email={storeSelectedEmail}
-              onClose={() => setSelectedEmail(null)}
-              onArchive={(id) => handleArchive([id])}
-              onDelete={handleDelete}
-              onReply={handleReply}
-              onForward={handleForward}
-            />
+            storeSelectedEmail.threadId ? (
+              <EmailThread
+                threadId={storeSelectedEmail.threadId}
+                onReply={handleReply}
+                onForward={handleForward}
+              />
+            ) : (
+              <EmailDetail
+                email={storeSelectedEmail}
+                onClose={() => setSelectedEmail(null)}
+                onArchive={(id) => handleArchive([id])}
+                onDelete={handleDelete}
+                onReply={handleReply}
+                onForward={handleForward}
+              />
+            )
           ) : undefined
         }
         showDetail={!!storeSelectedEmail}
       />
+      </DndContext>
 
       {/* Snackbar for notifications */}
       <Snackbar
@@ -432,6 +556,37 @@ export function Mailbox() {
           {snackbar.message}
         </MuiAlert>
       </Snackbar>
+
+      {/* Compose Dialog */}
+      <ComposeDialog
+        open={composeOpen}
+        defaultProviderId={defaultProviderId}
+        onClose={() => setComposeOpen(false)}
+        onSent={() => {
+          setSnackbar({
+            open: true,
+            message: 'Email sent successfully ✓',
+            severity: 'success',
+          });
+          loadData(); // Refresh email list
+        }}
+        onError={(message) => {
+          setSnackbar({
+            open: true,
+            message,
+            severity: 'error',
+          });
+        }}
+      />
+
+      {/* Advanced Search Dialog */}
+      <AdvancedSearchDialog
+        open={advancedSearchOpen}
+        initialFilters={advancedFilters}
+        onClose={() => setAdvancedSearchOpen(false)}
+        onSearch={handleAdvancedSearch}
+        onReset={handleResetFilters}
+      />
     </>
   );
 }

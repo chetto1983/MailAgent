@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -8,6 +8,7 @@ import {
   Tooltip,
   Button,
   Paper,
+  CircularProgress,
 } from '@mui/material';
 import {
   ArrowLeft,
@@ -20,18 +21,14 @@ import {
 } from 'lucide-react';
 import DOMPurify from 'isomorphic-dompurify'; // HTML sanitization for XSS protection
 import type { Email } from '@/stores/email-store';
+import {
+  emailApi,
+  type EmailAttachment,
+  type SmartReply,
+  type Category,
+} from '@/lib/api/email';
 import { useTranslations } from '@/lib/hooks/use-translations';
-
-/**
- * Email attachment interface
- */
-interface Attachment {
-  id: string;
-  filename: string;
-  size: number;
-  mimeType: string;
-  url?: string;
-}
+import { Sparkles, Tag } from 'lucide-react';
 
 /**
  * Props for EmailDetail component
@@ -71,11 +68,6 @@ interface EmailDetailProps {
    * Callback for more options menu
    */
   onMoreOptions?: (event: React.MouseEvent<HTMLElement>) => void;
-
-  /**
-   * Attachments data (if available)
-   */
-  attachments?: Attachment[];
 }
 
 /**
@@ -144,10 +136,121 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
   onReply,
   onForward,
   onMoreOptions,
-  attachments,
 }) => {
   const t = useTranslations();
   const fromData = useMemo(() => parseEmailFrom(email.from), [email.from]);
+
+  // Attachments state
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([]);
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
+
+  // AI features state
+  const [summary, setSummary] = useState<string | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [smartReplies, setSmartReplies] = useState<SmartReply[]>([]);
+  const [loadingSmartReplies, setLoadingSmartReplies] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
+  // Load attachments if email has them
+  useEffect(() => {
+    const loadAttachments = async () => {
+      if (!email.hasAttachments) {
+        setAttachments([]);
+        return;
+      }
+
+      // If email object already has attachments array, use it
+      if ((email as any).attachments && Array.isArray((email as any).attachments)) {
+        setAttachments((email as any).attachments);
+        return;
+      }
+
+      // Otherwise we'd need to fetch from API
+      // For now, show empty state as backend might not expose attachment list endpoint
+      setAttachments([]);
+    };
+
+    loadAttachments();
+  }, [email.id, email.hasAttachments]);
+
+  // Handle attachment download
+  const handleDownloadAttachment = useCallback(async (attachmentId: string) => {
+    try {
+      setDownloadingAttachmentId(attachmentId);
+
+      const response = await emailApi.downloadAttachment(email.id, attachmentId);
+
+      if (response.data.downloadUrl) {
+        // Open download URL in new window
+        window.open(response.data.downloadUrl, '_blank');
+      } else {
+        console.error('No download URL available for attachment');
+      }
+    } catch (error) {
+      console.error('Failed to download attachment:', error);
+    } finally {
+      setDownloadingAttachmentId(null);
+    }
+  }, [email.id]);
+
+  // AI Features Handlers
+
+  // Handle summarize email
+  const handleSummarize = useCallback(async () => {
+    if (summary) {
+      setShowSummary(!showSummary);
+      return;
+    }
+
+    try {
+      setLoadingSummary(true);
+      const response = await emailApi.summarizeEmail(email.id, 'it');
+      setSummary(response.data.summary);
+      setShowSummary(true);
+    } catch (error) {
+      console.error('Failed to summarize email:', error);
+    } finally {
+      setLoadingSummary(false);
+    }
+  }, [email.id, summary, showSummary]);
+
+  // Auto-load AI features on email open
+  useEffect(() => {
+    // Reset AI features when email changes
+    setSummary(null);
+    setShowSummary(false);
+    setSmartReplies([]);
+    setCategories([]);
+
+    // Auto-load categories and smart replies
+    const loadAIFeatures = async () => {
+      try {
+        // Load categories
+        setLoadingCategories(true);
+        const categorizeResponse = await emailApi.categorizeEmail(email.id);
+        setCategories(categorizeResponse.data.categories);
+      } catch (error) {
+        console.error('Failed to categorize email:', error);
+      } finally {
+        setLoadingCategories(false);
+      }
+
+      try {
+        // Load smart replies
+        setLoadingSmartReplies(true);
+        const replyResponse = await emailApi.generateSmartReply(email.id, 'it');
+        setSmartReplies(replyResponse.data.replies);
+      } catch (error) {
+        console.error('Failed to generate smart replies:', error);
+      } finally {
+        setLoadingSmartReplies(false);
+      }
+    };
+
+    loadAIFeatures();
+  }, [email.id]);
 
   // Sanitize email body with DOMPurify to prevent XSS attacks
   const emailBody = useMemo(() => {
@@ -198,6 +301,20 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
           </Tooltip>
         )}
         <Box sx={{ flex: 1 }} />
+        <Tooltip title={summary ? (showSummary ? 'Hide Summary' : 'Show Summary') : 'Summarize with AI'}>
+          <IconButton
+            size="small"
+            onClick={handleSummarize}
+            disabled={loadingSummary}
+            color={summary ? 'primary' : 'default'}
+          >
+            {loadingSummary ? (
+              <CircularProgress size={18} />
+            ) : (
+              <Sparkles size={18} />
+            )}
+          </IconButton>
+        </Tooltip>
         {onArchive && (
           <Tooltip title="Archive">
             <IconButton size="small" onClick={() => onArchive(email.id)}>
@@ -227,6 +344,69 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
         <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
           {email.subject || '(No subject)'}
         </Typography>
+
+        {/* AI Categories */}
+        {categories.length > 0 && (
+          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+            {categories.map((category, index) => (
+              <Paper
+                key={index}
+                variant="outlined"
+                sx={{
+                  px: 1.5,
+                  py: 0.5,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  bgcolor: 'primary.50',
+                  borderColor: 'primary.200',
+                }}
+              >
+                <Tag size={14} />
+                <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                  {category.name}
+                </Typography>
+                {category.confidence && (
+                  <Typography variant="caption" color="text.secondary">
+                    ({Math.round(category.confidence * 100)}%)
+                  </Typography>
+                )}
+              </Paper>
+            ))}
+            {loadingCategories && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <CircularProgress size={14} />
+                <Typography variant="caption" color="text.secondary">
+                  Categorizing...
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* AI Summary */}
+        {summary && showSummary && (
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              mb: 2,
+              bgcolor: 'background.default',
+              borderColor: 'primary.main',
+              borderWidth: 2,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Sparkles size={16} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                AI Summary
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary">
+              {summary}
+            </Typography>
+          </Paper>
+        )}
 
         {/* Sender Info */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
@@ -289,22 +469,92 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
                       {formatFileSize(attachment.size)}
                     </Typography>
                   </Box>
-                  {attachment.url && (
+                  <Tooltip title="Download">
                     <IconButton
                       size="small"
-                      component="a"
-                      href={attachment.url}
-                      download={attachment.filename}
+                      onClick={() => handleDownloadAttachment(attachment.id)}
+                      disabled={downloadingAttachmentId === attachment.id}
                     >
-                      <Download size={16} />
+                      {downloadingAttachmentId === attachment.id ? (
+                        <CircularProgress size={16} />
+                      ) : (
+                        <Download size={16} />
+                      )}
                     </IconButton>
-                  )}
+                  </Tooltip>
                 </Paper>
               ))}
             </Box>
           </Box>
         )}
       </Box>
+
+      {/* Smart Reply Suggestions */}
+      {smartReplies.length > 0 && onReply && (
+        <Box
+          sx={{
+            px: 2,
+            py: 1.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.default',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Sparkles size={14} />
+            <Typography variant="caption" sx={{ fontWeight: 600 }}>
+              Smart Reply Suggestions
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {smartReplies.map((reply, index) => (
+              <Paper
+                key={index}
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                    borderColor: 'primary.main',
+                  },
+                }}
+                onClick={() => {
+                  // TODO: Open compose dialog with prefilled reply
+                  // For now, just trigger onReply callback
+                  onReply(email);
+                }}
+              >
+                <Typography variant="body2">{reply.text}</Typography>
+                {reply.tone && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                    Tone: {reply.tone}
+                  </Typography>
+                )}
+              </Paper>
+            ))}
+          </Box>
+        </Box>
+      )}
+      {loadingSmartReplies && (
+        <Box
+          sx={{
+            px: 2,
+            py: 1.5,
+            borderTop: 1,
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          <CircularProgress size={14} />
+          <Typography variant="caption" color="text.secondary">
+            Generating smart replies...
+          </Typography>
+        </Box>
+      )}
 
       {/* Action Buttons */}
       <Box

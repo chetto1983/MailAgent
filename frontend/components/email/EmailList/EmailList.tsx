@@ -10,8 +10,9 @@ import {
   Typography,
   Skeleton,
   Stack,
+  CircularProgress,
 } from '@mui/material';
-import { Search, RefreshCw, Trash2, Mail } from 'lucide-react';
+import { Search, RefreshCw, Trash2, Mail, Archive, MailOpen, MailCheck, SlidersHorizontal } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { List } from 'react-window';
@@ -57,6 +58,16 @@ interface EmailListProps {
   onBulkDelete?: (ids: string[]) => void;
 
   /**
+   * Callback for bulk archive
+   */
+  onBulkArchive?: (ids: string[]) => void;
+
+  /**
+   * Callback for bulk mark as read/unread
+   */
+  onBulkMarkAsRead?: (ids: string[], isRead: boolean) => void;
+
+  /**
    * Custom empty state message
    */
   emptyMessage?: string;
@@ -70,6 +81,31 @@ interface EmailListProps {
    * Render function for each email item
    */
   renderItem: (email: Email, isSelected: boolean, isMultiSelected: boolean, onToggleSelect: (id: string) => void) => React.ReactNode;
+
+  /**
+   * Callback for loading more emails (infinite scroll)
+   */
+  onLoadMore?: () => void;
+
+  /**
+   * Whether there are more emails to load
+   */
+  hasMore?: boolean;
+
+  /**
+   * Whether more emails are being loaded
+   */
+  loadingMore?: boolean;
+
+  /**
+   * Callback for opening advanced search
+   */
+  onAdvancedSearch?: () => void;
+
+  /**
+   * Whether advanced filters are active
+   */
+  hasActiveFilters?: boolean;
 }
 
 /**
@@ -108,13 +144,35 @@ export const EmailList: React.FC<EmailListProps> = ({
   refreshing = false,
   onRefresh,
   onBulkDelete,
+  onBulkArchive,
+  onBulkMarkAsRead,
   emptyMessage,
   searchPlaceholder,
   renderItem,
+  onLoadMore,
+  hasMore = false,
+  loadingMore = false,
+  onAdvancedSearch,
+  hasActiveFilters = false,
 }) => {
   const t = useTranslations();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Infinite scroll handler
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    if (!hasMore || loadingMore || !onLoadMore) return;
+
+    const target = event.currentTarget;
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight;
+    const clientHeight = target.clientHeight;
+
+    // Load more when 200px from bottom
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      onLoadMore();
+    }
+  }, [hasMore, loadingMore, onLoadMore]);
 
   // Filter emails by search query
   const filteredEmails = useMemo(() => {
@@ -161,6 +219,22 @@ export const EmailList: React.FC<EmailListProps> = ({
       setSelectedIds(new Set());
     }
   }, [onBulkDelete, selectedIds]);
+
+  // Handle bulk archive
+  const handleBulkArchive = useCallback(() => {
+    if (onBulkArchive && selectedIds.size > 0) {
+      onBulkArchive(Array.from(selectedIds));
+      setSelectedIds(new Set());
+    }
+  }, [onBulkArchive, selectedIds]);
+
+  // Handle bulk mark as read
+  const handleBulkMarkAsRead = useCallback((isRead: boolean) => {
+    if (onBulkMarkAsRead && selectedIds.size > 0) {
+      onBulkMarkAsRead(Array.from(selectedIds), isRead);
+      setSelectedIds(new Set());
+    }
+  }, [onBulkMarkAsRead, selectedIds]);
 
   // Handle refresh
   const handleRefresh = useCallback(() => {
@@ -229,6 +303,27 @@ export const EmailList: React.FC<EmailListProps> = ({
               <Typography variant="body2" sx={{ mr: 1 }}>
                 {selectedIds.size} selected
               </Typography>
+              {onBulkMarkAsRead && (
+                <>
+                  <Tooltip title="Mark as read">
+                    <IconButton size="small" onClick={() => handleBulkMarkAsRead(true)}>
+                      <MailCheck size={18} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Mark as unread">
+                    <IconButton size="small" onClick={() => handleBulkMarkAsRead(false)}>
+                      <MailOpen size={18} />
+                    </IconButton>
+                  </Tooltip>
+                </>
+              )}
+              {onBulkArchive && (
+                <Tooltip title="Archive">
+                  <IconButton size="small" onClick={handleBulkArchive}>
+                    <Archive size={18} />
+                  </IconButton>
+                </Tooltip>
+              )}
               {onBulkDelete && (
                 <Tooltip title={t.common.delete}>
                   <IconButton size="small" onClick={handleBulkDelete}>
@@ -256,24 +351,41 @@ export const EmailList: React.FC<EmailListProps> = ({
         </Box>
 
         {/* Search Bar */}
-        <TextField
-          fullWidth
-          size="small"
-          placeholder={searchPlaceholder || t.dashboard.email.searchPlaceholder}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search size={18} />
-              </InputAdornment>
-            ),
-          }}
-        />
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder={searchPlaceholder || t.dashboard.email.searchPlaceholder}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search size={18} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          {onAdvancedSearch && (
+            <Tooltip title="Advanced Search">
+              <IconButton
+                size="small"
+                onClick={onAdvancedSearch}
+                color={hasActiveFilters ? 'primary' : 'default'}
+                sx={{
+                  border: 1,
+                  borderColor: hasActiveFilters ? 'primary.main' : 'divider',
+                }}
+              >
+                <SlidersHorizontal size={18} />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
       </Box>
 
       {/* Email List */}
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, overflow: 'auto' }} onScroll={handleScroll}>
         {loading ? (
           <Box sx={{ px: 2, pt: 2 }}>
             {[...Array(8)].map((_, i) => (
@@ -301,19 +413,27 @@ export const EmailList: React.FC<EmailListProps> = ({
             </Typography>
           </Box>
         ) : (
-          <AutoSizer>
-            {({ height, width }) => (
-              <div style={{ height, width }}>
-                <List
-                  defaultHeight={height}
-                  rowHeight={80}
-                  rowCount={filteredEmails.length}
-                  rowComponent={Row}
-                  rowProps={{}}
-                />
-              </div>
+          <>
+            <AutoSizer>
+              {({ height, width }) => (
+                <div style={{ height, width }}>
+                  <List
+                    defaultHeight={height}
+                    rowHeight={80}
+                    rowCount={filteredEmails.length}
+                    rowComponent={Row}
+                    rowProps={{}}
+                  />
+                </div>
+              )}
+            </AutoSizer>
+            {/* Loading more indicator */}
+            {loadingMore && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress size={24} />
+              </Box>
             )}
-          </AutoSizer>
+          </>
         )}
       </Box>
     </Paper>

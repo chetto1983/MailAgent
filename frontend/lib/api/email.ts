@@ -157,6 +157,45 @@ export type ConversationsResponse = {
   };
 };
 
+// AI Feature Types
+export type SmartReply = {
+  text: string;
+  tone: string;
+};
+
+export type SmartReplyResponse = {
+  replies: SmartReply[];
+  emailId: string;
+};
+
+export type SummarizeResponse = {
+  summary: string;
+  emailId: string;
+};
+
+export type Category = {
+  name: string;
+  confidence: number;
+  reasoning?: string;
+};
+
+export type CategorizeResponse = {
+  categories: Category[];
+  suggestedLabels: string[];
+  emailId: string;
+};
+
+export type KnowledgeSearchResult = {
+  content: string;
+  metadata: Record<string, unknown>;
+  score: number;
+};
+
+export type KnowledgeSearchResponse = {
+  results: KnowledgeSearchResult[];
+  totalResults: number;
+};
+
 // ===== API CLIENT =====
 
 export const emailApi = {
@@ -395,5 +434,46 @@ export const emailApi = {
       downloadUrl: string | null;
       message?: string;
     }>(`/emails/${emailId}/attachments/${attachmentId}/download`);
+  },
+
+  // ===== AI FEATURES =====
+
+  /**
+   * Generate smart reply suggestions for an email
+   * POST /ai/smart-reply/:emailId
+   */
+  generateSmartReply(emailId: string, locale: string = 'it') {
+    return apiClient.post<SmartReplyResponse>(`/ai/smart-reply/${emailId}`, {
+      locale,
+    });
+  },
+
+  /**
+   * Summarize email content
+   * POST /ai/summarize/:emailId
+   */
+  summarizeEmail(emailId: string, locale: string = 'it') {
+    return apiClient.post<SummarizeResponse>(`/ai/summarize/${emailId}`, {
+      locale,
+    });
+  },
+
+  /**
+   * Auto-categorize email and suggest labels
+   * POST /ai/categorize/:emailId
+   */
+  categorizeEmail(emailId: string) {
+    return apiClient.post<CategorizeResponse>(`/ai/categorize/${emailId}`);
+  },
+
+  /**
+   * Search knowledge base using RAG
+   * POST /ai/memory/search
+   */
+  searchKnowledge(query: string, limit: number = 5) {
+    return apiClient.post<KnowledgeSearchResponse>('/ai/memory/search', {
+      query,
+      limit,
+    });
   },
 };
