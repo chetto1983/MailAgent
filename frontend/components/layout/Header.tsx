@@ -35,6 +35,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { emailApi } from '@/lib/api/email';
 import { useLocale } from '@/lib/hooks/use-locale';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface HeaderNotification {
   id: string;
@@ -59,6 +60,7 @@ export function Header({
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const logout = useAuthStore((state: any) => state.logout);
   const { user } = useAuth();
+  const t = useTranslations();
 
   const [searchValue, setSearchValue] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -93,12 +95,12 @@ export function Header({
     const date = new Date(isoDate);
     const diffMs = Date.now() - date.getTime();
     const diffMinutes = Math.floor(diffMs / 60000);
-    if (diffMinutes < 1) return 'Just now';
-    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffMinutes < 1) return t.timeAgo.justNow;
+    if (diffMinutes < 60) return t.timeAgo.minutesAgo.replace('{minutes}', diffMinutes.toString());
     const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffHours < 24) return t.timeAgo.hoursAgo.replace('{hours}', diffHours.toString());
     const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 7) return t.timeAgo.daysAgo.replace('{days}', diffDays.toString());
     return date.toLocaleDateString();
   };
 
@@ -115,7 +117,7 @@ export function Header({
       const items = response.data.emails || [];
       const mapped: HeaderNotification[] = items.map((email) => ({
         id: email.id,
-        subject: email.subject || 'No subject',
+        subject: email.subject || t.common.noSubject,
         sender: parseSender(email.from),
         receivedAt: email.receivedAt || email.sentAt || email.createdAt,
       }));
@@ -123,11 +125,11 @@ export function Header({
     } catch (error) {
       console.error('Failed to load notifications:', error);
       setNotifications([]);
-      setNotificationsError('Unable to load notifications');
+      setNotificationsError(t.dashboard.settings.mailAccountsPanel.loadError);
     } finally {
       setNotificationsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const handleNotificationOpen = (event: React.MouseEvent<HTMLElement>) => {
     setNotificationAnchor(event.currentTarget);
@@ -172,7 +174,7 @@ export function Header({
   const displayName =
     [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() ||
     user?.email ||
-    'Account';
+    t.nav.account;
   const displayEmail = user?.email || '';
   const avatarInitials =
     displayName
@@ -219,7 +221,7 @@ export function Header({
           <TextField
             fullWidth
             size="small"
-            placeholder="Search emails, contacts, events..."
+            placeholder={t.nav.searchPlaceholder}
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             InputProps={{
@@ -241,7 +243,7 @@ export function Header({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
           {/* Language Selector */}
           {!isMobile && (
-            <Tooltip title="Language">
+            <Tooltip title={t.nav.language}>
               <IconButton onClick={handleLanguageOpen} color="inherit">
                 <Languages size={20} />
               </IconButton>
@@ -250,7 +252,7 @@ export function Header({
 
           {/* Theme Toggle */}
           {!isMobile && (
-            <Tooltip title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
+            <Tooltip title={isDarkMode ? t.nav.lightMode : t.nav.darkMode}>
               <IconButton onClick={onThemeToggle} color="inherit">
                 {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
               </IconButton>
@@ -258,7 +260,7 @@ export function Header({
           )}
 
           {/* Notifications */}
-          <Tooltip title="Notifications">
+          <Tooltip title={t.nav.notifications}>
             <IconButton color="inherit" onClick={handleNotificationOpen}>
               <Badge
                 badgeContent={Math.min(99, unreadCount)}
@@ -271,7 +273,7 @@ export function Header({
           </Tooltip>
 
           {/* User Menu */}
-          <Tooltip title="Account">
+          <Tooltip title={t.nav.account}>
             <IconButton onClick={handleUserMenuOpen} sx={{ p: 0.5 }}>
               <Avatar
                 sx={{
@@ -319,7 +321,7 @@ export function Header({
             <ListItemIcon>
               <User size={18} />
             </ListItemIcon>
-            <ListItemText>Profile</ListItemText>
+            <ListItemText>{t.nav.profile}</ListItemText>
           </MenuItem>
           <MenuItem
             onClick={() => {
@@ -330,7 +332,7 @@ export function Header({
             <ListItemIcon>
               <Settings size={18} />
             </ListItemIcon>
-            <ListItemText>Settings</ListItemText>
+            <ListItemText>{t.nav.settings}</ListItemText>
           </MenuItem>
           {isMobile && (
             <>
@@ -338,13 +340,13 @@ export function Header({
                 <ListItemIcon>
                   <Languages size={18} />
                 </ListItemIcon>
-                <ListItemText>Language: {locale === 'en' ? 'EN' : 'IT'}</ListItemText>
+                <ListItemText>{t.nav.language}: {locale === 'en' ? 'EN' : 'IT'}</ListItemText>
               </MenuItem>
               <MenuItem onClick={onThemeToggle}>
                 <ListItemIcon>
                   {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
                 </ListItemIcon>
-                <ListItemText>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</ListItemText>
+                <ListItemText>{isDarkMode ? t.nav.lightMode : t.nav.darkMode}</ListItemText>
               </MenuItem>
             </>
           )}
@@ -353,7 +355,7 @@ export function Header({
             <ListItemIcon>
               <LogOut size={18} />
             </ListItemIcon>
-            <ListItemText>Logout</ListItemText>
+            <ListItemText>{t.nav.logout}</ListItemText>
           </MenuItem>
         </Menu>
 
@@ -374,7 +376,7 @@ export function Header({
         >
           <Box sx={{ px: 2, py: 1.5 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Notifications
+              {t.nav.notifications}
             </Typography>
           </Box>
           <Divider />
@@ -393,7 +395,7 @@ export function Header({
           {!notificationsLoading && !notificationsError && notifications.length === 0 && (
             <Box sx={{ px: 2, py: 2 }}>
               <Typography variant="body2" color="text.secondary">
-                tutto a posto
+                {t.common.allCaughtUp}
               </Typography>
             </Box>
           )}
@@ -429,7 +431,7 @@ export function Header({
             sx={{ justifyContent: 'center', color: 'primary.main' }}
           >
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Go to Inbox
+              {t.dashboard.home.sections.viewAllEmails}
             </Typography>
           </MenuItem>
         </Menu>
