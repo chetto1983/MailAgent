@@ -1,11 +1,11 @@
 import React from 'react';
-import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
-import { PmSyncMailboxRefactored } from '@/components/dashboard/PmSyncMailboxRefactored';
+import { Layout } from '@/components/layout/Layout';
+import { Mailbox } from '@/components/dashboard/Mailbox';
 
 /**
- * Email Page - Refactored PmSync Design
+ * Email Page
  *
- * Now uses modular architecture:
+ * Modular email interface with:
  * - EmailLayout, EmailSidebar, EmailList, EmailDetail components
  * - Centralized email-store (Zustand)
  * - Custom hooks (use-email-actions, use-keyboard-navigation)
@@ -13,9 +13,9 @@ import { PmSyncMailboxRefactored } from '@/components/dashboard/PmSyncMailboxRef
  */
 export default function EmailPage() {
   return (
-    <PmSyncLayout>
-      <PmSyncMailboxRefactored />
-    </PmSyncLayout>
+    <Layout>
+      <Mailbox />
+    </Layout>
   );
 }
 

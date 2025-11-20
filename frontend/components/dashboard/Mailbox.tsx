@@ -42,7 +42,7 @@ interface FolderItem {
  * - email-store for global state
  * - Custom hooks for actions and keyboard navigation
  */
-export function PmSyncMailboxRefactored() {
+export function Mailbox() {
   const t = useTranslations();
 
   // Store state

@@ -51,7 +51,7 @@ interface CalendarCategory {
 // Color palette for calendar categories - defined outside component to avoid re-creation
 const CATEGORY_PALETTE = ['#9C27B0', '#00C853', '#FF9800', '#0B7EFF', '#E91E63', '#3F51B5'];
 
-export function PmSyncCalendar() {
+export function Calendar() {
   const router = useRouter();
   const calendarRef = useRef<FullCalendar>(null);
   const [currentMonth, setCurrentMonth] = useState('');

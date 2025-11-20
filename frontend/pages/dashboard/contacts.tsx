@@ -1,12 +1,12 @@
 import React from 'react';
-import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
-import { PmSyncContacts } from '@/components/dashboard/PmSyncContacts';
+import { Layout } from '@/components/layout/Layout';
+import { Contacts } from '@/components/dashboard/Contacts';
 
 export default function ContactsPage() {
   return (
-    <PmSyncLayout>
-      <PmSyncContacts />
-    </PmSyncLayout>
+    <Layout>
+      <Contacts />
+    </Layout>
   );
 }
 

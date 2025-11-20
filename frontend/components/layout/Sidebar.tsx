@@ -45,7 +45,7 @@ export interface PmSyncSidebarProps {
   mobileOpen?: boolean;
 }
 
-export function PmSyncSidebar({
+export function Sidebar({
   open = true,
   collapsed = false,
   onToggleCollapse,

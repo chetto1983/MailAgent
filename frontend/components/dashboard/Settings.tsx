@@ -50,7 +50,7 @@ type SettingsSection =
   | 'account'
   | 'notifications';
 
-export function PmSyncSettings() {
+export function Settings() {
   const router = useRouter();
   const { user } = useAuth();
   const t = useTranslations();

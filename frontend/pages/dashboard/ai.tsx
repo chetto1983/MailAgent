@@ -12,7 +12,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Send, Plus } from 'lucide-react';
-import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
+import { Layout } from '@/components/layout/Layout';
 import { aiApi, type ChatMessage, type ChatSession } from '@/lib/api/ai';
 
 function AiAssistantView() {
@@ -247,9 +247,9 @@ function AiAssistantView() {
 
 export default function AiAssistantPage() {
   return (
-    <PmSyncLayout>
+    <Layout>
       <AiAssistantView />
-    </PmSyncLayout>
+    </Layout>
   );
 }
 

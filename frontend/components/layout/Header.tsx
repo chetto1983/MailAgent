@@ -47,7 +47,7 @@ export interface PmSyncHeaderProps {
   isDarkMode?: boolean;
 }
 
-export function PmSyncHeader({
+export function Header({
   onMenuClick,
   onThemeToggle,
   isDarkMode = true,

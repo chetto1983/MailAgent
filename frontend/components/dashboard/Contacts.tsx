@@ -87,7 +87,7 @@ const getPrimaryPhone = (contact?: Contact | null) =>
   contact?.phoneNumbers?.[0]?.value ||
   '';
 
-export function PmSyncContacts() {
+export function Contacts() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [contacts, setContacts] = useState<Contact[]>([]);

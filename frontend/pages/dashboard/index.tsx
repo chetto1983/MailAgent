@@ -2,8 +2,8 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useAuth } from '@/lib/hooks/use-auth';
-import { PmSyncLayout } from '@/components/layout/PmSyncLayout';
-import { PmSyncDashboard } from '@/components/dashboard/PmSyncDashboard';
+import { Layout } from '@/components/layout/Layout';
+import { Dashboard } from '@/components/dashboard/Dashboard';
 
 /**
  * Dashboard Index - Main Dashboard Page
@@ -49,9 +49,9 @@ export default function DashboardIndex() {
   }
 
   return (
-    <PmSyncLayout>
-      <PmSyncDashboard />
-    </PmSyncLayout>
+    <Layout>
+      <Dashboard />
+    </Layout>
   );
 }
 

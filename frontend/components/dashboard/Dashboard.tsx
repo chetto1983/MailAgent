@@ -67,7 +67,7 @@ interface Stats {
   totalContacts: number;
 }
 
-export function PmSyncDashboard() {
+export function Dashboard() {
   const router = useRouter();
   const { user } = useAuth();
   const [_loading, setLoading] = useState(true);
