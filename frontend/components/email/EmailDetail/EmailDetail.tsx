@@ -327,7 +327,7 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
           </Tooltip>
         )}
         <Box sx={{ flex: 1 }} />
-        <Tooltip title={categories.length > 0 ? 'Categories loaded' : 'Categorize with AI'}>
+        <Tooltip title={categories.length > 0 ? t.dashboard.emailView.categoriesLoaded : t.dashboard.emailView.categoriesGenerate}>
           <IconButton
             size="small"
             onClick={handleCategorize}
@@ -341,7 +341,7 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
             )}
           </IconButton>
         </Tooltip>
-        <Tooltip title={smartReplies.length > 0 ? 'Smart Replies loaded' : 'Generate Smart Replies'}>
+        <Tooltip title={smartReplies.length > 0 ? t.dashboard.emailView.smartRepliesLoaded : t.dashboard.emailView.smartRepliesGenerate}>
           <IconButton
             size="small"
             onClick={handleGenerateSmartReplies}
@@ -355,7 +355,7 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
             )}
           </IconButton>
         </Tooltip>
-        <Tooltip title={summary ? (showSummary ? 'Hide Summary' : 'Show Summary') : 'Summarize with AI'}>
+        <Tooltip title={summary ? (showSummary ? t.dashboard.emailView.summaryHide : t.dashboard.emailView.summaryShow) : t.dashboard.emailView.summaryGenerate}>
           <IconButton
             size="small"
             onClick={handleSummarize}

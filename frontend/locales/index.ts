@@ -311,10 +311,16 @@ export interface AppTranslations {
       summaryTitle: string;
       summaryGenerate: string;
       summaryRegenerate: string;
+      summaryShow: string;
+      summaryHide: string;
       summaryEmpty: string;
+      categoriesGenerate: string;
+      categoriesLoaded: string;
+      categoriesLoading: string;
       smartRepliesTitle: string;
       smartRepliesGenerate: string;
       smartRepliesRegenerate: string;
+      smartRepliesLoaded: string;
       smartRepliesLoading: string;
       smartRepliesEmpty: string;
       labelTitle: string;
