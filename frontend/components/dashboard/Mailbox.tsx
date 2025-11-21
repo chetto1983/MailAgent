@@ -847,13 +847,35 @@ export function Mailbox() {
               )}
 
               {/* View Mode Toggle (Center) */}
-              <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  minWidth: 0,
+                }}
+              >
                 <ToggleButtonGroup
                   value={viewMode}
                   exclusive
                   onChange={handleViewModeChange}
                   size="small"
                   aria-label="view mode"
+                  sx={{
+                    bgcolor: 'background.default',
+                    '& .MuiToggleButton-root': {
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      '&.Mui-selected': {
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                        '&:hover': {
+                          bgcolor: 'primary.dark',
+                        },
+                      },
+                    },
+                  }}
                 >
                   <ToggleButton value="list" aria-label="list view">
                     <Tooltip title={t.dashboard.emailList.emailListView}>
