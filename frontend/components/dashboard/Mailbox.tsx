@@ -866,10 +866,23 @@ export function Mailbox() {
                       size="small"
                       aria-label="view mode"
                       sx={{
+                        display: 'flex',
+                        minHeight: 40,
+                        height: 'auto',
                         bgcolor: 'background.default',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
                         '& .MuiToggleButton-root': {
-                          border: '1px solid',
+                          minWidth: 44,
+                          minHeight: 40,
+                          px: 2,
+                          border: 'none',
+                          borderRight: '1px solid',
                           borderColor: 'divider',
+                          '&:last-child': {
+                            borderRight: 'none',
+                          },
                           '&.Mui-selected': {
                             bgcolor: 'primary.main',
                             color: 'primary.contrastText',

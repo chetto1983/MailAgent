@@ -274,13 +274,20 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
       }}
     >
       {/* Compose Button */}
-      {showComposeButton && (
-        <Box sx={{ p: 2 }}>
+      {showComposeButton && onCompose && (
+        <Box sx={{ p: 2, flexShrink: 0, minHeight: 'fit-content' }}>
           <Button
             variant="contained"
             fullWidth
             startIcon={<Mail size={18} />}
             onClick={handleCompose}
+            sx={{
+              minHeight: 40,
+              height: 'auto',
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+            }}
           >
             {t.common.compose}
           </Button>
