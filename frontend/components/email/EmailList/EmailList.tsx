@@ -11,6 +11,7 @@ import {
   Skeleton,
   Stack,
   List as MuiList,
+  CircularProgress,
 } from '@mui/material';
 import { Search, RefreshCw, Trash2, Mail, Archive, MailOpen, MailCheck, SlidersHorizontal } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
@@ -163,9 +164,9 @@ export const EmailList: React.FC<EmailListProps> = ({
   emptyMessage,
   searchPlaceholder,
   renderItem,
-  onLoadMore: _onLoadMore,
-  hasMore: _hasMore = false,
-  loadingMore: _loadingMore = false,
+  onLoadMore,
+  hasMore = false,
+  loadingMore = false,
   onAdvancedSearch,
   hasActiveFilters = false,
   selectedIds: propSelectedIds,
@@ -271,6 +272,22 @@ export const EmailList: React.FC<EmailListProps> = ({
       onRefresh();
     }
   }, [onRefresh]);
+
+  // Handle infinite scroll
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (!hasMore || loadingMore || !onLoadMore) return;
+
+      const target = e.currentTarget;
+      const scrollBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+
+      // Load more when within 100px of bottom
+      if (scrollBottom < 100) {
+        onLoadMore();
+      }
+    },
+    [hasMore, loadingMore, onLoadMore]
+  );
 
   return (
     <Paper
@@ -388,7 +405,7 @@ export const EmailList: React.FC<EmailListProps> = ({
       </Box>
 
       {/* Email List */}
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, overflow: 'auto' }} onScroll={handleScroll}>
         {(() => {
           console.log('[DEBUG EmailList] Rendering decision:', {
             loading,
@@ -426,20 +443,27 @@ export const EmailList: React.FC<EmailListProps> = ({
             </Typography>
           </Box>
         ) : (
-          <MuiList disablePadding>
-            {filteredEmails.map((email, index) => {
-              const isSelected = selectedEmailId === email.id;
-              const isMultiSelected = selectedIds.has(email.id);
-              if (index === 0) {
-                console.log('[DEBUG EmailList] Rendering first email, onEmailClick:', typeof onEmailClick);
-              }
-              return (
-                <React.Fragment key={email.id}>
-                  {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
-                </React.Fragment>
-              );
-            })}
-          </MuiList>
+          <>
+            <MuiList disablePadding>
+              {filteredEmails.map((email, index) => {
+                const isSelected = selectedEmailId === email.id;
+                const isMultiSelected = selectedIds.has(email.id);
+                if (index === 0) {
+                  console.log('[DEBUG EmailList] Rendering first email, onEmailClick:', typeof onEmailClick);
+                }
+                return (
+                  <React.Fragment key={email.id}>
+                    {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
+                  </React.Fragment>
+                );
+              })}
+            </MuiList>
+            {loadingMore && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                <CircularProgress size={24} />
+              </Box>
+            )}
+          </>
         )}
       </Box>
     </Paper>
