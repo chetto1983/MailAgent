@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -10,10 +10,10 @@ import {
   Typography,
   Skeleton,
   Stack,
-  List as MuiList,
   CircularProgress,
 } from '@mui/material';
 import { Search, RefreshCw, Trash2, Mail, Archive, MailOpen, MailCheck, SlidersHorizontal } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Email } from '@/stores/email-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
 
@@ -274,7 +274,18 @@ export const EmailList: React.FC<EmailListProps> = ({
     }
   }, [onRefresh]);
 
-  // Handle infinite scroll
+  // Ref for scroll container
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Virtual scrolling setup
+  const rowVirtualizer = useVirtualizer({
+    count: filteredEmails.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 88, // Estimated height of EmailListItem
+    overscan: 5, // Render 5 items above/below viewport
+  });
+
+  // Handle infinite scroll with virtualizer
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
       if (!hasMore || loadingMore || !onLoadMore) return;
@@ -282,8 +293,8 @@ export const EmailList: React.FC<EmailListProps> = ({
       const target = e.currentTarget;
       const scrollBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
 
-      // Load more when within 100px of bottom
-      if (scrollBottom < 100) {
+      // Load more when within 200px of bottom
+      if (scrollBottom < 200) {
         onLoadMore();
       }
     },
@@ -410,7 +421,11 @@ export const EmailList: React.FC<EmailListProps> = ({
       </Box>
 
       {/* Email List */}
-      <Box sx={{ flex: 1, overflow: 'auto' }} onScroll={handleScroll}>
+      <Box
+        ref={parentRef}
+        sx={{ flex: 1, overflow: 'auto' }}
+        onScroll={handleScroll}
+      >
         {loading ? (
           <Box sx={{ px: 2, pt: 2 }}>
             {[...Array(8)].map((_, i) => (
@@ -439,17 +454,38 @@ export const EmailList: React.FC<EmailListProps> = ({
           </Box>
         ) : (
           <>
-            <MuiList disablePadding>
-              {filteredEmails.map((email) => {
+            {/* Virtual scrolling container */}
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: '100%',
+                position: 'relative',
+              }}
+            >
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const email = filteredEmails[virtualRow.index];
                 const isSelected = selectedEmailId === email.id;
                 const isMultiSelected = selectedIds.has(email.id);
+
                 return (
-                  <React.Fragment key={email.id}>
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
                     {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}
-                  </React.Fragment>
+                  </div>
                 );
               })}
-            </MuiList>
+            </div>
+
             {loadingMore && (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
                 <CircularProgress size={24} />

@@ -12,6 +12,8 @@ import {
   Typography,
   CircularProgress,
   Chip,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import { X, Send, Paperclip, Check, FileText, Trash2 } from 'lucide-react';
 import type { SendEmailPayload, EmailAttachmentUpload } from '@/lib/api/email';
@@ -91,6 +93,9 @@ export function ComposeDialog({
   onSent,
   onError,
 }: ComposeDialogProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
   // Form state
   const [to, setTo] = useState('');
   const [cc, setCc] = useState('');
@@ -315,10 +320,11 @@ export function ComposeDialog({
       onClose={handleClose}
       maxWidth="md"
       fullWidth
+      fullScreen={isMobile}
       PaperProps={{
         sx: {
-          height: '80vh',
-          maxHeight: 800,
+          height: isMobile ? '100%' : '80vh',
+          maxHeight: isMobile ? '100%' : 800,
         },
       }}
     >
@@ -513,6 +519,7 @@ export function ComposeDialog({
             onChange={handleFileSelect}
             style={{ display: 'none' }}
             accept="*/*"
+            aria-label="Attach files"
           />
           {/* Attach files button */}
           <IconButton

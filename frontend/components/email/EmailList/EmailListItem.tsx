@@ -10,7 +10,6 @@ import {
   Divider,
 } from '@mui/material';
 import { Star, Paperclip, Tag } from 'lucide-react';
-import { useDraggable } from '@dnd-kit/core';
 import type { Email } from '@/stores/email-store';
 import { useLabelStore } from '@/stores/label-store';
 
@@ -107,22 +106,6 @@ export const EmailListItem = React.memo<EmailListItemProps>(
     const fromData = parseEmailFrom(email.from);
     const { getLabelById } = useLabelStore();
 
-    // Setup draggable functionality
-    const { attributes: _attributes, listeners: _listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: email.id,
-      data: {
-        type: 'email',
-        email,
-      },
-    });
-
-    // Apply transform for drag visual feedback
-    const style = transform
-      ? {
-          transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        }
-      : undefined;
-
     const handleClick = (e: React.MouseEvent) => {
       // Don't trigger email open if clicking on checkbox or star button
       if ((e.target as HTMLElement).closest('.MuiCheckbox-root, .MuiIconButton-root')) {
@@ -134,9 +117,6 @@ export const EmailListItem = React.memo<EmailListItemProps>(
     return (
       <>
         <ListItemButton
-          ref={setNodeRef}
-          // {...listeners}
-          // {...attributes}
           selected={selected}
           onClick={handleClick}
           sx={{
@@ -146,13 +126,11 @@ export const EmailListItem = React.memo<EmailListItemProps>(
             gap: 2,
             alignItems: 'flex-start',
             bgcolor: email.isRead ? 'transparent' : 'action.hover',
-            opacity: isDragging ? 0.5 : 1,
-            cursor: isDragging ? 'grabbing' : 'pointer',
-            transition: 'opacity 0.2s ease',
+            cursor: 'pointer',
+            transition: 'background-color 0.2s ease',
             '&.Mui-selected': {
               bgcolor: 'action.selected',
             },
-            ...style,
           }}
         >
           {/* Multi-select Checkbox */}

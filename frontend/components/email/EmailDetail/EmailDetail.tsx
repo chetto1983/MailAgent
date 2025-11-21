@@ -250,40 +250,48 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
     }
   }, [email.id, summary, showSummary]);
 
-  // Auto-load AI features on email open
+  // Handle categorize email (manual trigger)
+  const handleCategorize = useCallback(async () => {
+    if (categories.length > 0) {
+      // Already loaded, do nothing (cached)
+      return;
+    }
+
+    try {
+      setLoadingCategories(true);
+      const categorizeResponse = await emailApi.categorizeEmail(email.id);
+      setCategories(categorizeResponse.data.categories);
+    } catch (error) {
+      console.error('Failed to categorize email:', error);
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, [email.id, categories.length]);
+
+  // Handle generate smart replies (manual trigger)
+  const handleGenerateSmartReplies = useCallback(async () => {
+    if (smartReplies.length > 0) {
+      // Already loaded, do nothing (cached)
+      return;
+    }
+
+    try {
+      setLoadingSmartReplies(true);
+      const replyResponse = await emailApi.generateSmartReply(email.id, 'it');
+      setSmartReplies(replyResponse.data.replies);
+    } catch (error) {
+      console.error('Failed to generate smart replies:', error);
+    } finally {
+      setLoadingSmartReplies(false);
+    }
+  }, [email.id, smartReplies.length]);
+
+  // Reset AI features when email changes
   useEffect(() => {
-    // Reset AI features when email changes
     setSummary(null);
     setShowSummary(false);
     setSmartReplies([]);
     setCategories([]);
-
-    // Auto-load categories and smart replies
-    const loadAIFeatures = async () => {
-      try {
-        // Load categories
-        setLoadingCategories(true);
-        const categorizeResponse = await emailApi.categorizeEmail(email.id);
-        setCategories(categorizeResponse.data.categories);
-      } catch (error) {
-        console.error('Failed to categorize email:', error);
-      } finally {
-        setLoadingCategories(false);
-      }
-
-      try {
-        // Load smart replies
-        setLoadingSmartReplies(true);
-        const replyResponse = await emailApi.generateSmartReply(email.id, 'it');
-        setSmartReplies(replyResponse.data.replies);
-      } catch (error) {
-        console.error('Failed to generate smart replies:', error);
-      } finally {
-        setLoadingSmartReplies(false);
-      }
-    };
-
-    loadAIFeatures();
   }, [email.id]);
 
   // Email body as pure HTML (no sanitization)
@@ -319,6 +327,34 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
           </Tooltip>
         )}
         <Box sx={{ flex: 1 }} />
+        <Tooltip title={categories.length > 0 ? 'Categories loaded' : 'Categorize with AI'}>
+          <IconButton
+            size="small"
+            onClick={handleCategorize}
+            disabled={loadingCategories}
+            color={categories.length > 0 ? 'primary' : 'default'}
+          >
+            {loadingCategories ? (
+              <CircularProgress size={18} />
+            ) : (
+              <Tag size={18} />
+            )}
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={smartReplies.length > 0 ? 'Smart Replies loaded' : 'Generate Smart Replies'}>
+          <IconButton
+            size="small"
+            onClick={handleGenerateSmartReplies}
+            disabled={loadingSmartReplies}
+            color={smartReplies.length > 0 ? 'primary' : 'default'}
+          >
+            {loadingSmartReplies ? (
+              <CircularProgress size={18} />
+            ) : (
+              <Reply size={18} />
+            )}
+          </IconButton>
+        </Tooltip>
         <Tooltip title={summary ? (showSummary ? 'Hide Summary' : 'Show Summary') : 'Summarize with AI'}>
           <IconButton
             size="small"
