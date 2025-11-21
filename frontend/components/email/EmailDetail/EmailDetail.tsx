@@ -312,7 +312,7 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
         }}
       >
         {onClose && (
-          <Tooltip title="Back">
+          <Tooltip title={t.dashboard.emailView.back}>
             <IconButton size="small" onClick={onClose}>
               <ArrowLeft size={18} />
             </IconButton>
@@ -334,7 +334,7 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
           </IconButton>
         </Tooltip>
         {onArchive && (
-          <Tooltip title="Archive">
+          <Tooltip title={t.dashboard.emailView.archive}>
             <IconButton size="small" onClick={() => onArchive(email.id)}>
               <Archive size={18} />
             </IconButton>
@@ -348,7 +348,7 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
           </Tooltip>
         )}
         {onMoreOptions && (
-          <Tooltip title="More">
+          <Tooltip title={t.dashboard.emailView.more}>
             <IconButton size="small" onClick={onMoreOptions}>
               <MoreVertical size={18} />
             </IconButton>
@@ -500,7 +500,7 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
                       {formatFileSize(attachment.size)}
                     </Typography>
                   </Box>
-                  <Tooltip title="Download">
+                  <Tooltip title={t.dashboard.emailView.download}>
                     <IconButton
                       size="small"
                       onClick={() => handleDownloadAttachment(attachment.id)}

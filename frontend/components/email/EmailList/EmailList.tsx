@@ -326,12 +326,12 @@ export const EmailList: React.FC<EmailListProps> = ({
               </Typography>
               {onBulkMarkAsRead && (
                 <>
-                  <Tooltip title="Mark as read">
+                  <Tooltip title={t.dashboard.emailList.markAsRead}>
                     <IconButton size="small" onClick={() => handleBulkMarkAsRead(true)}>
                       <MailCheck size={18} />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Mark as unread">
+                  <Tooltip title={t.dashboard.emailList.markAsUnread}>
                     <IconButton size="small" onClick={() => handleBulkMarkAsRead(false)}>
                       <MailOpen size={18} />
                     </IconButton>
@@ -339,7 +339,7 @@ export const EmailList: React.FC<EmailListProps> = ({
                 </>
               )}
               {onBulkArchive && (
-                <Tooltip title="Archive">
+                <Tooltip title={t.dashboard.emailList.archive}>
                   <IconButton size="small" onClick={handleBulkArchive}>
                     <Archive size={18} />
                   </IconButton>
