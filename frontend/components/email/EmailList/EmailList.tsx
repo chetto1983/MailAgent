@@ -196,7 +196,6 @@ export const EmailList: React.FC<EmailListProps> = ({
   // Filter emails by search query
   const filteredEmails = useMemo(() => {
     if (!searchQuery.trim()) {
-      console.log('[DEBUG EmailList] No search query, returning all emails:', emails.length);
       return emails;
     }
 
@@ -207,9 +206,18 @@ export const EmailList: React.FC<EmailListProps> = ({
         email.from?.toLowerCase().includes(query) ||
         email.bodyPreview?.toLowerCase().includes(query)
     );
-    console.log('[DEBUG EmailList] Filtered emails:', filtered.length, 'from', emails.length);
     return filtered;
   }, [emails, searchQuery]);
+
+  // Check if all emails are selected
+  const allSelected = useMemo(() => {
+    return filteredEmails.length > 0 && selectedIds.size === filteredEmails.length;
+  }, [filteredEmails, selectedIds]);
+
+  // Check if some (but not all) emails are selected
+  const someSelected = useMemo(() => {
+    return selectedIds.size > 0 && selectedIds.size < filteredEmails.length;
+  }, [filteredEmails, selectedIds]);
 
   // Handle select all
   const handleSelectAll = useCallback(
@@ -354,7 +362,11 @@ export const EmailList: React.FC<EmailListProps> = ({
             </>
           ) : (
             <>
-              <Checkbox onChange={handleSelectAll} />
+              <Checkbox
+                checked={allSelected}
+                indeterminate={someSelected}
+                onChange={handleSelectAll}
+              />
               {onRefresh && (
                 <Tooltip title={t.common.refresh}>
                   <IconButton size="small" onClick={handleRefresh} disabled={refreshing}>
@@ -387,7 +399,7 @@ export const EmailList: React.FC<EmailListProps> = ({
             }}
           />
           {onAdvancedSearch && (
-            <Tooltip title="Advanced Search">
+            <Tooltip title={t.dashboard.emailList.advancedSearch}>
               <IconButton
                 size="small"
                 onClick={onAdvancedSearch}
@@ -406,16 +418,6 @@ export const EmailList: React.FC<EmailListProps> = ({
 
       {/* Email List */}
       <Box sx={{ flex: 1, overflow: 'auto' }} onScroll={handleScroll}>
-        {(() => {
-          console.log('[DEBUG EmailList] Rendering decision:', {
-            loading,
-            filteredEmailsLength: filteredEmails.length,
-            willShowLoading: loading,
-            willShowEmpty: !loading && filteredEmails.length === 0,
-            willShowList: !loading && filteredEmails.length > 0
-          });
-          return null;
-        })()}
         {loading ? (
           <Box sx={{ px: 2, pt: 2 }}>
             {[...Array(8)].map((_, i) => (
@@ -439,18 +441,15 @@ export const EmailList: React.FC<EmailListProps> = ({
           <Box sx={{ textAlign: 'center', py: 4, px: 2 }}>
             <Mail size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
             <Typography variant="body2" color="text.secondary">
-              {emptyMessage || 'No emails found'}
+              {emptyMessage || t.dashboard.emailList.empty}
             </Typography>
           </Box>
         ) : (
           <>
             <MuiList disablePadding>
-              {filteredEmails.map((email, index) => {
+              {filteredEmails.map((email) => {
                 const isSelected = selectedEmailId === email.id;
                 const isMultiSelected = selectedIds.has(email.id);
-                if (index === 0) {
-                  console.log('[DEBUG EmailList] Rendering first email, onEmailClick:', typeof onEmailClick);
-                }
                 return (
                   <React.Fragment key={email.id}>
                     {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}

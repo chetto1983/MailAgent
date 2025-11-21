@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box } from '@mui/material';
+import { Box, Drawer, useMediaQuery, useTheme } from '@mui/material';
 
 /**
  * Props for EmailLayout component
@@ -26,26 +26,43 @@ interface EmailLayoutProps {
   showDetail?: boolean;
 
   /**
-   * Custom height for the layout (default: 'calc(100vh - 64px)')
+   * Whether sidebar is open on mobile
+   */
+  sidebarOpen?: boolean;
+
+  /**
+   * Callback to close mobile sidebar
+   */
+  onSidebarClose?: () => void;
+
+  /**
+   * Custom height for the layout (default: '100vh')
    */
   height?: string;
 }
 
 /**
- * EmailLayout - Main layout container for email interface
+ * EmailLayout - Gmail/Outlook-style email interface
  *
- * Provides a 3-column layout:
- * - Sidebar (240px on desktop, full width on mobile)
- * - Email List (flex: 1)
- * - Email Detail (flex: 1, optional)
+ * Desktop (>= md):
+ * - Fixed sidebar (240px)
+ * - Email list (flex: 1)
+ * - Detail panel (flex: 1) when email selected
+ *
+ * Mobile (< md):
+ * - Drawer sidebar (swipeable)
+ * - Fullscreen email list
+ * - Fullscreen detail panel over list
  *
  * @example
  * ```tsx
  * <EmailLayout
  *   sidebar={<EmailSidebar />}
  *   list={<EmailList />}
- *   detail={<EmailDetail email={selectedEmail} />}
+ *   detail={<EmailDetail />}
  *   showDetail={!!selectedEmail}
+ *   sidebarOpen={mobileDrawerOpen}
+ *   onSidebarClose={() => setMobileDrawerOpen(false)}
  * />
  * ```
  */
@@ -54,8 +71,13 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
   list,
   detail,
   showDetail = false,
-  height = 'calc(100vh - 64px)',
+  sidebarOpen = false,
+  onSidebarClose,
+  height = '100vh',
 }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   return (
     <Box
       sx={{
@@ -63,52 +85,90 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
         display: 'flex',
         overflow: 'hidden',
         position: 'relative',
+        width: '100%',
       }}
     >
-      {/* Sidebar - hidden on mobile when detail is shown */}
-      <Box
-        sx={{
-          width: { xs: '100%', sm: 240 },
-          borderRight: { xs: 0, sm: 1 },
-          borderColor: 'divider',
-          display: showDetail ? { xs: 'none', sm: 'flex' } : { xs: 'flex', sm: 'flex' },
-          flexDirection: 'column',
-          overflow: 'hidden',
-          flexShrink: 0,
-        }}
-      >
-        {sidebar}
-      </Box>
+      {/* Desktop Sidebar - Fixed */}
+      {!isMobile && (
+        <Box
+          sx={{
+            width: 240,
+            borderRight: 1,
+            borderColor: 'divider',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            flexShrink: 0,
+            bgcolor: 'background.paper',
+          }}
+        >
+          {sidebar}
+        </Box>
+      )}
 
-      {/* Email List - hidden on mobile when detail is shown */}
+      {/* Mobile Sidebar - Drawer */}
+      {isMobile && (
+        <Drawer
+          variant="temporary"
+          open={sidebarOpen}
+          onClose={onSidebarClose}
+          ModalProps={{ keepMounted: true }}
+          sx={{
+            '& .MuiDrawer-paper': {
+              width: 280,
+              boxSizing: 'border-box',
+            },
+          }}
+        >
+          {sidebar}
+        </Drawer>
+      )}
+
+      {/* Email List - Hidden on mobile when detail shown */}
       <Box
         sx={{
           flex: 1,
-          borderRight: { xs: 0, sm: 1 },
+          borderRight: { xs: 0, md: showDetail ? 1 : 0 },
           borderColor: 'divider',
-          display: showDetail ? { xs: 'none', sm: 'flex' } : { xs: 'flex', sm: 'flex' },
+          display: isMobile && showDetail ? 'none' : 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          bgcolor: 'background.default',
         }}
       >
         {list}
       </Box>
 
-      {/* Email Detail - fullscreen on mobile, side panel on desktop */}
+      {/* Email Detail - Fullscreen on mobile, panel on desktop */}
       {showDetail && detail && (
         <Box
           sx={{
-            flex: 1,
+            flex: isMobile ? 'none' : 1,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            position: { xs: 'fixed', sm: 'relative' },
-            top: { xs: 64, sm: 'auto' },
-            left: { xs: 0, sm: 'auto' },
-            right: { xs: 0, sm: 'auto' },
-            bottom: { xs: 0, sm: 'auto' },
-            zIndex: { xs: 1200, sm: 'auto' },
+            position: isMobile ? 'fixed' : 'relative',
+            top: isMobile ? 0 : 'auto',
+            left: isMobile ? 0 : 'auto',
+            right: isMobile ? 0 : 'auto',
+            bottom: isMobile ? 0 : 'auto',
+            width: isMobile ? '100%' : 'auto',
+            height: isMobile ? '100%' : 'auto',
+            zIndex: isMobile ? 1300 : 'auto',
             bgcolor: 'background.paper',
+            // Smooth transitions for mobile slide-in effect
+            transition: isMobile
+              ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              : 'none',
+            animation: isMobile ? 'slideInRight 0.3s ease-out' : 'none',
+            '@keyframes slideInRight': {
+              '0%': {
+                transform: 'translateX(100%)',
+              },
+              '100%': {
+                transform: 'translateX(0)',
+              },
+            },
           }}
         >
           {detail}

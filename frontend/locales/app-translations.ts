@@ -356,6 +356,10 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         empty: 'No emails match your filters.',
         threads: { singular: 'thread', plural: 'threads' },
         inboxLabel: 'Inbox',
+        advancedSearch: 'Advanced Search',
+        emailListView: 'Email List',
+        conversationView: 'Conversation View',
+        openSidebar: 'Open sidebar',
       },
       emailView: {
         folderLabel: 'Folder',
@@ -1190,6 +1194,10 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         empty: 'Nessuna email corrisponde ai filtri.',
         threads: { singular: 'thread', plural: 'thread' },
         inboxLabel: 'Posta in arrivo',
+        advancedSearch: 'Ricerca Avanzata',
+        emailListView: 'Elenco Email',
+        conversationView: 'Vista Conversazione',
+        openSidebar: 'Apri barra laterale',
       },
       emailView: {
         folderLabel: 'Cartella',

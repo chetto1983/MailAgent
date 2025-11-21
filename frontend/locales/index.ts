@@ -286,6 +286,10 @@ export interface AppTranslations {
       empty: string;
       threads: { singular: string; plural: string };
       inboxLabel: string;
+      advancedSearch: string;
+      emailListView: string;
+      conversationView: string;
+      openSidebar: string;
     };
     emailView: {
       folderLabel: string;
