@@ -425,17 +425,20 @@ export function Mailbox() {
           total: filteredEmails.length,
         });
       } else {
+        // Build query params with proper priority: advanced filters override quick filters
         const queryParams: EmailListParams = {
           limit: 50,
           page: 1,
           ...currentActiveFolder.queryOverrides,
           search: advancedFilters.searchQuery || searchQuery || undefined,
           from: advancedFilters.from || undefined,
-          startDate: advancedFilters.startDate || undefined,
-          endDate: advancedFilters.endDate || undefined,
-          hasAttachments: advancedFilters.hasAttachments || undefined,
-          isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
-          isStarred: advancedFilters.isStarred || undefined,
+          // Only override date filters if advanced filters are set
+          ...(advancedFilters.startDate ? { startDate: advancedFilters.startDate } : {}),
+          ...(advancedFilters.endDate ? { endDate: advancedFilters.endDate } : {}),
+          // Only override boolean filters if advanced filters are explicitly set
+          ...(advancedFilters.hasAttachments !== undefined ? { hasAttachments: advancedFilters.hasAttachments } : {}),
+          ...(advancedFilters.isRead !== null ? { isRead: advancedFilters.isRead } : {}),
+          ...(advancedFilters.isStarred !== undefined ? { isStarred: advancedFilters.isStarred } : {}),
         };
 
         const emailsRes = await emailApi.listEmails(queryParams);
@@ -473,11 +476,13 @@ export function Mailbox() {
         ...activeFolder.queryOverrides,
         search: advancedFilters.searchQuery || searchQuery || undefined,
         from: advancedFilters.from || undefined,
-        startDate: advancedFilters.startDate || undefined,
-        endDate: advancedFilters.endDate || undefined,
-        hasAttachments: advancedFilters.hasAttachments || undefined,
-        isRead: advancedFilters.isRead !== null ? advancedFilters.isRead : undefined,
-        isStarred: advancedFilters.isStarred || undefined,
+        // Only override date filters if advanced filters are set
+        ...(advancedFilters.startDate ? { startDate: advancedFilters.startDate } : {}),
+        ...(advancedFilters.endDate ? { endDate: advancedFilters.endDate } : {}),
+        // Only override boolean filters if advanced filters are explicitly set
+        ...(advancedFilters.hasAttachments !== undefined ? { hasAttachments: advancedFilters.hasAttachments } : {}),
+        ...(advancedFilters.isRead !== null ? { isRead: advancedFilters.isRead } : {}),
+        ...(advancedFilters.isStarred !== undefined ? { isStarred: advancedFilters.isStarred } : {}),
       };
 
       const emailsRes = await emailApi.listEmails(queryParams);
