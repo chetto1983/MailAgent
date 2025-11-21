@@ -93,7 +93,7 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
       {!isMobile && (
         <Box
           sx={{
-            width: 240,
+            width: 220, // Reduced from 240px to 220px
             borderRight: 1,
             borderColor: 'divider',
             display: 'flex',
@@ -129,7 +129,10 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
       {/* Email List - Hidden on mobile when detail shown */}
       <Box
         sx={{
-          flex: 1,
+          // When detail is open, use fixed width; otherwise take full space
+          width: showDetail && !isMobile ? 400 : 'auto',
+          flex: showDetail && !isMobile ? '0 0 400px' : 1,
+          minWidth: showDetail && !isMobile ? 400 : 'auto',
           borderRight: { xs: 0, md: showDetail ? 1 : 0 },
           borderColor: 'divider',
           display: isMobile && showDetail ? 'none' : 'flex',
@@ -145,7 +148,9 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
       {showDetail && detail && (
         <Box
           sx={{
-            flex: isMobile ? 'none' : 1,
+            // Take all remaining space on desktop
+            flex: isMobile ? 'none' : '1 1 auto',
+            minWidth: 0, // Allow flex shrink
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
