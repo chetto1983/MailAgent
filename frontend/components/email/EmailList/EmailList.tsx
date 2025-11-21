@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { Search, RefreshCw, Trash2, Mail, Archive, MailOpen, MailCheck, SlidersHorizontal } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { throttle } from 'lodash-es';
 import type { Email } from '@/stores/email-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
 
@@ -285,19 +286,20 @@ export const EmailList: React.FC<EmailListProps> = ({
     overscan: 5, // Render 5 items above/below viewport
   });
 
-  // Handle infinite scroll with virtualizer
-  const handleScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      if (!hasMore || loadingMore || !onLoadMore) return;
+  // Handle infinite scroll with virtualizer (throttled for performance)
+  const handleScroll = useMemo(
+    () =>
+      throttle((e: React.UIEvent<HTMLDivElement>) => {
+        if (!hasMore || loadingMore || !onLoadMore) return;
 
-      const target = e.currentTarget;
-      const scrollBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+        const target = e.currentTarget;
+        const scrollBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
 
-      // Load more when within 200px of bottom
-      if (scrollBottom < 200) {
-        onLoadMore();
-      }
-    },
+        // Load more when within 200px of bottom
+        if (scrollBottom < 200) {
+          onLoadMore();
+        }
+      }, 300), // Throttle to max once per 300ms
     [hasMore, loadingMore, onLoadMore]
   );
 
