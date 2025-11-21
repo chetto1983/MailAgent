@@ -78,6 +78,11 @@ interface EmailListProps {
   searchPlaceholder?: string;
 
   /**
+   * View mode toggle button to display in toolbar
+   */
+  viewModeToggle?: React.ReactNode;
+
+  /**
    * Render function for each email item
    */
   renderItem: (
@@ -164,6 +169,7 @@ export const EmailList: React.FC<EmailListProps> = ({
   onBulkMarkAsRead,
   emptyMessage,
   searchPlaceholder,
+  viewModeToggle,
   renderItem,
   onLoadMore,
   hasMore = false,
@@ -395,6 +401,7 @@ export const EmailList: React.FC<EmailListProps> = ({
                   </IconButton>
                 </Tooltip>
               )}
+              {viewModeToggle}
               <Box sx={{ flex: 1 }} />
               <Typography variant="caption" color="text.secondary">
                 {filteredEmails.length > 0 ? `1-${filteredEmails.length}` : '0'} of {emails.length}

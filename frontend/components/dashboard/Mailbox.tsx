@@ -8,9 +8,8 @@ import {
   Calendar as CalendarIcon,
   List as ListIcon,
   MessageSquare,
-  Menu as MenuIcon,
 } from 'lucide-react';
-import { Snackbar, Alert as MuiAlert, Box, ToggleButtonGroup, ToggleButton, Tooltip, IconButton, useMediaQuery, useTheme } from '@mui/material';
+import { Snackbar, Alert as MuiAlert, Box, ToggleButtonGroup, ToggleButton, Tooltip, useMediaQuery, useTheme } from '@mui/material';
 import { debounce } from 'lodash-es';
 import { emailApi, type EmailListParams, type Conversation } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
@@ -822,78 +821,6 @@ export function Mailbox() {
         }
         list={
           <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Header with Hamburger Menu and View Mode Toggle */}
-            <Box
-              sx={{
-                p: 1,
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                bgcolor: 'background.paper',
-              }}
-            >
-              {/* Hamburger Menu (Mobile only) */}
-              {isMobile && (
-                <IconButton
-                  edge="start"
-                  onClick={() => setMobileSidebarOpen(true)}
-                  sx={{ width: 40, height: 40 }}
-                  aria-label={t.dashboard.emailList.openSidebar}
-                >
-                  <MenuIcon size={20} />
-                </IconButton>
-              )}
-
-              {/* View Mode Toggle (Center) */}
-              <Box
-                sx={{
-                  flex: 1,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  minWidth: 0,
-                }}
-              >
-                <ToggleButtonGroup
-                  value={viewMode}
-                  exclusive
-                  onChange={handleViewModeChange}
-                  size="small"
-                  aria-label="view mode"
-                  sx={{
-                    bgcolor: 'background.default',
-                    '& .MuiToggleButton-root': {
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      '&.Mui-selected': {
-                        bgcolor: 'primary.main',
-                        color: 'primary.contrastText',
-                        '&:hover': {
-                          bgcolor: 'primary.dark',
-                        },
-                      },
-                    },
-                  }}
-                >
-                  <ToggleButton value="list" aria-label="list view">
-                    <Tooltip title={t.dashboard.emailList.emailListView}>
-                      <ListIcon size={18} />
-                    </Tooltip>
-                  </ToggleButton>
-                  <ToggleButton value="conversation" aria-label="conversation view">
-                    <Tooltip title={t.dashboard.emailList.conversationView}>
-                      <MessageSquare size={18} />
-                    </Tooltip>
-                  </ToggleButton>
-                </ToggleButtonGroup>
-              </Box>
-
-              {/* Spacer for symmetry (Mobile only) */}
-              {isMobile && <Box sx={{ width: 40 }} />}
-            </Box>
-
             {/* Bulk Action Bar */}
             {viewMode === 'list' && (
               <BulkActionBar
@@ -931,6 +858,40 @@ export function Mailbox() {
                   loadingMore={loadingMore}
                   onAdvancedSearch={() => setAdvancedSearchOpen(true)}
                   hasActiveFilters={hasActiveFilters}
+                  viewModeToggle={
+                    <ToggleButtonGroup
+                      value={viewMode}
+                      exclusive
+                      onChange={handleViewModeChange}
+                      size="small"
+                      aria-label="view mode"
+                      sx={{
+                        bgcolor: 'background.default',
+                        '& .MuiToggleButton-root': {
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          '&.Mui-selected': {
+                            bgcolor: 'primary.main',
+                            color: 'primary.contrastText',
+                            '&:hover': {
+                              bgcolor: 'primary.dark',
+                            },
+                          },
+                        },
+                      }}
+                    >
+                      <ToggleButton value="list" aria-label="list view">
+                        <Tooltip title={t.dashboard.emailList.emailListView}>
+                          <ListIcon size={18} />
+                        </Tooltip>
+                      </ToggleButton>
+                      <ToggleButton value="conversation" aria-label="conversation view">
+                        <Tooltip title={t.dashboard.emailList.conversationView}>
+                          <MessageSquare size={18} />
+                        </Tooltip>
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  }
                   renderItem={(email, isSelected, isMultiSelected, onToggleSelect, onEmailClick) => (
                     <EmailListItem
                       email={email}
