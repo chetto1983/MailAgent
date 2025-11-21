@@ -349,7 +349,15 @@ export function ComposeDialog({
               />
             )}
           </Box>
-          <IconButton size="small" onClick={handleClose} disabled={sending}>
+          <IconButton
+            size="small"
+            onClick={handleClose}
+            disabled={sending}
+            sx={{
+              width: { xs: 44, sm: 'auto' },
+              height: { xs: 44, sm: 'auto' },
+            }}
+          >
             <X size={20} />
           </IconButton>
         </Box>
@@ -527,6 +535,10 @@ export function ComposeDialog({
             onClick={() => fileInputRef.current?.click()}
             disabled={sending || uploading}
             title="Attach files"
+            sx={{
+              width: { xs: 44, sm: 'auto' },
+              height: { xs: 44, sm: 'auto' },
+            }}
           >
             {uploading ? <CircularProgress size={18} /> : <Paperclip size={18} />}
           </IconButton>

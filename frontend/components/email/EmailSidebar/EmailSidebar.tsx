@@ -366,7 +366,14 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
               </Typography>
             </Stack>
             {onManageLabels && (
-              <IconButton size="small" onClick={onManageLabels}>
+              <IconButton
+                size="small"
+                onClick={onManageLabels}
+                sx={{
+                  width: { xs: 44, sm: 'auto' },
+                  height: { xs: 44, sm: 'auto' },
+                }}
+              >
                 <Settings size={14} />
               </IconButton>
             )}

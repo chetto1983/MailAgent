@@ -321,7 +321,14 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
       >
         {onClose && (
           <Tooltip title={t.dashboard.emailView.back}>
-            <IconButton size="small" onClick={onClose}>
+            <IconButton
+              size="small"
+              onClick={onClose}
+              sx={{
+                width: { xs: 44, sm: 'auto' },
+                height: { xs: 44, sm: 'auto' },
+              }}
+            >
               <ArrowLeft size={18} />
             </IconButton>
           </Tooltip>
@@ -333,6 +340,10 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
             onClick={handleCategorize}
             disabled={loadingCategories}
             color={categories.length > 0 ? 'primary' : 'default'}
+            sx={{
+              width: { xs: 44, sm: 'auto' },
+              height: { xs: 44, sm: 'auto' },
+            }}
           >
             {loadingCategories ? (
               <CircularProgress size={18} />
@@ -347,6 +358,10 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
             onClick={handleGenerateSmartReplies}
             disabled={loadingSmartReplies}
             color={smartReplies.length > 0 ? 'primary' : 'default'}
+            sx={{
+              width: { xs: 44, sm: 'auto' },
+              height: { xs: 44, sm: 'auto' },
+            }}
           >
             {loadingSmartReplies ? (
               <CircularProgress size={18} />
@@ -361,6 +376,10 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
             onClick={handleSummarize}
             disabled={loadingSummary}
             color={summary ? 'primary' : 'default'}
+            sx={{
+              width: { xs: 44, sm: 'auto' },
+              height: { xs: 44, sm: 'auto' },
+            }}
           >
             {loadingSummary ? (
               <CircularProgress size={18} />
@@ -371,21 +390,42 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
         </Tooltip>
         {onArchive && (
           <Tooltip title={t.dashboard.emailView.archive}>
-            <IconButton size="small" onClick={() => onArchive(email.id)}>
+            <IconButton
+              size="small"
+              onClick={() => onArchive(email.id)}
+              sx={{
+                width: { xs: 44, sm: 'auto' },
+                height: { xs: 44, sm: 'auto' },
+              }}
+            >
               <Archive size={18} />
             </IconButton>
           </Tooltip>
         )}
         {onDelete && (
           <Tooltip title={t.common.delete}>
-            <IconButton size="small" onClick={() => onDelete(email.id)}>
+            <IconButton
+              size="small"
+              onClick={() => onDelete(email.id)}
+              sx={{
+                width: { xs: 44, sm: 'auto' },
+                height: { xs: 44, sm: 'auto' },
+              }}
+            >
               <Trash2 size={18} />
             </IconButton>
           </Tooltip>
         )}
         {onMoreOptions && (
           <Tooltip title={t.dashboard.emailView.more}>
-            <IconButton size="small" onClick={onMoreOptions}>
+            <IconButton
+              size="small"
+              onClick={onMoreOptions}
+              sx={{
+                width: { xs: 44, sm: 'auto' },
+                height: { xs: 44, sm: 'auto' },
+              }}
+            >
               <MoreVertical size={18} />
             </IconButton>
           </Tooltip>
@@ -541,6 +581,10 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
                       size="small"
                       onClick={() => handleDownloadAttachment(attachment.id)}
                       disabled={downloadingAttachmentId === attachment.id}
+                      sx={{
+                        width: { xs: 44, sm: 'auto' },
+                        height: { xs: 44, sm: 'auto' },
+                      }}
                     >
                       {downloadingAttachmentId === attachment.id ? (
                         <CircularProgress size={16} />

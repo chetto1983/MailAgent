@@ -119,7 +119,11 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
           <IconButton
             size="small"
             onClick={onClearSelection}
-            sx={{ color: 'inherit' }}
+            sx={{
+              color: 'inherit',
+              width: { xs: 44, sm: 'auto' },
+              height: { xs: 44, sm: 'auto' },
+            }}
             disabled={loading !== null}
           >
             <X size={20} />
@@ -160,7 +164,11 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
                   size="small"
                   onClick={() => handleAction(onMarkRead, 'markRead')}
                   disabled={loading !== null}
-                  sx={{ color: 'inherit' }}
+                  sx={{
+                    color: 'inherit',
+                    width: { xs: 44, sm: 'auto' },
+                    height: { xs: 44, sm: 'auto' },
+                  }}
                 >
                   {loading === 'markRead' ? (
                     <CircularProgress size={20} color="inherit" />
@@ -180,7 +188,11 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
                   size="small"
                   onClick={() => handleAction(onMarkUnread, 'markUnread')}
                   disabled={loading !== null}
-                  sx={{ color: 'inherit' }}
+                  sx={{
+                    color: 'inherit',
+                    width: { xs: 44, sm: 'auto' },
+                    height: { xs: 44, sm: 'auto' },
+                  }}
                 >
                   {loading === 'markUnread' ? (
                     <CircularProgress size={20} color="inherit" />
@@ -199,7 +211,11 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
                 size="small"
                 onClick={() => handleAction(onDelete, 'delete')}
                 disabled={loading !== null}
-                sx={{ color: 'inherit' }}
+                sx={{
+                  color: 'inherit',
+                  width: { xs: 44, sm: 'auto' },
+                  height: { xs: 44, sm: 'auto' },
+                }}
               >
                 {loading === 'delete' ? (
                   <CircularProgress size={20} color="inherit" />
@@ -217,7 +233,11 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
                 size="small"
                 onClick={handleMoreClick}
                 disabled={loading !== null}
-                sx={{ color: 'inherit' }}
+                sx={{
+                  color: 'inherit',
+                  width: { xs: 44, sm: 'auto' },
+                  height: { xs: 44, sm: 'auto' },
+                }}
               >
                 <MoreVertical size={20} />
               </IconButton>
