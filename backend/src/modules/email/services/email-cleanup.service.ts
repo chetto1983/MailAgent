@@ -29,7 +29,8 @@ export class EmailCleanupService {
     }
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  // Run cleanup twice daily: at 3 AM and at noon (12 PM)
+  @Cron('0 3,12 * * *')
   async purgeDeletedEmailsCron() {
     if (!this.jobsEnabled) {
       return;
