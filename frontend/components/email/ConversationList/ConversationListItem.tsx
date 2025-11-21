@@ -119,7 +119,7 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
   onToggleStar,
 }) => {
   const t = useTranslations();
-  const fromData = parseEmailFrom(conversation.from);
+  const fromData = React.useMemo(() => parseEmailFrom(conversation.from), [conversation.from]);
   const participantCount = getParticipantCount(conversation);
   const hasMultipleParticipants = participantCount > 2;
 

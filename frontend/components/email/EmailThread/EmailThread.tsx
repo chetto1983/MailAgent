@@ -102,7 +102,7 @@ const ThreadMessage: React.FC<ThreadMessageProps> = ({
   onForward,
 }) => {
   const t = useTranslations();
-  const fromData = parseEmailFrom(email.from);
+  const fromData = React.useMemo(() => parseEmailFrom(email.from), [email.from]);
 
   // Email body as pure HTML (no sanitization)
   const emailBody = React.useMemo(() => {

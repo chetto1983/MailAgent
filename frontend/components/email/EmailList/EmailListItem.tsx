@@ -103,7 +103,7 @@ function formatDate(date: string | Date): string {
  */
 export const EmailListItem = React.memo<EmailListItemProps>(
   ({ email, selected = false, multiSelected = false, onToggleSelect, onToggleStar, getProviderIcon, onClick }) => {
-    const fromData = parseEmailFrom(email.from);
+    const fromData = React.useMemo(() => parseEmailFrom(email.from), [email.from]);
     const { getLabelById } = useLabelStore();
 
     const handleClick = (e: React.MouseEvent) => {
