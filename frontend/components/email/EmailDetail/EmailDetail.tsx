@@ -573,7 +573,24 @@ export const EmailDetail: React.FC<EmailDetailProps> = ({
               Smart Reply Suggestions
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+              maxHeight: { xs: '200px', sm: '300px' },
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              scrollBehavior: 'smooth',
+              '&::-webkit-scrollbar': {
+                width: '6px',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                bgcolor: 'action.hover',
+                borderRadius: '3px',
+              },
+            }}
+          >
             {smartReplies.map((reply, index) => (
               <Paper
                 key={index}
