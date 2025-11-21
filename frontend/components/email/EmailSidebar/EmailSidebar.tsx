@@ -270,6 +270,7 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
         display: 'flex',
         flexDirection: 'column',
         borderRadius: 0,
+        p: 0,
       }}
     >
       {/* Compose Button */}
