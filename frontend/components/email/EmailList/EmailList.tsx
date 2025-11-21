@@ -372,10 +372,22 @@ export const EmailList: React.FC<EmailListProps> = ({
                 checked={allSelected}
                 indeterminate={someSelected}
                 onChange={handleSelectAll}
+                sx={{
+                  width: { xs: 44, sm: 'auto' },
+                  height: { xs: 44, sm: 'auto' },
+                }}
               />
               {onRefresh && (
                 <Tooltip title={t.common.refresh}>
-                  <IconButton size="small" onClick={handleRefresh} disabled={refreshing}>
+                  <IconButton
+                    size="small"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    sx={{
+                      width: { xs: 44, sm: 'auto' },
+                      height: { xs: 44, sm: 'auto' },
+                    }}
+                  >
                     <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
                   </IconButton>
                 </Tooltip>
@@ -413,6 +425,8 @@ export const EmailList: React.FC<EmailListProps> = ({
                 sx={{
                   border: 1,
                   borderColor: hasActiveFilters ? 'primary.main' : 'divider',
+                  width: { xs: 44, sm: 'auto' },
+                  height: { xs: 44, sm: 'auto' },
                 }}
               >
                 <SlidersHorizontal size={18} />
