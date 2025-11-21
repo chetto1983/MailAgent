@@ -626,7 +626,7 @@ export function Mailbox() {
     try {
       await emailApi.bulkAddLabels(ids, labelIds);
       clearSelection();
-      await loadData(); // Reload to show updated labels
+      await handleRefresh(); // Reload to show updated labels
       setSnackbar({
         open: true,
         message: t.dashboard.email.messages.labelsAdded.replace('{count}', ids.length.toString()),
@@ -640,7 +640,7 @@ export function Mailbox() {
         severity: 'error',
       });
     }
-  }, [selectedIds, clearSelection, loadData, t.dashboard.email.messages.labelsAdded, t.dashboard.email.messages.labelsFailed]);
+  }, [selectedIds, clearSelection, handleRefresh, t.dashboard.email.messages.labelsAdded, t.dashboard.email.messages.labelsFailed]);
 
   const handleBulkMoveToFolder = useCallback(async (folder: string) => {
     const ids = Array.from(selectedIds);
@@ -759,11 +759,11 @@ export function Mailbox() {
 
         // Reload data when switching to list view if emails are empty
         if (newMode === 'list' && storeEmailsRef.current.length === 0) {
-          loadData();
+          handleRefresh();
         }
       }
     },
-    [setSelectedEmail, loadData]
+    [setSelectedEmail, handleRefresh]
   );
 
   // Handle conversation selection
@@ -967,7 +967,7 @@ export function Mailbox() {
             message: t.dashboard.email.messages.emailSent,
             severity: 'success',
           });
-          loadData(); // Refresh email list
+          handleRefresh(); // Refresh email list
         }}
         onError={(message) => {
           setSnackbar({
