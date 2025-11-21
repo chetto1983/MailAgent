@@ -336,9 +336,11 @@ export const EmailList: React.FC<EmailListProps> = ({
         {/* Actions Bar */}
         <Box
           sx={{
-            display: 'flex',
+            display: 'flex !important',
             alignItems: 'center',
             gap: 1,
+            minHeight: 48,
+            flexShrink: 0,
           }}
         >
           {selectedIds.size > 0 ? (
