@@ -17,9 +17,6 @@ import { useAuth } from '@/lib/hooks/use-auth';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { useSyncStore } from '@/stores/sync-store';
 
-const DRAWER_WIDTH_EXPANDED = 240;
-const DRAWER_WIDTH_COLLAPSED = 72;
-
 export interface LayoutProps {
   children: React.ReactNode;
 }
@@ -97,8 +94,6 @@ export function Layout({ children }: LayoutProps) {
     persistTheme(next);
   };
 
-  const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED;
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -119,19 +114,6 @@ export function Layout({ children }: LayoutProps) {
             display: 'flex',
             flexDirection: 'column',
             minHeight: '100vh',
-            width: {
-              xs: '100%',
-              md: `calc(100% - ${drawerWidth}px)`,
-            },
-            ml: {
-              xs: 0,
-              md: `${drawerWidth}px`,
-            },
-            transition: (theme) =>
-              theme.transitions.create(['margin', 'width'], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
           }}
         >
           {/* Header */}

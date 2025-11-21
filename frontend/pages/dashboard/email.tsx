@@ -24,9 +24,6 @@ import {
 } from '@/lib/utils/user-settings';
 import { useWebSocket } from '@/hooks/use-websocket';
 
-const DRAWER_WIDTH_EXPANDED = 240;
-const DRAWER_WIDTH_COLLAPSED = 72;
-
 /**
  * Email Page - Dedicated full-screen email management interface
  *
@@ -116,8 +113,6 @@ export default function EmailPage() {
     persistTheme(next);
   };
 
-  const drawerWidth = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH_EXPANDED;
-
   if (isLoading) {
     return (
       <Box
@@ -163,19 +158,6 @@ export default function EmailPage() {
             display: 'flex',
             flexDirection: 'column',
             minHeight: '100vh',
-            width: {
-              xs: '100%',
-              md: `calc(100% - ${drawerWidth}px)`,
-            },
-            ml: {
-              xs: 0,
-              md: `${drawerWidth}px`,
-            },
-            transition: (theme) =>
-              theme.transitions.create(['margin', 'width'], {
-                easing: theme.transitions.easing.sharp,
-                duration: theme.transitions.duration.enteringScreen,
-              }),
           }}
         >
           <Header
