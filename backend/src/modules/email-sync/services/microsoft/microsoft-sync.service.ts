@@ -6,6 +6,7 @@ import { CryptoService } from '../../../../common/services/crypto.service';
 import { SyncJobData, SyncJobResult } from '../../interfaces/sync-job.interface';
 import { EmailEmbeddingJob, EmailEmbeddingQueueService } from '../../../ai/services/email-embedding.queue';
 import { EmbeddingsService } from '../../../ai/services/embeddings.service';
+import { KnowledgeBaseService } from '../../../ai/services/knowledge-base.service';
 import { RealtimeEventsService } from '../../../realtime/services/realtime-events.service';
 import { EmailEventReason } from '../../../realtime/types/realtime.types';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,7 @@ import { ProviderTokenService } from '../provider-token.service';
 import { mergeEmailStatusMetadata } from '../../utils/email-metadata.util';
 import { RetryService } from '../../../../common/services/retry.service';
 import { AttachmentStorageService } from '../../../email/services/attachment.storage';
+import { StorageService } from '../../../email/services/storage.service';
 import { BaseEmailSyncService } from '../base-email-sync.service';
 import { MicrosoftAttachmentHandler } from './microsoft-attachment-handler';
 import { MicrosoftFolderService } from './microsoft-folder.service';
@@ -90,9 +92,11 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
     private crypto: CryptoService,
     private emailEmbeddingQueue: EmailEmbeddingQueueService,
     private embeddingsService: EmbeddingsService,
+    private knowledgeBaseService: KnowledgeBaseService,
     private readonly providerTokenService: ProviderTokenService,
     private retryService: RetryService,
     private attachmentStorage: AttachmentStorageService,
+    private storage: StorageService,
     private microsoftAttachmentHandler: MicrosoftAttachmentHandler,
     private microsoftFolderService: MicrosoftFolderService,
     private microsoftMessageParser: MicrosoftMessageParser,
@@ -859,22 +863,71 @@ export class MicrosoftSyncService extends BaseEmailSyncService {
       return;
     }
 
-    await this.prisma.email.updateMany({
-      where: {
-        providerId,
-        externalId,
-      },
-      data: {
-        isDeleted: true,
-        folder: 'TRASH',
-      },
+    // Hard delete: remove emails permanently from database
+    for (const record of affected) {
+      try {
+        await this.removeEmailPermanently(record.id, tenantId);
+        this.notifyMicrosoftMailboxChange(tenantId, providerId, 'message-deleted', {
+          emailId: record.id,
+          externalId,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Failed to remove Microsoft email ${record.id} (external: ${externalId}): ${message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Permanently remove an email from the database
+   * Includes cleanup of attachments, embeddings, and S3 storage
+   */
+  private async removeEmailPermanently(emailId: string, tenantId: string): Promise<void> {
+    // 1. Get attachments BEFORE deleting email
+    const attachments = await this.prisma.emailAttachment.findMany({
+      where: { emailId },
+      select: { storagePath: true, storageType: true },
     });
 
-    for (const record of affected) {
-      this.notifyMicrosoftMailboxChange(tenantId, providerId, 'message-deleted', {
-        emailId: record.id,
-        externalId,
+    // 2. Delete embeddings
+    try {
+      await this.knowledgeBaseService.deleteEmbeddingsForEmail(tenantId, emailId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Failed to delete embeddings for email ${emailId} during hard-delete: ${message}`,
+      );
+    }
+
+    // 3. Delete email from database (cascade deletes EmailAttachment records)
+    try {
+      await this.prisma.email.delete({
+        where: { id: emailId },
       });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to remove email ${emailId} from database: ${message}`);
+      throw error; // Re-throw to prevent S3 cleanup if DB deletion failed
+    }
+
+    // 4. Delete S3 files (after DB deletion)
+    const s3Keys = attachments
+      .filter((a) => a.storageType === 's3' && a.storagePath)
+      .map((a) => a.storagePath!);
+
+    if (s3Keys.length > 0) {
+      try {
+        const result = await this.storage.deleteObjects(s3Keys);
+        this.logger.debug(
+          `Deleted ${result.deleted} S3 objects for email ${emailId} (${result.failed} failed)`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Failed to delete S3 objects for email ${emailId}: ${message}`);
+        // Don't throw - email already deleted from DB
+      }
     }
   }
 

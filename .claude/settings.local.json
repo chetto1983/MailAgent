@@ -30,7 +30,11 @@
       "Bash(mkdir:*)",
       "Bash(npm test:*)",
       "Bash(npm run lint:win:*)",
-      "Bash(git -C d:/MailAgent branch:*)"
+      "Bash(git -C d:/MailAgent branch:*)",
+      "Bash(node check-webhooks.js:*)",
+      "Bash(node test-gmail-webhook.js:*)",
+      "Bash(node check-gmail-email-webhook.js:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []
