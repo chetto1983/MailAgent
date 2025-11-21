@@ -172,36 +172,36 @@ export function Mailbox() {
     return [
       {
         id: 'smart:unread',
-        label: 'Unread',
+        label: t.dashboard.email.quickFilters.unread,
         icon: <MailIcon size={18} />,
         color: '#0B7EFF',
       },
       {
         id: 'smart:today',
-        label: 'Today',
+        label: t.dashboard.email.quickFilters.today,
         icon: <Clock size={18} />,
         color: '#00C853',
       },
       {
         id: 'smart:this-week',
-        label: 'This Week',
+        label: t.dashboard.email.quickFilters.thisWeek,
         icon: <CalendarIcon size={18} />,
         color: '#9C27B0',
       },
       {
         id: 'smart:attachments',
-        label: 'Has Attachments',
+        label: t.dashboard.email.quickFilters.hasAttachments,
         icon: <Paperclip size={18} />,
         color: '#FF9800',
       },
       {
         id: 'smart:important',
-        label: 'Important',
+        label: t.dashboard.email.quickFilters.important,
         icon: <Star size={18} />,
         color: '#FFB300',
       },
     ];
-  }, []);
+  }, [t]);
 
   // Aggregator folders (All Inbox, All Starred)
   const aggregatorFolders = useMemo<FolderItem[]>(
@@ -229,8 +229,14 @@ export function Mailbox() {
   const smartFilterFolders = useMemo<FolderItem[]>(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay());
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
 
     return smartFilters.map((filter) => {
       let queryOverrides: Partial<EmailListParams> = {};
@@ -240,10 +246,16 @@ export function Mailbox() {
           queryOverrides = { isRead: false };
           break;
         case 'smart:today':
-          queryOverrides = { startDate: today.toISOString() };
+          queryOverrides = {
+            startDate: today.toISOString(),
+            endDate: endOfToday.toISOString(),
+          };
           break;
         case 'smart:this-week':
-          queryOverrides = { startDate: startOfWeek.toISOString() };
+          queryOverrides = {
+            startDate: startOfWeek.toISOString(),
+            endDate: endOfWeek.toISOString(),
+          };
           break;
         case 'smart:attachments':
           queryOverrides = { hasAttachments: true };

@@ -283,6 +283,14 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         selectEmail: 'Select a conversation to start collaborating.',
         allAccountsLabel: 'All accounts',
         starredFolderLabel: 'Starred',
+        quickFilters: {
+          title: 'Quick Filters',
+          unread: 'Unread',
+          today: 'Today',
+          thisWeek: 'This Week',
+          hasAttachments: 'Has Attachments',
+          important: 'Important',
+        },
         bulkBar: {
           selected: '{count} selected',
           markUnread: 'Mark unread',
@@ -1134,6 +1142,14 @@ export const appTranslations: Record<LocaleKey, AppTranslations> = {
         selectEmail: 'Seleziona una conversazione per iniziare a collaborare.',
         allAccountsLabel: 'Tutti gli account',
         starredFolderLabel: 'Speciali',
+        quickFilters: {
+          title: 'Filtri Rapidi',
+          unread: 'Non lette',
+          today: 'Oggi',
+          thisWeek: 'Questa settimana',
+          hasAttachments: 'Con allegati',
+          important: 'Importanti',
+        },
         bulkBar: {
           selected: '{count} elementi',
           markUnread: 'Segna come non letto',

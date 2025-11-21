@@ -298,7 +298,7 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
                 color="text.secondary"
                 sx={{ fontWeight: 600, textTransform: 'uppercase' }}
               >
-                Quick Filters
+                {t.dashboard.email.quickFilters.title}
               </Typography>
             </Stack>
           </Box>

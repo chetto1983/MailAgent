@@ -213,6 +213,14 @@ export interface AppTranslations {
       selectEmail: string;
       allAccountsLabel: string;
       starredFolderLabel: string;
+      quickFilters: {
+        title: string;
+        unread: string;
+        today: string;
+        thisWeek: string;
+        hasAttachments: string;
+        important: string;
+      };
       bulkBar: {
         selected: string;
         markUnread: string;
