@@ -367,22 +367,12 @@ export function Mailbox() {
 
   // Load emails data
   const loadData = useCallback(async () => {
-    console.log('[DEBUG] loadData called', {
-      selectedFolderId,
-      viewMode: viewModeRef.current,
-      combinedFoldersLength: combinedFolders.length,
-      storeEmailsLength: storeEmailsRef.current.length
-    });
-
     // Calculate active folder directly from selectedFolderId to avoid stale closure
     const currentActiveFolder = combinedFolders.find((folder) => folder.id === selectedFolderId) ||
       combinedFolders[0] ||
       null;
 
-    console.log('[DEBUG] currentActiveFolder:', currentActiveFolder?.label, currentActiveFolder?.id);
-
     if (!currentActiveFolder) {
-      console.log('[DEBUG] No active folder, returning early');
       return;
     }
 
@@ -438,14 +428,8 @@ export function Mailbox() {
         };
 
         const emailsRes = await emailApi.listEmails(queryParams);
-        console.log('[DEBUG] API response:', {
-          emailsCount: emailsRes.data.emails?.length || 0,
-          total: emailsRes.data.pagination?.total,
-          queryParams
-        });
 
         setEmails((emailsRes.data.emails || []) as any);
-        console.log('[DEBUG] setEmails called with', emailsRes.data.emails?.length || 0, 'emails');
         setSelectedEmail(null);
 
         // Update pagination
@@ -456,12 +440,11 @@ export function Mailbox() {
         });
       }
     } catch (error) {
-      console.error('[DEBUG] Failed to load mailbox data:', error);
+      console.error('Failed to load mailbox data:', error);
       setEmails([]);
       setSelectedEmail(null);
       setPagination({ page: 1, hasMore: false, total: 0 });
     } finally {
-      console.log('[DEBUG] loadData finished, loading set to false');
       setLoading(false);
     }
   }, [combinedFolders, selectedFolderId, searchQuery, advancedFilters, setEmails, setLoading, setSelectedEmail]);
@@ -686,15 +669,12 @@ export function Mailbox() {
 
   // Load folders on mount
   useEffect(() => {
-    console.log('[DEBUG] Component mounted, loading folder metadata');
     loadFolderMetadata();
   }, [loadFolderMetadata]);
 
   // Auto-select first folder when folders are loaded
   useEffect(() => {
-    console.log('[DEBUG] Auto-select check:', { selectedFolderId, combinedFoldersLength: combinedFolders.length });
     if (!selectedFolderId && combinedFolders.length > 0) {
-      console.log('[DEBUG] Auto-selecting first folder:', combinedFolders[0].id, combinedFolders[0].label);
       setSelectedFolderId(combinedFolders[0].id);
     }
   }, [combinedFolders, selectedFolderId]);
@@ -702,9 +682,7 @@ export function Mailbox() {
   // Load emails when folder ID changes (not activeFolder object to avoid unnecessary re-renders)
   // Only re-run when selectedFolderId or advancedFilters change, NOT when loadData changes
   useEffect(() => {
-    console.log('[DEBUG] selectedFolderId changed, viewMode:', viewMode, 'selectedFolderId:', selectedFolderId);
     if (selectedFolderId) {
-      console.log('[DEBUG] Calling loadData from useEffect');
       loadData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -762,7 +740,6 @@ export function Mailbox() {
   // Handle view mode toggle
   const handleViewModeChange = useCallback(
     (_event: React.MouseEvent<HTMLElement>, newMode: 'list' | 'conversation' | null) => {
-      console.log('[DEBUG] View mode change:', { from: viewModeRef.current, to: newMode, storeEmailsLength: storeEmailsRef.current.length });
       if (newMode !== null) {
         setViewMode(newMode);
         // Reset selections when switching view modes
@@ -771,7 +748,6 @@ export function Mailbox() {
 
         // Reload data when switching to list view if emails are empty
         if (newMode === 'list' && storeEmailsRef.current.length === 0) {
-          console.log('[DEBUG] Reloading data because switching to list view with empty emails');
           loadData();
         }
       }
@@ -792,18 +768,6 @@ export function Mailbox() {
       console.error('Failed to load thread:', error);
     });
   }, [setSelectedEmail]);
-
-  // Debug logging at render
-  console.log('[DEBUG] Mailbox render:', {
-    viewMode,
-    storeEmailsLength: storeEmails.length,
-    storeLoading,
-    selectedFolderId,
-    activeFolderId: activeFolder?.id,
-    activeFolderLabel: activeFolder?.label,
-    storeSelectedEmail: storeSelectedEmail?.id,
-    showDetail: !!storeSelectedEmail
-  });
 
   return (
     <>

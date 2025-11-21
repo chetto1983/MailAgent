@@ -156,6 +156,19 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
             height: isMobile ? '100%' : 'auto',
             zIndex: isMobile ? 1300 : 'auto',
             bgcolor: 'background.paper',
+            // Smooth transitions for mobile slide-in effect
+            transition: isMobile
+              ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              : 'none',
+            animation: isMobile ? 'slideInRight 0.3s ease-out' : 'none',
+            '@keyframes slideInRight': {
+              '0%': {
+                transform: 'translateX(100%)',
+              },
+              '100%': {
+                transform: 'translateX(0)',
+              },
+            },
           }}
         >
           {detail}

@@ -128,7 +128,6 @@ export const EmailListItem = React.memo<EmailListItemProps>(
       if ((e.target as HTMLElement).closest('.MuiCheckbox-root, .MuiIconButton-root')) {
         return;
       }
-      console.log('[DEBUG EmailListItem] Email clicked:', email.id, email.subject);
       onClick?.(email);
     };
 
