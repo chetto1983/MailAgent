@@ -293,6 +293,9 @@ export const EmailList: React.FC<EmailListProps> = ({
         if (!hasMore || loadingMore || !onLoadMore) return;
 
         const target = e.currentTarget;
+        // Guard against null target (can happen with throttle after unmount/navigation)
+        if (!target) return;
+
         const scrollBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
 
         // Load more when within 200px of bottom
