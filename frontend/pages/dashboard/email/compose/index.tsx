@@ -19,6 +19,7 @@ import { providersApi, type ProviderConfig, type ProviderAlias } from '@/lib/api
 import { emailApi } from '@/lib/api/email';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { cleanEmailAddresses, getInitialComposeFromQuery } from '@/lib/utils/email-utils';
+import { ContactAutocomplete } from '@/components/email/ContactAutocomplete';
 
 type ComposeMode = 'new' | 'reply' | 'forward';
 
@@ -369,25 +370,25 @@ function EmailComposeInner() {
           </Select>
         </FormControl>
 
-        <TextField
+        <ContactAutocomplete
           label={composerCopy.to}
           value={form.to}
-          onChange={handleInputChange('to')}
-          fullWidth
+          onChange={(value) => setForm((prev) => ({ ...prev, to: value }))}
+          disabled={sending}
         />
 
-        <TextField
+        <ContactAutocomplete
           label={composerCopy.cc}
           value={form.cc}
-          onChange={handleInputChange('cc')}
-          fullWidth
+          onChange={(value) => setForm((prev) => ({ ...prev, cc: value }))}
+          disabled={sending}
         />
 
-        <TextField
+        <ContactAutocomplete
           label={composerCopy.bcc}
           value={form.bcc}
-          onChange={handleInputChange('bcc')}
-          fullWidth
+          onChange={(value) => setForm((prev) => ({ ...prev, bcc: value }))}
+          disabled={sending}
         />
 
         <TextField

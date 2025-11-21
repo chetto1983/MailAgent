@@ -108,7 +108,7 @@ export const EmailListItem = React.memo<EmailListItemProps>(
     const { getLabelById } = useLabelStore();
 
     // Setup draggable functionality
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    const { attributes: _attributes, listeners: _listeners, setNodeRef, transform, isDragging } = useDraggable({
       id: email.id,
       data: {
         type: 'email',
@@ -128,7 +128,6 @@ export const EmailListItem = React.memo<EmailListItemProps>(
       if ((e.target as HTMLElement).closest('.MuiCheckbox-root, .MuiIconButton-root')) {
         return;
       }
-      console.log('[DEBUG EmailListItem] Email clicked:', email.id, email.subject);
       onClick?.(email);
     };
 
