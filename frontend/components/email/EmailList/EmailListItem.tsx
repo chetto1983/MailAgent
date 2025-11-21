@@ -141,14 +141,19 @@ export const EmailListItem = React.memo<EmailListItemProps>(
               onToggleSelect(email.id);
             }}
             onClick={(e) => e.stopPropagation()}
-            sx={{ p: 0, mt: 0.5 }}
+            sx={{
+              p: 0,
+              mt: 0.5,
+              width: { xs: 44, sm: 'auto' },
+              height: { xs: 44, sm: 'auto' },
+            }}
           />
 
           {/* Avatar / Provider Icon */}
           <Avatar
             sx={{
-              width: 40,
-              height: 40,
+              width: { xs: 44, sm: 40 },
+              height: { xs: 44, sm: 40 },
               fontSize: '1rem',
               mt: 0.5,
             }}
@@ -269,7 +274,11 @@ export const EmailListItem = React.memo<EmailListItemProps>(
                 onToggleStar(email.id, email.isStarred || false);
               }
             }}
-            sx={{ mt: 0.5 }}
+            sx={{
+              mt: 0.5,
+              width: { xs: 44, sm: 'auto' },
+              height: { xs: 44, sm: 'auto' },
+            }}
           >
             <Star
               size={16}
