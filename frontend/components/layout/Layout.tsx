@@ -147,7 +147,6 @@ export function Layout({ children }: LayoutProps) {
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              p: { xs: 2, sm: 3 },
               backgroundColor: 'background.default',
               overflow: 'auto',
             }}
