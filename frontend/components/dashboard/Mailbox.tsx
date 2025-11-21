@@ -8,8 +8,9 @@ import {
   Calendar as CalendarIcon,
   List as ListIcon,
   MessageSquare,
+  Menu as MenuIcon,
 } from 'lucide-react';
-import { Snackbar, Alert as MuiAlert, Box, ToggleButtonGroup, ToggleButton, Tooltip } from '@mui/material';
+import { Snackbar, Alert as MuiAlert, Box, ToggleButtonGroup, ToggleButton, Tooltip, IconButton, useMediaQuery, useTheme } from '@mui/material';
 import { DndContext, DragEndEvent } from '@dnd-kit/core';
 import { emailApi, type EmailListParams, type Conversation } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
@@ -65,6 +66,8 @@ interface FolderItem {
  */
 export function Mailbox() {
   const t = useTranslations();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // Auth store - for WebSocket token
   //const { token } = useAuthStore();
@@ -114,6 +117,9 @@ export function Mailbox() {
   // View mode state
   const [viewMode, setViewMode] = useState<'list' | 'conversation'>('list');
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+
+  // Mobile sidebar state
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Refs for logging without causing dependency issues
   const viewModeRef = useRef(viewMode);
@@ -803,11 +809,18 @@ export function Mailbox() {
     <>
       <DndContext id="email-dnd-context" onDragEnd={handleDragEnd}>
         <EmailLayout
+          sidebarOpen={mobileSidebarOpen}
+          onSidebarClose={() => setMobileSidebarOpen(false)}
           sidebar={
           <EmailSidebar
             folderGroups={folderGroups}
             selectedFolderId={selectedFolderId}
-            onFolderSelect={setSelectedFolderId}
+            onFolderSelect={(folderId) => {
+              setSelectedFolderId(folderId);
+              if (isMobile) {
+                setMobileSidebarOpen(false);
+              }
+            }}
             loading={foldersLoading}
             smartFilters={smartFilters}
             showSmartFilters={true}
@@ -818,35 +831,54 @@ export function Mailbox() {
         }
         list={
           <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* View Mode Toggle */}
+            {/* Header with Hamburger Menu and View Mode Toggle */}
             <Box
               sx={{
                 p: 1,
                 borderBottom: '1px solid',
                 borderColor: 'divider',
                 display: 'flex',
-                justifyContent: 'center',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 bgcolor: 'background.paper',
               }}
             >
-              <ToggleButtonGroup
-                value={viewMode}
-                exclusive
-                onChange={handleViewModeChange}
-                size="small"
-                aria-label="view mode"
-              >
-                <ToggleButton value="list" aria-label="list view">
-                  <Tooltip title="Email List">
-                    <ListIcon size={18} />
-                  </Tooltip>
-                </ToggleButton>
-                <ToggleButton value="conversation" aria-label="conversation view">
-                  <Tooltip title="Conversation View">
-                    <MessageSquare size={18} />
-                  </Tooltip>
-                </ToggleButton>
-              </ToggleButtonGroup>
+              {/* Hamburger Menu (Mobile only) */}
+              {isMobile && (
+                <IconButton
+                  edge="start"
+                  onClick={() => setMobileSidebarOpen(true)}
+                  sx={{ width: 40, height: 40 }}
+                  aria-label="open sidebar"
+                >
+                  <MenuIcon size={20} />
+                </IconButton>
+              )}
+
+              {/* View Mode Toggle (Center) */}
+              <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                <ToggleButtonGroup
+                  value={viewMode}
+                  exclusive
+                  onChange={handleViewModeChange}
+                  size="small"
+                  aria-label="view mode"
+                >
+                  <ToggleButton value="list" aria-label="list view">
+                    <Tooltip title="Email List">
+                      <ListIcon size={18} />
+                    </Tooltip>
+                  </ToggleButton>
+                  <ToggleButton value="conversation" aria-label="conversation view">
+                    <Tooltip title="Conversation View">
+                      <MessageSquare size={18} />
+                    </Tooltip>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+
+              {/* Spacer for symmetry (Mobile only) */}
+              {isMobile && <Box sx={{ width: 40 }} />}
             </Box>
 
             {/* Bulk Action Bar */}

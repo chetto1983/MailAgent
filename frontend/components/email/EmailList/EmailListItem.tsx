@@ -108,7 +108,7 @@ export const EmailListItem = React.memo<EmailListItemProps>(
     const { getLabelById } = useLabelStore();
 
     // Setup draggable functionality
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    const { attributes: _attributes, listeners: _listeners, setNodeRef, transform, isDragging } = useDraggable({
       id: email.id,
       data: {
         type: 'email',
