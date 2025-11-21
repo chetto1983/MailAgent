@@ -161,7 +161,7 @@ export function Sidebar({
       <Divider />
 
       {/* Navigation Items */}
-      <List sx={{ flex: 1, pt: 2, px: 1 }}>
+      <List sx={{ pt: 2, px: 1 }}>
         {navigationItems.map((item) => (
           <Tooltip
             key={item.href}
@@ -205,6 +205,9 @@ export function Sidebar({
           </Tooltip>
         ))}
       </List>
+
+      {/* Spacer */}
+      <Box sx={{ flex: 1 }} />
 
       {/* AI Assistant Button */}
       <Box sx={{ px: 1, pb: 2 }}>
