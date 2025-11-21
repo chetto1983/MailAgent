@@ -427,9 +427,12 @@ export const EmailList: React.FC<EmailListProps> = ({
           </Box>
         ) : (
           <MuiList disablePadding>
-            {filteredEmails.map((email) => {
+            {filteredEmails.map((email, index) => {
               const isSelected = selectedEmailId === email.id;
               const isMultiSelected = selectedIds.has(email.id);
+              if (index === 0) {
+                console.log('[DEBUG EmailList] Rendering first email, onEmailClick:', typeof onEmailClick);
+              }
               return (
                 <React.Fragment key={email.id}>
                   {renderItem(email, isSelected, isMultiSelected, handleToggleSelect, onEmailClick)}

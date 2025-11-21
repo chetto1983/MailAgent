@@ -136,8 +136,8 @@ export const EmailListItem = React.memo<EmailListItemProps>(
       <>
         <ListItemButton
           ref={setNodeRef}
-          {...listeners}
-          {...attributes}
+          // {...listeners}
+          // {...attributes}
           selected={selected}
           onClick={handleClick}
           sx={{
