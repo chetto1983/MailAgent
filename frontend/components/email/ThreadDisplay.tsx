@@ -302,7 +302,7 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
             },
           }}
           dangerouslySetInnerHTML={{
-            __html: email.body || email.bodyPreview || '',
+            __html: email.bodyHtml || email.bodyText || email.snippet || '',
           }}
         />
 

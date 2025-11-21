@@ -12,6 +12,9 @@ export interface Email {
   subject: string;
   body?: string;
   bodyPreview?: string;
+  bodyHtml?: string;
+  bodyText?: string;
+  snippet?: string;
   receivedAt: string;
   isRead: boolean;
   isStarred?: boolean;

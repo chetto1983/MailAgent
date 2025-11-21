@@ -102,6 +102,31 @@ export function useEmailActions(callbacks?: EmailActionsCallbacks) {
   );
 
   /**
+   * Toggle read status on email
+   */
+  const handleToggleRead = useCallback(
+    async (emailId: string, currentRead: boolean) => {
+      const newRead = !currentRead;
+
+      try {
+        // Optimistic update
+        updateEmail(emailId, { isRead: newRead });
+
+        // API call
+        await emailApi.updateEmail(emailId, { isRead: newRead });
+
+        callbacks?.onSuccess?.(newRead ? 'Marked as read ✓' : 'Marked as unread ✓');
+      } catch (error) {
+        console.error('Failed to toggle read status:', error);
+        // Revert on error
+        updateEmail(emailId, { isRead: currentRead });
+        callbacks?.onError?.('Failed to update read status. Please try again.');
+      }
+    },
+    [updateEmail, callbacks]
+  );
+
+  /**
    * Toggle star on email
    */
   const handleToggleStar = useCallback(
@@ -137,8 +162,8 @@ export function useEmailActions(callbacks?: EmailActionsCallbacks) {
         // Optimistic update (using updateEmail for now)
         updateEmail(emailId, { isImportant: newImportant });
 
-        // API call
-        await emailApi.updateEmail(emailId, { isImportant: newImportant });
+        // API call (backend uses isFlagged instead of isImportant)
+        await emailApi.updateEmail(emailId, { isFlagged: newImportant });
 
         callbacks?.onSuccess?.(newImportant ? 'Marked as important ✓' : 'Unmarked as important ✓');
       } catch (error) {
@@ -256,6 +281,7 @@ export function useEmailActions(callbacks?: EmailActionsCallbacks) {
     handleDelete,
     handleBulkDelete,
     handleMarkAsRead,
+    handleToggleRead,
     handleToggleStar,
     handleToggleImportant,
     handleArchive,

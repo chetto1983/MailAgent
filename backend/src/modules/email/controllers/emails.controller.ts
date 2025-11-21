@@ -241,10 +241,23 @@ export class EmailsController {
   async updateEmail(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() data: { isRead?: boolean; isStarred?: boolean; folder?: string },
+    @Body() data: { isRead?: boolean; isStarred?: boolean; isFlagged?: boolean; folder?: string },
   ) {
     const tenantId = req.user.tenantId;
     return this.emailsService.updateEmail(id, tenantId, data);
+  }
+
+  /**
+   * DELETE /emails/bulk - Bulk delete emails
+   * IMPORTANT: Must come before @Delete(':id') to avoid route conflict
+   */
+  @Delete('bulk')
+  async bulkDelete(
+    @Req() req: any,
+    @Body() data: { emailIds: string[] },
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.bulkDelete(data.emailIds, tenantId);
   }
 
   /**
@@ -322,19 +335,6 @@ export class EmailsController {
       data.isRead,
     );
   }
-
-  /**
-   * DELETE /emails/bulk - Bulk delete emails
-   */
-  @Delete('bulk')
-  async bulkDelete(
-    @Req() req: any,
-    @Body() data: { emailIds: string[] },
-  ) {
-    const tenantId = req.user.tenantId;
-    return this.emailsService.bulkDelete(data.emailIds, tenantId);
-  }
-
   /**
    * PATCH /emails/bulk/star - Bulk star/unstar emails
    */
@@ -348,6 +348,22 @@ export class EmailsController {
       data.emailIds,
       tenantId,
       data.isStarred,
+    );
+  }
+
+  /**
+   * PATCH /emails/bulk/flag - Bulk flag/unflag emails (mark as important)
+   */
+  @Patch('bulk/flag')
+  async bulkUpdateFlag(
+    @Req() req: any,
+    @Body() data: { emailIds: string[]; isFlagged: boolean },
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.emailsService.bulkUpdateFlagged(
+      data.emailIds,
+      tenantId,
+      data.isFlagged,
     );
   }
 

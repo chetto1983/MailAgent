@@ -45,6 +45,18 @@ interface FolderItem {
 }
 
 /**
+ * Map API email to store email format
+ * Handles field name differences between API and store
+ */
+function mapApiEmailToStore(apiEmail: any): any {
+  return {
+    ...apiEmail,
+    // Map isFlagged (API) to isImportant (store)
+    isImportant: apiEmail.isFlagged || false,
+  };
+}
+
+/**
  * Mailbox - Modern email interface with unified components
  *
  * Uses:
@@ -78,6 +90,7 @@ export function Mailbox() {
     markAsRead: storeMarkAsRead,
     bulkDelete: storeBulkDelete,
     markAsStarred: storeMarkAsStarred,
+    markAsImportant: storeMarkAsImportant,
   } = useEmailStore();
 
   // WebSocket for real-time updates (email events, folder counts, etc.)
@@ -128,6 +141,7 @@ export function Mailbox() {
   // Custom hooks
   const {
     handleDelete,
+    handleToggleRead,
     handleToggleStar,
     handleToggleImportant,
     handleArchive,
@@ -400,9 +414,9 @@ export function Mailbox() {
 
         const emailsRes = await emailApi.listEmails(queryParams);
         // Filter emails by label client-side for now
-        const filteredEmails = (emailsRes.data.emails || []).filter((email: any) =>
-          email.labels && email.labels.includes(labelId)
-        );
+        const filteredEmails = (emailsRes.data.emails || [])
+          .filter((email: any) => email.labels && email.labels.includes(labelId))
+          .map(mapApiEmailToStore);
         setEmails(filteredEmails as any);
         setSelectedEmail(null);
 
@@ -431,7 +445,7 @@ export function Mailbox() {
 
         const emailsRes = await emailApi.listEmails(queryParams);
 
-        setEmails((emailsRes.data.emails || []) as any);
+        setEmails((emailsRes.data.emails || []).map(mapApiEmailToStore) as any);
         setSelectedEmail(null);
 
         // Update pagination
@@ -578,6 +592,50 @@ export function Mailbox() {
       });
     }
   }, [selectedIds, storeMarkAsStarred, t.dashboard.email.messages.unstarred, t.dashboard.email.messages.unstarFailed]);
+
+  const handleBulkFlag = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkFlag(ids, true);
+      storeMarkAsImportant(ids, true);
+      setSnackbar({
+        open: true,
+        message: `Marked ${ids.length} email(s) as important`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to flag emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to mark as important. Please try again.',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeMarkAsImportant]);
+
+  const handleBulkUnflag = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      await emailApi.bulkFlag(ids, false);
+      storeMarkAsImportant(ids, false);
+      setSnackbar({
+        open: true,
+        message: `Unmarked ${ids.length} email(s) as important`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Failed to unflag emails:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to unmark as important. Please try again.',
+        severity: 'error',
+      });
+    }
+  }, [selectedIds, storeMarkAsImportant]);
 
   const handleBulkAddLabels = useCallback(async (labelIds: string[]) => {
     const ids = Array.from(selectedIds);
@@ -737,6 +795,8 @@ export function Mailbox() {
                 onDelete={handleBulkDelete}
                 onStar={handleBulkStar}
                 onUnstar={handleBulkUnstar}
+                onFlag={handleBulkFlag}
+                onUnflag={handleBulkUnflag}
                 onAddLabels={() => setLabelSelectorOpen(true)}
                 onMoveToFolder={() => setFolderSelectorOpen(true)}
               />
@@ -751,6 +811,7 @@ export function Mailbox() {
                 isLoading={storeLoading}
                 onThreadClick={handleEmailClick}
                 onToggleSelect={toggleSelection}
+                onToggleRead={handleToggleRead}
                 onToggleStar={handleToggleStar}
                 onToggleImportant={handleToggleImportant}
                 onArchive={(id) => handleArchive([id])}

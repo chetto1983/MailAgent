@@ -36,6 +36,60 @@ export class EmailsService {
   ) {}
 
   /**
+   * Recalculate and emit folder counts for affected folders
+   * Only calculates if tenant has active WebSocket connections to avoid wasting resources
+   */
+  private async updateFolderCounts(
+    tenantId: string,
+    providerId: string,
+    folders: string[],
+  ) {
+    try {
+      // Skip calculation if no active WebSocket connections for this tenant
+      // This avoids wasting resources on inactive tenants
+      if (!this.realtimeEvents.hasTenantConnections(tenantId)) {
+        this.logger.debug(`Skipping folder count update for inactive tenant: ${tenantId}`);
+        return;
+      }
+
+      for (const folder of folders) {
+        // Count total and unread emails in this folder
+        const [totalCount, unreadCount] = await Promise.all([
+          this.prisma.email.count({
+            where: {
+              tenantId,
+              providerId,
+              folder: { equals: folder, mode: 'insensitive' },
+              isDeleted: folder.toUpperCase() === 'TRASH' ? undefined : false,
+            },
+          }),
+          this.prisma.email.count({
+            where: {
+              tenantId,
+              providerId,
+              folder: { equals: folder, mode: 'insensitive' },
+              isDeleted: folder.toUpperCase() === 'TRASH' ? undefined : false,
+              isRead: false,
+            },
+          }),
+        ]);
+
+        // Emit websocket event with updated counts
+        this.realtimeEvents.emitFolderCountsUpdate(tenantId, {
+          providerId,
+          folderId: folder,
+          folderName: folder,
+          totalCount,
+          unreadCount,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error: any) {
+      this.logger.error(`Failed to update folder counts: ${error?.message || error}`);
+    }
+  }
+
+  /**
    * Get paginated list of emails with filters
    */
   async listEmails(params: EmailListParams) {
@@ -162,7 +216,7 @@ export class EmailsService {
   async updateEmail(
     id: string,
     tenantId: string,
-    data: { isRead?: boolean; isStarred?: boolean; folder?: string },
+    data: { isRead?: boolean; isStarred?: boolean; isFlagged?: boolean; folder?: string },
   ) {
     const email = await this.prisma.email.findFirst({
       where: { id, tenantId },
@@ -189,39 +243,18 @@ export class EmailsService {
       reason: 'message-processed',
     });
 
-    // Emit unread count update if isRead changed
+    // Update folder counts if isRead changed or folder changed
     if (data.isRead !== undefined || data.folder) {
-      // Current/target folder (TENANT-SCOPED)
-      const unreadCountTarget = await this.prisma.email.count({
-        where: {
-          tenantId, // ✅ CRITICAL: Tenant isolation
-          providerId: email.providerId,
-          folder: targetFolder,
-          isRead: false,
-        },
-      });
-      this.realtimeEvents.emitUnreadCountUpdate(tenantId, {
-        folder: targetFolder,
-        count: unreadCountTarget,
-        providerId: email.providerId,
-      });
-
-      // If folder changed, update source folder as well (TENANT-SCOPED)
+      const affectedFolders: string[] = [targetFolder];
+      // If folder changed, also update source folder
       if (data.folder && data.folder !== email.folder) {
-        const unreadCountSource = await this.prisma.email.count({
-          where: {
-            tenantId, // ✅ CRITICAL: Tenant isolation
-            providerId: email.providerId,
-            folder: email.folder,
-            isRead: false,
-          },
-        });
-        this.realtimeEvents.emitUnreadCountUpdate(tenantId, {
-          folder: email.folder,
-          count: unreadCountSource,
-          providerId: email.providerId,
-        });
+        affectedFolders.push(email.folder);
       }
+
+      // Update folder counts (async, don't wait)
+      this.updateFolderCounts(tenantId, email.providerId, affectedFolders).catch((error) => {
+        this.logger.error(`Failed to update folder counts: ${error.message}`);
+      });
     }
 
     // Sync changes back to provider (async, don't wait)
@@ -237,7 +270,7 @@ export class EmailsService {
    */
   private async syncChangesToProvider(
     email: any,
-    changes: { isRead?: boolean; isStarred?: boolean; folder?: string },
+    changes: { isRead?: boolean; isStarred?: boolean; isFlagged?: boolean; folder?: string },
   ) {
     const operations = [];
 
@@ -260,6 +293,17 @@ export class EmailsService {
         providerId: email.providerId,
         tenantId: email.tenantId,
         operation: changes.isStarred ? ('star' as const) : ('unstar' as const),
+      });
+    }
+
+    // Handle flag/unflag (important)
+    if (changes.isFlagged !== undefined) {
+      operations.push({
+        emailId: email.id,
+        externalId: email.externalId,
+        providerId: email.providerId,
+        tenantId: email.tenantId,
+        operation: changes.isFlagged ? ('flag' as const) : ('unflag' as const),
       });
     }
 
@@ -475,7 +519,7 @@ export class EmailsService {
     tenantId: string,
     isRead: boolean,
   ) {
-    // Get emails for syncing
+    // Get emails for syncing and folder tracking
     const emails = await this.prisma.email.findMany({
       where: {
         id: { in: emailIds },
@@ -486,7 +530,19 @@ export class EmailsService {
         externalId: true,
         providerId: true,
         tenantId: true,
+        folder: true,
       },
+    });
+
+    // Track affected folders per provider for count updates
+    const affectedFolders = new Map<string, Set<string>>();
+    emails.forEach((email) => {
+      if (!affectedFolders.has(email.providerId)) {
+        affectedFolders.set(email.providerId, new Set());
+      }
+      if (email.folder) {
+        affectedFolders.get(email.providerId)!.add(email.folder);
+      }
     });
 
     // Update in database
@@ -497,6 +553,13 @@ export class EmailsService {
       },
       data: { isRead },
     });
+
+    // Update folder counts (async, don't wait - unread count changes)
+    for (const [providerId, folders] of affectedFolders.entries()) {
+      this.updateFolderCounts(tenantId, providerId, Array.from(folders)).catch((error) => {
+        this.logger.error(`Failed to update folder counts: ${error.message}`);
+      });
+    }
 
     // Sync to provider (async, don't wait)
     const operations = emails.map((email) => ({
@@ -730,7 +793,7 @@ export class EmailsService {
    * Bulk delete emails
    */
   async bulkDelete(emailIds: string[], tenantId: string) {
-    // Get emails for syncing
+    // Get emails for syncing and folder tracking
     const emails = await this.prisma.email.findMany({
       where: {
         id: { in: emailIds },
@@ -741,7 +804,21 @@ export class EmailsService {
         externalId: true,
         providerId: true,
         tenantId: true,
+        folder: true,
       },
+    });
+
+    // Track affected folders per provider for count updates
+    const affectedFolders = new Map<string, Set<string>>();
+    emails.forEach((email) => {
+      if (!affectedFolders.has(email.providerId)) {
+        affectedFolders.set(email.providerId, new Set());
+      }
+      // Add both original folder and TRASH folder
+      if (email.folder) {
+        affectedFolders.get(email.providerId)!.add(email.folder);
+      }
+      affectedFolders.get(email.providerId)!.add('TRASH');
     });
 
     // Soft delete in database
@@ -752,6 +829,13 @@ export class EmailsService {
       },
       data: { isDeleted: true, folder: 'TRASH' },
     });
+
+    // Update folder counts (async, don't wait)
+    for (const [providerId, folders] of affectedFolders.entries()) {
+      this.updateFolderCounts(tenantId, providerId, Array.from(folders)).catch((error) => {
+        this.logger.error(`Failed to update folder counts: ${error.message}`);
+      });
+    }
 
     // Sync to provider (async, don't wait)
     const operations = emails.map((email) => ({
@@ -817,6 +901,53 @@ export class EmailsService {
   }
 
   /**
+   * Bulk flag/unflag emails (mark as important)
+   */
+  async bulkUpdateFlagged(
+    emailIds: string[],
+    tenantId: string,
+    isFlagged: boolean,
+  ) {
+    // Get emails for syncing
+    const emails = await this.prisma.email.findMany({
+      where: {
+        id: { in: emailIds },
+        tenantId,
+      },
+      select: {
+        id: true,
+        externalId: true,
+        providerId: true,
+        tenantId: true,
+      },
+    });
+
+    // Update in database
+    const result = await this.prisma.email.updateMany({
+      where: {
+        id: { in: emailIds },
+        tenantId,
+      },
+      data: { isFlagged },
+    });
+
+    // Sync to provider (async, don't wait)
+    const operations = emails.map((email) => ({
+      emailId: email.id,
+      externalId: email.externalId,
+      providerId: email.providerId,
+      tenantId: email.tenantId,
+      operation: isFlagged ? ('flag' as const) : ('unflag' as const),
+    }));
+
+    this.emailSyncBack.syncOperationsBatch(operations).catch((error) => {
+      this.logger.error(`Failed to sync bulk flagged update to provider: ${error.message}`);
+    });
+
+    return { updated: result.count };
+  }
+
+  /**
    * Bulk move emails to folder
    */
   async bulkMoveToFolder(
@@ -824,7 +955,7 @@ export class EmailsService {
     tenantId: string,
     folder: string,
   ) {
-    // Get emails for syncing
+    // Get emails for syncing and folder tracking
     const emails = await this.prisma.email.findMany({
       where: {
         id: { in: emailIds },
@@ -839,6 +970,19 @@ export class EmailsService {
       },
     });
 
+    // Track affected folders per provider for count updates (both source and destination)
+    const affectedFolders = new Map<string, Set<string>>();
+    emails.forEach((email) => {
+      if (!affectedFolders.has(email.providerId)) {
+        affectedFolders.set(email.providerId, new Set());
+      }
+      // Add both source and destination folders
+      if (email.folder) {
+        affectedFolders.get(email.providerId)!.add(email.folder);
+      }
+      affectedFolders.get(email.providerId)!.add(folder);
+    });
+
     // Update in database
     const result = await this.prisma.email.updateMany({
       where: {
@@ -847,6 +991,13 @@ export class EmailsService {
       },
       data: { folder },
     });
+
+    // Update folder counts (async, don't wait)
+    for (const [providerId, folders] of affectedFolders.entries()) {
+      this.updateFolderCounts(tenantId, providerId, Array.from(folders)).catch((error) => {
+        this.logger.error(`Failed to update folder counts: ${error.message}`);
+      });
+    }
 
     // Sync to provider (async, don't wait)
     const operations = emails.map((email) => ({

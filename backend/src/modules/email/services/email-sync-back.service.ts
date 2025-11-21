@@ -12,7 +12,7 @@ export interface EmailSyncOperation {
   externalId: string;
   providerId: string;
   tenantId: string;
-  operation: 'delete' | 'hardDelete' | 'markRead' | 'markUnread' | 'star' | 'unstar' | 'moveToFolder';
+  operation: 'delete' | 'hardDelete' | 'markRead' | 'markUnread' | 'star' | 'unstar' | 'flag' | 'unflag' | 'moveToFolder';
   folder?: string;
 }
 
@@ -257,6 +257,34 @@ export class EmailSyncBackService {
         );
         break;
 
+      case 'flag':
+        await this.executeWithRetry(
+          () =>
+            gmail.users.messages.modify({
+              userId: 'me',
+              id: operation.externalId,
+              requestBody: {
+                addLabelIds: ['IMPORTANT'],
+              },
+            }),
+          `gmail flag ${operation.externalId}`,
+        );
+        break;
+
+      case 'unflag':
+        await this.executeWithRetry(
+          () =>
+            gmail.users.messages.modify({
+              userId: 'me',
+              id: operation.externalId,
+              requestBody: {
+                removeLabelIds: ['IMPORTANT'],
+              },
+            }),
+          `gmail unflag ${operation.externalId}`,
+        );
+        break;
+
       case 'hardDelete':
         await this.executeWithRetry(
           () =>
@@ -343,6 +371,26 @@ export class EmailSyncBackService {
           });
         break;
 
+      case 'flag':
+        await client
+          .api(`/me/messages/${operation.externalId}`)
+          .patch({
+            flag: {
+              flagStatus: 'flagged',
+            },
+          });
+        break;
+
+      case 'unflag':
+        await client
+          .api(`/me/messages/${operation.externalId}`)
+          .patch({
+            flag: {
+              flagStatus: 'notFlagged',
+            },
+          });
+        break;
+
       case 'hardDelete':
         await client.api(`/me/messages/${operation.externalId}`).delete();
         break;
@@ -414,6 +462,16 @@ export class EmailSyncBackService {
         case 'unstar':
           await client.messageFlagsRemove({ uid }, ['\\Flagged'], { uid: true });
           this.logger.log(`✅ IMAP: Unstarred message ${uid}`);
+          break;
+
+        case 'flag':
+          await client.messageFlagsAdd({ uid }, ['\\Flagged'], { uid: true });
+          this.logger.log(`✅ IMAP: Flagged message ${uid}`);
+          break;
+
+        case 'unflag':
+          await client.messageFlagsRemove({ uid }, ['\\Flagged'], { uid: true });
+          this.logger.log(`✅ IMAP: Unflagged message ${uid}`);
           break;
 
         case 'delete':
@@ -561,6 +619,8 @@ export class EmailSyncBackService {
     const markUnreadIds: string[] = [];
     const starIds: string[] = [];
     const unstarIds: string[] = [];
+    const flagIds: string[] = [];
+    const unflagIds: string[] = [];
     const moveToTrashIds: string[] = [];
 
     for (const op of ops) {
@@ -582,6 +642,12 @@ export class EmailSyncBackService {
           break;
         case 'unstar':
           unstarIds.push(op.externalId);
+          break;
+        case 'flag':
+          flagIds.push(op.externalId);
+          break;
+        case 'unflag':
+          unflagIds.push(op.externalId);
           break;
         case 'moveToFolder':
           if (op.folder === 'TRASH') {
@@ -680,6 +746,35 @@ export class EmailSyncBackService {
         `gmail batchUnstar (${ids.length})`,
       );
     }
+
+    // Flag / unflag via batchModify
+    for (const ids of this.chunk(flagIds, 900)) {
+      await this.executeWithRetry(
+        () =>
+          gmail.users.messages.batchModify({
+            userId: 'me',
+            requestBody: {
+              ids,
+              addLabelIds: ['IMPORTANT'],
+            },
+          }),
+        `gmail batchFlag (${ids.length})`,
+      );
+    }
+
+    for (const ids of this.chunk(unflagIds, 900)) {
+      await this.executeWithRetry(
+        () =>
+          gmail.users.messages.batchModify({
+            userId: 'me',
+            requestBody: {
+              ids,
+              removeLabelIds: ['IMPORTANT'],
+            },
+          }),
+        `gmail batchUnflag (${ids.length})`,
+      );
+    }
   }
 
   /**
@@ -734,6 +829,12 @@ export class EmailSyncBackService {
           enqueue('PATCH', `/me/messages/${op.externalId}`, { flag: { flagStatus: 'flagged' } });
           break;
         case 'unstar':
+          enqueue('PATCH', `/me/messages/${op.externalId}`, { flag: { flagStatus: 'notFlagged' } });
+          break;
+        case 'flag':
+          enqueue('PATCH', `/me/messages/${op.externalId}`, { flag: { flagStatus: 'flagged' } });
+          break;
+        case 'unflag':
           enqueue('PATCH', `/me/messages/${op.externalId}`, { flag: { flagStatus: 'notFlagged' } });
           break;
         case 'moveToFolder': {

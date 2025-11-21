@@ -50,6 +50,11 @@ interface ThreadListProps {
   onToggleImportant?: (id: string, isImportant: boolean) => void;
 
   /**
+   * Callback to toggle read status
+   */
+  onToggleRead?: (id: string, isRead: boolean) => void;
+
+  /**
    * Callback to archive thread
    */
   onArchive?: (id: string) => void;
@@ -106,6 +111,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
   isLoading = false,
   onThreadClick,
   onToggleSelect,
+  onToggleRead,
   onToggleStar,
   onToggleImportant,
   onArchive,
@@ -185,6 +191,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
             selected={selectedId === threadId}
             multiSelected={selectedIds.has(threadId)}
             onToggleSelect={onToggleSelect}
+            onToggleRead={onToggleRead}
             onToggleStar={onToggleStar}
             onToggleImportant={onToggleImportant}
             onArchive={onArchive}

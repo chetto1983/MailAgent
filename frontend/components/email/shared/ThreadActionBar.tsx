@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, IconButton, Tooltip, Fade } from '@mui/material';
-import { Star, AlertCircle, Archive, Trash2 } from 'lucide-react';
+import { Star, Flag, Archive, Trash2, Mail, MailOpen } from 'lucide-react';
 import { useTranslations } from '@/lib/hooks/use-translations';
 
 /**
@@ -13,6 +13,11 @@ export interface ThreadActionBarProps {
   threadId: string;
 
   /**
+   * Whether the thread is read
+   */
+  isRead: boolean;
+
+  /**
    * Whether the thread is starred
    */
   isStarred: boolean;
@@ -21,6 +26,11 @@ export interface ThreadActionBarProps {
    * Whether the thread is marked as important
    */
   isImportant: boolean;
+
+  /**
+   * Callback to toggle read status
+   */
+  onToggleRead: () => void;
 
   /**
    * Callback to toggle star status
@@ -87,8 +97,10 @@ export interface ThreadActionBarProps {
  * ```
  */
 export const ThreadActionBar: React.FC<ThreadActionBarProps> = ({
+  isRead,
   isStarred,
   isImportant,
+  onToggleRead,
   onToggleStar,
   onToggleImportant,
   onArchive,
@@ -98,6 +110,11 @@ export const ThreadActionBar: React.FC<ThreadActionBarProps> = ({
   position = 'center',
 }) => {
   const t = useTranslations();
+
+  const handleReadClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleRead();
+  };
 
   const handleStarClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -142,6 +159,31 @@ export const ThreadActionBar: React.FC<ThreadActionBarProps> = ({
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Read/Unread Button */}
+        <Tooltip
+          title={isRead ? t.dashboard.email.bulkBar.markUnread : t.dashboard.email.bulkBar.markRead}
+          arrow
+          placement="top"
+        >
+          <IconButton
+            size="small"
+            onClick={handleReadClick}
+            sx={{
+              width: 28,
+              height: 28,
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+            }}
+          >
+            {isRead ? (
+              <Mail size={16} color="currentColor" />
+            ) : (
+              <MailOpen size={16} color="currentColor" />
+            )}
+          </IconButton>
+        </Tooltip>
+
         {/* Star Button */}
         <Tooltip
           title={isStarred ? t.dashboard.email.bulkBar.removeStar : t.dashboard.email.bulkBar.addStar}
@@ -180,14 +222,14 @@ export const ThreadActionBar: React.FC<ThreadActionBarProps> = ({
               width: 28,
               height: 28,
               '&:hover': {
-                bgcolor: isImportant ? 'error.light' : 'action.hover',
+                bgcolor: isImportant ? 'warning.light' : 'action.hover',
               },
             }}
           >
-            <AlertCircle
+            <Flag
               size={16}
-              fill={isImportant ? '#FF5722' : 'none'}
-              color={isImportant ? '#FF5722' : 'currentColor'}
+              fill={isImportant ? '#FF9800' : 'none'}
+              color={isImportant ? '#FF9800' : 'currentColor'}
             />
           </IconButton>
         </Tooltip>

@@ -69,6 +69,18 @@ export class RealtimeEventsService {
   }
 
   /**
+   * Verifica se un tenant ha connessioni WebSocket attive
+   * @param tenantId ID del tenant
+   * @returns true se ci sono client connessi per questo tenant
+   */
+  hasTenantConnections(tenantId: string): boolean {
+    if (!this.gateway) {
+      return false;
+    }
+    return this.gateway.hasTenantConnections(tenantId);
+  }
+
+  /**
    * EMAIL EVENTS
    */
 
@@ -336,6 +348,7 @@ export class RealtimeEventsService {
 
   /**
    * Emette un evento generico alla room del tenant
+   * Skip if no active connections to avoid wasting resources
    */
   private emitToTenant<E extends KnownRealtimeEvent>(
     tenantId: string,
@@ -344,6 +357,12 @@ export class RealtimeEventsService {
   ) {
     if (!this.gateway || !this.gateway.server) {
       this.logger.warn(`Gateway not initialized, cannot emit event: ${event}`);
+      return;
+    }
+
+    // Skip if tenant has no active connections
+    if (!this.hasTenantConnections(tenantId)) {
+      this.logger.debug(`Skipping event ${event} for inactive tenant: ${tenantId}`);
       return;
     }
 
@@ -356,6 +375,12 @@ export class RealtimeEventsService {
     event: E,
     payload: RealtimeEventPayloads[E],
   ) {
+    // Skip if tenant has no active connections
+    if (!this.hasTenantConnections(tenantId)) {
+      this.logger.debug(`Skipping immediate event ${event} for inactive tenant: ${tenantId}`);
+      return;
+    }
+
     this.emitInternal(buildTenantRoom(tenantId), event, payload);
   }
 

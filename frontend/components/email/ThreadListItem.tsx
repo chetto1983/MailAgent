@@ -41,6 +41,11 @@ interface ThreadListItemProps {
   onToggleImportant?: (id: string, isImportant: boolean) => void;
 
   /**
+   * Callback to toggle read status
+   */
+  onToggleRead?: (id: string, isRead: boolean) => void;
+
+  /**
    * Callback to archive
    */
   onArchive?: (id: string) => void;
@@ -130,6 +135,7 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
     onToggleSelect,
     onToggleStar,
     onToggleImportant,
+    onToggleRead,
     onArchive,
     onDelete,
     getProviderIcon,
@@ -184,6 +190,10 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
 
     const handleToggleImportant = () => {
       onToggleImportant?.(threadId, isImportant);
+    };
+
+    const handleToggleRead = () => {
+      onToggleRead?.(threadId, isRead);
     };
 
     const handleArchive = () => {
@@ -339,11 +349,13 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
           </Box>
 
           {/* Floating Action Bar */}
-          {(onToggleStar || onToggleImportant || onArchive || onDelete) && (
+          {(onToggleRead || onToggleStar || onToggleImportant || onArchive || onDelete) && (
             <ThreadActionBar
               threadId={threadId}
+              isRead={isRead}
               isStarred={isStarred}
               isImportant={isImportant}
+              onToggleRead={handleToggleRead}
               onToggleStar={handleToggleStar}
               onToggleImportant={handleToggleImportant}
               onArchive={handleArchive}

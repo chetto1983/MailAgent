@@ -125,7 +125,7 @@ export type EmailStats = {
 export type EmailUpdateData = {
   isRead?: boolean;
   isStarred?: boolean;
-  isImportant?: boolean;
+  isFlagged?: boolean;
   isDeleted?: boolean;
   isArchived?: boolean;
   folder?: string;
@@ -301,6 +301,17 @@ export const emailApi = {
     return apiClient.patch<{ updated: number }>(
       '/emails/bulk/star',
       { emailIds, isStarred }
+    );
+  },
+
+  /**
+   * Bulk flag/unflag emails (mark as important)
+   * PATCH /emails/bulk/flag
+   */
+  bulkFlag(emailIds: string[], isFlagged: boolean) {
+    return apiClient.patch<{ updated: number }>(
+      '/emails/bulk/flag',
+      { emailIds, isFlagged }
     );
   },
 

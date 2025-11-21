@@ -10,8 +10,6 @@ import {
   MenuItem,
   Divider,
   CircularProgress,
-  useMediaQuery,
-  useTheme,
 } from '@mui/material';
 import {
   X,
@@ -19,6 +17,7 @@ import {
   MailOpen,
   Trash2,
   Star,
+  Flag,
   Tag,
   FolderInput,
   MoreVertical,
@@ -35,6 +34,8 @@ export interface BulkActionBarProps {
   onDelete: () => Promise<void>;
   onStar?: () => Promise<void>;
   onUnstar?: () => Promise<void>;
+  onFlag?: () => Promise<void>;
+  onUnflag?: () => Promise<void>;
   onAddLabels?: () => void;
   onMoveToFolder?: () => void;
 }
@@ -59,12 +60,12 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
   onDelete,
   onStar,
   onUnstar,
+  onFlag,
+  onUnflag,
   onAddLabels,
   onMoveToFolder,
 }) => {
   const t = useTranslations();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState<string | null>(null);
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
 
@@ -156,53 +157,49 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
 
         {/* Action Buttons */}
         <Box sx={{ display: 'flex', gap: 0.5 }}>
-          {/* Mark as Read - Hidden on mobile */}
-          {!isMobile && (
-            <Tooltip title={t.dashboard.email.bulkBar.markRead}>
-              <span>
-                <IconButton
-                  size="small"
-                  onClick={() => handleAction(onMarkRead, 'markRead')}
-                  disabled={loading !== null}
-                  sx={{
-                    color: 'inherit',
-                    width: { xs: 44, sm: 'auto' },
-                    height: { xs: 44, sm: 'auto' },
-                  }}
-                >
-                  {loading === 'markRead' ? (
-                    <CircularProgress size={20} color="inherit" />
-                  ) : (
-                    <MailOpen size={20} />
-                  )}
-                </IconButton>
-              </span>
-            </Tooltip>
-          )}
+          {/* Mark as Read */}
+          <Tooltip title={t.dashboard.email.bulkBar.markRead}>
+            <span>
+              <IconButton
+                size="small"
+                onClick={() => handleAction(onMarkRead, 'markRead')}
+                disabled={loading !== null}
+                sx={{
+                  color: 'inherit',
+                  width: { xs: 44, sm: 'auto' },
+                  height: { xs: 44, sm: 'auto' },
+                }}
+              >
+                {loading === 'markRead' ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  <MailOpen size={20} />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
 
-          {/* Mark as Unread - Hidden on mobile */}
-          {!isMobile && (
-            <Tooltip title={t.dashboard.email.bulkBar.markUnread}>
-              <span>
-                <IconButton
-                  size="small"
-                  onClick={() => handleAction(onMarkUnread, 'markUnread')}
-                  disabled={loading !== null}
-                  sx={{
-                    color: 'inherit',
-                    width: { xs: 44, sm: 'auto' },
-                    height: { xs: 44, sm: 'auto' },
-                  }}
-                >
-                  {loading === 'markUnread' ? (
-                    <CircularProgress size={20} color="inherit" />
-                  ) : (
-                    <Mail size={20} />
-                  )}
-                </IconButton>
-              </span>
-            </Tooltip>
-          )}
+          {/* Mark as Unread */}
+          <Tooltip title={t.dashboard.email.bulkBar.markUnread}>
+            <span>
+              <IconButton
+                size="small"
+                onClick={() => handleAction(onMarkUnread, 'markUnread')}
+                disabled={loading !== null}
+                sx={{
+                  color: 'inherit',
+                  width: { xs: 44, sm: 'auto' },
+                  height: { xs: 44, sm: 'auto' },
+                }}
+              >
+                {loading === 'markUnread' ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  <Mail size={20} />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
 
           {/* Delete */}
           <Tooltip title={t.dashboard.email.bulkBar.delete}>
@@ -257,32 +254,6 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
               horizontal: 'right',
             }}
           >
-            {/* Mark Read/Unread - Only visible on mobile */}
-            {isMobile && (
-              <>
-                <MenuItem
-                  onClick={() => {
-                    handleAction(onMarkRead, 'markRead');
-                    handleMoreClose();
-                  }}
-                  disabled={loading !== null}
-                >
-                  <MailOpen size={18} style={{ marginRight: 8 }} />
-                  {t.dashboard.email.bulkBar.markRead}
-                </MenuItem>
-                <MenuItem
-                  onClick={() => {
-                    handleAction(onMarkUnread, 'markUnread');
-                    handleMoreClose();
-                  }}
-                  disabled={loading !== null}
-                >
-                  <Mail size={18} style={{ marginRight: 8 }} />
-                  {t.dashboard.email.bulkBar.markUnread}
-                </MenuItem>
-                <Divider />
-              </>
-            )}
             {onStar && (
               <MenuItem
                 onClick={() => {
@@ -305,6 +276,30 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
               >
                 <Star size={18} style={{ marginRight: 8 }} />
                 {t.dashboard.email.bulkBar.removeStar}
+              </MenuItem>
+            )}
+            {onFlag && (
+              <MenuItem
+                onClick={() => {
+                  handleAction(onFlag, 'flag');
+                  handleMoreClose();
+                }}
+                disabled={loading !== null}
+              >
+                <Flag size={18} style={{ marginRight: 8 }} />
+                Mark as Important
+              </MenuItem>
+            )}
+            {onUnflag && (
+              <MenuItem
+                onClick={() => {
+                  handleAction(onUnflag, 'unflag');
+                  handleMoreClose();
+                }}
+                disabled={loading !== null}
+              >
+                <Flag size={18} style={{ marginRight: 8 }} />
+                Unmark as Important
               </MenuItem>
             )}
             {onAddLabels && (

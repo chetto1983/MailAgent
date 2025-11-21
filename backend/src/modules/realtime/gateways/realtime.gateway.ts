@@ -14,6 +14,7 @@ import { RealtimeEventsService } from '../services/realtime-events.service';
 import { RealtimeHandshakeService } from '../services/realtime-handshake.service';
 import {
   AuthenticatedSocket,
+  buildTenantRoom,
   buildTenantScopedRoom,
 } from '../types/realtime.types';
 
@@ -151,6 +152,21 @@ export class RealtimeGateway
     await client.leave(room);
     this.logger.debug(`Client ${client.id} left room: ${room}`);
     return { event: 'left_room', data: { room } };
+  }
+
+  /**
+   * Verifica se un tenant ha connessioni WebSocket attive
+   * @param tenantId ID del tenant
+   * @returns true se ci sono client connessi per questo tenant
+   */
+  hasTenantConnections(tenantId: string): boolean {
+    if (!this.server) {
+      return false;
+    }
+
+    const room = buildTenantRoom(tenantId);
+    const roomSize = this.server.sockets.adapter.rooms.get(room)?.size || 0;
+    return roomSize > 0;
   }
 
   /**
