@@ -41,7 +41,8 @@
       "Bash(git rm:*)",
       "Bash(timeout 5 npm run dev:*)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

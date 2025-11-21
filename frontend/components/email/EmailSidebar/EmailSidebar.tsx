@@ -447,7 +447,7 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
       )}
 
       {/* Folders List */}
-      <List sx={{ px: 1, flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <List sx={{ px: 1, pb: 1 }}>
         {loading ? (
           <Box sx={{ px: 1, py: 2 }}>
             {[...Array(3)].map((_, groupIndex) => (
@@ -528,6 +528,9 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
           ))
         )}
       </List>
+
+      {/* Spacer to push content to top */}
+      <Box sx={{ flex: 1 }} />
     </Paper>
   );
 };
