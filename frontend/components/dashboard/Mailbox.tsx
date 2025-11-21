@@ -813,7 +813,7 @@ export function Mailbox() {
                   edge="start"
                   onClick={() => setMobileSidebarOpen(true)}
                   sx={{ width: 40, height: 40 }}
-                  aria-label="open sidebar"
+                  aria-label={t.dashboard.emailList.openSidebar}
                 >
                   <MenuIcon size={20} />
                 </IconButton>
@@ -829,12 +829,12 @@ export function Mailbox() {
                   aria-label="view mode"
                 >
                   <ToggleButton value="list" aria-label="list view">
-                    <Tooltip title="Email List">
+                    <Tooltip title={t.dashboard.emailList.emailListView}>
                       <ListIcon size={18} />
                     </Tooltip>
                   </ToggleButton>
                   <ToggleButton value="conversation" aria-label="conversation view">
-                    <Tooltip title="Conversation View">
+                    <Tooltip title={t.dashboard.emailList.conversationView}>
                       <MessageSquare size={18} />
                     </Tooltip>
                   </ToggleButton>

@@ -399,7 +399,7 @@ export const EmailList: React.FC<EmailListProps> = ({
             }}
           />
           {onAdvancedSearch && (
-            <Tooltip title="Advanced Search">
+            <Tooltip title={t.dashboard.emailList.advancedSearch}>
               <IconButton
                 size="small"
                 onClick={onAdvancedSearch}
@@ -441,7 +441,7 @@ export const EmailList: React.FC<EmailListProps> = ({
           <Box sx={{ textAlign: 'center', py: 4, px: 2 }}>
             <Mail size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
             <Typography variant="body2" color="text.secondary">
-              {emptyMessage || 'No emails found'}
+              {emptyMessage || t.dashboard.emailList.empty}
             </Typography>
           </Box>
         ) : (
