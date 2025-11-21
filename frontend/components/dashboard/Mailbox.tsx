@@ -11,6 +11,7 @@ import {
   Menu as MenuIcon,
 } from 'lucide-react';
 import { Snackbar, Alert as MuiAlert, Box, ToggleButtonGroup, ToggleButton, Tooltip, IconButton, useMediaQuery, useTheme } from '@mui/material';
+import { debounce } from 'lodash-es';
 import { emailApi, type EmailListParams, type Conversation } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
@@ -677,14 +678,41 @@ export function Mailbox() {
     }
   }, [combinedFolders, selectedFolderId]);
 
-  // Load emails when folder ID changes (not activeFolder object to avoid unnecessary re-renders)
-  // Only re-run when selectedFolderId or advancedFilters change, NOT when loadData changes
+  // Ref to always access latest loadData without triggering useMemo dependencies
+  const loadDataRef = useRef(loadData);
+  useEffect(() => {
+    loadDataRef.current = loadData;
+  });
+
+  // Create a debounced version of loadData for filter changes (500ms delay)
+  const debouncedLoadData = useMemo(
+    () =>
+      debounce(() => {
+        if (loadDataRef.current) {
+          loadDataRef.current();
+        }
+      }, 500),
+    []
+  );
+
+  // Load emails immediately when folder ID changes
   useEffect(() => {
     if (selectedFolderId) {
+      // Cancel any pending debounced loads from filter changes
+      debouncedLoadData.cancel();
+      // Load immediately
       loadData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFolderId, advancedFilters]);
+  }, [selectedFolderId]);
+
+  // Load emails with debounce when advanced filters change
+  useEffect(() => {
+    if (selectedFolderId) {
+      debouncedLoadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advancedFilters]);
 
   // Keyboard navigation
   useKeyboardNavigation({
