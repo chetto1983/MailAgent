@@ -36,7 +36,7 @@ interface EmailLayoutProps {
   onSidebarClose?: () => void;
 
   /**
-   * Custom height for the layout (default: '100vh')
+   * Custom height for the layout (default: '100%')
    */
   height?: string;
 }
@@ -73,7 +73,7 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
   showDetail = false,
   sidebarOpen = false,
   onSidebarClose,
-  height = '100vh',
+  height = '100%',
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));

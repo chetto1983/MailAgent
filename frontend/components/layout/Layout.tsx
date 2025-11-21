@@ -144,11 +144,12 @@ export function Layout({ children }: LayoutProps) {
           {/* Page Content */}
           <Box
             sx={{
-              flexGrow: 1,
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
               p: { xs: 2, sm: 3 },
-              mt: '64px', // Header height
               backgroundColor: 'background.default',
-              minHeight: 'calc(100vh - 64px)',
+              overflow: 'auto',
             }}
           >
             {children}

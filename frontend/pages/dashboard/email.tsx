@@ -186,9 +186,9 @@ export default function EmailPage() {
 
           <Box
             sx={{
-              flexGrow: 1,
-              mt: '64px',
-              height: 'calc(100vh - 64px)',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
               overflow: 'hidden',
             }}
           >

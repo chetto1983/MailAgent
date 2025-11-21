@@ -34,7 +34,14 @@
       "Bash(node check-webhooks.js:*)",
       "Bash(node test-gmail-webhook.js:*)",
       "Bash(node check-gmail-email-webhook.js:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(timeout 5 npm run dev:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []
