@@ -14,6 +14,7 @@ import {
 import { ChevronDown, ChevronUp, Reply, Forward } from 'lucide-react';
 import type { Email } from '@/lib/api/email';
 import { emailApi } from '@/lib/api/email';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 /**
  * Props for EmailThread component
@@ -100,6 +101,7 @@ const ThreadMessage: React.FC<ThreadMessageProps> = ({
   onReply,
   onForward,
 }) => {
+  const t = useTranslations();
   const fromData = parseEmailFrom(email.from);
 
   // Email body as pure HTML (no sanitization)
@@ -208,14 +210,14 @@ const ThreadMessage: React.FC<ThreadMessageProps> = ({
           {/* Actions */}
           <Stack direction="row" spacing={1}>
             {onReply && (
-              <Tooltip title="Reply">
+              <Tooltip title={t.dashboard.emailView.reply}>
                 <IconButton size="small" onClick={(e) => { e.stopPropagation(); onReply(email); }}>
                   <Reply size={16} />
                 </IconButton>
               </Tooltip>
             )}
             {onForward && (
-              <Tooltip title="Forward">
+              <Tooltip title={t.dashboard.emailView.forward}>
                 <IconButton size="small" onClick={(e) => { e.stopPropagation(); onForward(email); }}>
                   <Forward size={16} />
                 </IconButton>

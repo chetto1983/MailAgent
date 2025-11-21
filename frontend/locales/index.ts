@@ -290,6 +290,9 @@ export interface AppTranslations {
       emailListView: string;
       conversationView: string;
       openSidebar: string;
+      markAsRead: string;
+      markAsUnread: string;
+      archive: string;
     };
     emailView: {
       folderLabel: string;
@@ -299,6 +302,10 @@ export interface AppTranslations {
       labels: string;
       date: string;
       selectEmail: string;
+      back: string;
+      archive: string;
+      more: string;
+      download: string;
       reply: string;
       forward: string;
       summaryTitle: string;
