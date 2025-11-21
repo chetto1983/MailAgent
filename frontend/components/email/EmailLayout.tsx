@@ -77,6 +77,7 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isVerySmallMobile = useMediaQuery('(max-width:360px)');
 
   return (
     <Box
@@ -115,7 +116,8 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
           ModalProps={{ keepMounted: true }}
           sx={{
             '& .MuiDrawer-paper': {
-              width: 280,
+              width: isVerySmallMobile ? 'calc(100vw - 56px)' : 280,
+              maxWidth: 280,
               boxSizing: 'border-box',
             },
           }}
