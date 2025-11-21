@@ -175,13 +175,6 @@ export const EmailList: React.FC<EmailListProps> = ({
   const t = useTranslations();
   const [searchQuery, setSearchQuery] = useState('');
 
-  console.log('[DEBUG EmailList] Render:', {
-    emailsLength: emails.length,
-    loading,
-    selectedEmailId,
-    searchQuery
-  });
-
   // Use prop selectedIds if provided, otherwise use local state
   const [localSelectedIds, setLocalSelectedIds] = useState<Set<string>>(new Set());
   const selectedIds = propSelectedIds ?? localSelectedIds;
