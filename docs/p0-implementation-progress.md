@@ -392,6 +392,86 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 ---
 
+## 🎨 Layout & UX Improvements
+
+### Layout Spacing Fix ✅
+
+**Data:** 2025-11-21
+
+**Problema Originale:**
+
+- Spazio eccessivo tra sidebar e main content su tutte le pagine dashboard
+- Il Drawer permanent occupava già spazio nel flex container con `flexShrink: 0`
+- Il main content Box aveva ANCHE `margin-left` e `width calcolato`, creando spazio doppio
+- Layout non edge-to-edge come previsto
+
+**Soluzione Implementata:**
+
+1. Rimosso `margin-left` dal main content Box in Layout.tsx
+2. Rimosso `width: calc(100% - ${drawerWidth}px)`
+3. Semplificato a solo `flexGrow: 1` per prendere lo spazio rimanente naturalmente
+4. Rimosso costanti e variabili `drawerWidth` non più utilizzate
+5. Applicato fix a entrambi Layout.tsx e email.tsx
+
+**File Modificati:**
+
+1. `frontend/components/layout/Layout.tsx`
+   - Rimosso `ml: { md: ${drawerWidth}px }` dal main Box (linea 126-128)
+   - Rimosso `width: { md: calc(100% - ${drawerWidth}px) }` (linee 122-125)
+   - Rimosso `transition` non più necessaria (linee 130-134)
+   - Rimosso costanti `DRAWER_WIDTH_EXPANDED` e `DRAWER_WIDTH_COLLAPSED` (linee 20-21)
+   - Rimosso variabile `drawerWidth` (linea 100)
+
+2. `frontend/pages/dashboard/email.tsx`
+   - Rimosso `ml: { md: ${drawerWidth}px }` dal main Box (linee 170-172)
+   - Rimosso `width: { md: calc(100% - ${drawerWidth}px) }` (linee 166-169)
+   - Rimosso `transition` non più necessaria (linee 174-178)
+   - Rimosso costanti `DRAWER_WIDTH_EXPANDED` e `DRAWER_WIDTH_COLLAPSED` (linee 27-28)
+   - Rimosso variabile `drawerWidth` (linea 119)
+
+**Risultato:**
+
+- ✅ Eliminato spazio doppio tra sidebar e content
+- ✅ Layout edge-to-edge corretto
+- ✅ Fix applicato a tutte le pagine dashboard (Home, Calendar, Contacts, Settings)
+- ✅ Fix applicato anche alla pagina Email dedicata
+- ✅ Codice più pulito (-36 righe totali)
+- ✅ Build completato con successo
+- ✅ TypeScript checks passati
+
+**Commit:**
+
+```bash
+fix(layout): eliminate excessive spacing by removing double-width calculation
+
+Root cause: The Drawer permanent component already occupies space in the flex
+container through flexShrink: 0, but the main content Box was ALSO applying
+margin-left and calculated width, creating double spacing.
+
+Changes:
+- Removed margin-left and width calculations from main content Box
+- Now uses only flexGrow: 1 to take remaining space naturally
+- Removed unused drawer width constants and variables
+- Applied fix to both Layout.tsx and email.tsx
+
+This eliminates the empty space visible on all dashboard pages.
+
+🤖 Generated with Claude Code
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+**Commit Hash:** `6a4f897`
+
+**Testing Raccomandato:**
+
+- [x] Verificare spacing su dashboard home page
+- [x] Verificare spacing su pagina email
+- [x] Verificare spacing su altre pagine (Calendar, Contacts, Settings)
+- [x] Test responsive mobile
+- [x] Test con sidebar collapsed/expanded
+
+---
+
 **🎉 FASE 1 (P0) COMPLETATA AL 100%!**
 
 Tutti i 4 fix critici sono stati implementati con successo. Pronto per commit e deploy.
