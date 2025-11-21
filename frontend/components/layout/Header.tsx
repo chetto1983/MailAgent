@@ -185,7 +185,7 @@ export function Header({
 
   return (
     <AppBar
-      position="fixed"
+      position="static"
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
         backgroundColor: 'background.paper',

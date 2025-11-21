@@ -280,6 +280,7 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
             p: 2,
             flexShrink: 0,
             minHeight: 60,
+            display: 'flex',
             bgcolor: 'background.paper',
             borderBottom: '1px solid',
             borderColor: 'divider',
@@ -294,6 +295,7 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
             sx={{
               minHeight: 48,
               height: 48,
+              display: 'flex !important',
               py: 1.5,
               fontWeight: 600,
               textTransform: 'none',
@@ -445,7 +447,6 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
                       }}
                     />
                     <Box sx={{ flex: 1 }} />
-                    {/* TODO: Add count when available */}
                   </ListItemButton>
                 );
               })

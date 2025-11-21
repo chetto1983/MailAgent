@@ -125,6 +125,7 @@ export type EmailStats = {
 export type EmailUpdateData = {
   isRead?: boolean;
   isStarred?: boolean;
+  isImportant?: boolean;
   isDeleted?: boolean;
   isArchived?: boolean;
   folder?: string;

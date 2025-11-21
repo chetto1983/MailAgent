@@ -6,18 +6,14 @@ import {
   Paperclip,
   Clock,
   Calendar as CalendarIcon,
-  List as ListIcon,
-  MessageSquare,
 } from 'lucide-react';
-import { Snackbar, Alert as MuiAlert, Box, ToggleButtonGroup, ToggleButton, Tooltip, useMediaQuery, useTheme } from '@mui/material';
+import { Snackbar, Alert as MuiAlert, Box, useMediaQuery, useTheme } from '@mui/material';
 import { debounce } from 'lodash-es';
-import { emailApi, type EmailListParams, type Conversation } from '@/lib/api/email';
+import { emailApi, type EmailListParams } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { useEmailStore } from '@/stores/email-store';
-//import { useAuthStore } from '@/stores/auth-store';
-//import { useWebSocket } from '@/hooks/use-websocket';
 import { useEmailActions } from '@/hooks/use-email-actions';
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation';
 import { normalizeFolderName, getFolderIcon as getIconForFolderUtil } from '@/lib/utils/folder-normalization';
@@ -25,11 +21,8 @@ import { normalizeFolderName, getFolderIcon as getIconForFolderUtil } from '@/li
 // Components
 import { EmailLayout } from '@/components/email/EmailLayout';
 import { EmailSidebar, type FolderGroup, type SmartFilter } from '@/components/email/EmailSidebar/EmailSidebar';
-import { EmailList } from '@/components/email/EmailList';
-import { EmailListItem } from '@/components/email/EmailList';
-import { EmailDetail } from '@/components/email/EmailDetail';
-import { EmailThread } from '@/components/email/EmailThread';
-import { ConversationList } from '@/components/email/ConversationList';
+import { ThreadList } from '@/components/email/ThreadList';
+import { ThreadDisplay } from '@/components/email/ThreadDisplay';
 import { ComposeDialog } from '@/components/email/ComposeDialog/ComposeDialog';
 import { AdvancedSearchDialog, type AdvancedSearchFilters } from '@/components/email/AdvancedSearchDialog';
 import { LabelManager } from '@/components/labels';
@@ -52,14 +45,13 @@ interface FolderItem {
 }
 
 /**
- * PmSyncMailboxRefactored - Refactored email mailbox component using modular architecture
+ * Mailbox - Modern email interface with unified components
  *
  * Uses:
  * - EmailLayout for container structure
  * - EmailSidebar for folder navigation
- * - EmailList for email list with search
- * - EmailListItem for individual emails (memoized)
- * - EmailDetail for email detail view
+ * - ThreadList for unified email/conversation list
+ * - ThreadDisplay for email detail view
  * - email-store for global state
  * - Custom hooks for actions and keyboard navigation
  */
@@ -97,12 +89,11 @@ export function Mailbox() {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [searchQuery] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
+  const [, setRefreshing] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchFilters>({});
-  const [pagination, setPagination] = useState({ page: 1, hasMore: true, total: 0 });
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [_pagination, setPagination] = useState({ page: 1, hasMore: true, total: 0 });
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -114,8 +105,7 @@ export function Mailbox() {
   });
 
   // View mode state
-  const [viewMode, setViewMode] = useState<'list' | 'conversation'>('list');
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [viewMode] = useState<'list' | 'conversation'>('list');
 
   // Mobile sidebar state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -139,11 +129,11 @@ export function Mailbox() {
   const {
     handleDelete,
     handleToggleStar,
+    handleToggleImportant,
     handleArchive,
-    handleMarkAsRead,
     handleReply,
     handleForward,
-    handleEmailClick,
+    handleEmailClick: handleEmailClickOriginal,
   } = useEmailActions({
     onSuccess: (message) => {
       setSnackbar({
@@ -160,6 +150,13 @@ export function Mailbox() {
       });
     },
   });
+
+  // Wrapper to handle both Email and Conversation types
+  const handleEmailClick = useCallback((thread: any) => {
+    if ('providerId' in thread) {
+      handleEmailClickOriginal(thread);
+    }
+  }, [handleEmailClickOriginal]);
 
   // Smart Filters for quick access
   const smartFilters = useMemo<SmartFilter[]>(() => {
@@ -281,14 +278,6 @@ export function Mailbox() {
     () => [...smartFilterFolders, ...aggregatorFolders, ...remoteFolders],
     [smartFilterFolders, aggregatorFolders, remoteFolders]
   );
-
-  // Active folder
-  const activeFolder = useMemo(() => {
-    const found = combinedFolders.find((folder) => folder.id === selectedFolderId) ||
-      combinedFolders[0] ||
-      null;
-    return found;
-  }, [combinedFolders, selectedFolderId]);
 
   // Folders grouped by provider for sidebar
   const folderGroups = useMemo<FolderGroup[]>(() => {
@@ -461,51 +450,6 @@ export function Mailbox() {
       setLoading(false);
     }
   }, [combinedFolders, selectedFolderId, searchQuery, advancedFilters, setEmails, setLoading, setSelectedEmail]);
-
-  // Load more emails (infinite scroll)
-  const loadMoreEmails = useCallback(async () => {
-    if (!activeFolder || !pagination.hasMore || loadingMore) return;
-
-    try {
-      setLoadingMore(true);
-
-      const queryParams: EmailListParams = {
-        limit: 50,
-        page: pagination.page + 1,
-        ...activeFolder.queryOverrides,
-        search: advancedFilters.searchQuery || searchQuery || undefined,
-        from: advancedFilters.from || undefined,
-        // Only override date filters if advanced filters are set
-        ...(advancedFilters.startDate ? { startDate: advancedFilters.startDate } : {}),
-        ...(advancedFilters.endDate ? { endDate: advancedFilters.endDate } : {}),
-        // Only override boolean filters if advanced filters are explicitly set
-        ...(advancedFilters.hasAttachments !== undefined ? { hasAttachments: advancedFilters.hasAttachments } : {}),
-        ...(advancedFilters.isRead !== null ? { isRead: advancedFilters.isRead } : {}),
-        ...(advancedFilters.isStarred !== undefined ? { isStarred: advancedFilters.isStarred } : {}),
-      };
-
-      const emailsRes = await emailApi.listEmails(queryParams);
-
-      // Append new emails to existing ones
-      setEmails([...storeEmails, ...(emailsRes.data.emails || [])] as any);
-
-      // Update pagination
-      setPagination({
-        page: emailsRes.data.pagination.page,
-        hasMore: emailsRes.data.pagination.page < emailsRes.data.pagination.totalPages,
-        total: emailsRes.data.pagination.total,
-      });
-    } catch (error) {
-      console.error('Failed to load more emails:', error);
-      setSnackbar({
-        open: true,
-        message: t.dashboard.email.messages.loadMoreFailed,
-        severity: 'error',
-      });
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [activeFolder, searchQuery, advancedFilters, pagination, loadingMore, storeEmails, setEmails, t.dashboard.email.messages.loadMoreFailed]);
 
   // Refresh emails
   const handleRefresh = useCallback(async () => {
@@ -755,46 +699,6 @@ export function Mailbox() {
     setAdvancedFilters({});
   }, []);
 
-  // Check if any advanced filters are active
-  const hasActiveFilters = useMemo(() => {
-    return Object.values(advancedFilters).some((value) => {
-      if (value === null || value === undefined || value === '') return false;
-      if (typeof value === 'boolean') return value;
-      return true;
-    });
-  }, [advancedFilters]);
-
-  // Handle view mode toggle
-  const handleViewModeChange = useCallback(
-    (_event: React.MouseEvent<HTMLElement>, newMode: 'list' | 'conversation' | null) => {
-      if (newMode !== null) {
-        setViewMode(newMode);
-        // Reset selections when switching view modes
-        setSelectedEmail(null);
-        setSelectedThreadId(null);
-
-        // Reload data when switching to list view if emails are empty
-        if (newMode === 'list' && storeEmailsRef.current.length === 0) {
-          handleRefresh();
-        }
-      }
-    },
-    [setSelectedEmail, handleRefresh]
-  );
-
-  // Handle conversation selection
-  const handleConversationSelect = useCallback((conversation: Conversation) => {
-    setSelectedThreadId(conversation.threadId);
-    // Fetch the first email in the thread to use for the EmailThread component
-    emailApi.getThread(conversation.threadId).then((response) => {
-      const threadEmails = response.data;
-      if (threadEmails.length > 0) {
-        setSelectedEmail(threadEmails[0] as any);
-      }
-    }).catch((error) => {
-      console.error('Failed to load thread:', error);
-    });
-  }, [setSelectedEmail]);
 
   return (
     <>
@@ -840,113 +744,35 @@ export function Mailbox() {
 
             {/* Render appropriate view based on mode */}
             <Box sx={{ flex: 1, overflow: 'hidden' }}>
-              {viewMode === 'list' ? (
-                <EmailList
-                  emails={storeEmails}
-                  selectedEmailId={storeSelectedEmail?.id}
-                  selectedIds={selectedIds}
-                  onToggleSelection={toggleSelection}
-                  onEmailClick={handleEmailClick}
-                  loading={storeLoading}
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  onBulkDelete={(ids) => ids.forEach(handleDelete)}
-                  onBulkArchive={(ids) => handleArchive(ids)}
-                  onBulkMarkAsRead={(ids, isRead) => handleMarkAsRead(ids, isRead)}
-                  onLoadMore={loadMoreEmails}
-                  hasMore={pagination.hasMore}
-                  loadingMore={loadingMore}
-                  onAdvancedSearch={() => setAdvancedSearchOpen(true)}
-                  hasActiveFilters={hasActiveFilters}
-                  viewModeToggle={
-                    <ToggleButtonGroup
-                      value={viewMode}
-                      exclusive
-                      onChange={handleViewModeChange}
-                      size="small"
-                      aria-label="view mode"
-                      sx={{
-                        display: 'flex',
-                        minHeight: 40,
-                        height: 'auto',
-                        bgcolor: 'background.default',
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        '& .MuiToggleButton-root': {
-                          minWidth: 44,
-                          minHeight: 40,
-                          px: 2,
-                          border: 'none',
-                          borderRight: '1px solid',
-                          borderColor: 'divider',
-                          '&:last-child': {
-                            borderRight: 'none',
-                          },
-                          '&.Mui-selected': {
-                            bgcolor: 'primary.main',
-                            color: 'primary.contrastText',
-                            '&:hover': {
-                              bgcolor: 'primary.dark',
-                            },
-                          },
-                        },
-                      }}
-                    >
-                      <ToggleButton value="list" aria-label="list view">
-                        <Tooltip title={t.dashboard.emailList.emailListView}>
-                          <ListIcon size={18} />
-                        </Tooltip>
-                      </ToggleButton>
-                      <ToggleButton value="conversation" aria-label="conversation view">
-                        <Tooltip title={t.dashboard.emailList.conversationView}>
-                          <MessageSquare size={18} />
-                        </Tooltip>
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  }
-                  renderItem={(email, isSelected, isMultiSelected, onToggleSelect, onEmailClick) => (
-                    <EmailListItem
-                      email={email}
-                      selected={isSelected}
-                      multiSelected={isMultiSelected}
-                      onToggleSelect={onToggleSelect}
-                      onToggleStar={handleToggleStar}
-                      getProviderIcon={getProviderIcon}
-                      onClick={onEmailClick}
-                    />
-                  )}
-                />
-              ) : (
-                <ConversationList
-                  providerId={activeFolder?.providerId}
-                  folder={activeFolder?.filterFolder || activeFolder?.queryOverrides?.folder}
-                  selectedThreadId={selectedThreadId || undefined}
-                  onSelectConversation={handleConversationSelect}
-                  onRefresh={handleRefresh}
-                />
-              )}
+              <ThreadList
+                threads={storeEmails}
+                selectedId={storeSelectedEmail?.id}
+                selectedIds={selectedIds}
+                isLoading={storeLoading}
+                onThreadClick={handleEmailClick}
+                onToggleSelect={toggleSelection}
+                onToggleStar={handleToggleStar}
+                onToggleImportant={handleToggleImportant}
+                onArchive={(id) => handleArchive([id])}
+                onDelete={handleDelete}
+                getProviderIcon={getProviderIcon}
+                viewMode={viewMode}
+              />
             </Box>
           </Box>
         }
         detail={
           storeSelectedEmail ? (
-            storeSelectedEmail.threadId ? (
-              <EmailThread
-                threadId={storeSelectedEmail.threadId}
-                onReply={handleReply}
-                onForward={handleForward}
-              />
-            ) : (
-              <EmailDetail
-                email={storeSelectedEmail}
-                onClose={() => setSelectedEmail(null)}
-                onArchive={(id) => handleArchive([id])}
-                onDelete={handleDelete}
-                onReply={handleReply}
-                onForward={handleForward}
-              />
-            )
+            <ThreadDisplay
+              email={storeSelectedEmail}
+              onClose={() => setSelectedEmail(null)}
+              onToggleStar={handleToggleStar}
+              onArchive={(id) => handleArchive([id])}
+              onDelete={handleDelete}
+              onReply={handleReply}
+              onReplyAll={handleReply}
+              onForward={handleForward}
+            />
           ) : undefined
         }
         showDetail={!!storeSelectedEmail}

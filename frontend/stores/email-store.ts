@@ -15,6 +15,7 @@ export interface Email {
   receivedAt: string;
   isRead: boolean;
   isStarred?: boolean;
+  isImportant?: boolean;
   labels?: string[];
   folder?: string;
   hasAttachments?: boolean;
@@ -88,6 +89,7 @@ interface EmailState {
   // Bulk actions
   markAsRead: (ids: string[]) => void;
   markAsStarred: (ids: string[], starred: boolean) => void;
+  markAsImportant: (ids: string[], important: boolean) => void;
   bulkDelete: (ids: string[]) => void;
   moveToFolder: (ids: string[], folderId: string) => void;
 
@@ -224,6 +226,13 @@ export const useEmailStore = create<EmailState>((set) => ({
     set((state) => ({
       emails: state.emails.map((email) =>
         ids.includes(email.id) ? { ...email, isStarred: starred } : email
+      ),
+    })),
+
+  markAsImportant: (ids, important) =>
+    set((state) => ({
+      emails: state.emails.map((email) =>
+        ids.includes(email.id) ? { ...email, isImportant: important } : email
       ),
     })),
 

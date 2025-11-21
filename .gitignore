@@ -1,853 +1,701 @@
 # Dependencies
 node_modules/
-backend/node_modules/
-frontend/node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+.nyc_output/
+
+# Next.js
+.next/
+out/
+
+# Production
+build/
+dist/
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+.pnpm-debug.log*
+lerna-debug.log*
 
-# Environment variables
+# Local env files
 .env
-.env.local
+.env*.local
 .env.development
 .env.test
 .env.production
-.env*.local
 
-# Build outputs
-dist/
-backend/dist/
-frontend/dist/
-build/
-out/
-.next/
-frontend/.next/
+# Vercel
+.vercel
+
+# TypeScript
 *.tsbuildinfo
+next-env.d.ts
 
-# Build caches
+# Turbo
 .turbo/
-frontend/.turbo/
-backend/.turbo/
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
-prisma/migrations/
+prisma/dev.db*
 
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
 
-# Docker
-docker-compose.override.yml
-.docker/
-
-# IDE
+# IDE & Editors
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 *.swp
 *.swo
 *~
-.DS_Store
-*.sublime-project
-*.sublime-workspace
+.eslintcache
+.stylelintcache
 
 # OS
 .DS_Store
 Thumbs.db
-Desktop.ini
 
-# Testing
-coverage/
-.nyc_output/
-*.lcov
+# Docker
+docker-compose.override.yml
+
+# SSL Certificates
+*.crt
+*.key
 
 # Temporary files
-*.tmp
 *.temp
-tmp/
-temp/
+*.tmp
 
 # Cache
 .cache/
-backend/.cache/
-frontend/.cache/
 .parcel-cache/
-.eslintcache
-.stylelintcache
 
-# Misc
-*.pem
-*.key
-*.crt
-.vercel
-.claude/
+# Claude Code local settings
 .claude/settings.local.json
-.claude/settings.local.json
-backend/.env
-backend/.env
-EXAMPLE ui/chrono-contact-muse-main/.gitignore
-EXAMPLE ui/chrono-contact-muse-main/bun.lockb
-EXAMPLE ui/chrono-contact-muse-main/components.json
-EXAMPLE ui/chrono-contact-muse-main/eslint.config.js
-EXAMPLE ui/chrono-contact-muse-main/index.html
-EXAMPLE ui/chrono-contact-muse-main/package.json
-EXAMPLE ui/chrono-contact-muse-main/postcss.config.js
-EXAMPLE ui/chrono-contact-muse-main/README.md
-EXAMPLE ui/chrono-contact-muse-main/tailwind.config.ts
-EXAMPLE ui/chrono-contact-muse-main/tsconfig.app.json
-EXAMPLE ui/chrono-contact-muse-main/tsconfig.json
-EXAMPLE ui/chrono-contact-muse-main/tsconfig.node.json
-EXAMPLE ui/chrono-contact-muse-main/vite.config.ts
-EXAMPLE ui/chrono-contact-muse-main/public/favicon.ico
-EXAMPLE ui/chrono-contact-muse-main/public/placeholder.svg
-EXAMPLE ui/chrono-contact-muse-main/public/robots.txt
-EXAMPLE ui/chrono-contact-muse-main/src/App.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/index.css
-EXAMPLE ui/chrono-contact-muse-main/src/main.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/vite-env.d.ts
-EXAMPLE ui/chrono-contact-muse-main/src/components/AppHeader.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/AppSidebar.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/NavLink.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/RichTextEditor.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ThemeToggle.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/accordion.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/alert-dialog.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/alert.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/aspect-ratio.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/avatar.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/badge.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/breadcrumb.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/button.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/calendar.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/card.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/carousel.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/chart.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/checkbox.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/collapsible.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/command.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/context-menu.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/dialog.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/drawer.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/dropdown-menu.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/form.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/hover-card.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/input-otp.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/input.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/label.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/menubar.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/navigation-menu.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/pagination.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/popover.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/progress.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/radio-group.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/resizable.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/scroll-area.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/select.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/separator.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/sheet.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/sidebar.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/skeleton.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/slider.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/sonner.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/switch.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/table.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/tabs.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/textarea.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/toast.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/toaster.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/toggle-group.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/toggle.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/tooltip.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/components/ui/use-toast.ts
-EXAMPLE ui/chrono-contact-muse-main/src/hooks/use-mobile.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/hooks/use-toast.ts
-EXAMPLE ui/chrono-contact-muse-main/src/lib/utils.ts
-EXAMPLE ui/chrono-contact-muse-main/src/pages/Calendar.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/pages/Contacts.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/pages/Email.tsx
-EXAMPLE ui/chrono-contact-muse-main/src/pages/NotFound.tsx
-.gitignore
-EXAMPLE ui.zip
-EXAMPLE ui/stitch_pm_sync/calendar_view_1/code.html
-EXAMPLE ui/stitch_pm_sync/calendar_view_1/screen.png
-EXAMPLE ui/stitch_pm_sync/calendar_view_2/code.html
-EXAMPLE ui/stitch_pm_sync/calendar_view_2/screen.png
-EXAMPLE ui/stitch_pm_sync/calendar_view_3/code.html
-EXAMPLE ui/stitch_pm_sync/calendar_view_3/screen.png
-EXAMPLE ui/stitch_pm_sync/contacts_list_1/code.html
-EXAMPLE ui/stitch_pm_sync/contacts_list_1/screen.png
-EXAMPLE ui/stitch_pm_sync/contacts_list_2/code.html
-EXAMPLE ui/stitch_pm_sync/contacts_list_2/screen.png
-EXAMPLE ui/stitch_pm_sync/contacts_list_3/code.html
-EXAMPLE ui/stitch_pm_sync/contacts_list_3/screen.png
-EXAMPLE ui/stitch_pm_sync/dashboard_1/code.html
-EXAMPLE ui/stitch_pm_sync/dashboard_1/screen.png
-EXAMPLE ui/stitch_pm_sync/dashboard_2/code.html
-EXAMPLE ui/stitch_pm_sync/dashboard_2/screen.png
-EXAMPLE ui/stitch_pm_sync/dashboard_3/code.html
-EXAMPLE ui/stitch_pm_sync/dashboard_3/screen.png
-EXAMPLE ui/stitch_pm_sync/dashboard_4/code.html
-EXAMPLE ui/stitch_pm_sync/dashboard_4/screen.png
-EXAMPLE ui/stitch_pm_sync/mailbox_1/code.html
-EXAMPLE ui/stitch_pm_sync/mailbox_1/screen.png
-EXAMPLE ui/stitch_pm_sync/mailbox_2/code.html
-EXAMPLE ui/stitch_pm_sync/mailbox_2/screen.png
-EXAMPLE ui/stitch_pm_sync/mailbox_3/code.html
-EXAMPLE ui/stitch_pm_sync/mailbox_3/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_calendar_view_(dark_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_calendar_view_(dark_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_calendar_view_(light_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_calendar_view_(light_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_contacts_list_(dark_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_contacts_list_(dark_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_contacts_list_(light_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_contacts_list_(light_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_dashboard_(dark_mode_variant)__1/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_dashboard_(dark_mode_variant)__1/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_dashboard_(dark_mode_variant)__2/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_dashboard_(dark_mode_variant)__2/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_dashboard_(light_mode_variant)__1/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_dashboard_(light_mode_variant)__1/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_dashboard_(light_mode_variant)__2/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_dashboard_(light_mode_variant)__2/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_mailbox_(dark_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_mailbox_(dark_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_mailbox_(light_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_mailbox_(light_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_settings_(dark_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_settings_(dark_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_settings_(light_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_settings_(light_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_task_management_(dark_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_task_management_(dark_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/pmsync_task_management_(light_mode_variant)_/code.html
-EXAMPLE ui/stitch_pm_sync/pmsync_task_management_(light_mode_variant)_/screen.png
-EXAMPLE ui/stitch_pm_sync/settings_1/code.html
-EXAMPLE ui/stitch_pm_sync/settings_1/screen.png
-EXAMPLE ui/stitch_pm_sync/settings_2/code.html
-EXAMPLE ui/stitch_pm_sync/settings_2/screen.png
-EXAMPLE ui/stitch_pm_sync/settings_3/code.html
-EXAMPLE ui/stitch_pm_sync/settings_3/screen.png
-EXAMPLE ui/stitch_pm_sync/task_management_1/code.html
-EXAMPLE ui/stitch_pm_sync/task_management_1/screen.png
-EXAMPLE ui/stitch_pm_sync/task_management_2/code.html
-EXAMPLE ui/stitch_pm_sync/task_management_2/screen.png
-EXAMPLE ui/stitch_pm_sync/task_management_3/code.html
-EXAMPLE ui/stitch_pm_sync/task_management_3/screen.png
-.claude/settings.local.json
-.claude/settings.local.json
-.claude/settings.local.json
-Repo_Esempio/Zero-main/Zero-main/.dockerignore
-Repo_Esempio/Zero-main/Zero-main/.env.example
-Repo_Esempio/Zero-main/Zero-main/.npmrc
-Repo_Esempio/Zero-main/Zero-main/.nvmrc
-Repo_Esempio/Zero-main/Zero-main/.oxlintrc.json
-Repo_Esempio/Zero-main/Zero-main/.prettierignore
-Repo_Esempio/Zero-main/Zero-main/.prettierrc
-Repo_Esempio/Zero-main/Zero-main/AGENT.md
-Repo_Esempio/Zero-main/Zero-main/crowdin.yml
-Repo_Esempio/Zero-main/Zero-main/docker-compose.db.yaml
-Repo_Esempio/Zero-main/Zero-main/docker-compose.prod.yaml
-Repo_Esempio/Zero-main/Zero-main/eslint.config.mjs
-Repo_Esempio/Zero-main/Zero-main/i18n.json
-Repo_Esempio/Zero-main/Zero-main/i18n.lock
-Repo_Esempio/Zero-main/Zero-main/LICENSE
-Repo_Esempio/Zero-main/Zero-main/MCP.md
-Repo_Esempio/Zero-main/Zero-main/package.json
-Repo_Esempio/Zero-main/Zero-main/pnpm-workspace.yaml
-Repo_Esempio/Zero-main/Zero-main/README.md
-Repo_Esempio/Zero-main/Zero-main/ROADMAP.md
-Repo_Esempio/Zero-main/Zero-main/SECURITY.md
-Repo_Esempio/Zero-main/Zero-main/tsconfig.json
-Repo_Esempio/Zero-main/Zero-main/turbo.json
-Repo_Esempio/Zero-main/Zero-main/.cursor/rules/tailwind-css-v4.mdc
-Repo_Esempio/Zero-main/Zero-main/.devcontainer/devcontainer.json
-Repo_Esempio/Zero-main/Zero-main/.devcontainer/Dockerfile
-Repo_Esempio/Zero-main/Zero-main/.github/CODE_OF_CONDUCT.md
-Repo_Esempio/Zero-main/Zero-main/.github/CODEOWNERS.md
-Repo_Esempio/Zero-main/Zero-main/.github/CONTRIBUTING.md
-Repo_Esempio/Zero-main/Zero-main/.github/FUNDING.yml
-Repo_Esempio/Zero-main/Zero-main/.github/PULL_REQUEST_TEMPLATE.md
-Repo_Esempio/Zero-main/Zero-main/.github/TRANSLATION.md
-Repo_Esempio/Zero-main/Zero-main/.github/ISSUE_TEMPLATE/bug_report.yml
-Repo_Esempio/Zero-main/Zero-main/.github/workflows/ci.yml
-Repo_Esempio/Zero-main/Zero-main/.github/workflows/deploy-to-prod-command.yml
-Repo_Esempio/Zero-main/Zero-main/.github/workflows/lingo-dev.yml
-Repo_Esempio/Zero-main/Zero-main/.github/workflows/sync-production.yml
-Repo_Esempio/Zero-main/Zero-main/.husky/pre-commit
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/eslint.config.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/locales.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/package.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/react-router.config.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/tsconfig.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/vite.config.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/wrangler.jsonc
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/entry.client.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/entry.server.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/globals.css
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/instrument.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/mailto-handler.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/root.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/routes.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(auth)/login/error-message.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(auth)/login/login-client.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(auth)/login/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(auth)/zero/login/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(auth)/zero/signup/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(full-width)/about.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(full-width)/contributors.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(full-width)/hr.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(full-width)/layout.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(full-width)/pricing.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(full-width)/privacy.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(full-width)/terms.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/layout.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/developer/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/mail/layout.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/mail/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/mail/\[folder]/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/mail/compose/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/mail/create/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/mail/under-construction/\[path]/back-button.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/mail/under-construction/\[path]/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/layout.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/\[...settings]/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/appearance/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/categories/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/connections/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/danger-zone/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/general/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/labels/colors.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/labels/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/notifications/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/privacy/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/security/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/shortcuts/hotkey-recorder.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/(routes)/settings/shortcuts/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/home/page.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/app/meta-files/not-found.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ai-toggle-button.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/keyboard-layout-indicator.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/navigation.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/onboarding.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/party.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/responsive-modal.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/setup-phone.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/voice-button.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/connection/add.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/context/command-palette-context.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/context/label-sidebar-context.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/context/loading-context.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/context/sidebar-context.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/context/thread-context.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/cookies/cookie-trigger.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/ai-chat.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/ai-textarea.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/create-email.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/editor-autocomplete.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/editor-buttons.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/editor-menu.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/editor.colors.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/editor.text-buttons.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/editor.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/email-composer.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/email-phrases.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/extensions.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/ghost-text.css
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/image-compression-settings.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/prosemirror.css
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/slash-command.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/template-button.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/toolbar.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/create/uploaded-file-icon.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/home/footer.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/home/HomeContent.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/home/pixelated-bg.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/icons/empty-state-svg.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/icons/icons.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/icons/animated/moon.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/icons/animated/square-pen.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/icons/animated/sun.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/labels/label-dialog.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/magicui/file-tree.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/attachment-dialog.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/attachments-accordion.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/data.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/mail-content.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/mail-display.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/mail-list.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/mail-skeleton.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/mail.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/navbar.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/note-panel.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/optimistic-thread-state.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/render-labels.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/reply-composer.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/select-all-checkbox.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/snooze-dialog.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/thread-display.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/thread-subject.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/mail/use-mail.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/motion-primitives/text-effect.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/pricing/comparision.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/pricing/pricing-card.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/providers/editor-provider.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/providers/hotkey-provider-wrapper.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/settings/settings-card.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/theme/sidebar-theme-switcher.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/theme/theme-switcher.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/theme/theme-toggle.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/accordion.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/ai-sidebar.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/alert.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/animated-number.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/app-sidebar.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/avatar.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/badge.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/bimi-avatar.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/button.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/calendar.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/card.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/chart.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/checkbox.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/collapsible.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/command.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/context-menu.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/dialog.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/drawer.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/dropdown-menu.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/envelop.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/form.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/gauge.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/input-otp.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/input.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/label.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/nav-main.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/nav-user.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/navigation-menu.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/page-header.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/popover.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/pricing-dialog.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/pricing-switch.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/progress.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/prompts-dialog.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/radio-group.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/recursive-folder.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/resizable.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/responsive-modal.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/scroll-area.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/select.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/separator.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/settings-content.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/sheet.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/sidebar-labels.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/sidebar-toggle.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/sidebar.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/skeleton.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/spinner.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/switch.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/tabs.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/text-shimmer.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/textarea.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/toast.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/toggle-group.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/toggle.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/components/ui/tooltip.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/config/navigation.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/config/shortcuts.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-animations.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-attachments.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-billing.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-categories.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-compose-editor.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-connections.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-copy-to-clipboard.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-debounce.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-drafts.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-email-aliases.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-geo-location.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-hot-key.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-image-loading.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-labels-search.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-labels.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-mail-navigation.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-media-query.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-mobile.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-notes.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-open-compose-modal.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-optimistic-actions.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-previous.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-search-value.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-settings.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-stats.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-summary.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-templates.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/use-threads.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/driver/use-delete.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/driver/use-move-to.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/hooks/ui/use-background-queue.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/auth-client.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/auth-proxy.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/constants.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/countries.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/elevenlabs-tools.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/email-utils.client.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/email-utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/image-compression.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/label-colors.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/notes-utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/optimistic-actions-manager.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/posthog-provider.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/prompts.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/sanitize-tip-tap-html.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/schemas.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/server-tool.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/site-config.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/thread-actions.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/timezones.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/trpc.server.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/hotkeys/compose-hotkeys.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/hotkeys/global-hotkeys.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/hotkeys/mail-list-hotkeys.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/hotkeys/navigation-hotkeys.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/hotkeys/thread-display-hotkeys.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/lib/hotkeys/use-hotkey-utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/ar.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/ca.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/cs.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/de.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/en.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/es.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/fa.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/fr.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/hi.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/hu.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/ja.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/ko.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/lv.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/nl.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/pl.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/pt.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/ru.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/tr.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/vi.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/zh_CN.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/messages/zh_TW.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/project.inlang/project_id
-Repo_Esempio/Zero-main/Zero-main/apps/mail/project.inlang/settings.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/providers/client-providers.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/providers/query-provider.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/providers/server-providers.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/providers/voice-provider.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/adam.jpg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/ahmet.jpg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/ai-chat.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/ai-summary.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/ai.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/black-icon.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/claude.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/compose.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/dudu.jpg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/email-preview.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/empty-state-light.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/empty-state.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/favicon.ico
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/gradient.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/homepage-image.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/lock.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/mail-list.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/mail-pixel.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/mail.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/manifest.json
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/netflix.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/nizzy.jpg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/og.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/openai.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/opened-mail.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/pixel.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/pricing-gradient.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/purple-gradient.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/purple-zap.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/ryan.jpg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/search.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/small-pixel.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/snooze-home.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/star-home.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/star.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/stripe.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/verified-home.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/white-icon.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/yc-small.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/yc.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/zap.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/m0 rounded edges.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/m0 rounded edges.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/m0 w lines rounded edges.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/m0 w lines rounded edges.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/m0 w lines.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/m0 w lines.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/m0.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/m0.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/mail.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/mail0.io - Text + logo w lines.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/mail0.io - Text + logo w lines.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/mail0.io - Text w lines.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/mail0.io - Text w lines.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/rocket.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/audio.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/csv.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/excel.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/figma.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/file.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/html.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/pdf.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/powerpoint.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/video.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/word.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/assets/attachment-icons/zip.svg
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/fonts/geist/Geist-Black.ttf
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/fonts/geist/Geist-Bold.ttf
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/fonts/geist/Geist-ExtraBold.ttf
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/fonts/geist/Geist-ExtraLight.ttf
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/fonts/geist/Geist-Light.ttf
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/fonts/geist/Geist-Medium.ttf
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/fonts/geist/Geist-Regular.ttf
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/fonts/geist/Geist-SemiBold.ttf
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/fonts/geist/Geist-Thin.ttf
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/icons-pwa/icon-180.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/icons-pwa/icon-192.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/icons-pwa/icon-512.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/onboarding/coming-soon.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/onboarding/get-started.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/onboarding/ready.png
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/onboarding/step1.gif
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/onboarding/step2.gif
-Repo_Esempio/Zero-main/Zero-main/apps/mail/public/onboarding/step3.gif
-Repo_Esempio/Zero-main/Zero-main/apps/mail/store/backgroundQueue.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/store/draftStates.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/store/optimistic-updates.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/types/index.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/types/speech-recognition.d.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/types/tools.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/utils/keyboard-layout-map.ts
-Repo_Esempio/Zero-main/Zero-main/apps/mail/utils/keyboard-utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/drizzle.config.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/eslint.config.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/package.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/tsconfig.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/vite.config.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/wrangler.jsonc
-Repo_Esempio/Zero-main/Zero-main/apps/server/evals/ai-chat-basic.eval.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/ctx.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/env.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/main.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/pipelines.effect.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/pipelines.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/types.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/index.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/schema.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0000_fine_steel_serpent.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0001_greedy_darkhawk.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0002_flimsy_nightshade.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0003_purple_kylun.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0004_quiet_grey_gargoyle.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0005_mature_lady_deathstrike.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0006_small_unicorn.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0007_tense_wrecking_crew.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0008_freezing_hydra.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0009_boring_big_bertha.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0010_dry_hemingway.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0011_huge_newton_destine.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0012_even_johnny_storm.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0013_calm_timeslip.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0014_cuddly_energizer.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0015_minor_mister_sinister.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0016_neat_ogun.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0017_bouncy_shotgun.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0018_far_lady_mastermind.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0019_mean_war_machine.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0020_bright_gladiator.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0021_outgoing_mariko_yashida.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0022_round_violations.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0023_narrow_maria_hill.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0024_familiar_wiccan.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0025_far_echo.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0025_nervous_paper_doll.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0026_smooth_norrin_radd.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0027_vengeful_golden_guardian.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0028_worried_molecule_man.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0029_common_network.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0029_thin_triathlon.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0030_blue_grandmaster.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0031_legal_colleen_wing.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0032_add_image_compression_setting.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0032_smiling_raider.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0033_first_bastion.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0034_mushy_runaways.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0035_giant_hydra.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0035_uneven_shiva.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/0036_petite_mole_man.sql
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/_journal.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0000_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0001_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0002_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0003_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0004_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0005_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0006_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0007_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0008_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0009_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0010_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0011_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0012_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0013_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0014_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0015_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0016_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0017_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0018_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0019_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0020_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0021_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0022_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0023_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0024_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0025_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0026_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0027_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0028_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0029_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0030_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0031_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0032_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0033_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0034_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0035_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/db/migrations/meta/0036_snapshot.json
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/auth-providers.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/auth.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/brain.fallback.prompts.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/brain.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/bulk-delete.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/cookies.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/email-processor.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/email-utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/gmail-rate-limit.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/notes-manager.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/prompts.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/sanitize-tip-tap-html.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/schemas.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/sequential-thinking.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/server-utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/services.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/shortcuts.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/templates-manager.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/timezones.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/analyze/interests.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/driver/google-label-color-map.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/driver/google.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/driver/index.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/driver/microsoft.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/driver/types.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/driver/utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/factories/base-subscription.factory.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/factories/google-subscription.factory.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/factories/outlook-subscription.factory.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/factories/subscription-factory.registry.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/lib/react-emails/email-sequences.tsx
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/ai.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/auth.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/autumn.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/agent/index.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/agent/mcp.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/agent/orchestrator.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/agent/rpc.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/agent/shared.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/agent/tools.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/agent/types.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/routes/agent/utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/services/writing-style-service.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/services/call-service/system-prompt.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/thread-workflow-utils/index.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/thread-workflow-utils/README.md
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/thread-workflow-utils/workflow-engine.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/thread-workflow-utils/workflow-functions.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/thread-workflow-utils/workflow-utils.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/index.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/trpc.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/bimi.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/brain.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/categories.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/connections.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/cookies.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/drafts.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/label.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/mail.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/notes.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/settings.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/shortcut.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/templates.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/user.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/ai/compose.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/ai/index.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/ai/search.ts
-Repo_Esempio/Zero-main/Zero-main/apps/server/src/trpc/routes/ai/webSearch.ts
-Repo_Esempio/Zero-main/Zero-main/docker/app/Dockerfile
-Repo_Esempio/Zero-main/Zero-main/docker/db/Dockerfile
-Repo_Esempio/Zero-main/Zero-main/packages/cli/package.json
-Repo_Esempio/Zero-main/Zero-main/packages/cli/tsconfig.json
-Repo_Esempio/Zero-main/Zero-main/packages/cli/src/cli.ts
-Repo_Esempio/Zero-main/Zero-main/packages/cli/src/utils.ts
-Repo_Esempio/Zero-main/Zero-main/packages/cli/src/commands/fix-env.ts
-Repo_Esempio/Zero-main/Zero-main/packages/cli/src/commands/index.ts
-Repo_Esempio/Zero-main/Zero-main/packages/cli/src/commands/reinstall-node-modules.ts
-Repo_Esempio/Zero-main/Zero-main/packages/cli/src/commands/sync.ts
-Repo_Esempio/Zero-main/Zero-main/packages/eslint-config/config.ts
-Repo_Esempio/Zero-main/Zero-main/packages/eslint-config/package.json
-Repo_Esempio/Zero-main/Zero-main/packages/eslint-config/tsconfig.json
-Repo_Esempio/Zero-main/Zero-main/packages/testing/package.json
-Repo_Esempio/Zero-main/Zero-main/packages/testing/playwright.config.ts
-Repo_Esempio/Zero-main/Zero-main/packages/testing/tsconfig.json
-Repo_Esempio/Zero-main/Zero-main/packages/testing/e2e/auth.setup.ts
-Repo_Esempio/Zero-main/Zero-main/packages/testing/e2e/mail-inbox.spec.ts
-Repo_Esempio/Zero-main/Zero-main/packages/tsconfig/base.json
-Repo_Esempio/Zero-main/Zero-main/packages/tsconfig/package.json
-Repo_Esempio/Zero-main/Zero-main/patches/novel.patch
-Repo_Esempio/Zero-main/Zero-main/public/better-auth.png
-Repo_Esempio/Zero-main/Zero-main/public/coderabbit.png
-Repo_Esempio/Zero-main/Zero-main/public/drizzle-orm.png
-Repo_Esempio/Zero-main/Zero-main/public/vercel.png
-Repo_Esempio/Zero-main/Zero-main/scripts/package.json
-Repo_Esempio/Zero-main/Zero-main/scripts/README.md
-Repo_Esempio/Zero-main/Zero-main/scripts/register-elevenlabs-tools.ts
-Repo_Esempio/Zero-main/Zero-main/scripts/run.ts
-Repo_Esempio/Zero-main/Zero-main/scripts/tsconfig.json
-Repo_Esempio/Zero-main/Zero-main/scripts/docker/entrypoint.sh
-Repo_Esempio/Zero-main/Zero-main/scripts/docker/replace-placeholder.sh
-Repo_Esempio/Zero-main/Zero-main/scripts/seed-style/styles/concise_emails.json
-Repo_Esempio/Zero-main/Zero-main/scripts/seed-style/styles/friendly_emails.json
-Repo_Esempio/Zero-main/Zero-main/scripts/seed-style/styles/genz_emails.json
-Repo_Esempio/Zero-main/Zero-main/scripts/seed-style/styles/persuasive_emails.json
-Repo_Esempio/Zero-main/Zero-main/scripts/seed-style/styles/professional_emails.json
-Repo_Esempio/Zero-main/Zero-main/scripts/send-emails/index.ts
-backend/.env
 
-backend/.env
-docker-compose.dev.yml
+# Backend specific
+backend/dist/
+backend/uploads/
+backend/node_modules/
+
+# Frontend specific
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/node_modules/
+esempio/Zero-main/.dockerignore
+esempio/Zero-main/.env.example
+esempio/Zero-main/.gitignore
+esempio/Zero-main/.npmrc
+esempio/Zero-main/.nvmrc
+esempio/Zero-main/.oxlintrc.json
+esempio/Zero-main/.prettierignore
+esempio/Zero-main/.prettierrc
+esempio/Zero-main/AGENT.md
+esempio/Zero-main/crowdin.yml
+esempio/Zero-main/docker-compose.db.yaml
+esempio/Zero-main/docker-compose.prod.yaml
+esempio/Zero-main/eslint.config.mjs
+esempio/Zero-main/i18n.json
+esempio/Zero-main/i18n.lock
+esempio/Zero-main/LICENSE
+esempio/Zero-main/MCP.md
+esempio/Zero-main/package.json
+esempio/Zero-main/pnpm-lock.yaml
+esempio/Zero-main/pnpm-workspace.yaml
+esempio/Zero-main/README.md
+esempio/Zero-main/ROADMAP.md
+esempio/Zero-main/SECURITY.md
+esempio/Zero-main/tsconfig.json
+esempio/Zero-main/turbo.json
+esempio/Zero-main/.cursor/rules/tailwind-css-v4.mdc
+esempio/Zero-main/.devcontainer/devcontainer.json
+esempio/Zero-main/.devcontainer/Dockerfile
+esempio/Zero-main/.github/CODE_OF_CONDUCT.md
+esempio/Zero-main/.github/CODEOWNERS.md
+esempio/Zero-main/.github/CONTRIBUTING.md
+esempio/Zero-main/.github/FUNDING.yml
+esempio/Zero-main/.github/PULL_REQUEST_TEMPLATE.md
+esempio/Zero-main/.github/TRANSLATION.md
+esempio/Zero-main/.github/ISSUE_TEMPLATE/bug_report.yml
+esempio/Zero-main/.github/workflows/ci.yml
+esempio/Zero-main/.github/workflows/deploy-to-prod-command.yml
+esempio/Zero-main/.github/workflows/lingo-dev.yml
+esempio/Zero-main/.github/workflows/sync-production.yml
+esempio/Zero-main/.husky/pre-commit
+esempio/Zero-main/apps/mail/.gitignore
+esempio/Zero-main/apps/mail/components.json
+esempio/Zero-main/apps/mail/eslint.config.ts
+esempio/Zero-main/apps/mail/locales.ts
+esempio/Zero-main/apps/mail/package.json
+esempio/Zero-main/apps/mail/react-router.config.ts
+esempio/Zero-main/apps/mail/tsconfig.json
+esempio/Zero-main/apps/mail/vite.config.ts
+esempio/Zero-main/apps/mail/wrangler.jsonc
+esempio/Zero-main/apps/mail/app/entry.client.tsx
+esempio/Zero-main/apps/mail/app/entry.server.tsx
+esempio/Zero-main/apps/mail/app/globals.css
+esempio/Zero-main/apps/mail/app/instrument.ts
+esempio/Zero-main/apps/mail/app/mailto-handler.ts
+esempio/Zero-main/apps/mail/app/page.tsx
+esempio/Zero-main/apps/mail/app/root.tsx
+esempio/Zero-main/apps/mail/app/routes.ts
+esempio/Zero-main/apps/mail/app/(auth)/login/error-message.tsx
+esempio/Zero-main/apps/mail/app/(auth)/login/login-client.tsx
+esempio/Zero-main/apps/mail/app/(auth)/login/page.tsx
+esempio/Zero-main/apps/mail/app/(auth)/zero/login/page.tsx
+esempio/Zero-main/apps/mail/app/(auth)/zero/signup/page.tsx
+esempio/Zero-main/apps/mail/app/(full-width)/about.tsx
+esempio/Zero-main/apps/mail/app/(full-width)/contributors.tsx
+esempio/Zero-main/apps/mail/app/(full-width)/hr.tsx
+esempio/Zero-main/apps/mail/app/(full-width)/layout.tsx
+esempio/Zero-main/apps/mail/app/(full-width)/pricing.tsx
+esempio/Zero-main/apps/mail/app/(full-width)/privacy.tsx
+esempio/Zero-main/apps/mail/app/(full-width)/terms.tsx
+esempio/Zero-main/apps/mail/app/(routes)/layout.tsx
+esempio/Zero-main/apps/mail/app/(routes)/developer/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/mail/layout.tsx
+esempio/Zero-main/apps/mail/app/(routes)/mail/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/mail/\[folder]/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/mail/compose/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/mail/create/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/mail/under-construction/\[path]/back-button.tsx
+esempio/Zero-main/apps/mail/app/(routes)/mail/under-construction/\[path]/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/layout.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/\[...settings]/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/appearance/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/categories/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/connections/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/danger-zone/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/general/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/labels/colors.ts
+esempio/Zero-main/apps/mail/app/(routes)/settings/labels/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/notifications/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/privacy/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/security/page.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/shortcuts/hotkey-recorder.tsx
+esempio/Zero-main/apps/mail/app/(routes)/settings/shortcuts/page.tsx
+esempio/Zero-main/apps/mail/app/home/page.tsx
+esempio/Zero-main/apps/mail/app/meta-files/not-found.ts
+esempio/Zero-main/apps/mail/components/ai-toggle-button.tsx
+esempio/Zero-main/apps/mail/components/keyboard-layout-indicator.tsx
+esempio/Zero-main/apps/mail/components/navigation.tsx
+esempio/Zero-main/apps/mail/components/onboarding.tsx
+esempio/Zero-main/apps/mail/components/party.tsx
+esempio/Zero-main/apps/mail/components/responsive-modal.tsx
+esempio/Zero-main/apps/mail/components/setup-phone.tsx
+esempio/Zero-main/apps/mail/components/voice-button.tsx
+esempio/Zero-main/apps/mail/components/connection/add.tsx
+esempio/Zero-main/apps/mail/components/context/command-palette-context.tsx
+esempio/Zero-main/apps/mail/components/context/label-sidebar-context.tsx
+esempio/Zero-main/apps/mail/components/context/loading-context.tsx
+esempio/Zero-main/apps/mail/components/context/sidebar-context.tsx
+esempio/Zero-main/apps/mail/components/context/thread-context.tsx
+esempio/Zero-main/apps/mail/components/cookies/cookie-trigger.tsx
+esempio/Zero-main/apps/mail/components/create/ai-chat.tsx
+esempio/Zero-main/apps/mail/components/create/ai-textarea.tsx
+esempio/Zero-main/apps/mail/components/create/create-email.tsx
+esempio/Zero-main/apps/mail/components/create/editor-autocomplete.ts
+esempio/Zero-main/apps/mail/components/create/editor-buttons.tsx
+esempio/Zero-main/apps/mail/components/create/editor-menu.tsx
+esempio/Zero-main/apps/mail/components/create/editor.colors.tsx
+esempio/Zero-main/apps/mail/components/create/editor.text-buttons.tsx
+esempio/Zero-main/apps/mail/components/create/editor.tsx
+esempio/Zero-main/apps/mail/components/create/email-composer.tsx
+esempio/Zero-main/apps/mail/components/create/email-phrases.ts
+esempio/Zero-main/apps/mail/components/create/extensions.ts
+esempio/Zero-main/apps/mail/components/create/ghost-text.css
+esempio/Zero-main/apps/mail/components/create/image-compression-settings.tsx
+esempio/Zero-main/apps/mail/components/create/prosemirror.css
+esempio/Zero-main/apps/mail/components/create/slash-command.tsx
+esempio/Zero-main/apps/mail/components/create/template-button.tsx
+esempio/Zero-main/apps/mail/components/create/toolbar.tsx
+esempio/Zero-main/apps/mail/components/create/uploaded-file-icon.tsx
+esempio/Zero-main/apps/mail/components/home/footer.tsx
+esempio/Zero-main/apps/mail/components/home/HomeContent.tsx
+esempio/Zero-main/apps/mail/components/home/pixelated-bg.tsx
+esempio/Zero-main/apps/mail/components/icons/empty-state-svg.tsx
+esempio/Zero-main/apps/mail/components/icons/icons.tsx
+esempio/Zero-main/apps/mail/components/icons/animated/moon.tsx
+esempio/Zero-main/apps/mail/components/icons/animated/square-pen.tsx
+esempio/Zero-main/apps/mail/components/icons/animated/sun.tsx
+esempio/Zero-main/apps/mail/components/labels/label-dialog.tsx
+esempio/Zero-main/apps/mail/components/magicui/file-tree.tsx
+esempio/Zero-main/apps/mail/components/mail/attachment-dialog.tsx
+esempio/Zero-main/apps/mail/components/mail/attachments-accordion.tsx
+esempio/Zero-main/apps/mail/components/mail/data.tsx
+esempio/Zero-main/apps/mail/components/mail/mail-content.tsx
+esempio/Zero-main/apps/mail/components/mail/mail-display.tsx
+esempio/Zero-main/apps/mail/components/mail/mail-list.tsx
+esempio/Zero-main/apps/mail/components/mail/mail-skeleton.tsx
+esempio/Zero-main/apps/mail/components/mail/mail.tsx
+esempio/Zero-main/apps/mail/components/mail/navbar.tsx
+esempio/Zero-main/apps/mail/components/mail/note-panel.tsx
+esempio/Zero-main/apps/mail/components/mail/optimistic-thread-state.tsx
+esempio/Zero-main/apps/mail/components/mail/render-labels.tsx
+esempio/Zero-main/apps/mail/components/mail/reply-composer.tsx
+esempio/Zero-main/apps/mail/components/mail/select-all-checkbox.tsx
+esempio/Zero-main/apps/mail/components/mail/snooze-dialog.tsx
+esempio/Zero-main/apps/mail/components/mail/thread-display.tsx
+esempio/Zero-main/apps/mail/components/mail/thread-subject.tsx
+esempio/Zero-main/apps/mail/components/mail/use-mail.ts
+esempio/Zero-main/apps/mail/components/motion-primitives/text-effect.tsx
+esempio/Zero-main/apps/mail/components/pricing/comparision.tsx
+esempio/Zero-main/apps/mail/components/pricing/pricing-card.tsx
+esempio/Zero-main/apps/mail/components/providers/editor-provider.tsx
+esempio/Zero-main/apps/mail/components/providers/hotkey-provider-wrapper.tsx
+esempio/Zero-main/apps/mail/components/settings/settings-card.tsx
+esempio/Zero-main/apps/mail/components/theme/sidebar-theme-switcher.tsx
+esempio/Zero-main/apps/mail/components/theme/theme-switcher.tsx
+esempio/Zero-main/apps/mail/components/theme/theme-toggle.tsx
+esempio/Zero-main/apps/mail/components/ui/accordion.tsx
+esempio/Zero-main/apps/mail/components/ui/ai-sidebar.tsx
+esempio/Zero-main/apps/mail/components/ui/alert.tsx
+esempio/Zero-main/apps/mail/components/ui/animated-number.tsx
+esempio/Zero-main/apps/mail/components/ui/app-sidebar.tsx
+esempio/Zero-main/apps/mail/components/ui/avatar.tsx
+esempio/Zero-main/apps/mail/components/ui/badge.tsx
+esempio/Zero-main/apps/mail/components/ui/bimi-avatar.tsx
+esempio/Zero-main/apps/mail/components/ui/button.tsx
+esempio/Zero-main/apps/mail/components/ui/calendar.tsx
+esempio/Zero-main/apps/mail/components/ui/card.tsx
+esempio/Zero-main/apps/mail/components/ui/chart.tsx
+esempio/Zero-main/apps/mail/components/ui/checkbox.tsx
+esempio/Zero-main/apps/mail/components/ui/collapsible.tsx
+esempio/Zero-main/apps/mail/components/ui/command.tsx
+esempio/Zero-main/apps/mail/components/ui/context-menu.tsx
+esempio/Zero-main/apps/mail/components/ui/dialog.tsx
+esempio/Zero-main/apps/mail/components/ui/drawer.tsx
+esempio/Zero-main/apps/mail/components/ui/dropdown-menu.tsx
+esempio/Zero-main/apps/mail/components/ui/envelop.tsx
+esempio/Zero-main/apps/mail/components/ui/form.tsx
+esempio/Zero-main/apps/mail/components/ui/gauge.tsx
+esempio/Zero-main/apps/mail/components/ui/input-otp.tsx
+esempio/Zero-main/apps/mail/components/ui/input.tsx
+esempio/Zero-main/apps/mail/components/ui/label.tsx
+esempio/Zero-main/apps/mail/components/ui/nav-main.tsx
+esempio/Zero-main/apps/mail/components/ui/nav-user.tsx
+esempio/Zero-main/apps/mail/components/ui/navigation-menu.tsx
+esempio/Zero-main/apps/mail/components/ui/page-header.tsx
+esempio/Zero-main/apps/mail/components/ui/popover.tsx
+esempio/Zero-main/apps/mail/components/ui/pricing-dialog.tsx
+esempio/Zero-main/apps/mail/components/ui/pricing-switch.tsx
+esempio/Zero-main/apps/mail/components/ui/progress.tsx
+esempio/Zero-main/apps/mail/components/ui/prompts-dialog.tsx
+esempio/Zero-main/apps/mail/components/ui/radio-group.tsx
+esempio/Zero-main/apps/mail/components/ui/recursive-folder.tsx
+esempio/Zero-main/apps/mail/components/ui/resizable.tsx
+esempio/Zero-main/apps/mail/components/ui/responsive-modal.tsx
+esempio/Zero-main/apps/mail/components/ui/scroll-area.tsx
+esempio/Zero-main/apps/mail/components/ui/select.tsx
+esempio/Zero-main/apps/mail/components/ui/separator.tsx
+esempio/Zero-main/apps/mail/components/ui/settings-content.tsx
+esempio/Zero-main/apps/mail/components/ui/sheet.tsx
+esempio/Zero-main/apps/mail/components/ui/sidebar-labels.tsx
+esempio/Zero-main/apps/mail/components/ui/sidebar-toggle.tsx
+esempio/Zero-main/apps/mail/components/ui/sidebar.tsx
+esempio/Zero-main/apps/mail/components/ui/skeleton.tsx
+esempio/Zero-main/apps/mail/components/ui/spinner.tsx
+esempio/Zero-main/apps/mail/components/ui/switch.tsx
+esempio/Zero-main/apps/mail/components/ui/tabs.tsx
+esempio/Zero-main/apps/mail/components/ui/text-shimmer.tsx
+esempio/Zero-main/apps/mail/components/ui/textarea.tsx
+esempio/Zero-main/apps/mail/components/ui/toast.tsx
+esempio/Zero-main/apps/mail/components/ui/toggle-group.tsx
+esempio/Zero-main/apps/mail/components/ui/toggle.tsx
+esempio/Zero-main/apps/mail/components/ui/tooltip.tsx
+esempio/Zero-main/apps/mail/config/navigation.ts
+esempio/Zero-main/apps/mail/config/shortcuts.ts
+esempio/Zero-main/apps/mail/hooks/use-animations.ts
+esempio/Zero-main/apps/mail/hooks/use-attachments.ts
+esempio/Zero-main/apps/mail/hooks/use-billing.ts
+esempio/Zero-main/apps/mail/hooks/use-categories.ts
+esempio/Zero-main/apps/mail/hooks/use-compose-editor.ts
+esempio/Zero-main/apps/mail/hooks/use-connections.ts
+esempio/Zero-main/apps/mail/hooks/use-copy-to-clipboard.ts
+esempio/Zero-main/apps/mail/hooks/use-debounce.ts
+esempio/Zero-main/apps/mail/hooks/use-drafts.ts
+esempio/Zero-main/apps/mail/hooks/use-email-aliases.ts
+esempio/Zero-main/apps/mail/hooks/use-geo-location.ts
+esempio/Zero-main/apps/mail/hooks/use-hot-key.ts
+esempio/Zero-main/apps/mail/hooks/use-image-loading.ts
+esempio/Zero-main/apps/mail/hooks/use-labels-search.ts
+esempio/Zero-main/apps/mail/hooks/use-labels.ts
+esempio/Zero-main/apps/mail/hooks/use-mail-navigation.ts
+esempio/Zero-main/apps/mail/hooks/use-media-query.ts
+esempio/Zero-main/apps/mail/hooks/use-mobile.tsx
+esempio/Zero-main/apps/mail/hooks/use-notes.tsx
+esempio/Zero-main/apps/mail/hooks/use-open-compose-modal.ts
+esempio/Zero-main/apps/mail/hooks/use-optimistic-actions.ts
+esempio/Zero-main/apps/mail/hooks/use-previous.ts
+esempio/Zero-main/apps/mail/hooks/use-search-value.ts
+esempio/Zero-main/apps/mail/hooks/use-settings.ts
+esempio/Zero-main/apps/mail/hooks/use-stats.ts
+esempio/Zero-main/apps/mail/hooks/use-summary.ts
+esempio/Zero-main/apps/mail/hooks/use-templates.ts
+esempio/Zero-main/apps/mail/hooks/use-threads.ts
+esempio/Zero-main/apps/mail/hooks/driver/use-delete.ts
+esempio/Zero-main/apps/mail/hooks/driver/use-move-to.ts
+esempio/Zero-main/apps/mail/hooks/ui/use-background-queue.ts
+esempio/Zero-main/apps/mail/lib/auth-client.ts
+esempio/Zero-main/apps/mail/lib/auth-proxy.ts
+esempio/Zero-main/apps/mail/lib/constants.tsx
+esempio/Zero-main/apps/mail/lib/countries.ts
+esempio/Zero-main/apps/mail/lib/elevenlabs-tools.ts
+esempio/Zero-main/apps/mail/lib/email-utils.client.tsx
+esempio/Zero-main/apps/mail/lib/email-utils.ts
+esempio/Zero-main/apps/mail/lib/image-compression.ts
+esempio/Zero-main/apps/mail/lib/label-colors.ts
+esempio/Zero-main/apps/mail/lib/notes-utils.ts
+esempio/Zero-main/apps/mail/lib/optimistic-actions-manager.ts
+esempio/Zero-main/apps/mail/lib/posthog-provider.tsx
+esempio/Zero-main/apps/mail/lib/prompts.ts
+esempio/Zero-main/apps/mail/lib/sanitize-tip-tap-html.tsx
+esempio/Zero-main/apps/mail/lib/schemas.ts
+esempio/Zero-main/apps/mail/lib/server-tool.ts
+esempio/Zero-main/apps/mail/lib/site-config.ts
+esempio/Zero-main/apps/mail/lib/thread-actions.ts
+esempio/Zero-main/apps/mail/lib/timezones.ts
+esempio/Zero-main/apps/mail/lib/trpc.server.ts
+esempio/Zero-main/apps/mail/lib/utils.ts
+esempio/Zero-main/apps/mail/lib/hotkeys/compose-hotkeys.tsx
+esempio/Zero-main/apps/mail/lib/hotkeys/global-hotkeys.tsx
+esempio/Zero-main/apps/mail/lib/hotkeys/mail-list-hotkeys.tsx
+esempio/Zero-main/apps/mail/lib/hotkeys/navigation-hotkeys.tsx
+esempio/Zero-main/apps/mail/lib/hotkeys/thread-display-hotkeys.tsx
+esempio/Zero-main/apps/mail/lib/hotkeys/use-hotkey-utils.ts
+esempio/Zero-main/apps/mail/messages/ar.json
+esempio/Zero-main/apps/mail/messages/ca.json
+esempio/Zero-main/apps/mail/messages/cs.json
+esempio/Zero-main/apps/mail/messages/de.json
+esempio/Zero-main/apps/mail/messages/en.json
+esempio/Zero-main/apps/mail/messages/es.json
+esempio/Zero-main/apps/mail/messages/fa.json
+esempio/Zero-main/apps/mail/messages/fr.json
+esempio/Zero-main/apps/mail/messages/hi.json
+esempio/Zero-main/apps/mail/messages/hu.json
+esempio/Zero-main/apps/mail/messages/ja.json
+esempio/Zero-main/apps/mail/messages/ko.json
+esempio/Zero-main/apps/mail/messages/lv.json
+esempio/Zero-main/apps/mail/messages/nl.json
+esempio/Zero-main/apps/mail/messages/pl.json
+esempio/Zero-main/apps/mail/messages/pt.json
+esempio/Zero-main/apps/mail/messages/ru.json
+esempio/Zero-main/apps/mail/messages/tr.json
+esempio/Zero-main/apps/mail/messages/vi.json
+esempio/Zero-main/apps/mail/messages/zh_CN.json
+esempio/Zero-main/apps/mail/messages/zh_TW.json
+esempio/Zero-main/apps/mail/project.inlang/.gitignore
+esempio/Zero-main/apps/mail/project.inlang/project_id
+esempio/Zero-main/apps/mail/project.inlang/settings.json
+esempio/Zero-main/apps/mail/providers/client-providers.tsx
+esempio/Zero-main/apps/mail/providers/query-provider.tsx
+esempio/Zero-main/apps/mail/providers/server-providers.tsx
+esempio/Zero-main/apps/mail/providers/voice-provider.tsx
+esempio/Zero-main/apps/mail/public/adam.jpg
+esempio/Zero-main/apps/mail/public/ahmet.jpg
+esempio/Zero-main/apps/mail/public/ai-chat.png
+esempio/Zero-main/apps/mail/public/ai-summary.png
+esempio/Zero-main/apps/mail/public/ai.svg
+esempio/Zero-main/apps/mail/public/black-icon.svg
+esempio/Zero-main/apps/mail/public/claude.png
+esempio/Zero-main/apps/mail/public/compose.png
+esempio/Zero-main/apps/mail/public/dudu.jpg
+esempio/Zero-main/apps/mail/public/email-preview.png
+esempio/Zero-main/apps/mail/public/empty-state-light.svg
+esempio/Zero-main/apps/mail/public/empty-state.svg
+esempio/Zero-main/apps/mail/public/favicon.ico
+esempio/Zero-main/apps/mail/public/gradient.svg
+esempio/Zero-main/apps/mail/public/homepage-image.png
+esempio/Zero-main/apps/mail/public/lock.svg
+esempio/Zero-main/apps/mail/public/mail-list.png
+esempio/Zero-main/apps/mail/public/mail-pixel.svg
+esempio/Zero-main/apps/mail/public/mail.svg
+esempio/Zero-main/apps/mail/public/manifest.json
+esempio/Zero-main/apps/mail/public/netflix.svg
+esempio/Zero-main/apps/mail/public/nizzy.jpg
+esempio/Zero-main/apps/mail/public/og.png
+esempio/Zero-main/apps/mail/public/openai.png
+esempio/Zero-main/apps/mail/public/opened-mail.svg
+esempio/Zero-main/apps/mail/public/pixel.svg
+esempio/Zero-main/apps/mail/public/pricing-gradient.png
+esempio/Zero-main/apps/mail/public/purple-gradient.png
+esempio/Zero-main/apps/mail/public/purple-zap.svg
+esempio/Zero-main/apps/mail/public/ryan.jpg
+esempio/Zero-main/apps/mail/public/search.png
+esempio/Zero-main/apps/mail/public/small-pixel.png
+esempio/Zero-main/apps/mail/public/snooze-home.png
+esempio/Zero-main/apps/mail/public/star-home.png
+esempio/Zero-main/apps/mail/public/star.svg
+esempio/Zero-main/apps/mail/public/stripe.svg
+esempio/Zero-main/apps/mail/public/verified-home.png
+esempio/Zero-main/apps/mail/public/white-icon.svg
+esempio/Zero-main/apps/mail/public/yc-small.svg
+esempio/Zero-main/apps/mail/public/yc.svg
+esempio/Zero-main/apps/mail/public/zap.svg
+esempio/Zero-main/apps/mail/public/assets/m0 rounded edges.png
+esempio/Zero-main/apps/mail/public/assets/m0 rounded edges.svg
+esempio/Zero-main/apps/mail/public/assets/m0 w lines rounded edges.png
+esempio/Zero-main/apps/mail/public/assets/m0 w lines rounded edges.svg
+esempio/Zero-main/apps/mail/public/assets/m0 w lines.png
+esempio/Zero-main/apps/mail/public/assets/m0 w lines.svg
+esempio/Zero-main/apps/mail/public/assets/m0.png
+esempio/Zero-main/apps/mail/public/assets/m0.svg
+esempio/Zero-main/apps/mail/public/assets/mail.svg
+esempio/Zero-main/apps/mail/public/assets/mail0.io - Text + logo w lines.png
+esempio/Zero-main/apps/mail/public/assets/mail0.io - Text + logo w lines.svg
+esempio/Zero-main/apps/mail/public/assets/mail0.io - Text w lines.png
+esempio/Zero-main/apps/mail/public/assets/mail0.io - Text w lines.svg
+esempio/Zero-main/apps/mail/public/assets/rocket.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/audio.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/csv.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/excel.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/figma.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/file.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/html.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/pdf.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/powerpoint.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/video.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/word.svg
+esempio/Zero-main/apps/mail/public/assets/attachment-icons/zip.svg
+esempio/Zero-main/apps/mail/public/fonts/geist/Geist-Black.ttf
+esempio/Zero-main/apps/mail/public/fonts/geist/Geist-Bold.ttf
+esempio/Zero-main/apps/mail/public/fonts/geist/Geist-ExtraBold.ttf
+esempio/Zero-main/apps/mail/public/fonts/geist/Geist-ExtraLight.ttf
+esempio/Zero-main/apps/mail/public/fonts/geist/Geist-Light.ttf
+esempio/Zero-main/apps/mail/public/fonts/geist/Geist-Medium.ttf
+esempio/Zero-main/apps/mail/public/fonts/geist/Geist-Regular.ttf
+esempio/Zero-main/apps/mail/public/fonts/geist/Geist-SemiBold.ttf
+esempio/Zero-main/apps/mail/public/fonts/geist/Geist-Thin.ttf
+esempio/Zero-main/apps/mail/public/icons-pwa/icon-180.png
+esempio/Zero-main/apps/mail/public/icons-pwa/icon-192.png
+esempio/Zero-main/apps/mail/public/icons-pwa/icon-512.png
+esempio/Zero-main/apps/mail/public/onboarding/coming-soon.png
+esempio/Zero-main/apps/mail/public/onboarding/get-started.png
+esempio/Zero-main/apps/mail/public/onboarding/ready.png
+esempio/Zero-main/apps/mail/public/onboarding/step1.gif
+esempio/Zero-main/apps/mail/public/onboarding/step2.gif
+esempio/Zero-main/apps/mail/public/onboarding/step3.gif
+esempio/Zero-main/apps/mail/store/backgroundQueue.ts
+esempio/Zero-main/apps/mail/store/draftStates.ts
+esempio/Zero-main/apps/mail/store/optimistic-updates.ts
+esempio/Zero-main/apps/mail/types/index.ts
+esempio/Zero-main/apps/mail/types/speech-recognition.d.ts
+esempio/Zero-main/apps/mail/types/tools.ts
+esempio/Zero-main/apps/mail/utils/keyboard-layout-map.ts
+esempio/Zero-main/apps/mail/utils/keyboard-utils.ts
+esempio/Zero-main/apps/server/drizzle.config.ts
+esempio/Zero-main/apps/server/eslint.config.ts
+esempio/Zero-main/apps/server/package.json
+esempio/Zero-main/apps/server/tsconfig.json
+esempio/Zero-main/apps/server/vite.config.ts
+esempio/Zero-main/apps/server/wrangler.jsonc
+esempio/Zero-main/apps/server/evals/ai-chat-basic.eval.ts
+esempio/Zero-main/apps/server/src/ctx.ts
+esempio/Zero-main/apps/server/src/env.ts
+esempio/Zero-main/apps/server/src/main.ts
+esempio/Zero-main/apps/server/src/pipelines.effect.ts
+esempio/Zero-main/apps/server/src/pipelines.ts
+esempio/Zero-main/apps/server/src/types.ts
+esempio/Zero-main/apps/server/src/db/index.ts
+esempio/Zero-main/apps/server/src/db/schema.ts
+esempio/Zero-main/apps/server/src/db/migrations/0000_fine_steel_serpent.sql
+esempio/Zero-main/apps/server/src/db/migrations/0001_greedy_darkhawk.sql
+esempio/Zero-main/apps/server/src/db/migrations/0002_flimsy_nightshade.sql
+esempio/Zero-main/apps/server/src/db/migrations/0003_purple_kylun.sql
+esempio/Zero-main/apps/server/src/db/migrations/0004_quiet_grey_gargoyle.sql
+esempio/Zero-main/apps/server/src/db/migrations/0005_mature_lady_deathstrike.sql
+esempio/Zero-main/apps/server/src/db/migrations/0006_small_unicorn.sql
+esempio/Zero-main/apps/server/src/db/migrations/0007_tense_wrecking_crew.sql
+esempio/Zero-main/apps/server/src/db/migrations/0008_freezing_hydra.sql
+esempio/Zero-main/apps/server/src/db/migrations/0009_boring_big_bertha.sql
+esempio/Zero-main/apps/server/src/db/migrations/0010_dry_hemingway.sql
+esempio/Zero-main/apps/server/src/db/migrations/0011_huge_newton_destine.sql
+esempio/Zero-main/apps/server/src/db/migrations/0012_even_johnny_storm.sql
+esempio/Zero-main/apps/server/src/db/migrations/0013_calm_timeslip.sql
+esempio/Zero-main/apps/server/src/db/migrations/0014_cuddly_energizer.sql
+esempio/Zero-main/apps/server/src/db/migrations/0015_minor_mister_sinister.sql
+esempio/Zero-main/apps/server/src/db/migrations/0016_neat_ogun.sql
+esempio/Zero-main/apps/server/src/db/migrations/0017_bouncy_shotgun.sql
+esempio/Zero-main/apps/server/src/db/migrations/0018_far_lady_mastermind.sql
+esempio/Zero-main/apps/server/src/db/migrations/0019_mean_war_machine.sql
+esempio/Zero-main/apps/server/src/db/migrations/0020_bright_gladiator.sql
+esempio/Zero-main/apps/server/src/db/migrations/0021_outgoing_mariko_yashida.sql
+esempio/Zero-main/apps/server/src/db/migrations/0022_round_violations.sql
+esempio/Zero-main/apps/server/src/db/migrations/0023_narrow_maria_hill.sql
+esempio/Zero-main/apps/server/src/db/migrations/0024_familiar_wiccan.sql
+esempio/Zero-main/apps/server/src/db/migrations/0025_far_echo.sql
+esempio/Zero-main/apps/server/src/db/migrations/0025_nervous_paper_doll.sql
+esempio/Zero-main/apps/server/src/db/migrations/0026_smooth_norrin_radd.sql
+esempio/Zero-main/apps/server/src/db/migrations/0027_vengeful_golden_guardian.sql
+esempio/Zero-main/apps/server/src/db/migrations/0028_worried_molecule_man.sql
+esempio/Zero-main/apps/server/src/db/migrations/0029_common_network.sql
+esempio/Zero-main/apps/server/src/db/migrations/0029_thin_triathlon.sql
+esempio/Zero-main/apps/server/src/db/migrations/0030_blue_grandmaster.sql
+esempio/Zero-main/apps/server/src/db/migrations/0031_legal_colleen_wing.sql
+esempio/Zero-main/apps/server/src/db/migrations/0032_add_image_compression_setting.sql
+esempio/Zero-main/apps/server/src/db/migrations/0032_smiling_raider.sql
+esempio/Zero-main/apps/server/src/db/migrations/0033_first_bastion.sql
+esempio/Zero-main/apps/server/src/db/migrations/0034_mushy_runaways.sql
+esempio/Zero-main/apps/server/src/db/migrations/0035_giant_hydra.sql
+esempio/Zero-main/apps/server/src/db/migrations/0035_uneven_shiva.sql
+esempio/Zero-main/apps/server/src/db/migrations/0036_petite_mole_man.sql
+esempio/Zero-main/apps/server/src/db/migrations/meta/_journal.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0000_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0001_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0002_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0003_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0004_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0005_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0006_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0007_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0008_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0009_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0010_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0011_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0012_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0013_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0014_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0015_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0016_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0017_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0018_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0019_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0020_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0021_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0022_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0023_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0024_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0025_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0026_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0027_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0028_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0029_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0030_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0031_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0032_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0033_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0034_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0035_snapshot.json
+esempio/Zero-main/apps/server/src/db/migrations/meta/0036_snapshot.json
+esempio/Zero-main/apps/server/src/lib/auth-providers.ts
+esempio/Zero-main/apps/server/src/lib/auth.ts
+esempio/Zero-main/apps/server/src/lib/brain.fallback.prompts.ts
+esempio/Zero-main/apps/server/src/lib/brain.ts
+esempio/Zero-main/apps/server/src/lib/bulk-delete.ts
+esempio/Zero-main/apps/server/src/lib/cookies.ts
+esempio/Zero-main/apps/server/src/lib/email-processor.ts
+esempio/Zero-main/apps/server/src/lib/email-utils.ts
+esempio/Zero-main/apps/server/src/lib/gmail-rate-limit.ts
+esempio/Zero-main/apps/server/src/lib/notes-manager.ts
+esempio/Zero-main/apps/server/src/lib/prompts.ts
+esempio/Zero-main/apps/server/src/lib/sanitize-tip-tap-html.ts
+esempio/Zero-main/apps/server/src/lib/schemas.ts
+esempio/Zero-main/apps/server/src/lib/sequential-thinking.ts
+esempio/Zero-main/apps/server/src/lib/server-utils.ts
+esempio/Zero-main/apps/server/src/lib/services.ts
+esempio/Zero-main/apps/server/src/lib/shortcuts.ts
+esempio/Zero-main/apps/server/src/lib/templates-manager.ts
+esempio/Zero-main/apps/server/src/lib/timezones.ts
+esempio/Zero-main/apps/server/src/lib/utils.ts
+esempio/Zero-main/apps/server/src/lib/analyze/interests.ts
+esempio/Zero-main/apps/server/src/lib/driver/google-label-color-map.ts
+esempio/Zero-main/apps/server/src/lib/driver/google.ts
+esempio/Zero-main/apps/server/src/lib/driver/index.ts
+esempio/Zero-main/apps/server/src/lib/driver/microsoft.ts
+esempio/Zero-main/apps/server/src/lib/driver/types.ts
+esempio/Zero-main/apps/server/src/lib/driver/utils.ts
+esempio/Zero-main/apps/server/src/lib/factories/base-subscription.factory.ts
+esempio/Zero-main/apps/server/src/lib/factories/google-subscription.factory.ts
+esempio/Zero-main/apps/server/src/lib/factories/outlook-subscription.factory.ts
+esempio/Zero-main/apps/server/src/lib/factories/subscription-factory.registry.ts
+esempio/Zero-main/apps/server/src/lib/react-emails/email-sequences.tsx
+esempio/Zero-main/apps/server/src/routes/ai.ts
+esempio/Zero-main/apps/server/src/routes/auth.ts
+esempio/Zero-main/apps/server/src/routes/autumn.ts
+esempio/Zero-main/apps/server/src/routes/agent/index.ts
+esempio/Zero-main/apps/server/src/routes/agent/mcp.ts
+esempio/Zero-main/apps/server/src/routes/agent/orchestrator.ts
+esempio/Zero-main/apps/server/src/routes/agent/rpc.ts
+esempio/Zero-main/apps/server/src/routes/agent/shared.ts
+esempio/Zero-main/apps/server/src/routes/agent/tools.ts
+esempio/Zero-main/apps/server/src/routes/agent/types.ts
+esempio/Zero-main/apps/server/src/routes/agent/utils.ts
+esempio/Zero-main/apps/server/src/services/writing-style-service.ts
+esempio/Zero-main/apps/server/src/services/call-service/system-prompt.ts
+esempio/Zero-main/apps/server/src/thread-workflow-utils/index.ts
+esempio/Zero-main/apps/server/src/thread-workflow-utils/README.md
+esempio/Zero-main/apps/server/src/thread-workflow-utils/workflow-engine.ts
+esempio/Zero-main/apps/server/src/thread-workflow-utils/workflow-functions.ts
+esempio/Zero-main/apps/server/src/thread-workflow-utils/workflow-utils.ts
+esempio/Zero-main/apps/server/src/trpc/index.ts
+esempio/Zero-main/apps/server/src/trpc/trpc.ts
+esempio/Zero-main/apps/server/src/trpc/routes/bimi.ts
+esempio/Zero-main/apps/server/src/trpc/routes/brain.ts
+esempio/Zero-main/apps/server/src/trpc/routes/categories.ts
+esempio/Zero-main/apps/server/src/trpc/routes/connections.ts
+esempio/Zero-main/apps/server/src/trpc/routes/cookies.ts
+esempio/Zero-main/apps/server/src/trpc/routes/drafts.ts
+esempio/Zero-main/apps/server/src/trpc/routes/label.ts
+esempio/Zero-main/apps/server/src/trpc/routes/mail.ts
+esempio/Zero-main/apps/server/src/trpc/routes/notes.ts
+esempio/Zero-main/apps/server/src/trpc/routes/settings.ts
+esempio/Zero-main/apps/server/src/trpc/routes/shortcut.ts
+esempio/Zero-main/apps/server/src/trpc/routes/templates.ts
+esempio/Zero-main/apps/server/src/trpc/routes/user.ts
+esempio/Zero-main/apps/server/src/trpc/routes/ai/compose.ts
+esempio/Zero-main/apps/server/src/trpc/routes/ai/index.ts
+esempio/Zero-main/apps/server/src/trpc/routes/ai/search.ts
+esempio/Zero-main/apps/server/src/trpc/routes/ai/webSearch.ts
+esempio/Zero-main/docker/app/Dockerfile
+esempio/Zero-main/docker/db/Dockerfile
+esempio/Zero-main/packages/cli/package.json
+esempio/Zero-main/packages/cli/tsconfig.json
+esempio/Zero-main/packages/cli/src/cli.ts
+esempio/Zero-main/packages/cli/src/utils.ts
+esempio/Zero-main/packages/cli/src/commands/fix-env.ts
+esempio/Zero-main/packages/cli/src/commands/index.ts
+esempio/Zero-main/packages/cli/src/commands/reinstall-node-modules.ts
+esempio/Zero-main/packages/cli/src/commands/sync.ts
+esempio/Zero-main/packages/eslint-config/config.ts
+esempio/Zero-main/packages/eslint-config/package.json
+esempio/Zero-main/packages/eslint-config/tsconfig.json
+esempio/Zero-main/packages/testing/package.json
+esempio/Zero-main/packages/testing/playwright.config.ts
+esempio/Zero-main/packages/testing/tsconfig.json
+esempio/Zero-main/packages/testing/e2e/auth.setup.ts
+esempio/Zero-main/packages/testing/e2e/mail-inbox.spec.ts
+esempio/Zero-main/packages/tsconfig/base.json
+esempio/Zero-main/packages/tsconfig/package.json
+esempio/Zero-main/patches/novel.patch
+esempio/Zero-main/public/better-auth.png
+esempio/Zero-main/public/coderabbit.png
+esempio/Zero-main/public/drizzle-orm.png
+esempio/Zero-main/public/vercel.png
+esempio/Zero-main/scripts/package.json
+esempio/Zero-main/scripts/README.md
+esempio/Zero-main/scripts/register-elevenlabs-tools.ts
+esempio/Zero-main/scripts/run.ts
+esempio/Zero-main/scripts/tsconfig.json
+esempio/Zero-main/scripts/docker/entrypoint.sh
+esempio/Zero-main/scripts/docker/replace-placeholder.sh
+esempio/Zero-main/scripts/seed-style/styles/concise_emails.json
+esempio/Zero-main/scripts/seed-style/styles/friendly_emails.json
+esempio/Zero-main/scripts/seed-style/styles/genz_emails.json
+esempio/Zero-main/scripts/seed-style/styles/persuasive_emails.json
+esempio/Zero-main/scripts/seed-style/styles/professional_emails.json
+esempio/Zero-main/scripts/send-emails/index.ts

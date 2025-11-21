@@ -226,6 +226,7 @@ export interface AppTranslations {
         markUnread: string;
         markRead: string;
         delete: string;
+        archive: string;
         selectAll: string;
         clear: string;
         moreActions: string;

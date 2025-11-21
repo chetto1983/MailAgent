@@ -42,7 +42,11 @@
       "Bash(timeout 5 npm run dev:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(NUL)",
+      "Bash(ls:*)",
+      "Bash(git checkout:*)",
+      "Bash(git -C \"d:\\MailAgent\" status --short)"
     ],
     "deny": [],
     "ask": []

@@ -127,6 +127,31 @@ export function useEmailActions(callbacks?: EmailActionsCallbacks) {
   );
 
   /**
+   * Toggle important status on email
+   */
+  const handleToggleImportant = useCallback(
+    async (emailId: string, currentImportant: boolean) => {
+      const newImportant = !currentImportant;
+
+      try {
+        // Optimistic update (using updateEmail for now)
+        updateEmail(emailId, { isImportant: newImportant });
+
+        // API call
+        await emailApi.updateEmail(emailId, { isImportant: newImportant });
+
+        callbacks?.onSuccess?.(newImportant ? 'Marked as important ✓' : 'Unmarked as important ✓');
+      } catch (error) {
+        console.error('Failed to toggle important:', error);
+        // Revert on error
+        updateEmail(emailId, { isImportant: currentImportant });
+        callbacks?.onError?.('Failed to update important status. Please try again.');
+      }
+    },
+    [updateEmail, callbacks]
+  );
+
+  /**
    * Archive email (move to Archive folder)
    */
   const handleArchive = useCallback(
@@ -232,6 +257,7 @@ export function useEmailActions(callbacks?: EmailActionsCallbacks) {
     handleBulkDelete,
     handleMarkAsRead,
     handleToggleStar,
+    handleToggleImportant,
     handleArchive,
     handleMoveToFolder,
     handleReply,

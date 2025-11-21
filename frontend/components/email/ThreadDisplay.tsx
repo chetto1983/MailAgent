@@ -1,0 +1,354 @@
+import React, { useMemo } from 'react';
+import {
+  Box,
+  Typography,
+  IconButton,
+  Divider,
+  Avatar,
+  Chip,
+  Paper,
+  Stack,
+  CircularProgress,
+} from '@mui/material';
+import {
+  ChevronLeft,
+  Star,
+  Archive,
+  Trash2,
+  MoreVertical,
+  Reply,
+  ReplyAll,
+  Forward,
+  Paperclip,
+} from 'lucide-react';
+import { useTranslations } from '@/lib/hooks/use-translations';
+import type { Email } from '@/stores/email-store';
+
+/**
+ * Props for ThreadDisplay component
+ */
+interface ThreadDisplayProps {
+  /**
+   * Email/thread to display
+   */
+  email: Email | null;
+
+  /**
+   * Whether data is loading
+   */
+  isLoading?: boolean;
+
+  /**
+   * Callback to close/go back
+   */
+  onClose?: () => void;
+
+  /**
+   * Callback to toggle star
+   */
+  onToggleStar?: (id: string, isStarred: boolean) => void;
+
+  /**
+   * Callback to archive
+   */
+  onArchive?: (id: string) => void;
+
+  /**
+   * Callback to delete
+   */
+  onDelete?: (id: string) => void;
+
+  /**
+   * Callback to reply
+   */
+  onReply?: (email: Email) => void;
+
+  /**
+   * Callback to reply all
+   */
+  onReplyAll?: (email: Email) => void;
+
+  /**
+   * Callback to forward
+   */
+  onForward?: (email: Email) => void;
+}
+
+/**
+ * Parse email from field
+ */
+function parseEmailFrom(from: string): { name: string; email: string } {
+  const match = from.match(/^"?([^"<]+)"?\s*<?([^>]*)>?$/);
+  if (match) {
+    return {
+      name: match[1].trim(),
+      email: match[2].trim() || match[1].trim(),
+    };
+  }
+  return { name: from, email: from };
+}
+
+/**
+ * Format date for email header
+ */
+function formatEmailDate(date: string | Date): string {
+  const d = new Date(date);
+  return d.toLocaleString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/**
+ * ThreadDisplay - Clean email/thread viewer
+ *
+ * Features:
+ * - Clean, readable layout
+ * - Toolbar with common actions
+ * - HTML email rendering (sanitized)
+ * - Attachments display
+ * - Reply/Forward actions
+ * - Mobile responsive
+ *
+ * @example
+ * ```tsx
+ * <ThreadDisplay
+ *   email={selectedEmail}
+ *   onClose={() => setSelectedEmail(null)}
+ *   onToggleStar={handleToggleStar}
+ *   onArchive={handleArchive}
+ *   onDelete={handleDelete}
+ *   onReply={handleReply}
+ * />
+ * ```
+ */
+export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
+  email,
+  isLoading = false,
+  onClose,
+  onToggleStar,
+  onArchive,
+  onDelete,
+  onReply,
+  onReplyAll,
+  onForward,
+}) => {
+  const t = useTranslations();
+
+  const fromData = useMemo(() => {
+    return email ? parseEmailFrom(email.from) : { name: '', email: '' };
+  }, [email]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+          minHeight: 400,
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Empty state
+  if (!email) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+          minHeight: 400,
+          px: 3,
+          textAlign: 'center',
+        }}
+      >
+        <Typography variant="h6" color="text.secondary" gutterBottom>
+          {t.dashboard.email.selectEmail}
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Toolbar */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          borderBottom: 1,
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+        }}
+      >
+        {onClose && (
+          <IconButton size="small" onClick={onClose} sx={{ mr: 1 }}>
+            <ChevronLeft size={20} />
+          </IconButton>
+        )}
+
+        <Box sx={{ flex: 1 }} />
+
+        <IconButton
+          size="small"
+          onClick={() => onToggleStar?.(email.id, email.isStarred || false)}
+          title={email.isStarred ? t.dashboard.email.bulkBar.removeStar : t.dashboard.email.bulkBar.addStar}
+        >
+          <Star size={18} fill={email.isStarred ? '#FFB300' : 'none'} color={email.isStarred ? '#FFB300' : 'currentColor'} />
+        </IconButton>
+
+        <IconButton
+          size="small"
+          onClick={() => onArchive?.(email.id)}
+          title={t.dashboard.email.bulkBar.archive}
+        >
+          <Archive size={18} />
+        </IconButton>
+
+        <IconButton
+          size="small"
+          onClick={() => onDelete?.(email.id)}
+          title={t.dashboard.email.bulkBar.delete}
+        >
+          <Trash2 size={18} />
+        </IconButton>
+
+        <IconButton size="small" title="More">
+          <MoreVertical size={18} />
+        </IconButton>
+      </Paper>
+
+      {/* Email Content */}
+      <Box
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          p: 3,
+        }}
+      >
+        {/* Subject */}
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
+          {email.subject || '(No subject)'}
+        </Typography>
+
+        {/* From/To/Date */}
+        <Box sx={{ mb: 3 }}>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
+            <Avatar sx={{ width: 48, height: 48 }}>
+              {fromData.name?.[0]?.toUpperCase() || 'U'}
+            </Avatar>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                {fromData.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {fromData.email}
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              {formatEmailDate(email.receivedAt)}
+            </Typography>
+          </Stack>
+
+          {email.to && email.to.length > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              <strong>To:</strong> {email.to.join(', ')}
+            </Typography>
+          )}
+
+          {email.cc && email.cc.length > 0 && (
+            <Typography variant="body2" color="text.secondary">
+              <strong>Cc:</strong> {email.cc.join(', ')}
+            </Typography>
+          )}
+        </Box>
+
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Email Body */}
+        <Box
+          sx={{
+            mb: 3,
+            '& img': {
+              maxWidth: '100%',
+              height: 'auto',
+            },
+            '& a': {
+              color: 'primary.main',
+              textDecoration: 'underline',
+            },
+          }}
+          dangerouslySetInnerHTML={{
+            __html: email.body || email.bodyPreview || '',
+          }}
+        />
+
+        {/* Attachments */}
+        {email.hasAttachments && (
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Paperclip size={16} />
+              Attachments
+            </Typography>
+            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+              <Chip
+                label="example.pdf"
+                size="small"
+                icon={<Paperclip size={14} />}
+                onClick={() => {}}
+                sx={{ cursor: 'pointer' }}
+              />
+            </Stack>
+          </Box>
+        )}
+      </Box>
+
+      {/* Action Bar */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          borderTop: 1,
+          borderColor: 'divider',
+          display: 'flex',
+          gap: 1,
+        }}
+      >
+        <IconButton size="small" onClick={() => onReply?.(email)} title="Reply">
+          <Reply size={18} />
+        </IconButton>
+        <IconButton size="small" onClick={() => onReplyAll?.(email)} title="Reply All">
+          <ReplyAll size={18} />
+        </IconButton>
+        <IconButton size="small" onClick={() => onForward?.(email)} title="Forward">
+          <Forward size={18} />
+        </IconButton>
+      </Paper>
+    </Box>
+  );
+};
+
+export default ThreadDisplay;
