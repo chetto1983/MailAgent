@@ -160,7 +160,7 @@ export class RealtimeGateway
    * @returns true se ci sono client connessi per questo tenant
    */
   hasTenantConnections(tenantId: string): boolean {
-    if (!this.server) {
+    if (!this.server || !this.server.sockets || !this.server.sockets.adapter) {
       return false;
     }
 
