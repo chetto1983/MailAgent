@@ -16,9 +16,12 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { X, Send, Paperclip, Check, FileText, Trash2 } from 'lucide-react';
+import { EditorContent } from '@tiptap/react';
 import type { SendEmailPayload, EmailAttachmentUpload } from '@/lib/api/email';
 import { emailApi } from '@/lib/api/email';
 import { useDraftAutosave } from '@/hooks/use-draft-autosave';
+import { useComposeEditor } from '@/hooks/use-compose-editor';
+import { EditorToolbar } from './EditorToolbar';
 
 export interface ComposeDialogProps {
   /**
@@ -109,6 +112,15 @@ export function ComposeDialog({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // TipTap editor
+  const editor = useComposeEditor({
+    initialContent: body,
+    placeholder: 'Compose your message...',
+    onChange: (html) => setBody(html),
+    autofocus: false,
+    editable: !sending,
+  });
+
   // Initialize form with prefill data
   useEffect(() => {
     if (open && prefillData) {
@@ -131,6 +143,13 @@ export function ComposeDialog({
       setAttachments([]);
     }
   }, [open, prefillData]);
+
+  // Sync editor content when body changes externally
+  useEffect(() => {
+    if (editor && body !== editor.getHTML()) {
+      editor.commands.setContent(body);
+    }
+  }, [editor, body]);
 
   // Parse comma-separated emails
   const parseEmails = useCallback((emailString: string): string[] => {
@@ -491,28 +510,33 @@ export function ComposeDialog({
             </Box>
           )}
 
-          {/* Body Field */}
-          <Box sx={{ flex: 1, px: 2, py: 2 }}>
-            <TextField
-              fullWidth
-              multiline
-              placeholder="Compose your message..."
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              disabled={sending}
-              sx={{
-                height: '100%',
-                '& .MuiOutlinedInput-root': {
-                  height: '100%',
-                  alignItems: 'flex-start',
-                  '& fieldset': { border: 'none' },
-                  '& textarea': {
-                    height: '100% !important',
-                    overflow: 'auto !important',
-                  },
+          {/* Editor Toolbar */}
+          <EditorToolbar editor={editor} />
+
+          {/* Body Field - TipTap Editor */}
+          <Box
+            sx={{
+              flex: 1,
+              overflow: 'auto',
+              '& .ProseMirror': {
+                minHeight: 200,
+                maxHeight: 400,
+                outline: 'none',
+                p: 2,
+                '&:focus': {
+                  outline: 'none',
                 },
-              }}
-            />
+              },
+              '& .ProseMirror p.is-editor-empty:first-child::before': {
+                color: 'text.disabled',
+                content: 'attr(data-placeholder)',
+                float: 'left',
+                height: 0,
+                pointerEvents: 'none',
+              },
+            }}
+          >
+            <EditorContent editor={editor} />
           </Box>
         </Box>
       </DialogContent>
