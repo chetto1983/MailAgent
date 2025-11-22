@@ -19,6 +19,7 @@ import { X, Send, Paperclip, Check, FileText, Trash2 } from 'lucide-react';
 import { EditorContent } from '@tiptap/react';
 import type { SendEmailPayload, EmailAttachmentUpload } from '@/lib/api/email';
 import { emailApi } from '@/lib/api/email';
+import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { useDraftAutosave } from '@/hooks/use-draft-autosave';
 import { useComposeEditor } from '@/hooks/use-compose-editor';
 import { EditorToolbar } from './EditorToolbar';
@@ -112,6 +113,10 @@ export function ComposeDialog({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Provider state
+  const [providers, setProviders] = useState<ProviderConfig[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>(defaultProviderId || '');
+
   // TipTap editor
   const editor = useComposeEditor({
     initialContent: body,
@@ -150,6 +155,29 @@ export function ComposeDialog({
       editor.commands.setContent(body);
     }
   }, [editor, body]);
+
+  // Fetch providers when dialog opens
+  useEffect(() => {
+    if (open) {
+      providersApi.getProviders().then((data) => {
+        const emailProviders = data.filter((p) => p.supportsEmail);
+        setProviders(emailProviders);
+
+        // Set selected provider
+        if (!selectedProvider && emailProviders.length > 0) {
+          const defaultProvider = emailProviders.find((p) => p.isDefault) || emailProviders[0];
+          setSelectedProvider(defaultProvider.id);
+        }
+      });
+    }
+  }, [open, selectedProvider]);
+
+  // Update selected provider when defaultProviderId changes
+  useEffect(() => {
+    if (defaultProviderId) {
+      setSelectedProvider(defaultProviderId);
+    }
+  }, [defaultProviderId]);
 
   // Parse comma-separated emails
   const parseEmails = useCallback((emailString: string): string[] => {
@@ -229,10 +257,10 @@ export function ComposeDialog({
 
   // Draft data for autosave
   const draftData = useMemo(() => {
-    if (!defaultProviderId) return null;
+    if (!selectedProvider) return null;
 
     return {
-      providerId: defaultProviderId,
+      providerId: selectedProvider,
       to: to ? parseEmails(to) : undefined,
       cc: cc ? parseEmails(cc) : undefined,
       bcc: bcc ? parseEmails(bcc) : undefined,
@@ -240,12 +268,12 @@ export function ComposeDialog({
       bodyText: body || undefined,
       bodyHtml: body ? `<p>${body.replace(/\n/g, '<br>')}</p>` : undefined,
     };
-  }, [defaultProviderId, to, cc, bcc, subject, body, parseEmails]);
+  }, [selectedProvider, to, cc, bcc, subject, body, parseEmails]);
 
   // Autosave draft
   const { isSaving: isDraftSaving, lastSaved } = useDraftAutosave({
-    draftData: draftData || { providerId: defaultProviderId || '' },
-    enabled: open && !!defaultProviderId && mode === 'compose', // Only autosave for new compose
+    draftData: draftData || { providerId: selectedProvider || '' },
+    enabled: open && !!selectedProvider && mode === 'compose', // Only autosave for new compose
     interval: 30000, // 30 seconds
   });
 
@@ -266,7 +294,7 @@ export function ComposeDialog({
   // Handle send
   const handleSend = useCallback(async () => {
     // Validation
-    if (!defaultProviderId) {
+    if (!selectedProvider) {
       onError?.('No email provider selected');
       return;
     }
@@ -286,7 +314,7 @@ export function ComposeDialog({
       setSending(true);
 
       const payload: SendEmailPayload = {
-        providerId: defaultProviderId,
+        providerId: selectedProvider,
         to: toEmails,
         cc: cc ? parseEmails(cc) : undefined,
         bcc: bcc ? parseEmails(bcc) : undefined,
@@ -317,7 +345,7 @@ export function ComposeDialog({
     } finally {
       setSending(false);
     }
-  }, [defaultProviderId, to, cc, bcc, subject, body, prefillData, parseEmails, onClose, onSent, onError, attachments]);
+  }, [selectedProvider, to, cc, bcc, subject, body, prefillData, parseEmails, onClose, onSent, onError, attachments]);
 
   // Check if form has unsaved changes
   const hasChanges = useCallback(() => {
@@ -384,6 +412,41 @@ export function ComposeDialog({
 
       <DialogContent dividers sx={{ p: 0 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          {/* From Field - Provider Selection */}
+          <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" sx={{ minWidth: 40, fontWeight: 500 }}>
+                From:
+              </Typography>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value)}
+                disabled={sending || providers.length === 0}
+                aria-label="Select email account"
+                SelectProps={{
+                  native: true,
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': { border: 'none' },
+                  },
+                }}
+              >
+                {providers.length === 0 && (
+                  <option value="">No email accounts available</option>
+                )}
+                {providers.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.email} {provider.displayName ? `(${provider.displayName})` : ''}
+                  </option>
+                ))}
+              </TextField>
+            </Box>
+          </Box>
+
           {/* To Field */}
           <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

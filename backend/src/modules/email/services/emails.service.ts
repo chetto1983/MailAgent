@@ -140,8 +140,15 @@ export class EmailsService {
           { bodyText: { contains: filters.search, mode: 'insensitive' } },
         ],
       }),
-      ...(filters.startDate && { receivedAt: { gte: filters.startDate } }),
-      ...(filters.endDate && { receivedAt: { lte: filters.endDate } }),
+      // Date range filters - combine both conditions in single receivedAt object
+      ...(filters.startDate || filters.endDate
+        ? {
+            receivedAt: {
+              ...(filters.startDate && { gte: filters.startDate }),
+              ...(filters.endDate && { lte: filters.endDate }),
+            },
+          }
+        : {}),
     };
 
     // Get total count and emails

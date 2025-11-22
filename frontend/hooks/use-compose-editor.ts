@@ -111,6 +111,7 @@ export function useComposeEditor({
     content: initialContent,
     editable,
     autofocus: autofocus ? 'end' : false,
+    immediatelyRender: false, // Prevent SSR hydration mismatch
     onUpdate: ({ editor }) => {
       if (onChange) {
         onChange(editor.getHTML());

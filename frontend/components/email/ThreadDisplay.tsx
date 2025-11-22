@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import type { Email } from '@/stores/email-store';
+import { useAuthStore } from '@/stores/auth-store';
 
 /**
  * Props for ThreadDisplay component
@@ -138,6 +139,7 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
   onForward,
 }) => {
   const t = useTranslations();
+  const { token } = useAuthStore();
 
   const fromData = useMemo(() => {
     return email ? parseEmailFrom(email.from) : { name: '', email: '' };
@@ -332,20 +334,65 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
         />
 
         {/* Attachments */}
-        {email.hasAttachments && (
+        {email.attachments && email.attachments.length > 0 && (
           <Box sx={{ mt: 3 }}>
             <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Paperclip size={16} />
-              Attachments
+              Attachments ({email.attachments.filter(a => !a.isInline).length})
             </Typography>
-            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-              <Chip
-                label="example.pdf"
-                size="small"
-                icon={<Paperclip size={14} />}
-                onClick={() => {}}
-                sx={{ cursor: 'pointer' }}
-              />
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1, gap: 1 }}>
+              {email.attachments
+                .filter(attachment => !attachment.isInline)
+                .map((attachment) => {
+                  const sizeKB = Math.round(attachment.size / 1024);
+                  const sizeLabel = sizeKB > 1024
+                    ? `${(sizeKB / 1024).toFixed(1)} MB`
+                    : `${sizeKB} KB`;
+
+                  return (
+                    <Chip
+                      key={attachment.id}
+                      label={`${attachment.filename} (${sizeLabel})`}
+                      size="small"
+                      icon={<Paperclip size={14} />}
+                      onClick={async () => {
+                        try {
+                          if (!token) {
+                            console.error('No auth token found');
+                            return;
+                          }
+
+                          // Fetch with Authorization header
+                          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+                          const response = await fetch(`${apiUrl}/email/attachments/${attachment.id}/download`, {
+                            headers: {
+                              'Authorization': `Bearer ${token}`,
+                            },
+                          });
+
+                          if (!response.ok) {
+                            throw new Error(`Download failed: ${response.status}`);
+                          }
+
+                          // Create blob and download
+                          const blob = await response.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = attachment.filename;
+                          document.body.appendChild(a);
+                          a.click();
+                          window.URL.revokeObjectURL(url);
+                          document.body.removeChild(a);
+                        } catch (error) {
+                          console.error('Failed to download attachment:', error);
+                          alert('Failed to download attachment. Please try again.');
+                        }
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  );
+                })}
             </Stack>
           </Box>
         )}

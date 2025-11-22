@@ -171,8 +171,9 @@ export const ThreadList: React.FC<ThreadListProps> = ({
 
   const isEmpty = threads.length === 0;
 
-  // Loading state
-  if (isLoading) {
+  // Loading state - only show full spinner if loading AND no threads
+  // This prevents hiding existing emails during infinite scroll
+  if (isLoading && isEmpty) {
     return (
       <Box
         sx={{

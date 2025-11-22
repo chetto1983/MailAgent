@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 
+export interface EmailAttachment {
+  id: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+  isInline: boolean;
+}
+
 export interface Email {
   id: string;
   providerId: string;
@@ -22,6 +30,7 @@ export interface Email {
   labels?: string[];
   folder?: string;
   hasAttachments?: boolean;
+  attachments?: EmailAttachment[];
   inReplyTo?: string;
   references?: string;
 }
@@ -67,6 +76,7 @@ interface EmailState {
 
   // Actions
   setEmails: (emails: Email[]) => void;
+  appendEmails: (emails: Email[]) => void;
   addEmail: (email: Email) => void;
   updateEmail: (id: string, updates: Partial<Email>) => void;
   deleteEmail: (id: string) => void;
@@ -116,6 +126,11 @@ export const useEmailStore = create<EmailState>((set) => ({
   selectedIds: new Set<string>(),
 
   setEmails: (emails) => set({ emails }),
+
+  appendEmails: (newEmails) =>
+    set((state) => ({
+      emails: [...state.emails, ...newEmails],
+    })),
 
   addEmail: (email) =>
     set((state) => {
@@ -202,7 +217,8 @@ export const useEmailStore = create<EmailState>((set) => ({
 
   selectAll: () =>
     set((state) => ({
-      selectedIds: new Set(state.emails.map((e) => e.id)),
+      // Use threadId || id to match ThreadList/ThreadListItem logic
+      selectedIds: new Set(state.emails.map((e) => e.threadId || e.id)),
     })),
 
   clearSelection: () => set({ selectedIds: new Set<string>() }),

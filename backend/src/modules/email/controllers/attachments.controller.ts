@@ -62,7 +62,7 @@ export class AttachmentsController {
       const tenantId = req.user.tenantId;
 
       this.logger.log(
-        `Attachment download requested: ${id} by tenant ${tenantId}`,
+        `[AttachmentsController] Attachment download requested: ${id} by tenant ${tenantId}`,
       );
 
       // Get signed download URL (may trigger on-demand fetch from provider)
@@ -73,8 +73,8 @@ export class AttachmentsController {
 
       // Redirect to S3 signed URL (browser downloads directly from S3)
       // This avoids proxying large files through the backend
-      this.logger.debug(
-        `Redirecting to S3 signed URL for attachment ${id}: ${result.filename}`,
+      this.logger.log(
+        `[AttachmentsController] Redirecting to S3 signed URL for attachment ${id}: ${result.filename}`,
       );
 
       res.redirect(result.url);

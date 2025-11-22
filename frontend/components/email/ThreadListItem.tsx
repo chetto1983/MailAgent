@@ -145,12 +145,17 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
     const [isHovered, setIsHovered] = useState(false);
     const { getLabelById } = useLabelStore();
 
-    // Extract common properties
-    const { threadId, from, subject, snippet, receivedAt, isRead, isStarred, isImportant, labels } =
+    // Extract common properties - use same ID logic as ThreadList
+    // threadId: for UI/selection (thread.threadId || thread.id)
+    // emailId: for API calls (thread.id)
+    const { threadId, emailId, from, subject, snippet, receivedAt, isRead, isStarred, isImportant, labels } =
       useMemo(() => {
         if (isEmail(thread)) {
+          // For Email: threadId for UI, id for API
+          const displayId = thread.threadId || thread.id;
           return {
-            threadId: thread.id,
+            threadId: displayId,
+            emailId: thread.id,
             from: thread.from,
             subject: thread.subject,
             snippet: thread.bodyPreview || '',
@@ -161,8 +166,10 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
             labels: thread.labels || [],
           };
         } else {
+          // For Conversation: use threadId for both (conversations don't have individual email operations)
           return {
             threadId: thread.threadId || '',
+            emailId: thread.threadId || '',
             from: thread.from,
             subject: thread.subject,
             snippet: thread.snippet || '',
@@ -185,23 +192,23 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
     };
 
     const handleToggleStar = () => {
-      onToggleStar?.(threadId, isStarred);
+      onToggleStar?.(emailId, isStarred);
     };
 
     const handleToggleImportant = () => {
-      onToggleImportant?.(threadId, isImportant);
+      onToggleImportant?.(emailId, isImportant);
     };
 
     const handleToggleRead = () => {
-      onToggleRead?.(threadId, isRead);
+      onToggleRead?.(emailId, isRead);
     };
 
     const handleArchive = () => {
-      onArchive?.(threadId);
+      onArchive?.(emailId);
     };
 
     const handleDelete = () => {
-      onDelete?.(threadId);
+      onDelete?.(emailId);
     };
 
     const handleToggleSelect = () => {
@@ -253,17 +260,35 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
         >
           {/* Checkbox */}
           {onToggleSelect && (
-            <Checkbox
-              checked={multiSelected}
-              onChange={handleToggleSelect}
-              onClick={(e) => e.stopPropagation()}
-              sx={{
-                p: 0,
-                mt: 0.5,
-                width: { xs: 44, sm: 'auto' },
-                height: { xs: 44, sm: 'auto' },
+            <Box
+              onClick={(e) => {
+                e.stopPropagation();
               }}
-            />
+              onMouseDown={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              <Checkbox
+                checked={multiSelected}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleToggleSelect();
+                }}
+                sx={{
+                  p: 0,
+                  mt: 0.5,
+                  width: { xs: 44, sm: 'auto' },
+                  height: { xs: 44, sm: 'auto' },
+                  color: 'action.active',
+                  '&.Mui-checked': {
+                    color: 'primary.main',
+                  },
+                  '& .MuiSvgIcon-root': {
+                    fontSize: 20,
+                  },
+                }}
+              />
+            </Box>
           )}
 
           {/* Avatar */}

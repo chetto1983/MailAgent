@@ -13,7 +13,7 @@ import { emailApi, type EmailListParams } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
-import { useEmailStore } from '@/stores/email-store';
+import { useEmailStore, type Email } from '@/stores/email-store';
 import { useEmailActions } from '@/hooks/use-email-actions';
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation';
 import { normalizeFolderName, getFolderIcon as getIconForFolderUtil } from '@/lib/utils/folder-normalization';
@@ -53,6 +53,8 @@ function mapApiEmailToStore(apiEmail: any): any {
     ...apiEmail,
     // Map isFlagged (API) to isImportant (store)
     isImportant: apiEmail.isFlagged || false,
+    // Calculate hasAttachments from attachments array
+    hasAttachments: apiEmail.attachments && apiEmail.attachments.length > 0,
   };
 }
 
@@ -82,6 +84,7 @@ export function Mailbox() {
     isLoading: storeLoading,
     selectedIds,
     setEmails,
+    appendEmails,
     setSelectedEmail,
     setLoading,
     toggleSelection,
@@ -104,6 +107,8 @@ export function Mailbox() {
   const [searchQuery] = useState('');
   const [, setRefreshing] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'forward'>('compose');
+  const [composePrefill, setComposePrefill] = useState<any>(null);
   const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedSearchFilters>({});
   const [_pagination, setPagination] = useState({ page: 1, hasMore: true, total: 0 });
@@ -146,7 +151,7 @@ export function Mailbox() {
     handleToggleImportant,
     handleArchive,
     handleReply,
-    handleForward,
+    //handleForward,
     handleEmailClick: handleEmailClickOriginal,
   } = useEmailActions({
     onSuccess: (message) => {
@@ -499,7 +504,7 @@ export function Mailbox() {
       const newEmails = (emailsRes.data.emails || []).map(mapApiEmailToStore);
 
       // Append new emails to existing ones
-      setEmails([...storeEmails, ...newEmails] as any);
+      appendEmails(newEmails as any);
 
       // Update pagination
       setPagination({
@@ -512,7 +517,7 @@ export function Mailbox() {
     } finally {
       setLoading(false);
     }
-  }, [_pagination, storeLoading, combinedFolders, selectedFolderId, searchQuery, advancedFilters, storeEmails, setEmails, setLoading]);
+  }, [_pagination, storeLoading, combinedFolders, selectedFolderId, searchQuery, advancedFilters, appendEmails, setLoading]);
 
   // Bulk operations handlers
   const handleBulkMarkRead = useCallback(async () => {
@@ -799,6 +804,45 @@ export function Mailbox() {
     setAdvancedFilters({});
   }, []);
 
+  // Handle Reply - open ComposeDialog instead of redirect
+  const handleReplyLocal = useCallback((email: Email) => {
+    setComposeMode('reply');
+    setComposePrefill({
+      to: [email.from],
+      subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+      body: `<br/><br/>On ${new Date(email.receivedAt).toLocaleString()}, ${email.from} wrote:<br/><blockquote>${email.bodyHtml || email.bodyText}</blockquote>`,
+      inReplyTo: email.externalId,
+      references: email.references || email.externalId,
+    });
+    setComposeOpen(true);
+  }, []);
+
+  // Handle Reply All - open ComposeDialog
+  const handleReplyAllLocal = useCallback((email: Email) => {
+    const allRecipients = [email.from, ...(!email.to ? []  : email.to), ...(!email.cc ? [] : email.cc)];
+    const uniqueRecipients = Array.from(new Set(allRecipients));
+
+    setComposeMode('reply');
+    setComposePrefill({
+      to: uniqueRecipients,
+      subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+      body: `<br/><br/>On ${new Date(email.receivedAt).toLocaleString()}, ${email.from} wrote:<br/><blockquote>${email.bodyHtml || email.bodyText}</blockquote>`,
+      inReplyTo: email.externalId,
+      references: email.references || email.externalId,
+    });
+    setComposeOpen(true);
+  }, []);
+
+  // Handle Forward - open ComposeDialog
+  const handleForwardLocal = useCallback((email: Email) => {
+    setComposeMode('forward');
+    setComposePrefill({
+      subject: email.subject.startsWith('Fwd:') ? email.subject : `Fwd: ${email.subject}`,
+      body: `<br/><br/>---------- Forwarded message ---------<br/>From: ${email.from}<br/>Date: ${new Date(email.receivedAt).toLocaleString()}<br/>Subject: ${email.subject}<br/>To: ${email.to?.join(', ') || ''}<br/><br/>${email.bodyHtml || email.bodyText}`,
+    });
+    setComposeOpen(true);
+  }, []);
+
 
   return (
     <>
@@ -874,9 +918,9 @@ export function Mailbox() {
               onToggleStar={handleToggleStar}
               onArchive={(id) => handleArchive([id])}
               onDelete={handleDelete}
-              onReply={handleReply}
-              onReplyAll={handleReply}
-              onForward={handleForward}
+              onReply={handleReplyLocal}
+              onReplyAll={handleReplyAllLocal}
+              onForward={handleForwardLocal}
             />
           ) : undefined
         }
@@ -903,14 +947,23 @@ export function Mailbox() {
       {/* Compose Dialog */}
       <ComposeDialog
         open={composeOpen}
+        mode={composeMode}
         defaultProviderId={defaultProviderId}
-        onClose={() => setComposeOpen(false)}
+        prefillData={composePrefill}
+        onClose={() => {
+          setComposeOpen(false);
+          setComposeMode('compose');
+          setComposePrefill(null);
+        }}
         onSent={() => {
           setSnackbar({
             open: true,
             message: t.dashboard.email.messages.emailSent,
             severity: 'success',
           });
+          setComposeOpen(false);
+          setComposeMode('compose');
+          setComposePrefill(null);
           handleRefresh(); // Refresh email list
         }}
         onError={(message) => {
