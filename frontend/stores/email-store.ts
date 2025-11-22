@@ -84,6 +84,9 @@ interface EmailState {
   // Multi-selection
   selectedIds: Set<string>;
 
+  // Thread support
+  threads: Map<string, string[]>; // threadId -> emailIds[]
+
   // Actions
   setEmails: (emails: Email[]) => void;
   appendEmails: (emails: Email[]) => void;
@@ -93,6 +96,11 @@ interface EmailState {
   setSelectedEmail: (email: Email | null) => void;
   setUnreadCount: (count: number) => void;
   setLoading: (loading: boolean) => void;
+
+  // Thread actions
+  updateThread: (threadId: string, emailIds: string[]) => void;
+  getThreadEmails: (threadId: string) => Email[];
+  getEmailThread: (emailId: string) => Email[];
 
   // Filtering and search
   setFilters: (filters: EmailFilter) => void;
@@ -120,7 +128,7 @@ interface EmailState {
   reset: () => void;
 }
 
-export const useEmailStore = create<EmailState>((set) => ({
+export const useEmailStore = create<EmailState>((set, get) => ({
   emails: [],
   unreadCount: 0,
   selectedEmail: null,
@@ -134,6 +142,7 @@ export const useEmailStore = create<EmailState>((set) => ({
     hasMore: false,
   },
   selectedIds: new Set<string>(),
+  threads: new Map<string, string[]>(),
 
   setEmails: (emails) => set({ emails }),
 
@@ -286,6 +295,33 @@ export const useEmailStore = create<EmailState>((set) => ({
       ),
     })),
 
+  // Thread actions
+  updateThread: (threadId, emailIds) =>
+    set((state) => {
+      const newThreads = new Map(state.threads);
+      newThreads.set(threadId, emailIds);
+      return { threads: newThreads };
+    }),
+
+  getThreadEmails: (threadId) => {
+    const state = get();
+    const emailIds = state.threads.get(threadId) || [];
+    return state.emails.filter((email) => emailIds.includes(email.id));
+  },
+
+  getEmailThread: (emailId) => {
+    const state = get();
+    const email = state.emails.find((e) => e.id === emailId);
+    if (!email || !email.threadId) return email ? [email] : [];
+
+    const threadEmailIds = state.threads.get(email.threadId) || [];
+    if (threadEmailIds.length === 0) return [email];
+
+    return state.emails
+      .filter((e) => threadEmailIds.includes(e.id))
+      .sort((a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime());
+  },
+
   reset: () =>
     set({
       emails: [],
@@ -301,5 +337,6 @@ export const useEmailStore = create<EmailState>((set) => ({
         hasMore: false,
       },
       selectedIds: new Set<string>(),
+      threads: new Map<string, string[]>(),
     }),
 }));

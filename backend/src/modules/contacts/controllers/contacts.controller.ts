@@ -20,11 +20,17 @@ import {
   ListContactsFilters,
 } from '../services/contacts.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../../auth/guards/tenant.guard';
+import { ForbiddenException } from '@nestjs/common';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Controller('contacts')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) {}
+  constructor(
+    private readonly contactsService: ContactsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * List contacts
@@ -106,6 +112,22 @@ export class ContactsController {
    */
   @Post('sync/:providerId')
   async syncProvider(@Req() req: any, @Param('providerId') providerId: string) {
+    const tenantId = req.user.tenantId;
+
+    // ✅ SECURITY: Verify provider ownership before syncing
+    const provider = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+      select: { tenantId: true },
+    });
+
+    if (!provider) {
+      throw new ForbiddenException('Provider not found');
+    }
+
+    if (provider.tenantId !== tenantId) {
+      throw new ForbiddenException('Access denied: You can only sync your own providers');
+    }
+
     const synced = await this.contactsService.syncContacts(providerId);
     return {
       success: true,

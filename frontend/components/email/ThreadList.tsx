@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 import { List, Box, Typography, CircularProgress } from '@mui/material';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { ThreadListItem } from './ThreadListItem';
-import type { Email } from '@/stores/email-store';
+import { useEmailStore, type Email } from '@/stores/email-store';
 import type { Conversation } from '@/lib/api/email';
 
 /**
@@ -134,6 +134,27 @@ export const ThreadList: React.FC<ThreadListProps> = ({
   const t = useTranslations();
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  // Get thread data from store for thread count badges
+  const emailStore = useEmailStore();
+
+  // Enhance threads with email count for thread conversations
+  const threadsWithCount = useMemo(() => {
+    return threads.map(thread => {
+      if ('providerId' in thread && thread.threadId) {
+        // This is an Email with a threadId - check if it's part of a multi-email thread
+        const threadEmails = emailStore.getThreadEmails(thread.threadId);
+        if (threadEmails.length > 1) {
+          // Add emailCount property for display (this is what ThreadListItem looks for)
+          return {
+            ...thread,
+            emailCount: threadEmails.length,
+          } as Email & { emailCount: number };
+        }
+      }
+      return thread;
+    });
+  }, [threads, emailStore]);
+
   const handleThreadClick = useCallback(
     (thread: Email | Conversation) => {
       onThreadClick?.(thread);
@@ -240,7 +261,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         },
       }}
     >
-      {threads.map((thread) => {
+      {threadsWithCount.map((thread) => {
         const threadId = ('threadId' in thread ? thread.threadId : thread.id) || '';
 
         return (

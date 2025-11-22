@@ -22,11 +22,18 @@ export class GdprService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getStatus(): Promise<GdprStatusDto> {
+  /**
+   * Get GDPR compliance status
+   * @param tenantId - Optional tenant ID to filter stats (admin sees own tenant, super-admin sees all)
+   */
+  async getStatus(tenantId?: string): Promise<GdprStatusDto> {
+    // If tenantId provided, filter stats by tenant
+    const tenantFilter = tenantId ? { tenantId } : {};
+
     const [totalUsers, softDeletedUsers, auditLogEntries] = await this.prisma.$transaction([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { deletedAt: { not: null } } }),
-      this.prisma.auditLog.count(),
+      this.prisma.user.count({ where: tenantFilter }),
+      this.prisma.user.count({ where: { ...tenantFilter, deletedAt: { not: null } } }),
+      this.prisma.auditLog.count({ where: tenantFilter }),
     ]);
 
     const checks: GdprCheckDto[] = [

@@ -14,9 +14,10 @@ import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { useEmailStore, type Email } from '@/stores/email-store';
-import { useLabelStore } from '@/stores/label-store';
+import { useAuthStore } from '@/stores/auth-store';
 import { useEmailActions } from '@/hooks/use-email-actions';
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation';
+import { useWebSocket } from '@/hooks/use-websocket';
 import { normalizeFolderName, getFolderIcon as getIconForFolderUtil } from '@/lib/utils/folder-normalization';
 
 // Components
@@ -76,7 +77,7 @@ export function Mailbox() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // Auth store - for WebSocket token
-  //const { token } = useAuthStore();
+  const { token } = useAuthStore();
 
   // Store state
   const {
@@ -97,11 +98,8 @@ export function Mailbox() {
     markAsImportant: storeMarkAsImportant,
   } = useEmailStore();
 
-  // Label store
-  const { labels } = useLabelStore();
-
   // WebSocket for real-time updates (email events, folder counts, etc.)
-  //useWebSocket(token, true);
+  useWebSocket(token, true);
 
   // Local state for folders and UI
   const [remoteFolders, setRemoteFolders] = useState<FolderItem[]>([]);
@@ -474,55 +472,29 @@ export function Mailbox() {
     }
   }, [combinedFolders, selectedFolderId, searchQuery, advancedFilters, setEmails, setLoading, setSelectedEmail]);
 
-  // Handle label changes
+  // Handle label changes - backend always returns updated email
   const handleLabelsChange = useCallback(async (emailId: string, labelIds: string[], updatedEmail?: any) => {
+    if (!updatedEmail) {
+      console.warn('[Mailbox] No updated email provided - this should not happen');
+      return;
+    }
+
     console.log('[Mailbox] handleLabelsChange:', {
       emailId,
       labelIds,
       updatedEmail,
     });
 
-    // If we have the updated email from backend, use it directly
-    if (updatedEmail) {
-      // Update email in store with backend data
-      setEmails(
-        storeEmails.map(email =>
-          email.id === emailId ? updatedEmail : email
-        )
-      );
+    // Update email in store with backend data
+    setEmails(
+      storeEmails.map(email =>
+        email.id === emailId ? updatedEmail : email
+      )
+    );
 
-      // Also update selected email if it's the one being modified
-      if (storeSelectedEmail?.id === emailId) {
-        setSelectedEmail(updatedEmail);
-      }
-    } else {
-      // Fallback: Build emailLabels structure from label IDs (backward compatibility)
-      const emailLabels = labelIds.map(labelId => {
-        const label = labels.find(l => l.id === labelId);
-        return {
-          label: {
-            id: labelId,
-            name: label?.name || '',
-            color: label?.color || null,
-          },
-        };
-      });
-
-      setEmails(
-        storeEmails.map(email =>
-          email.id === emailId
-            ? { ...email, labels: labelIds, emailLabels }
-            : email
-        )
-      );
-
-      if (storeSelectedEmail?.id === emailId) {
-        setSelectedEmail({
-          ...storeSelectedEmail,
-          labels: labelIds,
-          emailLabels,
-        });
-      }
+    // Also update selected email if it's the one being modified
+    if (storeSelectedEmail?.id === emailId) {
+      setSelectedEmail(updatedEmail);
     }
 
     setSnackbar({
@@ -530,7 +502,7 @@ export function Mailbox() {
       message: t.common.save || 'Labels updated',
       severity: 'success',
     });
-  }, [storeEmails, setEmails, storeSelectedEmail, setSelectedEmail, labels, t]);
+  }, [storeEmails, setEmails, storeSelectedEmail, setSelectedEmail, t]);
 
   // Refresh emails
   const handleRefresh = useCallback(async () => {

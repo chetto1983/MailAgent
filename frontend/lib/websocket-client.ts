@@ -224,6 +224,18 @@ class WebSocketClient {
     return () => this.socket?.off('email:thread_update', handler);
   }
 
+  onEmailBatchProcessed(handler: EventHandler<{
+    providerId: string;
+    processed: number;
+    created?: number;
+    syncType?: 'full' | 'incremental';
+    timestamp: string;
+  }>): () => void {
+    if (!this.socket) return () => {};
+    this.socket.on('email:batch_processed', handler);
+    return () => this.socket?.off('email:batch_processed', handler);
+  }
+
   /**
    * CALENDAR EVENTS
    */

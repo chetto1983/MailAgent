@@ -11,6 +11,7 @@ import type { SendEmailData } from '../../providers/interfaces/email-provider.in
 export interface SendEmailDto {
   tenantId: string;
   providerId: string;
+  threadId?: string;
   to: string[];
   cc?: string[];
   bcc?: string[];
@@ -142,6 +143,7 @@ export class EmailSendService {
         tenantId: data.tenantId,
         providerId,
         externalId: messageId,
+        threadId: data.threadId,
         messageId,
         from: '', // Will be filled in by next sync
         to: data.to,
@@ -211,6 +213,7 @@ export class EmailSendService {
       ...data,
       tenantId,
       providerId: originalEmail.providerId,
+      threadId: originalEmail.threadId ?? undefined,
       inReplyTo: originalEmail.messageId || undefined,
       references,
     });
@@ -262,6 +265,7 @@ ${originalEmail.bodyText || ''}
       ...data,
       tenantId,
       providerId: originalEmail.providerId,
+      threadId: originalEmail.threadId ?? undefined,
       subject,
       bodyHtml,
       bodyText,

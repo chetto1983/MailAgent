@@ -22,7 +22,7 @@ export function useWebSocket(token: string | null, enabled = true) {
   const isConnectedRef = useRef(false);
 
   // Store actions
-  const { addEmail, updateEmail, deleteEmail, setUnreadCount } = useEmailStore();
+  const { addEmail, updateEmail, deleteEmail, setUnreadCount, updateThread } = useEmailStore();
   const { addEvent, updateEvent, deleteEvent } = useCalendarStore();
   const { addContact, updateContact, deleteContact } = useContactStore();
   const { updateFolderCounts } = useFoldersStore();
@@ -75,6 +75,15 @@ export function useWebSocket(token: string | null, enabled = true) {
 
     const unsubEmailUpdate = websocketClient.onEmailUpdate((data) => {
       console.log('[WS] Email update:', data);
+
+      // Handle complete email object (new format from labels service)
+      if (data.email) {
+        // Replace the entire email with the updated version from backend
+        updateEmail(data.emailId || data.email.id, data.email);
+        return;
+      }
+
+      // Handle partial updates (legacy format)
       if (data.emailId && data.updates) {
         // If the email has moved folder, remove it from the current list to avoid stale UI
         if (data.updates.folder) {
@@ -103,6 +112,24 @@ export function useWebSocket(token: string | null, enabled = true) {
         totalCount: data.totalCount,
         unreadCount: data.unreadCount,
         folderName: data.folderName,
+      });
+    });
+
+    const unsubThreadUpdate = websocketClient.onThreadUpdate((data) => {
+      console.log('[WS] Thread update:', data);
+      if (data.threadId && data.emailIds) {
+        updateThread(data.threadId, data.emailIds);
+      }
+    });
+
+    const unsubBatchProcessed = websocketClient.onEmailBatchProcessed((data) => {
+      console.log('[WS] Email batch processed:', data);
+      // Update sync status with batch info
+      setSyncStatus({
+        providerId: data.providerId,
+        status: 'completed',
+        progress: 100,
+        timestamp: data.timestamp,
       });
     });
 
@@ -170,6 +197,8 @@ export function useWebSocket(token: string | null, enabled = true) {
       unsubEmailDelete();
       unsubUnreadCount();
       unsubFolderCounts();
+      unsubThreadUpdate();
+      unsubBatchProcessed();
       unsubCalendarNew();
       unsubCalendarUpdate();
       unsubCalendarDelete();
@@ -188,6 +217,7 @@ export function useWebSocket(token: string | null, enabled = true) {
     updateEmail,
     deleteEmail,
     setUnreadCount,
+    updateThread,
     addEvent,
     updateEvent,
     deleteEvent,

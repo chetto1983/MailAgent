@@ -356,7 +356,9 @@ export class EmailsService {
       this.logger.error(`Failed to sync email update to provider: ${error.message}`);
     });
 
-    return updated;
+    // Return complete email with all relationships
+    const [updatedEmail] = await this.getEmailsByIds([id], tenantId);
+    return updatedEmail || updated;
   }
 
   /**
@@ -521,6 +523,9 @@ export class EmailsService {
     dto: {
       id?: string;
       providerId: string;
+      threadId?: string;
+      inReplyTo?: string;
+      references?: string;
       to?: string[];
       cc?: string[];
       bcc?: string[];
@@ -541,10 +546,10 @@ export class EmailsService {
       tenantId,
       providerId: dto.providerId,
       externalId: dto.id ?? `draft-${Date.now()}`,
-      threadId: null,
+      threadId: dto.threadId ?? null,
       messageId: null,
-      inReplyTo: null,
-      references: null,
+      inReplyTo: dto.inReplyTo ?? null,
+      references: dto.references ?? null,
       from: '',
       to: dto.to ?? [],
       cc: dto.cc ?? [],
@@ -668,7 +673,9 @@ export class EmailsService {
       this.logger.error(`Failed to sync bulk read update to provider: ${error.message}`);
     });
 
-    return { updated: result.count };
+    // Return updated emails with all relationships
+    const updatedEmails = await this.getEmailsByIds(emailIds, tenantId);
+    return { updated: result.count, emails: updatedEmails };
   }
 
   /**
@@ -1013,7 +1020,9 @@ export class EmailsService {
       this.logger.error(`Failed to sync bulk starred update to provider: ${error.message}`);
     });
 
-    return { updated: result.count };
+    // Return updated emails with all relationships
+    const updatedEmails = await this.getEmailsByIds(emailIds, tenantId);
+    return { updated: result.count, emails: updatedEmails };
   }
 
   /**
@@ -1060,7 +1069,9 @@ export class EmailsService {
       this.logger.error(`Failed to sync bulk flagged update to provider: ${error.message}`);
     });
 
-    return { updated: result.count };
+    // Return updated emails with all relationships
+    const updatedEmails = await this.getEmailsByIds(emailIds, tenantId);
+    return { updated: result.count, emails: updatedEmails };
   }
 
   /**
@@ -1129,7 +1140,9 @@ export class EmailsService {
       this.logger.error(`Failed to sync bulk move to provider: ${error.message}`);
     });
 
-    return { updated: result.count };
+    // Return updated emails with all relationships
+    const updatedEmails = await this.getEmailsByIds(emailIds, tenantId);
+    return { updated: result.count, emails: updatedEmails };
   }
 
   /**
@@ -1168,7 +1181,9 @@ export class EmailsService {
       skipDuplicates: true,
     });
 
-    return { updated: result.count };
+    // Return updated emails with all relationships
+    const updatedEmails = await this.getEmailsByIds(emailIds, tenantId);
+    return { updated: result.count, emails: updatedEmails };
   }
 
   /**
@@ -1186,6 +1201,8 @@ export class EmailsService {
       },
     });
 
-    return { deleted: result.count };
+    // Return updated emails with all relationships
+    const updatedEmails = await this.getEmailsByIds(emailIds, tenantId);
+    return { deleted: result.count, emails: updatedEmails };
   }
 }

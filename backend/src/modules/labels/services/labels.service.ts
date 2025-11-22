@@ -7,6 +7,7 @@ import {
 import { Prisma, PrismaPromise } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmailsService } from '../../email/services/emails.service';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import {
   AddEmailsToLabelDto,
   CreateLabelDto,
@@ -19,6 +20,7 @@ export class LabelsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailsService: EmailsService,
+    private readonly realtimeEvents: RealtimeEventsService,
   ) {}
 
   async findAllByTenant(tenantId: string) {
@@ -205,6 +207,17 @@ export class LabelsService {
       tenantId,
     );
 
+    // Emit realtime events for each updated email
+    updatedEmails.forEach((email) => {
+      this.realtimeEvents.emitEmailUpdate(tenantId, {
+        emailId: email.id,
+        providerId: email.providerId,
+        folder: email.folder,
+        reason: 'labels-updated',
+        email: email as any, // Include complete email object for frontend
+      });
+    });
+
     return { count: validEmails.length, emails: updatedEmails };
   }
 
@@ -228,7 +241,20 @@ export class LabelsService {
       tenantId,
     );
 
-    return updatedEmails[0] || null;
+    const updatedEmail = updatedEmails[0];
+
+    // Emit realtime event
+    if (updatedEmail) {
+      this.realtimeEvents.emitEmailUpdate(tenantId, {
+        emailId: updatedEmail.id,
+        providerId: updatedEmail.providerId,
+        folder: updatedEmail.folder,
+        reason: 'labels-updated',
+        email: updatedEmail as any, // Include complete email object for frontend
+      });
+    }
+
+    return updatedEmail || null;
   }
 
   async getEmailsForLabel(tenantId: string, labelId: string) {

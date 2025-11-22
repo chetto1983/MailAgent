@@ -1,17 +1,30 @@
-import { Controller, Get } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { GdprService } from '../services/gdpr.service';
 import { GdprStatusDto } from '../dto/gdpr-status.dto';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { AuthenticatedRequest } from '../../../common/types/request.types';
 
 @ApiTags('Compliance')
+@ApiBearerAuth()
 @Controller('compliance/gdpr')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class GdprController {
   constructor(private readonly gdprService: GdprService) {}
 
+  /**
+   * Get GDPR compliance status
+   * SECURITY: Requires admin or super-admin role
+   * Returns status for user's tenant only
+   */
   @Get('status')
-  @ApiOperation({ summary: 'Get GDPR compliance status' })
+  @Roles('admin', 'super-admin')
+  @ApiOperation({ summary: 'Get GDPR compliance status (admin only)' })
   @ApiOkResponse({ type: GdprStatusDto })
-  getStatus(): Promise<GdprStatusDto> {
-    return this.gdprService.getStatus();
+  getStatus(@Request() req: AuthenticatedRequest): Promise<GdprStatusDto> {
+    // ✅ Security: Return status for user's tenant only
+    return this.gdprService.getStatus(req.user.tenantId);
   }
 }
