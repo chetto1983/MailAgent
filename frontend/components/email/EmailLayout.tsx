@@ -98,7 +98,8 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
             borderColor: 'divider',
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
+            overflowX: 'hidden', // Hide horizontal overflow
+            overflowY: 'visible', // Allow vertical scrolling for inner components
             flexShrink: 0,
             bgcolor: 'background.paper',
           }}
@@ -118,6 +119,9 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
             '& .MuiDrawer-paper': {
               width: isVerySmallMobile ? 'calc(100vw - 56px)' : 280,
               maxWidth: 280,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
               boxSizing: 'border-box',
             },
           }}
@@ -137,7 +141,8 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
           borderColor: 'divider',
           display: isMobile && showDetail ? 'none' : 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
+          overflowX: 'hidden', // Hide horizontal overflow
+          overflowY: 'visible', // Allow vertical scrolling for inner components
           bgcolor: 'background.default',
         }}
       >
@@ -153,7 +158,8 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
             minWidth: 0, // Allow flex shrink
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
+            overflowX: 'hidden', // Hide horizontal overflow
+            overflowY: 'visible', // Allow vertical scrolling for inner components
             position: isMobile ? 'fixed' : 'relative',
             top: isMobile ? 0 : 'auto',
             left: isMobile ? 0 : 'auto',

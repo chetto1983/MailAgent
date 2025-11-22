@@ -247,6 +247,23 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
           flex: 1,
           overflow: 'auto',
           p: 3,
+          // Scrollbar per Firefox
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'divider background.paper',
+          // Scrollbar per Chrome, Safari, Edge
+          '&::-webkit-scrollbar': {
+            width: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            bgcolor: 'background.paper',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            bgcolor: 'divider',
+            borderRadius: '4px',
+            '&:hover': {
+              bgcolor: 'text.disabled',
+            },
+          },
         }}
       >
         {/* Subject */}

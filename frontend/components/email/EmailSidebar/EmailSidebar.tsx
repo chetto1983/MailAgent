@@ -257,8 +257,11 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
   };
 
   // Get live count for a folder
-  const getFolderCount = (folderId: string): number | undefined => {
-    const liveCounts = countsByFolderId[folderId];
+  const getFolderCount = (folderId: string, providerId?: string): number | undefined => {
+    // If providerId is provided, use it to construct the composite key
+    // The store saves counts with key: `${providerId}:${folderId}`
+    const key = providerId ? `${providerId}:${folderId}` : folderId;
+    const liveCounts = countsByFolderId[key];
     return liveCounts?.unreadCount;
   };
 
@@ -467,8 +470,31 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
       )}
 
       {/* Folders List */}
-      <List sx={{ px: 1, pb: 1 }}>
-        {loading ? (
+      <Box
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          // Scrollbar per Firefox
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'divider background.paper',
+          // Scrollbar per Chrome, Safari, Edge
+          '&::-webkit-scrollbar': {
+            width: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            bgcolor: 'background.paper',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            bgcolor: 'divider',
+            borderRadius: '4px',
+            '&:hover': {
+              bgcolor: 'text.disabled',
+            },
+          },
+        }}
+      >
+        <List sx={{ px: 1, pb: 1 }}>
+          {loading ? (
           <Box sx={{ px: 1, py: 2 }}>
             {[...Array(3)].map((_, groupIndex) => (
               <Box key={groupIndex} sx={{ mb: 3 }}>
@@ -529,7 +555,7 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
               <AccordionDetails sx={{ p: 0 }}>
                 <List sx={{ py: 0 }}>
                   {group.folders.map((folder) => {
-                    const displayCount = getFolderCount(folder.id) ?? folder.count;
+                    const displayCount = getFolderCount(folder.id, folder.providerId) ?? folder.count;
                     const isSelected = selectedFolderId === folder.id;
 
                     return (
@@ -547,10 +573,8 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
             </Accordion>
           ))
         )}
-      </List>
-
-      {/* Spacer to push content to top */}
-      <Box sx={{ flex: 1 }} />
+        </List>
+      </Box>
     </Paper>
   );
 };

@@ -699,3 +699,5 @@ esempio/Zero-main/scripts/seed-style/styles/genz_emails.json
 esempio/Zero-main/scripts/seed-style/styles/persuasive_emails.json
 esempio/Zero-main/scripts/seed-style/styles/professional_emails.json
 esempio/Zero-main/scripts/send-emails/index.ts
+NUL
+.claude/settings.local.json

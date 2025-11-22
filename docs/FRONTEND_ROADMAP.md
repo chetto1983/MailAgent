@@ -282,6 +282,13 @@ hitl:approval_denied
   - Verify all package.json dependencies are installed
   - **Files**: `package.json`
 
+- [x] **Custom Scrollbar UX** ✅ **COMPLETED 2025-11-22**
+  - Added custom styled scrollbars (8px, themed) ✅
+  - Applied to folder list in EmailSidebar ✅
+  - Applied to email body in ThreadDisplay ✅
+  - Fixed parent container overflow issues in EmailLayout ✅
+  - **Files**: `EmailSidebar.tsx`, `ThreadDisplay.tsx`, `EmailLayout.tsx` ✅
+
 ---
 
 ### Phase 2: Complete Feature Implementation (3 weeks)
@@ -289,6 +296,12 @@ hitl:approval_denied
 #### Week 3: Email Advanced Features
 
 **Goal**: Leverage all backend email capabilities
+
+- [x] **HTML Email Rendering** ✅ **COMPLETED 2025-11-22**
+  - Fixed API to return `bodyHtml`, `bodyText` fields ✅
+  - Emails now render with HTML formatting and images ✅
+  - DOMPurify sanitization maintained for XSS protection ✅
+  - **Files**: `emails.service.ts` (backend), `ThreadDisplay.tsx` (frontend) ✅
 
 - [ ] **Implement Email Labels/Tags**
   - Add label UI in email detail
@@ -393,11 +406,14 @@ hitl:approval_denied
   - **WS**: `sync:status` event
   - **Files**: `components/layout/Header.tsx`, `stores/sync-store.ts`
 
-- [ ] **Live Folder Counts**
-  - Update unread counts via WebSocket
-  - Animate count changes
-  - **WS**: `email:folder_counts_update`
-  - **Files**: `components/email/EmailSidebar/`, `stores/folders-store.ts`
+- [x] **Live Folder Counts** ✅ **COMPLETED 2025-11-22**
+  - Update unread counts via WebSocket ✅
+  - Animate count changes ✅
+  - **WS**: `email:folder_counts_update` ✅
+  - **Files**: `components/email/EmailSidebar/`, `stores/folders-store.ts` ✅
+  - **Backend**: Added `updateFolderCounts()` to all email operations ✅
+  - **Optimization**: Events only emitted for active tenants ✅
+  - **Bug Fix**: Fixed store key mismatch (`${providerId}:${folderId}`) ✅
 
 - [ ] **Desktop Notifications**
   - Request notification permission
@@ -654,5 +670,16 @@ NEXTAUTH_SECRET=<secret>
 
 ---
 
-**Last Updated**: 2025-11-20
+## 📝 Recent Updates
+
+### 2025-11-22 Session
+- ✅ Completed **Live Folder Counts** (Phase 3, Week 6)
+- ✅ Completed **HTML Email Rendering** (Phase 2, Week 3)
+- ✅ Completed **Custom Scrollbar UX** (Phase 1, Week 2)
+- 🐛 Fixed 5 critical bugs (folder counts, store keys, WebSocket namespace, API fields, overflow)
+- 📊 Full session details: [`SESSION_SUMMARY_2025-11-22.md`](./archive/testing/SESSION_SUMMARY_2025-11-22.md)
+
+---
+
+**Last Updated**: 2025-11-22
 **Maintained By**: MailAgent Development Team

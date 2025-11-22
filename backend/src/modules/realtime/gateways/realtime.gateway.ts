@@ -160,13 +160,27 @@ export class RealtimeGateway
    * @returns true se ci sono client connessi per questo tenant
    */
   hasTenantConnections(tenantId: string): boolean {
-    if (!this.server || !this.server.sockets || !this.server.sockets.adapter) {
+    // Check if server is initialized and has the 'of' method
+    if (!this.server || typeof this.server.of !== 'function') {
       return false;
     }
 
-    const room = buildTenantRoom(tenantId);
-    const roomSize = this.server.sockets.adapter.rooms.get(room)?.size || 0;
-    return roomSize > 0;
+    try {
+      // Use the /realtime namespace, not the default namespace
+      const namespace = this.server.of('/realtime');
+      if (!namespace || !namespace.adapter) {
+        return false;
+      }
+
+      const room = buildTenantRoom(tenantId);
+      const roomSize = namespace.adapter.rooms.get(room)?.size || 0;
+
+      return roomSize > 0;
+    } catch (error) {
+      // If anything fails, assume no connections to avoid breaking the sync
+      this.logger.debug(`hasTenantConnections error: ${error}`);
+      return false;
+    }
   }
 
   /**
