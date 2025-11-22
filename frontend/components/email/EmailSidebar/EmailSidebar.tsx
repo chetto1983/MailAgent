@@ -29,6 +29,7 @@ import { useRouter } from 'next/router';
 import { useFoldersStore } from '@/stores/folders-store';
 import { useLabelStore } from '@/stores/label-store';
 import { useTranslations } from '@/lib/hooks/use-translations';
+import { labelColorToHex } from '@/lib/api/labels';
 
 /**
  * Folder item with provider info
@@ -437,13 +438,13 @@ export const EmailSidebar: React.FC<EmailSidebarProps> = ({
                         minWidth: 36,
                       }}
                     >
-                      <Tag size={18} color={label.color} />
+                      <Tag size={18} color={labelColorToHex(label.color)} />
                     </ListItemIcon>
                     <Chip
                       label={label.name}
                       size="small"
                       sx={{
-                        bgcolor: label.color,
+                        bgcolor: labelColorToHex(label.color),
                         color: '#fff',
                         fontWeight: 500,
                         fontSize: '0.75rem',
