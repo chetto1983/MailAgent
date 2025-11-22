@@ -69,18 +69,18 @@ export class LabelsController {
     @Param('id') labelId: string,
     @Body() dto: AddEmailsToLabelDto,
   ) {
-    const count = await this.labelsService.addEmailsToLabel(req.user.tenantId, labelId, dto);
-    return { count };
+    const result = await this.labelsService.addEmailsToLabel(req.user.tenantId, labelId, dto);
+    return result;
   }
 
   @Delete(':id/emails/:emailId')
-  @HttpCode(HttpStatus.NO_CONTENT)
   async removeEmail(
     @Req() req: AuthenticatedRequest,
     @Param('id') labelId: string,
     @Param('emailId') emailId: string,
   ) {
-    await this.labelsService.removeEmailFromLabel(req.user.tenantId, labelId, emailId);
+    const email = await this.labelsService.removeEmailFromLabel(req.user.tenantId, labelId, emailId);
+    return { email };
   }
 
   @Get(':id/emails')

@@ -151,7 +151,7 @@ export const labelsApi = {
    * Add emails to a label
    * POST /labels/:id/emails
    */
-  async addEmailsToLabel(labelId: string, dto: AddEmailsToLabelDto): Promise<{ count: number }> {
+  async addEmailsToLabel(labelId: string, dto: AddEmailsToLabelDto): Promise<{ count: number; emails: any[] }> {
     const response = await apiClient.post(`/labels/${labelId}/emails`, dto);
     return response.data;
   },
@@ -160,8 +160,9 @@ export const labelsApi = {
    * Remove an email from a label
    * DELETE /labels/:id/emails/:emailId
    */
-  async removeEmailFromLabel(labelId: string, emailId: string): Promise<void> {
-    await apiClient.delete(`/labels/${labelId}/emails/${emailId}`);
+  async removeEmailFromLabel(labelId: string, emailId: string): Promise<{ email: any }> {
+    const response = await apiClient.delete(`/labels/${labelId}/emails/${emailId}`);
+    return response.data;
   },
 
   /**

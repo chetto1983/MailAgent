@@ -262,6 +262,49 @@ export class EmailsService {
   }
 
   /**
+   * Get multiple emails by IDs
+   */
+  async getEmailsByIds(ids: string[], tenantId: string) {
+    const emails = await this.prisma.email.findMany({
+      where: {
+        id: { in: ids },
+        tenantId,
+      },
+      include: {
+        provider: {
+          select: {
+            id: true,
+            email: true,
+            providerType: true,
+          },
+        },
+        attachments: {
+          select: {
+            id: true,
+            filename: true,
+            size: true,
+            mimeType: true,
+            isInline: true,
+          },
+        },
+        emailLabels: {
+          select: {
+            label: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return emails;
+  }
+
+  /**
    * Update email flags - syncs back to provider
    */
   async updateEmail(

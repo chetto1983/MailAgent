@@ -86,7 +86,7 @@ interface ThreadDisplayProps {
   /**
    * Callback when labels change
    */
-  onLabelsChange?: (emailId: string, labelIds: string[]) => void;
+  onLabelsChange?: (emailId: string, labelIds: string[], updatedEmail?: any) => void;
 }
 
 /**
@@ -216,18 +216,32 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
     const removed = currentLabels.filter(id => !labelIds.includes(id));
 
     try {
+      let updatedEmail = email;
+
       // Add new labels
-      for (const labelId of added) {
-        await addEmailsToLabel(labelId, [email.id]);
+      if (added.length > 0) {
+        for (const labelId of added) {
+          const result = await addEmailsToLabel(labelId, [email.id]);
+          // Use the returned email data (first one since we only added one email)
+          if (result.emails && result.emails.length > 0) {
+            updatedEmail = result.emails[0];
+          }
+        }
       }
 
       // Remove old labels
-      for (const labelId of removed) {
-        await removeEmailFromLabel(labelId, email.id);
+      if (removed.length > 0) {
+        for (const labelId of removed) {
+          const result = await removeEmailFromLabel(labelId, email.id);
+          // Use the returned email data
+          if (result.email) {
+            updatedEmail = result.email;
+          }
+        }
       }
 
-      // Notify parent
-      onLabelsChange?.(email.id, labelIds);
+      // Notify parent with the updated email data
+      onLabelsChange?.(email.id, labelIds, updatedEmail);
     } catch (error) {
       console.error('Failed to update labels:', error);
     }

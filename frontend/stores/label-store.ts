@@ -12,8 +12,8 @@ interface LabelStore {
   updateLabel: (labelId: string, name?: string, colorHex?: string) => Promise<Label>;
   deleteLabel: (labelId: string) => Promise<void>;
   reorderLabels: (labelIds: string[]) => Promise<void>;
-  addEmailsToLabel: (labelId: string, emailIds: string[]) => Promise<void>;
-  removeEmailFromLabel: (labelId: string, emailId: string) => Promise<void>;
+  addEmailsToLabel: (labelId: string, emailIds: string[]) => Promise<{ count: number; emails: any[] }>;
+  removeEmailFromLabel: (labelId: string, emailId: string) => Promise<{ email: any }>;
 
   // Helpers
   getLabelById: (labelId: string) => Label | undefined;
@@ -116,7 +116,8 @@ export const useLabelStore = create<LabelStore>((set, get) => ({
 
   addEmailsToLabel: async (labelId: string, emailIds: string[]) => {
     try {
-      await labelsApi.addEmailsToLabel(labelId, { emailIds });
+      const result = await labelsApi.addEmailsToLabel(labelId, { emailIds });
+      return result;
     } catch (error) {
       console.error('Failed to add emails to label:', error);
       throw error;
@@ -125,7 +126,8 @@ export const useLabelStore = create<LabelStore>((set, get) => ({
 
   removeEmailFromLabel: async (labelId: string, emailId: string) => {
     try {
-      await labelsApi.removeEmailFromLabel(labelId, emailId);
+      const result = await labelsApi.removeEmailFromLabel(labelId, emailId);
+      return result;
     } catch (error) {
       console.error('Failed to remove email from label:', error);
       throw error;

@@ -174,52 +174,6 @@ export function Mailbox() {
     },
   });
 
-  // Handle label changes
-  const handleLabelsChange = useCallback((emailId: string, labelIds: string[]) => {
-    // Build emailLabels structure from label IDs using label store data
-    const emailLabels = labelIds.map(labelId => {
-      const label = labels.find(l => l.id === labelId);
-      return {
-        label: {
-          id: labelId,
-          name: label?.name || '',
-          color: label?.color || null,
-        },
-      };
-    });
-
-    console.log('[Mailbox] handleLabelsChange:', {
-      emailId,
-      labelIds,
-      emailLabels,
-      availableLabels: labels,
-    });
-
-    // Update email in store with new labels
-    setEmails(
-      storeEmails.map(email =>
-        email.id === emailId
-          ? { ...email, labels: labelIds, emailLabels }
-          : email
-      )
-    );
-
-    // Also update selected email if it's the one being modified
-    if (storeSelectedEmail?.id === emailId) {
-      setSelectedEmail({
-        ...storeSelectedEmail,
-        labels: labelIds,
-        emailLabels,
-      });
-    }
-
-    setSnackbar({
-      open: true,
-      message: t.common.save || 'Labels updated',
-      severity: 'success',
-    });
-  }, [storeEmails, setEmails, storeSelectedEmail, setSelectedEmail, labels, t]);
-
   // Wrapper to handle both Email and Conversation types
   const handleEmailClick = useCallback((thread: any) => {
     if ('providerId' in thread) {
@@ -519,6 +473,64 @@ export function Mailbox() {
       setLoading(false);
     }
   }, [combinedFolders, selectedFolderId, searchQuery, advancedFilters, setEmails, setLoading, setSelectedEmail]);
+
+  // Handle label changes
+  const handleLabelsChange = useCallback(async (emailId: string, labelIds: string[], updatedEmail?: any) => {
+    console.log('[Mailbox] handleLabelsChange:', {
+      emailId,
+      labelIds,
+      updatedEmail,
+    });
+
+    // If we have the updated email from backend, use it directly
+    if (updatedEmail) {
+      // Update email in store with backend data
+      setEmails(
+        storeEmails.map(email =>
+          email.id === emailId ? updatedEmail : email
+        )
+      );
+
+      // Also update selected email if it's the one being modified
+      if (storeSelectedEmail?.id === emailId) {
+        setSelectedEmail(updatedEmail);
+      }
+    } else {
+      // Fallback: Build emailLabels structure from label IDs (backward compatibility)
+      const emailLabels = labelIds.map(labelId => {
+        const label = labels.find(l => l.id === labelId);
+        return {
+          label: {
+            id: labelId,
+            name: label?.name || '',
+            color: label?.color || null,
+          },
+        };
+      });
+
+      setEmails(
+        storeEmails.map(email =>
+          email.id === emailId
+            ? { ...email, labels: labelIds, emailLabels }
+            : email
+        )
+      );
+
+      if (storeSelectedEmail?.id === emailId) {
+        setSelectedEmail({
+          ...storeSelectedEmail,
+          labels: labelIds,
+          emailLabels,
+        });
+      }
+    }
+
+    setSnackbar({
+      open: true,
+      message: t.common.save || 'Labels updated',
+      severity: 'success',
+    });
+  }, [storeEmails, setEmails, storeSelectedEmail, setSelectedEmail, labels, t]);
 
   // Refresh emails
   const handleRefresh = useCallback(async () => {

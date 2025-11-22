@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, PrismaPromise } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EmailsService } from '../../email/services/emails.service';
 import {
   AddEmailsToLabelDto,
   CreateLabelDto,
@@ -15,7 +16,10 @@ import {
 
 @Injectable()
 export class LabelsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailsService: EmailsService,
+  ) {}
 
   async findAllByTenant(tenantId: string) {
     return this.prisma.userLabel.findMany({
@@ -184,7 +188,7 @@ export class LabelsService {
     });
 
     if (validEmails.length === 0) {
-      return 0;
+      return { count: 0, emails: [] };
     }
 
     await this.prisma.emailLabel.createMany({
@@ -195,7 +199,13 @@ export class LabelsService {
       skipDuplicates: true,
     });
 
-    return validEmails.length;
+    // Get updated emails with emailLabels relationship
+    const updatedEmails = await this.emailsService.getEmailsByIds(
+      uniqueIds,
+      tenantId,
+    );
+
+    return { count: validEmails.length, emails: updatedEmails };
   }
 
   async removeEmailFromLabel(tenantId: string, labelId: string, emailId: string) {
@@ -211,6 +221,14 @@ export class LabelsService {
     await this.prisma.emailLabel.deleteMany({
       where: { labelId, emailId },
     });
+
+    // Get updated email with emailLabels relationship
+    const updatedEmails = await this.emailsService.getEmailsByIds(
+      [emailId],
+      tenantId,
+    );
+
+    return updatedEmails[0] || null;
   }
 
   async getEmailsForLabel(tenantId: string, labelId: string) {
