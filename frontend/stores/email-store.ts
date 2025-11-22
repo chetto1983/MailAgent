@@ -8,6 +8,15 @@ export interface EmailAttachment {
   isInline: boolean;
 }
 
+export interface EmailLabelData {
+  id: string;
+  name: string;
+  color?: {
+    backgroundColor: string;
+    textColor: string;
+  } | null;
+}
+
 export interface Email {
   id: string;
   providerId: string;
@@ -27,7 +36,8 @@ export interface Email {
   isRead: boolean;
   isStarred?: boolean;
   isImportant?: boolean;
-  labels?: string[];
+  labels?: string[]; // Old field for backward compatibility
+  emailLabels?: { label: EmailLabelData }[]; // New relationship field
   folder?: string;
   hasAttachments?: boolean;
   attachments?: EmailAttachment[];

@@ -114,8 +114,8 @@ export const LabelSelectorDialog: React.FC<LabelSelectorDialogProps> = ({
                       label={label.name}
                       size="small"
                       sx={{
-                        bgcolor: label.color,
-                        color: '#fff',
+                        bgcolor: label.color?.backgroundColor || '#9E9E9E',
+                        color: label.color?.textColor || '#fff',
                       }}
                     />
                   </Box>

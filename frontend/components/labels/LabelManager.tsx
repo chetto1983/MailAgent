@@ -19,6 +19,7 @@ import { Plus, Edit2, Trash2, X } from 'lucide-react';
 import { useLabelStore } from '@/stores/label-store';
 import { LabelColorPicker } from './LabelColorPicker';
 import { useTranslations } from '@/lib/hooks/use-translations';
+import { labelColorToHex } from '@/lib/api/labels';
 
 interface LabelManagerProps {
   open: boolean;
@@ -268,7 +269,7 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
                   <Box>
                     <IconButton
                       size="small"
-                      onClick={() => handleStartEdit(label.id, label.name, label.color)}
+                      onClick={() => handleStartEdit(label.id, label.name, labelColorToHex(label.color))}
                       disabled={actionLoading}
                     >
                       <Edit2 size={16} />
@@ -288,8 +289,8 @@ export const LabelManager: React.FC<LabelManagerProps> = ({ open, onClose }) => 
                     label={label.name}
                     size="small"
                     sx={{
-                      bgcolor: label.color,
-                      color: '#fff',
+                      bgcolor: label.color?.backgroundColor || '#9E9E9E',
+                      color: label.color?.textColor || '#fff',
                       fontWeight: 500,
                     }}
                   />

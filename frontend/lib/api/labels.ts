@@ -1,26 +1,83 @@
 import { apiClient } from '../api-client';
 
+// ===== UTILITIES =====
+
+/**
+ * Calculate text color (black or white) based on background color for optimal contrast
+ */
+function getContrastColor(hexColor: string): string {
+  // Remove # if present
+  const color = hexColor.replace('#', '');
+
+  // Convert to RGB
+  const r = parseInt(color.substr(0, 2), 16);
+  const g = parseInt(color.substr(2, 2), 16);
+  const b = parseInt(color.substr(4, 2), 16);
+
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  // Return black for light backgrounds, white for dark backgrounds
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
+
+/**
+ * Convert hex color string to LabelColor object
+ */
+export function hexToLabelColor(hexColor: string): LabelColor {
+  return {
+    backgroundColor: hexColor,
+    textColor: getContrastColor(hexColor),
+  };
+}
+
+/**
+ * Extract backgroundColor from LabelColor object or return hex string
+ */
+export function labelColorToHex(color: LabelColor | null): string {
+  return color?.backgroundColor || '#9E9E9E'; // Default grey
+}
+
 // ===== TYPES =====
+
+export interface LabelColor {
+  backgroundColor: string;
+  textColor: string;
+}
 
 export interface Label {
   id: string;
   tenantId: string;
   name: string;
-  color: string;
-  order: number;
+  slug: string;
+  type: 'SYSTEM' | 'USER';
+  color: LabelColor | null;
+  icon: string | null;
+  parentId: string | null;
+  level: number;
+  orderIndex: number;
+  isArchived: boolean;
   createdAt: string;
   updatedAt: string;
+  children?: Label[];
+  _count?: {
+    emailLabels: number;
+  };
 }
 
 export interface CreateLabelDto {
   name: string;
-  color: string;
-  order?: number;
+  color?: LabelColor;
+  icon?: string;
+  parentId?: string;
 }
 
 export interface UpdateLabelDto {
   name?: string;
-  color?: string;
+  color?: LabelColor | null;
+  icon?: string | null;
+  parentId?: string | null;
+  orderIndex?: number;
 }
 
 export interface AddEmailsToLabelDto {

@@ -150,7 +150,7 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
     // Extract common properties - use same ID logic as ThreadList
     // threadId: for UI/selection (thread.threadId || thread.id)
     // emailId: for API calls (thread.id)
-    const { threadId, emailId, from, subject, snippet, receivedAt, isRead, isStarred, isImportant, labels } =
+    const { threadId, emailId, from, subject, snippet, receivedAt, isRead, isStarred, isImportant, labels, emailLabels } =
       useMemo(() => {
         if (isEmail(thread)) {
           // For Email: threadId for UI, id for API
@@ -166,6 +166,7 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
             isStarred: thread.isStarred || false,
             isImportant: thread.isImportant || false,
             labels: thread.labels || [],
+            emailLabels: thread.emailLabels || undefined,
           };
         } else {
           // For Conversation: use threadId for both (conversations don't have individual email operations)
@@ -180,6 +181,7 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
             isStarred: thread.isStarred || false,
             isImportant: false,
             labels: thread.labels || [],
+            emailLabels: undefined,
           };
         }
       }, [thread]);
@@ -219,6 +221,16 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
 
     // Convert labels to ThreadLabels format
     const labelsData = useMemo(() => {
+      // If emailLabels is available (from API with relationship), use it directly
+      if (emailLabels && emailLabels.length > 0) {
+        return emailLabels.map(el => ({
+          id: el.label.id,
+          name: el.label.name,
+          color: el.label.color,
+        }));
+      }
+
+      // Otherwise, fall back to looking up labels by ID (backward compatibility)
       return labels
         .map((labelId) => {
           const label = getLabelById(labelId);
@@ -230,7 +242,7 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
           };
         })
         .filter((label): label is NonNullable<typeof label> => label !== null);
-    }, [labels, getLabelById]);
+    }, [emailLabels, labels, getLabelById]);
 
     // Get email count for conversations
     const emailCount = isConversation(thread) ? thread.emailCount : undefined;

@@ -2,6 +2,15 @@ import { apiClient } from '../api-client';
 
 // ===== TYPES =====
 
+export type EmailLabel = {
+  id: string;
+  name: string;
+  color?: {
+    backgroundColor: string;
+    textColor: string;
+  } | null;
+};
+
 export type Email = {
   id: string;
   tenantId: string;
@@ -21,7 +30,8 @@ export type Email = {
   bodyHtml?: string;
   snippet?: string;
   folder: string;
-  labels: string[];
+  labels: string[]; // Old field for backward compatibility
+  emailLabels?: { label: EmailLabel }[]; // New relationship field
   isRead: boolean;
   isStarred: boolean;
   isFlagged: boolean;

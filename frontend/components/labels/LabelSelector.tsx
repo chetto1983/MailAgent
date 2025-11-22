@@ -142,8 +142,8 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
                   size="small"
                   label={label.name}
                   sx={{
-                    bgcolor: label.color,
-                    color: '#fff',
+                    bgcolor: label.color?.backgroundColor || '#9E9E9E',
+                    color: label.color?.textColor || '#fff',
                     fontWeight: 500,
                   }}
                 />
@@ -179,14 +179,14 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
           deleteIcon={<X size={14} />}
           disabled={disabled}
           sx={{
-            bgcolor: label.color,
-            color: '#fff',
+            bgcolor: label.color?.backgroundColor || '#9E9E9E',
+            color: label.color?.textColor || '#fff',
             fontWeight: 500,
             '& .MuiChip-icon': {
-              color: '#fff',
+              color: label.color?.textColor || '#fff',
             },
             '& .MuiChip-deleteIcon': {
-              color: '#fff',
+              color: label.color?.textColor || '#fff',
               '&:hover': {
                 color: '#f0f0f0',
               },
@@ -244,8 +244,8 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
                   size="small"
                   label={label.name}
                   sx={{
-                    bgcolor: label.color,
-                    color: '#fff',
+                    bgcolor: label.color?.backgroundColor || '#9E9E9E',
+                    color: label.color?.textColor || '#fff',
                     fontWeight: 500,
                   }}
                 />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Chip } from '@mui/material';
 import { Tag } from 'lucide-react';
+import type { LabelColor } from '@/lib/api/labels';
 
 /**
  * Label data structure
@@ -8,7 +9,7 @@ import { Tag } from 'lucide-react';
 export interface Label {
   id: string;
   name: string;
-  color?: string;
+  color?: LabelColor | null;
 }
 
 /**
@@ -91,11 +92,11 @@ export const ThreadLabels: React.FC<ThreadLabelsProps> = ({
           sx={{
             height: size === 'small' ? 18 : 24,
             fontSize: size === 'small' ? '0.65rem' : '0.75rem',
-            bgcolor: label.color || 'primary.main',
-            color: '#fff',
+            bgcolor: label.color?.backgroundColor || 'primary.main',
+            color: label.color?.textColor || '#fff',
             fontWeight: 500,
             '& .MuiChip-icon': {
-              color: '#fff',
+              color: label.color?.textColor || '#fff',
               marginLeft: size === 'small' ? 0.5 : 1,
             },
             '& .MuiChip-label': {

@@ -189,6 +189,17 @@ export class EmailsService {
               isInline: true,
             },
           },
+          emailLabels: {
+            select: {
+              label: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                },
+              },
+            },
+          },
           provider: {
             select: {
               id: true,
@@ -229,6 +240,17 @@ export class EmailsService {
           },
         },
         attachments: true,
+        emailLabels: {
+          select: {
+            label: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -689,6 +711,17 @@ export class EmailsService {
         isFlagged: true,
         receivedAt: true,
         sentAt: true,
+        emailLabels: {
+          select: {
+            label: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -761,6 +794,17 @@ export class EmailsService {
       orderBy: { receivedAt: 'asc' },
       include: {
         attachments: true,
+        emailLabels: {
+          select: {
+            label: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+              },
+            },
+          },
+        },
       },
     });
 

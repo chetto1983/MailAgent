@@ -19,10 +19,20 @@ import {
   ReplyAll,
   Forward,
   Paperclip,
+  FileText,
+  Image as ImageIcon,
+  Video,
+  Music,
+  FileSpreadsheet,
+  FileCode,
+  FileArchive,
+  File,
 } from 'lucide-react';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import type { Email } from '@/stores/email-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { LabelSelector } from '@/components/labels';
+import { useLabelStore } from '@/stores/label-store';
 
 /**
  * Props for ThreadDisplay component
@@ -72,6 +82,11 @@ interface ThreadDisplayProps {
    * Callback to forward
    */
   onForward?: (email: Email) => void;
+
+  /**
+   * Callback when labels change
+   */
+  onLabelsChange?: (emailId: string, labelIds: string[]) => void;
 }
 
 /**
@@ -102,6 +117,51 @@ function formatEmailDate(date: string | Date): string {
     minute: '2-digit',
     hour12: true,
   });
+}
+
+/**
+ * Get appropriate icon based on file extension
+ */
+function getFileIcon(filename: string, size = 14): React.ReactElement {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+
+  // Documents
+  if (['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'].includes(ext)) {
+    return <FileText size={size} />;
+  }
+
+  // Images
+  if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico'].includes(ext)) {
+    return <ImageIcon size={size} />;
+  }
+
+  // Videos
+  if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv', 'mpeg', 'mpg'].includes(ext)) {
+    return <Video size={size} />;
+  }
+
+  // Audio
+  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(ext)) {
+    return <Music size={size} />;
+  }
+
+  // Spreadsheets
+  if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) {
+    return <FileSpreadsheet size={size} />;
+  }
+
+  // Code
+  if (['js', 'ts', 'tsx', 'jsx', 'html', 'css', 'json', 'xml', 'py', 'java', 'cpp', 'c', 'php', 'rb', 'go', 'rs', 'swift'].includes(ext)) {
+    return <FileCode size={size} />;
+  }
+
+  // Archives
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) {
+    return <FileArchive size={size} />;
+  }
+
+  // Default
+  return <File size={size} />;
 }
 
 /**
@@ -137,13 +197,41 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
   onReply,
   onReplyAll,
   onForward,
+  onLabelsChange,
 }) => {
   const t = useTranslations();
   const { token } = useAuthStore();
+  const { addEmailsToLabel, removeEmailFromLabel } = useLabelStore();
 
   const fromData = useMemo(() => {
     return email ? parseEmailFrom(email.from) : { name: '', email: '' };
   }, [email]);
+
+  const handleLabelsChange = async (labelIds: string[]) => {
+    if (!email) return;
+
+    // Get current label IDs from emailLabels relationship
+    const currentLabels = email.emailLabels?.map(el => el.label.id) || [];
+    const added = labelIds.filter(id => !currentLabels.includes(id));
+    const removed = currentLabels.filter(id => !labelIds.includes(id));
+
+    try {
+      // Add new labels
+      for (const labelId of added) {
+        await addEmailsToLabel(labelId, [email.id]);
+      }
+
+      // Remove old labels
+      for (const labelId of removed) {
+        await removeEmailFromLabel(labelId, email.id);
+      }
+
+      // Notify parent
+      onLabelsChange?.(email.id, labelIds);
+    } catch (error) {
+      console.error('Failed to update labels:', error);
+    }
+  };
 
   // Loading state
   if (isLoading) {
@@ -313,34 +401,38 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
               <strong>Cc:</strong> {email.cc.join(', ')}
             </Typography>
           )}
+
+          {/* Labels */}
+          {onLabelsChange && (
+            <Box sx={{ mt: 2 }}>
+              <LabelSelector
+                selectedLabelIds={email.emailLabels?.map(el => el.label.id) || []}
+                onLabelsChange={handleLabelsChange}
+                variant="chips"
+              />
+            </Box>
+          )}
         </Box>
 
-        {/* Email Body */}
-        <Box
-          sx={{
-            mb: 3,
-            '& img': {
-              maxWidth: '100%',
-              height: 'auto',
-            },
-            '& a': {
-              color: 'primary.main',
-              textDecoration: 'underline',
-            },
-          }}
-          dangerouslySetInnerHTML={{
-            __html: email.bodyHtml || email.bodyText || email.snippet || '',
-          }}
-        />
-
-        {/* Attachments */}
-        {email.attachments && email.attachments.length > 0 && (
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {/* Attachments - Outlook style (before body) */}
+        {email.attachments && email.attachments.length > 0 && email.attachments.filter(a => !a.isInline).length > 0 && (
+          <Paper
+            elevation={0}
+            sx={{
+              mb: 3,
+              p: 2,
+              bgcolor: 'background.default',
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+            }}
+          >
+            <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
               <Paperclip size={16} />
-              Attachments ({email.attachments.filter(a => !a.isInline).length})
+              {email.attachments.filter(a => !a.isInline).length} {t.dashboard.email.attachment}
+              {email.attachments.filter(a => !a.isInline).length > 1 ? 's' : ''}
             </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1, gap: 1 }}>
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
               {email.attachments
                 .filter(attachment => !attachment.isInline)
                 .map((attachment) => {
@@ -353,9 +445,9 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
                     <Chip
                       key={attachment.id}
                       label={`${attachment.filename} (${sizeLabel})`}
-                      size="small"
-                      icon={<Paperclip size={14} />}
-                      onClick={async () => {
+                      size="medium"
+                      icon={getFileIcon(attachment.filename, 14)}
+                      onClick={async (e) => {
                         try {
                           if (!token) {
                             console.error('No auth token found');
@@ -374,28 +466,74 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
                             throw new Error(`Download failed: ${response.status}`);
                           }
 
-                          // Create blob and download
+                          // Create blob and open in new tab or download
                           const blob = await response.blob();
                           const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = attachment.filename;
-                          document.body.appendChild(a);
-                          a.click();
-                          window.URL.revokeObjectURL(url);
-                          document.body.removeChild(a);
+
+                          // Ctrl/Cmd+Click = force download, otherwise open in new tab
+                          if (e.ctrlKey || e.metaKey) {
+                            // Force download
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = attachment.filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                          } else {
+                            // Open in new tab (browser will display if possible, otherwise download)
+                            const newWindow = window.open(url, '_blank');
+                            if (newWindow) {
+                              // Clean up URL after window loads
+                              newWindow.addEventListener('load', () => {
+                                setTimeout(() => window.URL.revokeObjectURL(url), 100);
+                              });
+                            } else {
+                              // Fallback to download if popup blocked
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = attachment.filename;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              window.URL.revokeObjectURL(url);
+                            }
+                          }
                         } catch (error) {
-                          console.error('Failed to download attachment:', error);
-                          alert('Failed to download attachment. Please try again.');
+                          console.error('Failed to open attachment:', error);
+                          alert('Failed to open attachment. Please try again.');
                         }
                       }}
-                      sx={{ cursor: 'pointer' }}
+                      sx={{
+                        cursor: 'pointer',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                        },
+                      }}
                     />
                   );
                 })}
             </Stack>
-          </Box>
+          </Paper>
         )}
+
+        {/* Email Body */}
+        <Box
+          sx={{
+            mb: 3,
+            '& img': {
+              maxWidth: '100%',
+              height: 'auto',
+            },
+            '& a': {
+              color: 'primary.main',
+              textDecoration: 'underline',
+            },
+          }}
+          dangerouslySetInnerHTML={{
+            __html: email.bodyHtml || email.bodyText || email.snippet || '',
+          }}
+        />
       </Box>
     </Box>
   );

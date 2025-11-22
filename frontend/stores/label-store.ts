@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { labelsApi, type Label } from '@/lib/api/labels';
+import { labelsApi, type Label, hexToLabelColor } from '@/lib/api/labels';
 
 interface LabelStore {
   labels: Label[];
@@ -8,8 +8,8 @@ interface LabelStore {
 
   // Actions
   fetchLabels: () => Promise<void>;
-  createLabel: (name: string, color: string) => Promise<Label>;
-  updateLabel: (labelId: string, name?: string, color?: string) => Promise<Label>;
+  createLabel: (name: string, colorHex: string) => Promise<Label>;
+  updateLabel: (labelId: string, name?: string, colorHex?: string) => Promise<Label>;
   deleteLabel: (labelId: string) => Promise<void>;
   reorderLabels: (labelIds: string[]) => Promise<void>;
   addEmailsToLabel: (labelId: string, emailIds: string[]) => Promise<void>;
@@ -38,13 +38,12 @@ export const useLabelStore = create<LabelStore>((set, get) => ({
     }
   },
 
-  createLabel: async (name: string, color: string) => {
+  createLabel: async (name: string, colorHex: string) => {
     set({ isLoading: true, error: null });
     try {
       const response = await labelsApi.createLabel({
         name,
-        color,
-        order: get().labels.length, // Add at end
+        color: hexToLabelColor(colorHex),
       });
       const newLabel = response.label;
       set((state) => ({
@@ -59,10 +58,13 @@ export const useLabelStore = create<LabelStore>((set, get) => ({
     }
   },
 
-  updateLabel: async (labelId: string, name?: string, color?: string) => {
+  updateLabel: async (labelId: string, name?: string, colorHex?: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await labelsApi.updateLabel(labelId, { name, color });
+      const response = await labelsApi.updateLabel(labelId, {
+        name,
+        color: colorHex ? hexToLabelColor(colorHex) : undefined,
+      });
       const updatedLabel = response.label;
       set((state) => ({
         labels: state.labels.map((label) =>

@@ -14,6 +14,7 @@ import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { getFolders, type Folder as ProviderFolder } from '@/lib/api/folders';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { useEmailStore, type Email } from '@/stores/email-store';
+import { useLabelStore } from '@/stores/label-store';
 import { useEmailActions } from '@/hooks/use-email-actions';
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation';
 import { normalizeFolderName, getFolderIcon as getIconForFolderUtil } from '@/lib/utils/folder-normalization';
@@ -96,6 +97,9 @@ export function Mailbox() {
     markAsImportant: storeMarkAsImportant,
   } = useEmailStore();
 
+  // Label store
+  const { labels } = useLabelStore();
+
   // WebSocket for real-time updates (email events, folder counts, etc.)
   //useWebSocket(token, true);
 
@@ -169,6 +173,52 @@ export function Mailbox() {
       });
     },
   });
+
+  // Handle label changes
+  const handleLabelsChange = useCallback((emailId: string, labelIds: string[]) => {
+    // Build emailLabels structure from label IDs using label store data
+    const emailLabels = labelIds.map(labelId => {
+      const label = labels.find(l => l.id === labelId);
+      return {
+        label: {
+          id: labelId,
+          name: label?.name || '',
+          color: label?.color || null,
+        },
+      };
+    });
+
+    console.log('[Mailbox] handleLabelsChange:', {
+      emailId,
+      labelIds,
+      emailLabels,
+      availableLabels: labels,
+    });
+
+    // Update email in store with new labels
+    setEmails(
+      storeEmails.map(email =>
+        email.id === emailId
+          ? { ...email, labels: labelIds, emailLabels }
+          : email
+      )
+    );
+
+    // Also update selected email if it's the one being modified
+    if (storeSelectedEmail?.id === emailId) {
+      setSelectedEmail({
+        ...storeSelectedEmail,
+        labels: labelIds,
+        emailLabels,
+      });
+    }
+
+    setSnackbar({
+      open: true,
+      message: t.common.save || 'Labels updated',
+      severity: 'success',
+    });
+  }, [storeEmails, setEmails, storeSelectedEmail, setSelectedEmail, labels, t]);
 
   // Wrapper to handle both Email and Conversation types
   const handleEmailClick = useCallback((thread: any) => {
@@ -921,6 +971,7 @@ export function Mailbox() {
               onReply={handleReplyLocal}
               onReplyAll={handleReplyAllLocal}
               onForward={handleForwardLocal}
+              onLabelsChange={handleLabelsChange}
             />
           ) : undefined
         }
