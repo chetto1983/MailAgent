@@ -179,6 +179,23 @@ export const ThreadList: React.FC<ThreadListProps> = ({
         height: '100%',
         overflow: 'auto',
         p: 0,
+        // Scrollbar per Firefox
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#bdbdbd transparent',
+        // Scrollbar per Chrome, Safari, Edge
+        '&::-webkit-scrollbar': {
+          width: '8px',
+        },
+        '&::-webkit-scrollbar-track': {
+          bgcolor: 'transparent',
+        },
+        '&::-webkit-scrollbar-thumb': {
+          bgcolor: '#bdbdbd',
+          borderRadius: '4px',
+          '&:hover': {
+            bgcolor: '#9e9e9e',
+          },
+        },
       }}
     >
       {threads.map((thread) => {

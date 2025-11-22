@@ -98,8 +98,7 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
             borderColor: 'divider',
             display: 'flex',
             flexDirection: 'column',
-            overflowX: 'hidden', // Hide horizontal overflow
-            overflowY: 'visible', // Allow vertical scrolling for inner components
+            overflow: 'hidden', // Contain overflow, let child handle scroll
             flexShrink: 0,
             bgcolor: 'background.paper',
           }}
@@ -141,8 +140,7 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
           borderColor: 'divider',
           display: isMobile && showDetail ? 'none' : 'flex',
           flexDirection: 'column',
-          overflowX: 'hidden', // Hide horizontal overflow
-          overflowY: 'visible', // Allow vertical scrolling for inner components
+          overflow: 'hidden', // Contain overflow, let child handle scroll
           bgcolor: 'background.default',
         }}
       >
@@ -158,8 +156,7 @@ export const EmailLayout: React.FC<EmailLayoutProps> = ({
             minWidth: 0, // Allow flex shrink
             display: 'flex',
             flexDirection: 'column',
-            overflowX: 'hidden', // Hide horizontal overflow
-            overflowY: 'visible', // Allow vertical scrolling for inner components
+            overflow: 'hidden', // Contain overflow, let child handle scroll
             position: isMobile ? 'fixed' : 'relative',
             top: isMobile ? 0 : 'auto',
             left: isMobile ? 0 : 'auto',

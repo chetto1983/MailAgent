@@ -5,7 +5,8 @@
       "Bash(git -C \"d:\\MailAgent\" add backend/src/modules/realtime/gateways/realtime.gateway.ts)",
       "Bash(timeout:*)",
       "Bash(ping:*)",
-      "Bash(docker --version:*)"
+      "Bash(docker --version:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []

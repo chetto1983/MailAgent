@@ -249,19 +249,19 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
           p: 3,
           // Scrollbar per Firefox
           scrollbarWidth: 'thin',
-          scrollbarColor: 'divider background.paper',
+          scrollbarColor: '#bdbdbd transparent',
           // Scrollbar per Chrome, Safari, Edge
           '&::-webkit-scrollbar': {
             width: '8px',
           },
           '&::-webkit-scrollbar-track': {
-            bgcolor: 'background.paper',
+            bgcolor: 'transparent',
           },
           '&::-webkit-scrollbar-thumb': {
-            bgcolor: 'divider',
+            bgcolor: '#bdbdbd',
             borderRadius: '4px',
             '&:hover': {
-              bgcolor: 'text.disabled',
+              bgcolor: '#9e9e9e',
             },
           },
         }}

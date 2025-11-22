@@ -143,7 +143,7 @@ export default function EmailPage() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
         <Sidebar
           collapsed={collapsed}
           onToggleCollapse={handleToggleCollapse}
@@ -157,7 +157,8 @@ export default function EmailPage() {
             flexGrow: 1,
             display: 'flex',
             flexDirection: 'column',
-            minHeight: '100vh',
+            height: '100vh',
+            overflow: 'hidden',
           }}
         >
           <Header
