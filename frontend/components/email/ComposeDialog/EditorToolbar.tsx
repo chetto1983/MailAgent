@@ -15,6 +15,7 @@ import {
   Redo2,
 } from 'lucide-react';
 import type { Editor } from '@tiptap/core';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface EditorToolbarProps {
   /**
@@ -34,6 +35,8 @@ interface EditorToolbarProps {
  * - Undo/Redo
  */
 export function EditorToolbar({ editor }: EditorToolbarProps) {
+  const t = useTranslations();
+
   if (!editor) {
     return null;
   }
@@ -51,7 +54,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       }}
     >
       {/* Undo/Redo */}
-      <Tooltip title="Undo">
+      <Tooltip title={t.dashboard.email.composer.undo}>
         <span>
           <IconButton
             size="small"
@@ -68,7 +71,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         </span>
       </Tooltip>
 
-      <Tooltip title="Redo">
+      <Tooltip title={t.dashboard.email.composer.redo}>
         <span>
           <IconButton
             size="small"
@@ -88,7 +91,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
       {/* Headings */}
-      <Tooltip title="Heading 1">
+      <Tooltip title={t.dashboard.email.composer.heading1}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -102,7 +105,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Heading 2">
+      <Tooltip title={t.dashboard.email.composer.heading2}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
@@ -116,7 +119,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Heading 3">
+      <Tooltip title={t.dashboard.email.composer.heading3}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
@@ -133,7 +136,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
       {/* Text Formatting */}
-      <Tooltip title="Bold">
+      <Tooltip title={t.dashboard.email.composer.bold}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -148,7 +151,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Italic">
+      <Tooltip title={t.dashboard.email.composer.italic}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleItalic().run()}
@@ -162,7 +165,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Underline">
+      <Tooltip title={t.dashboard.email.composer.underline}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleUnderline().run()}
@@ -176,7 +179,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Strikethrough">
+      <Tooltip title={t.dashboard.email.composer.strikethrough}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleStrike().run()}
@@ -193,7 +196,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
       {/* Lists */}
-      <Tooltip title="Bullet List">
+      <Tooltip title={t.dashboard.email.composer.bulletList}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -207,7 +210,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         </IconButton>
       </Tooltip>
 
-      <Tooltip title="Numbered List">
+      <Tooltip title={t.dashboard.email.composer.numberedList}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
@@ -224,7 +227,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
       {/* Blockquote */}
-      <Tooltip title="Quote">
+      <Tooltip title={t.dashboard.email.composer.quote}>
         <IconButton
           size="small"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}

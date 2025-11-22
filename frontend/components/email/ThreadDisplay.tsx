@@ -212,13 +212,13 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
         )}
 
         {/* Reply/Forward Actions - Left Side */}
-        <IconButton size="small" onClick={() => onReply?.(email)} title="Reply">
+        <IconButton size="small" onClick={() => onReply?.(email)} title={t.dashboard.emailView.reply}>
           <Reply size={18} />
         </IconButton>
-        <IconButton size="small" onClick={() => onReplyAll?.(email)} title="Reply All">
+        <IconButton size="small" onClick={() => onReplyAll?.(email)} title={t.dashboard.emailView.replyAll}>
           <ReplyAll size={18} />
         </IconButton>
-        <IconButton size="small" onClick={() => onForward?.(email)} title="Forward">
+        <IconButton size="small" onClick={() => onForward?.(email)} title={t.dashboard.emailView.forward}>
           <Forward size={18} />
         </IconButton>
 
@@ -248,7 +248,7 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
           <Trash2 size={18} />
         </IconButton>
 
-        <IconButton size="small" title="More">
+        <IconButton size="small" title={t.dashboard.emailView.more}>
           <MoreVertical size={18} />
         </IconButton>
       </Paper>

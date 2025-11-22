@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { Tag, Plus, X, Check, Settings } from 'lucide-react';
 import { useLabelStore } from '@/stores/label-store';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface LabelSelectorProps {
   /**
@@ -58,6 +59,8 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
   onManageLabels,
   disabled = false,
 }) => {
+  const t = useTranslations();
+  const labelsCopy = t.dashboard.labels;
   const { labels, fetchLabels, isLoading } = useLabelStore();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -97,7 +100,7 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
   if (variant === 'button') {
     return (
       <>
-        <Tooltip title="Manage Labels">
+        <Tooltip title={labelsCopy.manageLabelsTooltip}>
           <IconButton size="small" onClick={handleClick} disabled={disabled || isLoading}>
             {isLoading ? <CircularProgress size={18} /> : <Tag size={18} />}
           </IconButton>
@@ -112,14 +115,14 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
         >
           <Box sx={{ px: 2, py: 1 }}>
             <Typography variant="caption" color="text.secondary">
-              Add or remove labels
+              {labelsCopy.addRemoveLabels}
             </Typography>
           </Box>
           <Divider />
           {labels.length === 0 ? (
             <MenuItem disabled>
               <Typography variant="body2" color="text.secondary">
-                No labels available
+                {labelsCopy.noLabelsAvailable}
               </Typography>
             </MenuItem>
           ) : (
@@ -154,7 +157,7 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
                 <ListItemIcon>
                   <Settings size={18} />
                 </ListItemIcon>
-                <ListItemText>Manage Labels</ListItemText>
+                <ListItemText>{labelsCopy.manageLabelsTooltip}</ListItemText>
               </MenuItem>
             </>
           )}
@@ -191,7 +194,7 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
           }}
         />
       ))}
-      <Tooltip title="Add Label">
+      <Tooltip title={labelsCopy.addLabelText}>
         <IconButton
           size="small"
           onClick={handleClick}
@@ -216,14 +219,14 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
       >
         <Box sx={{ px: 2, py: 1 }}>
           <Typography variant="caption" color="text.secondary">
-            Add label
+            {labelsCopy.addLabelText}
           </Typography>
         </Box>
         <Divider />
         {labels.length === 0 ? (
           <MenuItem disabled>
             <Typography variant="body2" color="text.secondary">
-              No labels available
+              {labelsCopy.noLabelsAvailable}
             </Typography>
           </MenuItem>
         ) : (
@@ -256,7 +259,7 @@ export const LabelSelector: React.FC<LabelSelectorProps> = ({
               <ListItemIcon>
                 <Settings size={18} />
               </ListItemIcon>
-              <ListItemText>Manage Labels</ListItemText>
+              <ListItemText>{labelsCopy.manageLabelsTooltip}</ListItemText>
             </MenuItem>
           </>
         )}

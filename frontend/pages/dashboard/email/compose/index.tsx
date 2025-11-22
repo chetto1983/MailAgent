@@ -34,7 +34,7 @@ type AttachmentDraft = {
 function EmailComposeInner() {
   const router = useRouter();
   const t = useTranslations();
-  const composerCopy = t.dashboard.composer;
+  const composerCopy = t.dashboard.email.composer;
   const { replyTo, forwardFrom, draftId: draftIdQuery } = router.query;
   const [mode, setMode] = useState<ComposeMode>('new');
   const [providers, setProviders] = useState<ProviderConfig[]>([]);

@@ -18,12 +18,15 @@ import {
 } from '@mui/material';
 import { Mail } from 'lucide-react';
 import { providersApi, ConnectGenericDto } from '@/lib/api/providers';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface GenericProviderCardProps {
   onSuccess: () => void;
 }
 
 export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
+  const t = useTranslations();
+  const genericCopy = t.dashboard.providers.genericCard;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -111,17 +114,17 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
             <Mail size={24} />
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              IMAP & CalDAV
+              {genericCopy.title}
             </Typography>
           </Box>
 
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Connect custom IMAP/SMTP and CalDAV providers
+            {genericCopy.description}
           </Typography>
 
           <Stack spacing={1.5} sx={{ flex: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              Bring any compatible mailbox or calendar by entering your server credentials.
+              {genericCopy.subtitle}
             </Typography>
 
             <Box
@@ -137,9 +140,9 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
                 fontSize: '0.875rem',
               }}
             >
-              <li>IMAP/SMTP support for inbound/outbound email</li>
-              <li>Optional CalDAV sync for calendars</li>
-              <li>Perfect for Fastmail, Yahoo, iCloud, and custom servers</li>
+              <li>{genericCopy.feature1}</li>
+              <li>{genericCopy.feature2}</li>
+              <li>{genericCopy.feature3}</li>
             </Box>
           </Stack>
 
@@ -149,7 +152,7 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
             onClick={() => setOpen(true)}
             sx={{ mt: 2 }}
           >
-            Configure IMAP / CalDAV
+            {genericCopy.configureButton}
           </Button>
         </CardContent>
       </Card>
@@ -164,10 +167,10 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
         <form onSubmit={handleSubmit}>
           <DialogTitle>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Connect IMAP/SMTP & CalDAV Provider
+              {genericCopy.dialogTitle}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Configure your email and calendar server settings
+              {genericCopy.dialogSubtitle}
             </Typography>
           </DialogTitle>
 
@@ -180,12 +183,12 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
 
             {/* Basic Info */}
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-              Basic Information
+              {genericCopy.basicInfo}
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
               <TextField
                 fullWidth
-                label="Email Address"
+                label={genericCopy.emailAddress}
                 type="email"
                 value={formData.email}
                 onChange={(e) => updateField('email', e.target.value)}
@@ -193,7 +196,7 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
               />
               <TextField
                 fullWidth
-                label="Display Name"
+                label={genericCopy.displayName}
                 value={formData.displayName}
                 onChange={(e) => updateField('displayName', e.target.value)}
               />
@@ -203,14 +206,14 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
 
             {/* IMAP Settings */}
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-              IMAP Settings (Incoming Mail)
+              {genericCopy.imapSettings}
             </Typography>
             <Stack spacing={2} sx={{ mb: 3 }}>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
                   fullWidth
-                  label="IMAP Host"
-                  placeholder="imap.example.com"
+                  label={genericCopy.imapHost}
+                  placeholder={genericCopy.imapHostPlaceholder}
                   value={formData.imapHost}
                   onChange={(e) => updateField('imapHost', e.target.value)}
                   required
@@ -218,7 +221,7 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
                 />
                 <TextField
                   fullWidth
-                  label="Port"
+                  label={genericCopy.port}
                   type="number"
                   value={formData.imapPort}
                   onChange={(e) => updateField('imapPort', parseInt(e.target.value))}
@@ -229,14 +232,14 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField
                   fullWidth
-                  label="Username"
+                  label={genericCopy.username}
                   value={formData.imapUsername}
                   onChange={(e) => updateField('imapUsername', e.target.value)}
                   required
                 />
                 <TextField
                   fullWidth
-                  label="Password"
+                  label={genericCopy.password}
                   type="password"
                   value={formData.imapPassword}
                   onChange={(e) => updateField('imapPassword', e.target.value)}
@@ -249,23 +252,23 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
 
             {/* SMTP Settings */}
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-              SMTP Settings (Outgoing Mail)
+              {genericCopy.smtpSettings}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Leave empty to use IMAP credentials
+              {genericCopy.smtpSubtitle}
             </Typography>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
               <TextField
                 fullWidth
-                label="SMTP Host"
-                placeholder="smtp.example.com"
+                label={genericCopy.smtpHost}
+                placeholder={genericCopy.smtpHostPlaceholder}
                 value={formData.smtpHost}
                 onChange={(e) => updateField('smtpHost', e.target.value)}
                 sx={{ flex: 2 }}
               />
               <TextField
                 fullWidth
-                label="Port"
+                label={genericCopy.port}
                 type="number"
                 value={formData.smtpPort}
                 onChange={(e) => updateField('smtpPort', parseInt(e.target.value))}
@@ -278,7 +281,7 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
             {/* CalDAV Settings */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                CalDAV Settings (Calendar Sync)
+                {genericCopy.caldavSettings}
               </Typography>
               <FormControlLabel
                 control={
@@ -287,7 +290,7 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
                     onChange={(e) => setShowCalDAV(e.target.checked)}
                   />
                 }
-                label="Enable Calendar"
+                label={genericCopy.enableCalendar}
               />
             </Box>
 
@@ -295,21 +298,21 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
               <Stack spacing={2}>
                 <TextField
                   fullWidth
-                  label="CalDAV URL"
-                  placeholder="https://caldav.example.com/calendars/user"
+                  label={genericCopy.caldavUrl}
+                  placeholder={genericCopy.caldavUrlPlaceholder}
                   value={formData.caldavUrl}
                   onChange={(e) => updateField('caldavUrl', e.target.value)}
                 />
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                   <TextField
                     fullWidth
-                    label="Username"
+                    label={genericCopy.username}
                     value={formData.caldavUsername}
                     onChange={(e) => updateField('caldavUsername', e.target.value)}
                   />
                   <TextField
                     fullWidth
-                    label="Password"
+                    label={genericCopy.password}
                     type="password"
                     value={formData.caldavPassword}
                     onChange={(e) => updateField('caldavPassword', e.target.value)}
@@ -321,10 +324,10 @@ export function GenericProviderCard({ onSuccess }: GenericProviderCardProps) {
 
           <DialogActions sx={{ px: 3, py: 2 }}>
             <Button onClick={() => setOpen(false)} disabled={loading}>
-              Cancel
+              {genericCopy.cancel}
             </Button>
             <Button type="submit" variant="contained" disabled={loading}>
-              {loading ? 'Connecting...' : 'Connect Provider'}
+              {loading ? genericCopy.connecting : genericCopy.connectProvider}
             </Button>
           </DialogActions>
         </form>

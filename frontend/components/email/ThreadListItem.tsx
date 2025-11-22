@@ -4,6 +4,7 @@ import { Paperclip, Users } from 'lucide-react';
 import type { Email } from '@/stores/email-store';
 import type { Conversation } from '@/lib/api/email';
 import { useLabelStore } from '@/stores/label-store';
+import { useTranslations } from '@/lib/hooks/use-translations';
 import { ThreadActionBar, ThreadAvatar, ThreadLabels } from './shared';
 
 /**
@@ -143,6 +144,7 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
     viewMode: _viewMode = 'list',
   }) => {
     const [isHovered, setIsHovered] = useState(false);
+    const t = useTranslations();
     const { getLabelById } = useLabelStore();
 
     // Extract common properties - use same ID logic as ThreadList
@@ -357,7 +359,7 @@ export const ThreadListItem = React.memo<ThreadListItemProps>(
                 <Chip
                   size="small"
                   icon={<Paperclip size={12} />}
-                  label="Attachment"
+                  label={t.dashboard.email.attachment}
                   sx={{ height: 18, fontSize: '0.65rem' }}
                 />
               )}

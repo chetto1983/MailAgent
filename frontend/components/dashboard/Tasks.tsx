@@ -21,6 +21,7 @@ import {
   MoreVertical,
   Filter,
 } from 'lucide-react';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 interface Task {
   id: string;
@@ -34,6 +35,8 @@ interface Task {
 }
 
 export function Tasks() {
+  const t = useTranslations();
+  const tasksCopy = t.dashboard.tasks;
   const [tasks, setTasks] = useState<Task[]>([
     {
       id: '1',
@@ -106,24 +109,24 @@ export function Tasks() {
         }}
       >
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-          Workspace
+          {tasksCopy.workspace}
         </Typography>
         <List sx={{ p: 0 }}>
           <ListItemButton selected={filter === 'all'} onClick={() => setFilter('all')}>
-            <ListItemText primary="All Tasks" />
+            <ListItemText primary={tasksCopy.allTasks} />
           </ListItemButton>
           <ListItemButton selected={filter === 'today'} onClick={() => setFilter('today')}>
-            <ListItemText primary="Today" />
+            <ListItemText primary={tasksCopy.today} />
           </ListItemButton>
           <ListItemButton selected={filter === 'upcoming'} onClick={() => setFilter('upcoming')}>
-            <ListItemText primary="Upcoming" />
+            <ListItemText primary={tasksCopy.upcoming} />
           </ListItemButton>
         </List>
 
         <Divider sx={{ my: 2 }} />
 
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
-          My Projects
+          {tasksCopy.myProjects}
         </Typography>
         <List sx={{ p: 0 }}>
           <ListItemButton>
@@ -141,7 +144,7 @@ export function Tasks() {
         </List>
 
         <Button fullWidth variant="outlined" startIcon={<Plus size={18} />} sx={{ mt: 2 }}>
-          Add New List
+          {tasksCopy.addNewList}
         </Button>
       </Paper>
 
@@ -151,20 +154,20 @@ export function Tasks() {
         <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <Typography variant="h5" sx={{ fontWeight: 600, flex: 1 }}>
-              Today
+              {tasksCopy.today}
             </Typography>
             <Button variant="outlined" startIcon={<Filter size={18} />} size="small">
-              Filter
+              {tasksCopy.filter}
             </Button>
             <Button variant="contained" startIcon={<Plus size={18} />}>
-              New Task
+              {tasksCopy.newTask}
             </Button>
           </Box>
 
           <TextField
             fullWidth
             size="small"
-            placeholder="Add a task for Today, press Enter to save"
+            placeholder={tasksCopy.addTaskPlaceholder}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -266,7 +269,7 @@ export function Tasks() {
           }}
         >
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-            Task Details
+            {tasksCopy.taskDetails}
           </Typography>
           {/* Add task details here */}
         </Paper>

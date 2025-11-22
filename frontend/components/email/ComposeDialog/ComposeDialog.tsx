@@ -22,6 +22,7 @@ import { emailApi } from '@/lib/api/email';
 import { providersApi, type ProviderConfig } from '@/lib/api/providers';
 import { useDraftAutosave } from '@/hooks/use-draft-autosave';
 import { useComposeEditor } from '@/hooks/use-compose-editor';
+import { useTranslations } from '@/lib/hooks/use-translations';
 import { EditorToolbar } from './EditorToolbar';
 
 export interface ComposeDialogProps {
@@ -99,6 +100,7 @@ export function ComposeDialog({
 }: ComposeDialogProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const t = useTranslations();
 
   // Form state
   const [to, setTo] = useState('');
@@ -120,7 +122,7 @@ export function ComposeDialog({
   // TipTap editor
   const editor = useComposeEditor({
     initialContent: body,
-    placeholder: 'Compose your message...',
+    placeholder: t.dashboard.email.composer.bodyPlaceholder,
     onChange: (html) => setBody(html),
     autofocus: false,
     editable: !sending,
@@ -200,7 +202,7 @@ export function ComposeDialog({
       for (const file of Array.from(files)) {
         // Check file size (max 10MB per file)
         if (file.size > 10 * 1024 * 1024) {
-          onError?.(`File ${file.name} is too large (max 10MB)`);
+          onError?.(t.dashboard.email.composer.fileTooLarge.replace('{filename}', file.name));
           continue;
         }
 
@@ -227,7 +229,7 @@ export function ComposeDialog({
       setAttachments((prev) => [...prev, ...newAttachments]);
     } catch (error) {
       console.error('Failed to upload attachments:', error);
-      onError?.('Failed to upload attachments');
+      onError?.(t.dashboard.email.composer.uploadError);
     } finally {
       setUploading(false);
       // Reset file input
@@ -235,7 +237,7 @@ export function ComposeDialog({
         fileInputRef.current.value = '';
       }
     }
-  }, [onError]);
+  }, [onError, t]);
 
   // Remove attachment
   const handleRemoveAttachment = useCallback((index: number) => {
@@ -284,29 +286,29 @@ export function ComposeDialog({
     const diff = now.getTime() - date.getTime();
     const seconds = Math.floor(diff / 1000);
 
-    if (seconds < 60) return 'Saved just now';
+    if (seconds < 60) return t.dashboard.email.composer.savedJustNow;
     const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `Saved ${minutes}m ago`;
+    if (minutes < 60) return t.dashboard.email.composer.savedMinutesAgo.replace('{minutes}', String(minutes));
     const hours = Math.floor(minutes / 60);
-    return `Saved ${hours}h ago`;
-  }, []);
+    return t.dashboard.email.composer.savedHoursAgo.replace('{hours}', String(hours));
+  }, [t]);
 
   // Handle send
   const handleSend = useCallback(async () => {
     // Validation
     if (!selectedProvider) {
-      onError?.('No email provider selected');
+      onError?.(t.dashboard.email.composer.noProvider);
       return;
     }
 
     const toEmails = parseEmails(to);
     if (toEmails.length === 0) {
-      onError?.('Please enter at least one recipient');
+      onError?.(t.dashboard.email.composer.validationTo);
       return;
     }
 
     if (!subject.trim()) {
-      onError?.('Please enter a subject');
+      onError?.(t.dashboard.email.composer.validationSubject);
       return;
     }
 
@@ -341,11 +343,11 @@ export function ComposeDialog({
       setAttachments([]);
     } catch (error) {
       console.error('Failed to send email:', error);
-      onError?.('Failed to send email. Please try again.');
+      onError?.(t.dashboard.email.composer.sendError);
     } finally {
       setSending(false);
     }
-  }, [selectedProvider, to, cc, bcc, subject, body, prefillData, parseEmails, onClose, onSent, onError, attachments]);
+  }, [selectedProvider, to, cc, bcc, subject, body, prefillData, parseEmails, onClose, onSent, onError, attachments, t]);
 
   // Check if form has unsaved changes
   const hasChanges = useCallback(() => {
@@ -355,11 +357,11 @@ export function ComposeDialog({
   // Handle close with confirmation
   const handleClose = useCallback(() => {
     if (hasChanges() && !sending) {
-      const confirmed = window.confirm('Discard unsaved changes?');
+      const confirmed = window.confirm(t.dashboard.email.composer.discardConfirm);
       if (!confirmed) return;
     }
     onClose();
-  }, [hasChanges, sending, onClose]);
+  }, [hasChanges, sending, onClose, t]);
 
   return (
     <Dialog
@@ -379,15 +381,15 @@ export function ComposeDialog({
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography variant="h6">
-              {mode === 'reply' && 'Reply'}
-              {mode === 'forward' && 'Forward'}
-              {mode === 'compose' && 'New Message'}
+              {mode === 'reply' && t.dashboard.email.composer.titleReply}
+              {mode === 'forward' && t.dashboard.email.composer.titleForward}
+              {mode === 'compose' && t.dashboard.email.composer.title}
             </Typography>
             {mode === 'compose' && (
               <Chip
                 size="small"
                 icon={isDraftSaving ? <CircularProgress size={12} /> : <Check size={12} />}
-                label={isDraftSaving ? 'Saving...' : formatLastSaved(lastSaved)}
+                label={isDraftSaving ? t.dashboard.email.composer.saving : formatLastSaved(lastSaved)}
                 sx={{
                   height: 20,
                   fontSize: '0.7rem',
@@ -416,7 +418,7 @@ export function ComposeDialog({
           <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2" sx={{ minWidth: 40, fontWeight: 500 }}>
-                From:
+                {t.dashboard.email.composer.from}:
               </Typography>
               <TextField
                 select
@@ -425,7 +427,7 @@ export function ComposeDialog({
                 value={selectedProvider}
                 onChange={(e) => setSelectedProvider(e.target.value)}
                 disabled={sending || providers.length === 0}
-                aria-label="Select email account"
+                aria-label={t.dashboard.email.composer.selectProvider}
                 SelectProps={{
                   native: true,
                 }}
@@ -436,7 +438,7 @@ export function ComposeDialog({
                 }}
               >
                 {providers.length === 0 && (
-                  <option value="">No email accounts available</option>
+                  <option value="">{t.dashboard.email.composer.noProvider}</option>
                 )}
                 {providers.map((provider) => (
                   <option key={provider.id} value={provider.id}>
@@ -451,12 +453,12 @@ export function ComposeDialog({
           <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2" sx={{ minWidth: 40, fontWeight: 500 }}>
-                To:
+                {t.dashboard.email.composer.toLabel}
               </Typography>
               <TextField
                 fullWidth
                 size="small"
-                placeholder="recipient@example.com"
+                placeholder={t.dashboard.email.composer.toPlaceholder}
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
                 disabled={sending}
@@ -469,12 +471,12 @@ export function ComposeDialog({
               <Box sx={{ display: 'flex', gap: 0.5 }}>
                 {!showCc && (
                   <Button size="small" onClick={() => setShowCc(true)}>
-                    Cc
+                    {t.dashboard.email.composer.cc}
                   </Button>
                 )}
                 {!showBcc && (
                   <Button size="small" onClick={() => setShowBcc(true)}>
-                    Bcc
+                    {t.dashboard.email.composer.bcc}
                   </Button>
                 )}
               </Box>
@@ -486,12 +488,12 @@ export function ComposeDialog({
             <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" sx={{ minWidth: 40, fontWeight: 500 }}>
-                  Cc:
+                  {t.dashboard.email.composer.ccLabel}
                 </Typography>
                 <TextField
                   fullWidth
                   size="small"
-                  placeholder="recipient@example.com"
+                  placeholder={t.dashboard.email.composer.toPlaceholder}
                   value={cc}
                   onChange={(e) => setCc(e.target.value)}
                   disabled={sending}
@@ -510,12 +512,12 @@ export function ComposeDialog({
             <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" sx={{ minWidth: 40, fontWeight: 500 }}>
-                  Bcc:
+                  {t.dashboard.email.composer.bccLabel}
                 </Typography>
                 <TextField
                   fullWidth
                   size="small"
-                  placeholder="recipient@example.com"
+                  placeholder={t.dashboard.email.composer.toPlaceholder}
                   value={bcc}
                   onChange={(e) => setBcc(e.target.value)}
                   disabled={sending}
@@ -533,12 +535,12 @@ export function ComposeDialog({
           <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography variant="body2" sx={{ minWidth: 40, fontWeight: 500 }}>
-                Subject:
+                {t.dashboard.email.composer.subjectLabel}
               </Typography>
               <TextField
                 fullWidth
                 size="small"
-                placeholder="Email subject"
+                placeholder={t.dashboard.email.composer.subjectPlaceholder}
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 disabled={sending}
@@ -555,7 +557,7 @@ export function ComposeDialog({
           {attachments.length > 0 && (
             <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                Attachments ({attachments.length})
+                {t.dashboard.email.composer.attachments.replace('{count}', String(attachments.length))}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {attachments.map((attachment, index) => (
@@ -614,14 +616,14 @@ export function ComposeDialog({
             onChange={handleFileSelect}
             style={{ display: 'none' }}
             accept="*/*"
-            aria-label="Attach files"
+            aria-label={t.dashboard.email.composer.attachFiles}
           />
           {/* Attach files button */}
           <IconButton
             size="small"
             onClick={() => fileInputRef.current?.click()}
             disabled={sending || uploading}
-            title="Attach files"
+            title={t.dashboard.email.composer.attachFiles}
             sx={{
               width: { xs: 44, sm: 'auto' },
               height: { xs: 44, sm: 'auto' },
@@ -631,7 +633,7 @@ export function ComposeDialog({
           </IconButton>
           <Box sx={{ flex: 1 }} />
           <Button onClick={handleClose} disabled={sending}>
-            Discard
+            {t.dashboard.email.composer.discard}
           </Button>
           <Button
             variant="contained"
@@ -639,7 +641,7 @@ export function ComposeDialog({
             onClick={handleSend}
             disabled={sending || !to.trim()}
           >
-            {sending ? 'Sending...' : 'Send'}
+            {sending ? t.dashboard.email.composer.sending : t.dashboard.email.composer.send}
           </Button>
         </Box>
       </DialogActions>

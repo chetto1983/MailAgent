@@ -243,10 +243,10 @@ export function Settings() {
       >
         <Box sx={{ p: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            Settings
+            {settingsCopy.sidebarTitle}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Manage your preferences
+            {settingsCopy.sidebarSubtitle}
           </Typography>
         </Box>
 
@@ -331,9 +331,9 @@ export function Settings() {
                     onChange={(_, newTheme) => newTheme && setTheme(newTheme)}
                     fullWidth
                   >
-                    <ToggleButton value="light">Light</ToggleButton>
-                    <ToggleButton value="dark">Dark</ToggleButton>
-                    <ToggleButton value="system">System</ToggleButton>
+                    <ToggleButton value="light">{generalCopy.themeOptions.light}</ToggleButton>
+                    <ToggleButton value="dark">{generalCopy.themeOptions.dark}</ToggleButton>
+                    <ToggleButton value="system">{generalCopy.themeOptions.system}</ToggleButton>
                   </ToggleButtonGroup>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                     {generalCopy.themeHint}
@@ -427,7 +427,7 @@ export function Settings() {
                     onClick={handleSaveSettings}
                     disabled={saveLoading}
                   >
-                    {saveLoading ? 'Saving...' : generalCopy.save}
+                    {saveLoading ? t.common.saving : generalCopy.save}
                   </Button>
                 </Box>
               </CardContent>
@@ -472,10 +472,10 @@ export function Settings() {
                   >
                     <Box>
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        Connected providers
+                        {mailAccountsCopy.connectedProviders}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Manage linked inboxes, calendars, and automation sources for your tenant.
+                        {mailAccountsCopy.connectedProvidersSubtitle}
                       </Typography>
                     </Box>
                     <Button
@@ -485,7 +485,7 @@ export function Settings() {
                       onClick={loadProviders}
                       disabled={providersLoading}
                     >
-                      {providersLoading ? 'Refreshing...' : 'Refresh'}
+                      {providersLoading ? t.common.refreshing : t.common.refresh}
                     </Button>
                   </Stack>
 
@@ -502,7 +502,7 @@ export function Settings() {
               <Card>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                    Add a provider
+                    {mailAccountsCopy.add}
                   </Typography>
                   <Stack spacing={2} direction={{ xs: 'column', md: 'row' }} alignItems="stretch">
                     <Box sx={{ flex: 1 }}>
@@ -521,7 +521,7 @@ export function Settings() {
               <Card>
                 <CardContent>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                    Need Help?
+                    {mailAccountsCopy.helpTitle}
                   </Typography>
                   <Box
                     component="div"

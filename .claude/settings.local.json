@@ -10,7 +10,9 @@
       "Bash(git -C \"d:\\MailAgent\" diff frontend/components/dashboard/Mailbox.tsx)",
       "Bash(git -C \"d:\\MailAgent\" status)",
       "Bash(npm install:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint)"
     ],
     "deny": [],
     "ask": []

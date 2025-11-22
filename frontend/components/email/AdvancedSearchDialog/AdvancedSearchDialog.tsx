@@ -17,6 +17,7 @@ import {
   Stack,
 } from '@mui/material';
 import { X, Search as SearchIcon } from 'lucide-react';
+import { useTranslations } from '@/lib/hooks/use-translations';
 
 /**
  * Advanced search filters
@@ -89,6 +90,7 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
   onSearch,
   onReset,
 }) => {
+  const t = useTranslations();
   const [filters, setFilters] = useState<AdvancedSearchFilters>(initialFilters);
 
   // Update filter value
@@ -136,10 +138,10 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <SearchIcon size={20} />
-            <Typography variant="h6">Advanced Search</Typography>
+            <Typography variant="h6">{t.dashboard.email.advancedSearch.title}</Typography>
             {activeFiltersCount > 0 && (
               <Typography variant="caption" color="primary">
-                ({activeFiltersCount} active)
+                ({activeFiltersCount} {t.dashboard.email.advancedSearch.active})
               </Typography>
             )}
           </Box>
@@ -154,8 +156,8 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
           {/* Search Query */}
           <TextField
             fullWidth
-            label="Search in subject and body"
-            placeholder="Enter keywords..."
+            label={t.dashboard.email.advancedSearch.searchInSubjectBody}
+            placeholder={t.dashboard.email.advancedSearch.enterKeywords}
             value={filters.searchQuery || ''}
             onChange={(e) => updateFilter('searchQuery', e.target.value)}
             InputProps={{
@@ -166,11 +168,11 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
           {/* From (Sender) */}
           <TextField
             fullWidth
-            label="From (Sender)"
-            placeholder="sender@example.com"
+            label={t.dashboard.email.advancedSearch.fromSender}
+            placeholder={t.dashboard.email.advancedSearch.senderPlaceholder}
             value={filters.from || ''}
             onChange={(e) => updateFilter('from', e.target.value)}
-            helperText="Filter by sender email address"
+            helperText={t.dashboard.email.advancedSearch.filterBySender}
           />
 
           <Divider />
@@ -178,12 +180,12 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
           {/* Date Range */}
           <Box>
             <FormLabel component="legend" sx={{ mb: 2 }}>
-              Date Range
+              {t.dashboard.email.advancedSearch.dateRange}
             </FormLabel>
             <Stack spacing={2}>
               <TextField
                 fullWidth
-                label="From Date"
+                label={t.dashboard.email.advancedSearch.fromDate}
                 type="date"
                 value={filters.startDate || ''}
                 onChange={(e) => updateFilter('startDate', e.target.value)}
@@ -194,7 +196,7 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
               />
               <TextField
                 fullWidth
-                label="To Date"
+                label={t.dashboard.email.advancedSearch.toDate}
                 type="date"
                 value={filters.endDate || ''}
                 onChange={(e) => updateFilter('endDate', e.target.value)}
@@ -211,7 +213,7 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
           {/* Status Filters */}
           <Box>
             <FormLabel component="legend" sx={{ mb: 1 }}>
-              Status Filters
+              {t.dashboard.email.advancedSearch.statusFilters}
             </FormLabel>
             <FormGroup>
               <FormControlLabel
@@ -221,7 +223,7 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
                     onChange={(e) => updateFilter('hasAttachments', e.target.checked)}
                   />
                 }
-                label="Has attachments"
+                label={t.dashboard.email.advancedSearch.hasAttachments}
               />
               <FormControlLabel
                 control={
@@ -230,7 +232,7 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
                     onChange={(e) => updateFilter('isStarred', e.target.checked)}
                   />
                 }
-                label="Starred only"
+                label={t.dashboard.email.advancedSearch.starredOnly}
               />
             </FormGroup>
           </Box>
@@ -238,7 +240,7 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
           {/* Read Status */}
           <Box>
             <FormLabel component="legend" sx={{ mb: 1 }}>
-              Read Status
+              {t.dashboard.email.advancedSearch.readStatus}
             </FormLabel>
             <FormGroup>
               <FormControlLabel
@@ -248,7 +250,7 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
                     onChange={(e) => updateFilter('isRead', e.target.checked ? false : null)}
                   />
                 }
-                label="Unread only"
+                label={t.dashboard.email.advancedSearch.unreadOnly}
               />
               <FormControlLabel
                 control={
@@ -257,7 +259,7 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
                     onChange={(e) => updateFilter('isRead', e.target.checked ? true : null)}
                   />
                 }
-                label="Read only"
+                label={t.dashboard.email.advancedSearch.readOnly}
               />
             </FormGroup>
           </Box>
@@ -266,12 +268,12 @@ export const AdvancedSearchDialog: React.FC<AdvancedSearchDialogProps> = ({
 
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button onClick={handleReset} color="inherit">
-          Reset All
+          {t.dashboard.email.advancedSearch.resetAll}
         </Button>
         <Box sx={{ flex: 1 }} />
-        <Button onClick={handleClose}>Cancel</Button>
+        <Button onClick={handleClose}>{t.dashboard.email.advancedSearch.cancel}</Button>
         <Button variant="contained" onClick={handleSearch} startIcon={<SearchIcon size={16} />}>
-          Search
+          {t.dashboard.email.advancedSearch.search}
         </Button>
       </DialogActions>
     </Dialog>
