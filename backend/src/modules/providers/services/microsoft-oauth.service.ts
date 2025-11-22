@@ -372,24 +372,39 @@ export class MicrosoftOAuthService {
    * Uses /me with otherMails_userPrincipalName_mail
    */
   async getAliases(tenantId: string, providerId: string): Promise<{ email: string; name?: string }[]> {
-    const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
-    const graphClient = this.getGraphClient(accessToken);
+    try {
+      const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
+      const graphClient = this.getGraphClient(accessToken);
 
-    const response = await graphClient
-      .api('/me')
-      .select('mail,userPrincipalName,otherMails,displayName')
-      .get();
+      const response = await graphClient
+        .api('/me')
+        .select('mail,userPrincipalName,otherMails,displayName')
+        .get();
 
-    const emails: string[] = [];
-    if (response.mail) emails.push(response.mail);
-    if (response.userPrincipalName) emails.push(response.userPrincipalName);
-    if (Array.isArray(response.otherMails)) emails.push(...response.otherMails);
+      const emails: string[] = [];
+      if (response.mail) emails.push(response.mail);
+      if (response.userPrincipalName) emails.push(response.userPrincipalName);
+      if (Array.isArray(response.otherMails)) emails.push(...response.otherMails);
 
-    const uniqueEmails = Array.from(new Set(emails.filter(Boolean)));
-    return uniqueEmails.map((email: string) => ({
-      email,
-      name: response.displayName || undefined,
-    }));
+      const uniqueEmails = Array.from(new Set(emails.filter(Boolean)));
+      return uniqueEmails.map((email: string) => ({
+        email,
+        name: response.displayName || undefined,
+      }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(
+        `Failed to fetch aliases from Microsoft Graph API for provider ${providerId}: ${errorMessage}. Falling back to provider email.`
+      );
+
+      // Fallback: return the primary provider email if Graph API fails
+      const provider = await this.prisma.providerConfig.findFirst({
+        where: { id: providerId, tenantId },
+        select: { email: true },
+      });
+
+      return provider?.email ? [{ email: provider.email }] : [];
+    }
   }
 
   /**

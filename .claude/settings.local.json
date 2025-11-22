@@ -6,7 +6,10 @@
       "Bash(timeout:*)",
       "Bash(ping:*)",
       "Bash(docker --version:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(git -C \"d:\\MailAgent\" diff frontend/components/dashboard/Mailbox.tsx)",
+      "Bash(git -C \"d:\\MailAgent\" status)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

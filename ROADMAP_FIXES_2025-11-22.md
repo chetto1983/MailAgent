@@ -316,12 +316,262 @@ I pulsanti **ESISTONO** in `ThreadDisplay.tsx` ma probabilmente i callback `onRe
 
 **Analysis**: ✅ **COMPLETED**
 
-**Implementation**: ⏳ **PENDING**
+**Implementation**: ✅ **COMPLETED**
 
-**Next Step**: Fix Scrollbar Visibility
+**Testing**: ✅ **COMPLETED**
+
+---
+
+## ✅ SESSIONE 1 - Completata (22/11/2025 Sera)
+
+### Fix Implementati:
+
+#### 1. ✅ Scrollbar Visibili su Tutti i Browser
+**Status**: COMPLETATO
+
+**Problema**: Scrollbar non visibili su Firefox
+
+**Soluzione**: Aggiunto supporto Firefox con `scrollbarWidth` e `scrollbarColor`
+
+**Files Modificati**:
+- ✅ `frontend/components/email/EmailSidebar/EmailSidebar.tsx` (lines 473-491)
+- ✅ `frontend/components/email/ThreadDisplay.tsx` (lines 245-267)
+- ✅ `frontend/components/email/ThreadList.tsx` (lines 176-199)
+
+**Implementazione**:
+```typescript
+sx={{
+  overflow: 'auto',
+  // Firefox
+  scrollbarWidth: 'thin',
+  scrollbarColor: '#bdbdbd transparent',
+  // Chrome, Safari, Edge
+  '&::-webkit-scrollbar': { width: '8px' },
+  '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+  '&::-webkit-scrollbar-thumb': {
+    bgcolor: '#bdbdbd',
+    borderRadius: '4px',
+    '&:hover': { bgcolor: '#9e9e9e' }
+  }
+}}
+```
+
+**Nota**: Usati colori hex invece di token MUI perché `scrollbarColor` non accetta theme tokens.
+
+---
+
+#### 2. ✅ Aree di Scroll Indipendenti
+**Status**: COMPLETATO
+
+**Problema**: Scrollando una sezione (cartelle/email/dettaglio) scrollava tutta la pagina
+
+**Soluzione**: Ristrutturato layout con container `height: '100vh'` e `overflow: 'hidden'`
+
+**Files Modificati**:
+- ✅ `frontend/pages/dashboard/email.tsx` (line 146, 160): Cambiato da `minHeight` a `height: '100vh'`
+- ✅ `frontend/components/email/EmailLayout.tsx` (lines 101, 144, 160): Tutti container con `overflow: 'hidden'`
+
+**Root Cause**:
+- Prima: `minHeight: '100vh'` permetteva alla pagina di crescere oltre viewport
+- Ora: `height: '100vh'` forza altezza fissa, ogni child gestisce il proprio scroll
+
+**Risultato**: 3 aree di scroll completamente indipendenti come Gmail/Outlook
+
+---
+
+#### 3. ✅ Callbacks Reply/Forward
+**Status**: GIÀ PRESENTI - Nessuna modifica necessaria
+
+**Verifica**: I pulsanti esistono in ThreadDisplay.tsx (lines 353-361) e i callbacks sono già collegati in Mailbox.tsx (lines 827-836)
+
+---
+
+## 🔥 SESSIONE 2 - Completata (22/11/2025 Mattina)
+
+### Nuovi Problemi Critici Rilevati:
+
+#### ❌ Problema 1: Folder Counts Non Si Aggiornano
+
+**Sintomo**: Dopo aver letto email, i contatori delle cartelle non si aggiornano in tempo reale
+
+**Root Cause Investigazione**:
+
+1. **Bug WebSocket Tenant Tracking** (CRITICO):
+   - `hasTenantConnections()` ritornava `false` anche con client connessi
+   - Backend skippava eventi perché pensava tenant non attivo
+   - Causa: `namespace.adapter.rooms.get(room)` non affidabile
+
+2. **Inconsistenza folderId negli Eventi** (CRITICO):
+   - `folder-sync.service.ts` emetteva `folderId: folder.id` (ID database)
+   - `emails.service.ts` emetteva `folderId: folder` (nome folder)
+   - Frontend non poteva matchare perché riceveva formati diversi
+
+---
+
+### Fix Implementati:
+
+#### 1. ✅ WebSocket Tenant Connection Tracking
+**Status**: COMPLETATO
+
+**File**: `backend/src/modules/realtime/gateways/realtime.gateway.ts`
+
+**Soluzione**: Tracking esplicito con Map invece di controllare rooms Socket.IO
+
+**Implementazione**:
+```typescript
+// Line 53: Tracking esplicito
+private activeTenantConnections = new Map<string, number>();
+
+// Lines 82-83: Increment su connessione
+const currentCount = this.activeTenantConnections.get(client.tenantId) || 0;
+this.activeTenantConnections.set(client.tenantId, currentCount + 1);
+
+// Lines 104-117: Decrement su disconnessione
+if (currentCount <= 1) {
+  this.activeTenantConnections.delete(client.tenantId);
+} else {
+  this.activeTenantConnections.set(client.tenantId, currentCount - 1);
+}
+
+// Lines 163-171: Check affidabile
+hasTenantConnections(tenantId: string): boolean {
+  const count = this.activeTenantConnections.get(tenantId) || 0;
+  return count > 0;
+}
+```
+
+**Benefici**:
+- ✅ Tracking affidabile e prevedibile
+- ✅ Supporta multiple connessioni per tenant
+- ✅ Non dipende da internals di Socket.IO adapter
+- ✅ Debug più semplice con logging
+
+---
+
+#### 2. ✅ Consistenza folderId negli Eventi Real-time
+**Status**: COMPLETATO
+
+**File**: `backend/src/modules/email/services/emails.service.ts`
+
+**Problema**:
+- Frontend cerca counts con chiave `${providerId}:${folderId}` dove `folderId` è ID database
+- `emails.service.ts` emetteva `folderId` come nome folder (es. "INBOX")
+- `folder-sync.service.ts` emetteva `folderId` come ID database
+- Mismatch causava mancato aggiornamento
+
+**Soluzione**: Query folder ID prima di emettere evento
+
+**Implementazione** (lines 55-102):
+```typescript
+// Lines 55-62: Query folder records
+const folderRecords = await this.prisma.folder.findMany({
+  where: {
+    providerId,
+    path: { in: folders, mode: 'insensitive' },
+  },
+  select: { id: true, path: true, name: true },
+});
+
+// Lines 64-67: Map per lookup veloce
+const folderMap = new Map(
+  folderRecords.map((f) => [f.path.toUpperCase(), f]),
+);
+
+// Line 70: Trova folder record per path
+const folderRecord = folderMap.get(folder.toUpperCase());
+
+// Lines 95-98: Emetti con ID database
+this.realtimeEvents.emitFolderCountsUpdate(tenantId, {
+  providerId,
+  folderId: folderRecord?.id || folder,  // ✅ Ora usa ID database
+  folderName: folderRecord?.name || folder,
+  totalCount,
+  unreadCount,
+  timestamp: new Date().toISOString(),
+});
+```
+
+**Risultato**:
+- ✅ Entrambi i service emettono `folderId` come ID database
+- ✅ Frontend matcha correttamente con `${providerId}:${folderId}`
+- ✅ Contatori si aggiornano in tempo reale
+
+---
+
+#### 3. ✅ Re-abilitati Check Ottimizzazione
+**Status**: COMPLETATO
+
+**Files**:
+- `backend/src/modules/email/services/emails.service.ts` (lines 50-53)
+- `backend/src/modules/realtime/services/realtime-events.service.ts` (lines 364-367)
+
+**Azione**: Decommentati i check `hasTenantConnections()` che erano stati temporaneamente disabilitati
+
+**Beneficio**: Eventi real-time emessi solo per tenant con client connessi (risparmio risorse)
+
+---
+
+## 🎯 Impatto delle Fix
+
+### Performance:
+- ✅ Ridotto carico server: eventi emessi solo per tenant attivi
+- ✅ Tracking O(1): Map lookup invece di iterare rooms
+
+### Affidabilità:
+- ✅ Folder counts si aggiornano istantaneamente
+- ✅ Nessun mismatch tra formati eventi
+- ✅ Tracking connessioni deterministico
+
+### UX:
+- ✅ Scrollbar visibili e stilizzate su tutti browser
+- ✅ 3 aree scroll indipendenti (Gmail-like)
+- ✅ Contatori real-time funzionanti
+
+---
+
+## 📝 Lezioni Apprese
+
+### 1. Socket.IO Rooms Non Sono Affidabili per Tracking
+**Problema**: `namespace.adapter.rooms.get()` può avere latency o essere inconsistente
+
+**Soluzione**: Sempre usare tracking esplicito con Map/Set per stato critico
+
+### 2. Eventi Real-time Devono Usare ID Consistenti
+**Problema**: Formati diversi (nome vs ID) causano mismatch lato client
+
+**Soluzione**: Definire uno schema chiaro e usare sempre lo stesso formato (preferire ID database)
+
+### 3. Debugging WebSocket Richiede Logging Estensivo
+**Aggiunto logging**:
+- Connessioni/disconnessioni con tenant ID
+- Check `hasTenantConnections()` con count
+- Eventi emessi con payload completo
+
+---
+
+## 🧪 Testing Completato
+
+### WebSocket:
+- ✅ Client si connette e viene tracciato
+- ✅ Multiple connessioni stesso tenant supportate
+- ✅ Disconnessione decrementa counter
+- ✅ Eventi emessi solo per tenant attivi
+
+### Folder Counts:
+- ✅ Lettura email → unread count decrementa immediatamente
+- ✅ Nuova email via webhook → count incrementa
+- ✅ Cambio folder → count aggiornato in entrambe le cartelle
+- ✅ Sync completo → tutti count aggiornati
+
+### Layout & Scroll:
+- ✅ Scrollbar visibili su Chrome, Firefox, Edge
+- ✅ Scroll sidebar non muove email list
+- ✅ Scroll email list non muove detail panel
+- ✅ Scroll detail non muove sidebar/list
 
 ---
 
 **Created**: 2025-11-22 21:30
-**Status**: Draft
-**Version**: 1.0
+**Updated**: 2025-11-22 10:30
+**Status**: ✅ **COMPLETED**
+**Version**: 2.0

@@ -439,7 +439,7 @@ export function Mailbox() {
           ...(advancedFilters.endDate ? { endDate: advancedFilters.endDate } : {}),
           // Only override boolean filters if advanced filters are explicitly set
           ...(advancedFilters.hasAttachments !== undefined ? { hasAttachments: advancedFilters.hasAttachments } : {}),
-          ...(advancedFilters.isRead !== null ? { isRead: advancedFilters.isRead } : {}),
+          ...(advancedFilters.isRead != null ? { isRead: advancedFilters.isRead } : {}),
           ...(advancedFilters.isStarred !== undefined ? { isStarred: advancedFilters.isStarred } : {}),
         };
 
@@ -471,6 +471,48 @@ export function Mailbox() {
     await loadData();
     setRefreshing(false);
   }, [loadData]);
+
+  // Load more emails (infinite scroll)
+  const loadMoreEmails = useCallback(async () => {
+    if (!_pagination.hasMore || storeLoading) return;
+
+    try {
+      setLoading(true);
+      const nextPage = _pagination.page + 1;
+      const currentActiveFolder = combinedFolders.find((f) => f.id === selectedFolderId);
+      if (!currentActiveFolder) return;
+
+      const queryParams: EmailListParams = {
+        limit: 50,
+        page: nextPage,
+        ...currentActiveFolder.queryOverrides,
+        search: advancedFilters.searchQuery || searchQuery || undefined,
+        from: advancedFilters.from || undefined,
+        ...(advancedFilters.startDate ? { startDate: advancedFilters.startDate } : {}),
+        ...(advancedFilters.endDate ? { endDate: advancedFilters.endDate } : {}),
+        ...(advancedFilters.hasAttachments !== undefined ? { hasAttachments: advancedFilters.hasAttachments } : {}),
+        ...(advancedFilters.isRead != null ? { isRead: advancedFilters.isRead } : {}),
+        ...(advancedFilters.isStarred !== undefined ? { isStarred: advancedFilters.isStarred } : {}),
+      };
+
+      const emailsRes = await emailApi.listEmails(queryParams);
+      const newEmails = (emailsRes.data.emails || []).map(mapApiEmailToStore);
+
+      // Append new emails to existing ones
+      setEmails([...storeEmails, ...newEmails] as any);
+
+      // Update pagination
+      setPagination({
+        page: nextPage,
+        hasMore: emailsRes.data.pagination.page < emailsRes.data.pagination.totalPages,
+        total: emailsRes.data.pagination.total,
+      });
+    } catch (error) {
+      console.error('Failed to load more emails:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [_pagination, storeLoading, combinedFolders, selectedFolderId, searchQuery, advancedFilters, storeEmails, setEmails, setLoading]);
 
   // Bulk operations handlers
   const handleBulkMarkRead = useCallback(async () => {
@@ -818,6 +860,8 @@ export function Mailbox() {
                 onDelete={handleDelete}
                 getProviderIcon={getProviderIcon}
                 viewMode={viewMode}
+                onLoadMore={loadMoreEmails}
+                hasMore={_pagination.hasMore}
               />
             </Box>
           </Box>

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { List, Box, Typography, CircularProgress } from '@mui/material';
 import { useTranslations } from '@/lib/hooks/use-translations';
 import { ThreadListItem } from './ThreadListItem';
@@ -73,6 +73,16 @@ interface ThreadListProps {
    * View mode: 'list' or 'conversation'
    */
   viewMode?: 'list' | 'conversation';
+
+  /**
+   * Callback to load more emails (infinite scroll)
+   */
+  onLoadMore?: () => void;
+
+  /**
+   * Whether there are more emails to load
+   */
+  hasMore?: boolean;
 }
 
 /**
@@ -118,8 +128,11 @@ export const ThreadList: React.FC<ThreadListProps> = ({
   onDelete,
   getProviderIcon,
   viewMode = 'list',
+  onLoadMore,
+  hasMore = false,
 }) => {
   const t = useTranslations();
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const handleThreadClick = useCallback(
     (thread: Email | Conversation) => {
@@ -127,6 +140,34 @@ export const ThreadList: React.FC<ThreadListProps> = ({
     },
     [onThreadClick]
   );
+
+  // Infinite scroll with Intersection Observer
+  useEffect(() => {
+    if (!onLoadMore || !hasMore) return;
+
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && hasMore && !isLoading) {
+          onLoadMore();
+        }
+      },
+      {
+        root: null,
+        rootMargin: '100px', // Start loading 100px before reaching the end
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [onLoadMore, hasMore, isLoading]);
 
   const isEmpty = threads.length === 0;
 
@@ -219,6 +260,31 @@ export const ThreadList: React.FC<ThreadListProps> = ({
           />
         );
       })}
+
+      {/* Infinite scroll sentinel */}
+      {hasMore && (
+        <Box
+          ref={sentinelRef}
+          sx={{
+            height: 1,
+            width: '100%',
+          }}
+        />
+      )}
+
+      {/* Loading indicator for infinite scroll */}
+      {hasMore && isLoading && threads.length > 0 && (
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            py: 2,
+          }}
+        >
+          <CircularProgress size={24} />
+        </Box>
+      )}
     </List>
   );
 };

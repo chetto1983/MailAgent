@@ -45,6 +45,13 @@ export class RealtimeGateway
   private readonly logger = new Logger(RealtimeGateway.name);
   private heartbeatInterval: NodeJS.Timeout;
 
+  /**
+   * Traccia esplicito dei tenant con connessioni attive
+   * Map: tenantId -> numero di connessioni
+   * Più affidabile del controllo delle rooms
+   */
+  private activeTenantConnections = new Map<string, number>();
+
   constructor(
     private readonly realtimeEvents: RealtimeEventsService,
     private readonly handshakeService: RealtimeHandshakeService,
@@ -78,7 +85,11 @@ export class RealtimeGateway
 
       await client.join(authContext.tenantRoom);
 
-      this.logger.log(`Client connected: ${client.id} | User: ${client.email} | Tenant: ${client.tenantId}`);
+      // Traccia il tenant come attivo - incrementa il counter
+      const currentCount = this.activeTenantConnections.get(client.tenantId) || 0;
+      this.activeTenantConnections.set(client.tenantId, currentCount + 1);
+
+      this.logger.log(`[WS] Client connected: ${client.id} | User: ${client.email} | Tenant: ${client.tenantId} | Room: ${authContext.tenantRoom} | Connections: ${this.activeTenantConnections.get(client.tenantId)}`);
 
       // Notifica il client della connessione riuscita
       client.emit('connected', {
@@ -90,7 +101,7 @@ export class RealtimeGateway
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
-      this.logger.error(`Connection error: ${message}`, stack);
+      this.logger.error(`[WS] Connection error: ${message}`, stack);
       client.disconnect();
     }
   }
@@ -99,9 +110,27 @@ export class RealtimeGateway
    * Gestisce disconnessioni
    */
   handleDisconnect(client: AuthenticatedSocket) {
-    this.logger.log(
-      `Client disconnected: ${client.id} | User: ${client.email || 'unknown'}`,
-    );
+    // Decrementa il counter delle connessioni per questo tenant
+    if (client.tenantId) {
+      const currentCount = this.activeTenantConnections.get(client.tenantId) || 0;
+      if (currentCount <= 1) {
+        // Ultima connessione, rimuovi il tenant
+        this.activeTenantConnections.delete(client.tenantId);
+        this.logger.log(
+          `[WS] Client disconnected: ${client.id} | User: ${client.email || 'unknown'} | Tenant: ${client.tenantId} | Last connection - tenant removed`,
+        );
+      } else {
+        // Ancora altre connessioni, decrementa
+        this.activeTenantConnections.set(client.tenantId, currentCount - 1);
+        this.logger.log(
+          `[WS] Client disconnected: ${client.id} | User: ${client.email || 'unknown'} | Tenant: ${client.tenantId} | Remaining connections: ${currentCount - 1}`,
+        );
+      }
+    } else {
+      this.logger.log(
+        `[WS] Client disconnected: ${client.id} | User: ${client.email || 'unknown'} | No tenant ID`,
+      );
+    }
   }
 
   /**
@@ -156,31 +185,19 @@ export class RealtimeGateway
 
   /**
    * Verifica se un tenant ha connessioni WebSocket attive
+   * Usa il tracking esplicito invece del controllo delle rooms (più affidabile)
    * @param tenantId ID del tenant
    * @returns true se ci sono client connessi per questo tenant
    */
   hasTenantConnections(tenantId: string): boolean {
-    // Check if server is initialized and has the 'of' method
-    if (!this.server || typeof this.server.of !== 'function') {
-      return false;
-    }
+    const count = this.activeTenantConnections.get(tenantId) || 0;
+    const hasConnections = count > 0;
 
-    try {
-      // Use the /realtime namespace, not the default namespace
-      const namespace = this.server.of('/realtime');
-      if (!namespace || !namespace.adapter) {
-        return false;
-      }
+    this.logger.debug(
+      `[hasTenantConnections] Tenant ${tenantId}: ${count} connection(s) - ${hasConnections ? 'ACTIVE' : 'INACTIVE'}`,
+    );
 
-      const room = buildTenantRoom(tenantId);
-      const roomSize = namespace.adapter.rooms.get(room)?.size || 0;
-
-      return roomSize > 0;
-    } catch (error) {
-      // If anything fails, assume no connections to avoid breaking the sync
-      this.logger.debug(`hasTenantConnections error: ${error}`);
-      return false;
-    }
+    return hasConnections;
   }
 
   /**

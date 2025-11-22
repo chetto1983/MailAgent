@@ -270,20 +270,35 @@ export class GoogleOAuthService {
    * List Gmail send-as identities (aliases)
    */
   async getSendAsAliases(tenantId: string, providerId: string): Promise<{ email: string; name?: string }[]> {
-    const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
-    const auth = new OAuth2Client();
-    auth.setCredentials({ access_token: accessToken });
+    try {
+      const { accessToken } = await this.getProviderWithTokens(tenantId, providerId);
+      const auth = new OAuth2Client();
+      auth.setCredentials({ access_token: accessToken });
 
-    const gmail = google.gmail({ version: 'v1', auth: auth as any });
-    const response = await gmail.users.settings.sendAs.list({ userId: 'me' });
-    const sendAs = response.data.sendAs || [];
+      const gmail = google.gmail({ version: 'v1', auth: auth as any });
+      const response = await gmail.users.settings.sendAs.list({ userId: 'me' });
+      const sendAs = response.data.sendAs || [];
 
-    return sendAs
-      .map((alias) => ({
-        email: alias.sendAsEmail || '',
-        name: alias.displayName || undefined,
-      }))
-      .filter((alias) => alias.email);
+      return sendAs
+        .map((alias) => ({
+          email: alias.sendAsEmail || '',
+          name: alias.displayName || undefined,
+        }))
+        .filter((alias) => alias.email);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(
+        `Failed to fetch send-as aliases from Gmail API for provider ${providerId}: ${errorMessage}. Falling back to provider email.`
+      );
+
+      // Fallback: return the primary provider email if Gmail API fails
+      const provider = await this.prisma.providerConfig.findFirst({
+        where: { id: providerId, tenantId },
+        select: { email: true },
+      });
+
+      return provider?.email ? [{ email: provider.email }] : [];
+    }
   }
 
   /**

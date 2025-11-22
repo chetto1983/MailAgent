@@ -3,7 +3,6 @@ import {
   Box,
   Typography,
   IconButton,
-  Divider,
   Avatar,
   Chip,
   Paper,
@@ -210,6 +209,17 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
           </IconButton>
         )}
 
+        {/* Reply/Forward Actions - Left Side */}
+        <IconButton size="small" onClick={() => onReply?.(email)} title="Reply">
+          <Reply size={18} />
+        </IconButton>
+        <IconButton size="small" onClick={() => onReplyAll?.(email)} title="Reply All">
+          <ReplyAll size={18} />
+        </IconButton>
+        <IconButton size="small" onClick={() => onForward?.(email)} title="Forward">
+          <Forward size={18} />
+        </IconButton>
+
         <Box sx={{ flex: 1 }} />
 
         <IconButton
@@ -303,8 +313,6 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
           )}
         </Box>
 
-        <Divider sx={{ mb: 3 }} />
-
         {/* Email Body */}
         <Box
           sx={{
@@ -342,28 +350,6 @@ export const ThreadDisplay: React.FC<ThreadDisplayProps> = ({
           </Box>
         )}
       </Box>
-
-      {/* Action Bar */}
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2,
-          borderTop: 1,
-          borderColor: 'divider',
-          display: 'flex',
-          gap: 1,
-        }}
-      >
-        <IconButton size="small" onClick={() => onReply?.(email)} title="Reply">
-          <Reply size={18} />
-        </IconButton>
-        <IconButton size="small" onClick={() => onReplyAll?.(email)} title="Reply All">
-          <ReplyAll size={18} />
-        </IconButton>
-        <IconButton size="small" onClick={() => onForward?.(email)} title="Forward">
-          <Forward size={18} />
-        </IconButton>
-      </Paper>
     </Box>
   );
 };

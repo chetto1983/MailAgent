@@ -52,7 +52,23 @@ export class EmailsService {
         return;
       }
 
+      // Get folder records to map path -> id
+      const folderRecords = await this.prisma.folder.findMany({
+        where: {
+          providerId,
+          path: { in: folders, mode: 'insensitive' },
+        },
+        select: { id: true, path: true, name: true },
+      });
+
+      // Create a map for quick lookup: path -> folder record
+      const folderMap = new Map(
+        folderRecords.map((f) => [f.path.toUpperCase(), f]),
+      );
+
       for (const folder of folders) {
+        const folderRecord = folderMap.get(folder.toUpperCase());
+
         // Count total and unread emails in this folder
         const [totalCount, unreadCount] = await Promise.all([
           this.prisma.email.count({
@@ -75,10 +91,11 @@ export class EmailsService {
         ]);
 
         // Emit websocket event with updated counts
+        // Use folder ID if found, otherwise fall back to folder name
         this.realtimeEvents.emitFolderCountsUpdate(tenantId, {
           providerId,
-          folderId: folder,
-          folderName: folder,
+          folderId: folderRecord?.id || folder,
+          folderName: folderRecord?.name || folder,
           totalCount,
           unreadCount,
           timestamp: new Date().toISOString(),
