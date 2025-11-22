@@ -2,6 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { LabelsService } from './labels.service';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EmailsService } from '../../email/services/emails.service';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 const createPrismaMock = () => ({
   userLabel: {
@@ -38,6 +40,20 @@ describe('LabelsService', () => {
         {
           provide: PrismaService,
           useValue: prisma,
+        },
+        {
+          provide: EmailsService,
+          useValue: {
+            updateEmailsLabels: jest.fn(),
+          },
+        },
+        {
+          provide: RealtimeEventsService,
+          useValue: {
+            emitLabelCreated: jest.fn(),
+            emitLabelUpdated: jest.fn(),
+            emitLabelDeleted: jest.fn(),
+          },
         },
       ],
     }).compile();

@@ -51,6 +51,11 @@ describe('QueueService', () => {
     service['redisConnection'] = {
       keys: jest.fn().mockResolvedValue([]),
       quit: jest.fn(),
+      scan: jest.fn().mockResolvedValue([0, []]),
+      sadd: jest.fn().mockResolvedValue(1),
+      srem: jest.fn().mockResolvedValue(1),
+      smembers: jest.fn().mockResolvedValue([]),
+      del: jest.fn().mockResolvedValue(1),
     } as any;
   });
 

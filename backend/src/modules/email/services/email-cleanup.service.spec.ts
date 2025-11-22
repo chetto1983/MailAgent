@@ -1,6 +1,8 @@
 import { EmailCleanupService } from './email-cleanup.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { KnowledgeBaseService } from '../../ai/services/knowledge-base.service';
+import { ConfigService } from '@nestjs/config';
+import { StorageService } from '../../../common/services/storage.service';
 
 describe('EmailCleanupService', () => {
   let service: EmailCleanupService;
@@ -17,11 +19,26 @@ describe('EmailCleanupService', () => {
       delete: deleteMock,
       findMany: findManyMock,
     },
+    emailAttachment: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   } as unknown as PrismaService;
+
+  const configMock = {
+    get: jest.fn().mockImplementation((key: string, defaultValue?: any) => {
+      if (key === 'JOBS_ENABLED') return 'true';
+      if (key === 'EMAIL_HARD_DELETE_THRESHOLD_DAYS') return '30';
+      return defaultValue;
+    }),
+  } as unknown as ConfigService;
+
+  const storageMock = {
+    deleteAttachments: jest.fn(),
+  } as unknown as StorageService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new EmailCleanupService(prismaMock, knowledgeMock);
+    service = new EmailCleanupService(prismaMock, knowledgeMock, configMock, storageMock);
   });
 
   it('removes duplicate emails using raw query results', async () => {

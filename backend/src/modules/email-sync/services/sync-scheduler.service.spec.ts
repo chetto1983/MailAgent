@@ -3,6 +3,7 @@ import { SyncSchedulerService } from './sync-scheduler.service';
 describe('SyncSchedulerService', () => {
   let prisma: any;
   let queueService: any;
+  let configService: any;
   let service: SyncSchedulerService;
 
   const providerBase = {
@@ -32,7 +33,16 @@ describe('SyncSchedulerService', () => {
       getQueueStatus: jest.fn().mockResolvedValue({ high: {}, normal: {}, low: {} }),
     };
 
-    service = new SyncSchedulerService(prisma, queueService);
+    configService = {
+      get: jest.fn().mockImplementation((key: string, defaultValue?: any) => {
+        if (key === 'EMAIL_SYNC_SCHEDULER_ENABLED') return 'true';
+        if (key === 'WEBHOOK_STALE_THRESHOLD_MINUTES') return '10';
+        if (key === 'EMAIL_SYNC_FULL_THRESHOLD_DAYS') return '7';
+        return defaultValue;
+      }),
+    };
+
+    service = new SyncSchedulerService(prisma, queueService, configService);
   });
 
   afterEach(() => {

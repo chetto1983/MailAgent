@@ -2,8 +2,7 @@ import { GmailWebhookService, GMAIL_WEBHOOK_RESOURCE } from './gmail-webhook.ser
 import { PrismaService } from '../../../prisma/prisma.service';
 import { QueueService } from './queue.service';
 import { ConfigService } from '@nestjs/config';
-import { GoogleOAuthService } from '../../providers/services/google-oauth.service';
-import { CryptoService } from '../../../common/services/crypto.service';
+import { ProviderTokenService } from '../../providers/services/provider-token.service';
 import { GmailPubSubMessage } from '../interfaces/webhook.interface';
 import { google } from 'googleapis';
 
@@ -37,6 +36,7 @@ describe('GmailWebhookService', () => {
     };
     webhookSubscription: {
       update: jest.Mock;
+      updateMany: jest.Mock;
       upsert: jest.Mock;
       findMany: jest.Mock;
       count: jest.Mock;
@@ -44,8 +44,7 @@ describe('GmailWebhookService', () => {
   };
   let queueService: { addSyncJob: jest.Mock };
   let configService: { get: jest.Mock };
-  let googleOAuthService: { refreshAccessToken: jest.Mock };
-  let cryptoService: { decrypt: jest.Mock; encrypt: jest.Mock };
+  let providerTokenService: { getProviderWithToken: jest.Mock };
 
   beforeEach(() => {
     prisma = {
@@ -56,6 +55,7 @@ describe('GmailWebhookService', () => {
       },
       webhookSubscription: {
         update: jest.fn(),
+        updateMany: jest.fn(),
         upsert: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
@@ -70,21 +70,15 @@ describe('GmailWebhookService', () => {
       get: jest.fn(),
     };
 
-    googleOAuthService = {
-      refreshAccessToken: jest.fn(),
-    };
-
-    cryptoService = {
-      decrypt: jest.fn(),
-      encrypt: jest.fn(),
+    providerTokenService = {
+      getProviderWithToken: jest.fn(),
     };
 
     service = new GmailWebhookService(
       prisma as unknown as PrismaService,
       queueService as unknown as QueueService,
       configService as unknown as ConfigService,
-      googleOAuthService as unknown as GoogleOAuthService,
-      cryptoService as unknown as CryptoService,
+      providerTokenService as unknown as ProviderTokenService,
     );
 
     watchMock.mockReset();
@@ -106,7 +100,7 @@ describe('GmailWebhookService', () => {
       };
 
       prisma.providerConfig.findFirst.mockResolvedValue(provider);
-      prisma.webhookSubscription.update.mockResolvedValue(undefined);
+      prisma.webhookSubscription.updateMany.mockResolvedValue({ count: 1 });
       queueService.addSyncJob.mockResolvedValue(undefined);
 
       const gmailData = {
@@ -131,14 +125,19 @@ describe('GmailWebhookService', () => {
           providerType: 'google',
           isActive: true,
         },
+        select: {
+          id: true,
+          email: true,
+          tenantId: true,
+          lastSyncedAt: true,
+          metadata: true,
+        },
       });
 
-      expect(prisma.webhookSubscription.update).toHaveBeenCalledWith({
+      expect(prisma.webhookSubscription.updateMany).toHaveBeenCalledWith({
         where: {
-          providerId_resourcePath: {
-            providerId: provider.id,
-            resourcePath: GMAIL_WEBHOOK_RESOURCE,
-          },
+          providerId: provider.id,
+          resourcePath: GMAIL_WEBHOOK_RESOURCE,
         },
         data: {
           lastNotificationAt: expect.any(Date),
@@ -178,7 +177,7 @@ describe('GmailWebhookService', () => {
       await expect(service.handleNotification(payload)).resolves.toBeUndefined();
 
       expect(queueService.addSyncJob).not.toHaveBeenCalled();
-      expect(prisma.webhookSubscription.update).not.toHaveBeenCalled();
+      expect(prisma.webhookSubscription.updateMany).not.toHaveBeenCalled();
     });
   });
 
@@ -196,7 +195,10 @@ describe('GmailWebhookService', () => {
       const expiration = Date.now() + 3600 * 1000;
 
       prisma.providerConfig.findUnique.mockResolvedValue(provider);
-      cryptoService.decrypt.mockReturnValue('plain-access-token');
+      providerTokenService.getProviderWithToken.mockResolvedValue({
+        provider,
+        accessToken: 'plain-access-token',
+      });
       prisma.webhookSubscription.upsert.mockResolvedValue(undefined);
 
       configService.get.mockImplementation((key: string, defaultValue?: any) => {
@@ -226,10 +228,7 @@ describe('GmailWebhookService', () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(cryptoService.decrypt).toHaveBeenCalledWith(
-        provider.accessToken,
-        provider.tokenEncryptionIv,
-      );
+      expect(providerTokenService.getProviderWithToken).toHaveBeenCalledWith(provider.id);
 
       expect(setCredentialsMock).toHaveBeenCalledWith({
         access_token: 'plain-access-token',

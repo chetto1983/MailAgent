@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CalendarWebhookController } from './calendar-webhook.controller';
 import { GoogleCalendarWebhookService } from '../services/google-calendar-webhook.service';
 import { MicrosoftCalendarWebhookService, MicrosoftCalendarNotification } from '../services/microsoft-calendar-webhook.service';
+import { SyncAuthService } from '../../email-sync/services/sync-auth.service';
 
 describe('CalendarWebhookController', () => {
   let controller: CalendarWebhookController;
@@ -24,6 +25,12 @@ describe('CalendarWebhookController', () => {
           useValue: {
             handleNotifications: jest.fn(),
             getStats: jest.fn(),
+          },
+        },
+        {
+          provide: SyncAuthService,
+          useValue: {
+            validateWebhookToken: jest.fn(),
           },
         },
       ],
@@ -73,12 +80,11 @@ describe('CalendarWebhookController', () => {
     it('should handle notifications with missing headers gracefully', async () => {
       const headers = {};
 
-      googleWebhook.handleNotification.mockResolvedValue(undefined);
+      await expect(controller.handleGoogleCalendarPush(headers)).rejects.toThrow(
+        'Missing required Google webhook headers',
+      );
 
-      const result = await controller.handleGoogleCalendarPush(headers);
-
-      expect(googleWebhook.handleNotification).toHaveBeenCalled();
-      expect(result).toEqual({ success: true });
+      expect(googleWebhook.handleNotification).not.toHaveBeenCalled();
     });
   });
 
